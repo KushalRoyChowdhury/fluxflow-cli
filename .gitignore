@@ -1,0 +1,7 @@
+# Flux Flow - Digital Perimeter
+node_modules/
+logs/
+secret/
+settings.json
+readme-npm.md
+dist/
