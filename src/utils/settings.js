@@ -1,9 +1,5 @@
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SETTINGS_PATH = path.join(__dirname, '../../settings.json');
+import { SETTINGS_FILE } from './paths.js';
 
 const DEFAULT_SETTINGS = {
     mode: 'Flux',
@@ -37,8 +33,8 @@ const DEFAULT_SETTINGS = {
  */
 export const loadSettings = async () => {
     try {
-        if (await fs.exists(SETTINGS_PATH)) {
-            const saved = await fs.readJson(SETTINGS_PATH);
+        if (await fs.exists(SETTINGS_FILE)) {
+            const saved = await fs.readJson(SETTINGS_FILE);
             // Deep merge for second-level objects
             return {
                 ...DEFAULT_SETTINGS,
@@ -61,7 +57,7 @@ export const saveSettings = async (settings) => {
     try {
         const current = await loadSettings();
         const updated = { ...current, ...settings };
-        await fs.writeJson(SETTINGS_PATH, updated, { spaces: 2 });
+        await fs.writeJson(SETTINGS_FILE, updated, { spaces: 2 });
         return true;
     } catch (err) {
         console.error('Failed to save settings:', err);

@@ -2,11 +2,7 @@ import * as cuimp from 'cuimp';
 import { parseArgs } from '../utils/arg_parser.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AGENT_ROOT = path.join(__dirname, '../../');
+import { LOGS_DIR } from '../utils/paths.js';
 
 /**
  * Direct HTML Search Tool (DuckDuckGo HTML)
@@ -48,7 +44,7 @@ export const web_search = async (argsString) => {
             count++;
         }
         // Add general logging of results to /logs/tools/results.log
-        const toolLogDir = path.join(AGENT_ROOT, 'logs', 'tools');
+        const toolLogDir = path.join(LOGS_DIR, 'tools');
         if (!fs.existsSync(toolLogDir)) {
             fs.mkdirSync(toolLogDir, { recursive: true });
         }
@@ -57,7 +53,7 @@ export const web_search = async (argsString) => {
 
         if (results.length === 0) {
             if (html.includes('anomaly')) {
-                const toolErrDir = path.join(AGENT_ROOT, 'logs', 'tools');
+                const toolErrDir = path.join(LOGS_DIR, 'tools');
                 if (!fs.existsSync(toolErrDir)) {
                     fs.mkdirSync(toolErrDir, { recursive: true });
                 }

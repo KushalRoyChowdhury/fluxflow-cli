@@ -19,6 +19,7 @@ import MemoryModal from './components/MemoryModal.jsx';
 import { getDailyUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
+import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
@@ -413,20 +414,21 @@ export default function App() {
                 }
                 case '/reset': {
                     const runReset = async () => {
-                        const AGENT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../');
-                        const logsDir = path.join(AGENT_ROOT, 'logs');
-                        const secretDir = path.join(AGENT_ROOT, 'secret');
-                        const settingsFile = path.join(AGENT_ROOT, 'settings.json');
-
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, { id: Date.now(), role: 'system', text: '☢️ [NUCLEAR] Initiating reset...' }];
                             });
 
-                            if (fs.existsSync(logsDir)) fs.removeSync(logsDir);
-                            if (fs.existsSync(secretDir)) fs.removeSync(secretDir);
-                            if (fs.existsSync(settingsFile)) fs.removeSync(settingsFile);
+                            if (fs.existsSync(LOGS_DIR)) fs.removeSync(LOGS_DIR);
+                            if (fs.existsSync(SECRET_DIR)) fs.removeSync(SECRET_DIR);
+                            if (fs.existsSync(SETTINGS_FILE)) fs.removeSync(SETTINGS_FILE);
+
+                            // Optional: Wipe the entire ~/.fluxflow root if empty
+                            try {
+                                const items = fs.readdirSync(FLUXFLOW_DIR);
+                                if (items.length === 0) fs.removeSync(FLUXFLOW_DIR);
+                            } catch (e) {}
 
                             setTimeout(() => {
                                 setActiveView('exit');

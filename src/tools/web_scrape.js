@@ -1,10 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AGENT_ROOT = path.join(__dirname, '../../');
+import { LOGS_DIR } from '../utils/paths.js';
 
 import * as cuimp from 'cuimp';
 
@@ -44,7 +40,7 @@ export const web_scrape = async (args) => {
         const finalContent = text.substring(0, 20000);
 
         // Add general logging of results to /logs/tools/results.log
-        const toolLogDir = path.join(AGENT_ROOT, 'logs', 'tools');
+        const toolLogDir = path.join(LOGS_DIR, 'tools');
         if (!fs.existsSync(toolLogDir)) {
             fs.mkdirSync(toolLogDir, { recursive: true });
         }

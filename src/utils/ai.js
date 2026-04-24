@@ -9,13 +9,9 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AGENT_ROOT = path.join(__dirname, '../../');
+import { LOGS_DIR, TEMP_MEM_FILE, MEMORIES_FILE } from './paths.js';
 
 let client = null;
-const TEMP_MEM_PATH = path.join(AGENT_ROOT, 'secret', 'memory-temp.json');
-const PERSISTENT_MEM_PATH = path.join(AGENT_ROOT, 'secret', 'memories.json');
 
 let TERMINATION_SIGNAL = false;
 
@@ -103,7 +99,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     }
 
     // Harvest temporary memories from different sessions only
-    const tempStorage = readEncryptedJson(TEMP_MEM_PATH, {});
+    const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
     const otherMemories = Object.entries(tempStorage)
         .filter(([id]) => id !== chatId)
         .flatMap(([_, mems]) => mems)
@@ -111,7 +107,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         .join('\n');
 
     // Harvest persistent user memories
-    const persistentStorage = readEncryptedJson(PERSISTENT_MEM_PATH, []);
+    const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
     const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
@@ -182,7 +178,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // Log error in /logs/agent/error.log. Append it. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
                 const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
                 // Create folder if it doesn't exist
-                const agentErrDir = path.join(AGENT_ROOT, 'logs', 'agent');
+                const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) {
                     fs.mkdirSync(agentErrDir, { recursive: true });
                 }
@@ -362,7 +358,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const isErr = result.startsWith('ERROR:');
                     const logStatus = isErr ? result.trim() : 'SUCCESS';
 
-                    const toolHistDir = path.join(AGENT_ROOT, 'logs', 'tools');
+                    const toolHistDir = path.join(LOGS_DIR, 'tools');
                     if (!fs.existsSync(toolHistDir)) {
                         fs.mkdirSync(toolHistDir, { recursive: true });
                     }
@@ -448,7 +444,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     finalSynthesis = parts[1].text;
                     // Append /logs/janitor/debug.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
                     const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                    const janitorLogDir = path.join(AGENT_ROOT, 'logs', 'janitor');
+                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                     // Create folder if it doesn't exist
                     if (!fs.existsSync(janitorLogDir)) {
                         fs.mkdirSync(janitorLogDir, { recursive: true });
@@ -472,7 +468,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // Log the tool result for high-fidelity debugging
                     const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                    const janitorLogDir = path.join(AGENT_ROOT, 'logs', 'janitor');
+                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                     fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
 
                     // Only signal UI if it's a permanent memory change (not temp context)
@@ -483,7 +479,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             } catch (janitorErr) {
                 // Append /logs/janitor/error.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
                 const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                const janitorErrDir = path.join(AGENT_ROOT, 'logs', 'janitor');
+                const janitorErrDir = path.join(LOGS_DIR, 'janitor');
                 // Create folder if it doesn't exist
                 if (!fs.existsSync(janitorErrDir)) {
                     fs.mkdirSync(janitorErrDir, { recursive: true });

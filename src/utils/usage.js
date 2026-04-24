@@ -1,9 +1,5 @@
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const USAGE_PATH = path.join(__dirname, '../../secret/usage.json');
+import { USAGE_FILE } from './paths.js';
 
 /**
  * Gets the daily usage stats, resetting if the date has changed
@@ -12,8 +8,8 @@ export const getDailyUsage = async () => {
     const today = new Date().toISOString().split('T')[0];
     
     try {
-        if (await fs.exists(USAGE_PATH)) {
-            const data = await fs.readJson(USAGE_PATH);
+        if (await fs.exists(USAGE_FILE)) {
+            const data = await fs.readJson(USAGE_FILE);
             if (data.date === today) {
                 return data.stats;
             }
@@ -24,7 +20,7 @@ export const getDailyUsage = async () => {
 
     // Reset for new day
     const defaultStats = { agent: 0, background: 0, search: 0 };
-    await fs.writeJson(USAGE_PATH, { date: today, stats: defaultStats }, { spaces: 2 });
+    await fs.writeJson(USAGE_FILE, { date: today, stats: defaultStats }, { spaces: 2 });
     return defaultStats;
 };
 
@@ -33,7 +29,7 @@ export const getDailyUsage = async () => {
  */
 export const incrementUsage = async (key) => {
     const today = new Date().toISOString().split('T')[0];
-    const data = await fs.readJson(USAGE_PATH).catch(() => ({ date: today, stats: { agent: 0, background: 0, search: 0 } }));
+    const data = await fs.readJson(USAGE_FILE).catch(() => ({ date: today, stats: { agent: 0, background: 0, search: 0 } }));
     
     if (data.date !== today) {
         data.date = today;
@@ -42,7 +38,7 @@ export const incrementUsage = async (key) => {
 
     if (data.stats[key] !== undefined) {
         data.stats[key]++;
-        await fs.writeJson(USAGE_PATH, data, { spaces: 2 });
+        await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
     }
 };
 

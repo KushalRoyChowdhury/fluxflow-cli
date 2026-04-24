@@ -1,14 +1,8 @@
 import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
+import { SECRET_DIR } from './paths.js';
+import path from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Resolve paths relative to the agent source code (not CWD)
-const AGENT_ROOT = path.join(__dirname, '../../');
-const SECRET_DIR = path.join(AGENT_ROOT, 'secret');
 const SECRET_FILE = path.join(SECRET_DIR, 'secrets.json');
 
 /**

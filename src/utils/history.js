@@ -1,12 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { nanoid } from 'nanoid';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AGENT_ROOT = path.join(__dirname, '../../');
-const HISTORY_FILE = path.join(AGENT_ROOT, 'secret/history.json');
+import { HISTORY_FILE, TEMP_MEM_FILE } from './paths.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
 let WRITE_LOCK = Promise.resolve();
@@ -90,13 +85,12 @@ export const deleteChat = async (id) => {
         await fs.writeJson(HISTORY_FILE, history, { spaces: 2 });
 
         // Also clean up temp memory if it exists
-        const tempFile = path.join(AGENT_ROOT, 'secret/memory-temp.json');
-        if (await fs.pathExists(tempFile)) {
+        if (await fs.pathExists(TEMP_MEM_FILE)) {
             try {
-                const temp = await fs.readJson(tempFile);
+                const temp = await fs.readJson(TEMP_MEM_FILE);
                 if (temp[id]) {
                     delete temp[id];
-                    await fs.writeJson(tempFile, temp, { spaces: 2 });
+                    await fs.writeJson(TEMP_MEM_FILE, temp, { spaces: 2 });
                 }
             } catch (e) {
                 // Ignore if temp file is encrypted/unreadable for now

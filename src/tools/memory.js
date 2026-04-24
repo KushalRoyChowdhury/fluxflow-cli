@@ -1,14 +1,5 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { readEncryptedJson, writeEncryptedJson } from '../utils/crypto.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const AGENT_ROOT = path.join(__dirname, '../../');
-
-const SECRET_DIR = path.join(AGENT_ROOT, 'secret');
-const MEMORIES_PATH = path.join(SECRET_DIR, 'memories.json');
-const TEMP_MEM_PATH = path.join(SECRET_DIR, 'memory-temp.json');
+import { TEMP_MEM_FILE, MEMORIES_FILE } from '../utils/paths.js';
 
 /**
  * Memory tool for the agent and janitor.
@@ -36,7 +27,7 @@ export const memory = async (rawArgs, context = {}) => {
     if (action === 'temp') {
         if (!content) return "ERROR: Missing 'content' for temp memory.";
 
-        const tempStorage = readEncryptedJson(TEMP_MEM_PATH, {});
+        const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
         if (!tempStorage[chatId]) tempStorage[chatId] = [];
 
         // LIMIT CHECK: Combined length should not exceed 3000 * 4 = 12000 chars
@@ -50,13 +41,13 @@ export const memory = async (rawArgs, context = {}) => {
         }
 
         tempStorage[chatId].push(content);
-        writeEncryptedJson(TEMP_MEM_PATH, tempStorage);
+        writeEncryptedJson(TEMP_MEM_FILE, tempStorage);
 
         return `SUCCESS: Temporary context saved for session [${chatId}]. (Size: ${currentTotalLength + content.length} chars)`;
     }
 
     if (action === 'user') {
-        const memories = readEncryptedJson(MEMORIES_PATH, []);
+        const memories = readEncryptedJson(MEMORIES_FILE, []);
 
         if (method === 'add') {
             if (!content) return "ERROR: Missing 'content' for memory addition.";
@@ -73,7 +64,7 @@ export const memory = async (rawArgs, context = {}) => {
 
             const newMemory = { id: `mem-${Date.now().toString(36)}`, memory: content };
             memories.push(newMemory);
-            writeEncryptedJson(MEMORIES_PATH, memories);
+            writeEncryptedJson(MEMORIES_FILE, memories);
             return `SUCCESS: Memory added with ID [${newMemory.id}]. (Vault Size: ${currentTotalLength + content.length} chars)`;
         }
 
@@ -85,7 +76,7 @@ export const memory = async (rawArgs, context = {}) => {
             if (index === -1) return `ERROR: Memory ID [${memId}] not found.`;
 
             memories[index].memory = newText;
-            writeEncryptedJson(MEMORIES_PATH, memories);
+            writeEncryptedJson(MEMORIES_FILE, memories);
             return `SUCCESS: Memory [${memId}] updated.`;
         }
 
@@ -96,7 +87,7 @@ export const memory = async (rawArgs, context = {}) => {
             const updatedMemories = memories.filter(m => m.id !== memId);
             if (updatedMemories.length === initialLen) return `ERROR: Memory ID [${memId}] not found.`;
 
-            writeEncryptedJson(MEMORIES_PATH, updatedMemories);
+            writeEncryptedJson(MEMORIES_FILE, updatedMemories);
             return `SUCCESS: Memory [${memId}] deleted.`;
         }
 
