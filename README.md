@@ -18,6 +18,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, and terminal execution.
+- **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Minimal to Max).
 
 ## 🚀 Quick Start
@@ -35,14 +36,14 @@ npx fluxflow-cli
 
 # OR Install Globally
 npm install -g fluxflow-cli
-fluxflow-cli
+fluxflow
 ```
 
 ### From Source (Local Development)
 1. Clone the repository and install dependencies:
    ```bash
    git clone <repository-url>
-   cd Custom_AI_Agent
+   cd Flux-Flow
    npm install
    ```
 
