@@ -135,6 +135,7 @@ export default function App() {
     const [escTimer, setEscTimer] = useState(null);
     const [queuedPrompt, setQueuedPrompt] = useState(null);
     const [resolutionData, setResolutionData] = useState(null);
+    const [tempModelOverride, setTempModelOverride] = useState(null);
 
     const [messages, setMessages] = useState([
         { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.\n' }
@@ -540,6 +541,10 @@ OUTPUT: ${execOutputRef.current}`;
                             setStatusText(packet.content);
                             continue;
                         }
+                        if (packet.type === 'model_update') {
+                            setTempModelOverride(packet.content);
+                            continue;
+                        }
                         if (packet.type === 'turn_reset') {
                             currentThinkId = null;
                             currentAgentId = null;
@@ -738,7 +743,7 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
 
                         title="🤖 Select AI Model"
-                        items={[{ label: 'Gemma 4 31B (Default)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro (Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' }, { label: 'Gemini 3.1 Flash Lite', value: 'gemini-3.1-flash-lite' }, { label: 'Cancel', value: 'Cancel' }]}
+                        items={[{ label: 'Gemma 4 31B (Default)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro (Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' }, { label: 'Gemini 3.1 Flash Lite', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
                         onSelect={(item) => {
                             if (item.value !== 'Cancel') setActiveModel(item.value);
                             setActiveView('chat');
@@ -1209,11 +1214,14 @@ OUTPUT: ${execOutputRef.current}`;
 
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
-                        {statusText && (
-                            <Box paddingX={1} marginBottom={0}>
-                                <Text color="magenta" italic>⏳ {statusText}</Text>
+                        <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
+                            <Box>
+                                {statusText && (
+                                    <Text color="magenta" italic>⏳ {statusText}</Text>
+                                )}
                             </Box>
-                        )}
+                            <Text color="gray" dimColor>({tempModelOverride || activeModel})</Text>
+                        </Box>
                         {suggestions.length > 0 && (
                             <Box paddingX={1} marginBottom={0}>
                                 <Text color="gray">💡 Suggestions: </Text>
@@ -1240,21 +1248,27 @@ OUTPUT: ${execOutputRef.current}`;
                                                 <Text color="yellow">❯ </Text>
                                             </Box>
                                             <Box flexGrow={1}>
-                                                <MultilineInput
-                                                    value={input.split('\n').pop() || ''}
-                                                    onChange={(val) => {
-                                                        const cleanVal = val.replace(/\\$/, '');
-                                                        const lines = input.split('\n');
-                                                        lines[lines.length - 1] = cleanVal;
-                                                        setInput(lines.join('\n'));
-                                                    }}
-                                                    onSubmit={handleSubmit}
-                                                    placeholder={escPressed ? "Press ESC again to cancel the request." : (isProcessing ? "Flux Flow is thinking..." : "Type your message or /command...")}
-                                                    keyBindings={{
-                                                        submit: (key) => key.return && !key.shift && !key.ctrl,
-                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
-                                                    }}
-                                                />
+                                                <Box flexGrow={1} position="relative">
+                                                    {input.split('\n').pop() === '' && !isProcessing && (
+                                                        <Box position="absolute" paddingLeft={0}>
+                                                            <Text color="gray" dimColor>Type your message...</Text>
+                                                        </Box>
+                                                    )}
+                                                    <MultilineInput
+                                                        value={input.split('\n').pop() || ''}
+                                                        onChange={(val) => {
+                                                            const cleanVal = val.replace(/\\$/, '');
+                                                            const lines = input.split('\n');
+                                                            lines[lines.length - 1] = cleanVal;
+                                                            setInput(lines.join('\n'));
+                                                        }}
+                                                        onSubmit={handleSubmit}
+                                                        keyBindings={{
+                                                            submit: (key) => key.return && !key.shift && !key.ctrl,
+                                                            newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
+                                                        }}
+                                                    />
+                                                </Box>
                                             </Box>
                                         </Box>
                                     </Box>
@@ -1264,21 +1278,27 @@ OUTPUT: ${execOutputRef.current}`;
                                             <Text color="yellow">❯ </Text>
                                         </Box>
                                         <Box flexGrow={1}>
-                                            <MultilineInput
-                                                value={input}
-                                                onChange={(val) => {
-                                                    // Handle manual backslash escapes without stripping them prematurely
-                                                    const cleanVal = val.replace(/\\\s*\n/g, '\n');
-                                                    setInput(cleanVal);
-                                                }}
-                                                onSubmit={handleSubmit}
-                                                placeholder={escPressed ? "Press ESC again to cancel the request." : (isProcessing ? "Flux Flow is thinking..." : "Type your message or /command...")}
-                                                maxRows={3}
-                                                keyBindings={{
-                                                    submit: (key) => key.return && !key.shift && !key.ctrl,
-                                                    newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
-                                                }}
-                                            />
+                                            <Box flexGrow={1} position="relative">
+                                                {input === '' && !isProcessing && (
+                                                    <Box position="absolute" paddingLeft={0}>
+                                                        <Text color="gray" dimColor>{escPressed ? "  Press ESC again to cancel the request." : "  Type your message or /command..."}</Text>
+                                                    </Box>
+                                                )}
+                                                <MultilineInput
+                                                    value={input}
+                                                    onChange={(val) => {
+                                                        // Handle manual backslash escapes without stripping them prematurely
+                                                        const cleanVal = val.replace(/\\\s*\n/g, '\n');
+                                                        setInput(cleanVal);
+                                                    }}
+                                                    onSubmit={handleSubmit}
+                                                    maxRows={3}
+                                                    keyBindings={{
+                                                        submit: (key) => key.return && !key.shift && !key.ctrl,
+                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
+                                                    }}
+                                                />
+                                            </Box>
                                         </Box>
                                     </Box>
                                 )}

@@ -117,8 +117,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
-    const MAX_LOOPS = mode === 'Flux' ? 50 : 5;
-    const MAX_RETRIES = 3;
+    const MAX_LOOPS = mode === 'Flux' ? 50 : 7;
+    const MAX_RETRIES = 7;
     yield { type: 'status', content: 'Working...' };
 
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
@@ -160,9 +160,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     throw new Error("Error: Daily Quota Exausted for Agent");
                 }
 
-                // fs.writeFileSync('test-content.txt', JSON.stringify(contents));
+                // [HIGH RELIABILITY FALLBACK]
+                let targetModel = modelName;
+                if (retryCount >= 5) {
+                    targetModel = 'gemini-3.1-flash-lite-preview';
+                    yield { type: 'model_update', content: 'Trying with fallback model' };
+                } else if (retryCount > 0) {
+                    // Reset name display if we are back to normal (e.g. on retry 6)
+                    yield { type: 'model_update', content: null };
+                }
+
                 stream = await client.models.generateContentStream({
-                    model: modelName,
+                    model: targetModel,
                     contents,
                     config: {
                         temperature: mode === "Flux" ? 0.9 : 1.3,
@@ -173,22 +182,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     },
                 });
                 success = true;
+                // Success - Reset model name display for final chunks
+                yield { type: 'model_update', content: null };
             } catch (err) {
-                const errMsg = err.message || String(err);
-                // Log error in /logs/agent/error.log. Append it. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
+                const errMsg = err.status || (err.error && err.error.message) || String(err);
+                // Log error in /logs/agent/error.log
                 const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                // Create folder if it doesn't exist
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
-                if (!fs.existsSync(agentErrDir)) {
-                    fs.mkdirSync(agentErrDir, { recursive: true });
-                }
+                if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
                 fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errMsg}\n`);
-                const isRetryable = errMsg.includes('429') || errMsg.includes('503') || errMsg.includes('overloaded') || errMsg.includes('deadline');
 
-                if (isRetryable && retryCount < MAX_RETRIES) {
+                if (retryCount < MAX_RETRIES) {
                     retryCount++;
+                    const waitTime = Math.floor(Math.random() * (2000 - 800 + 1)) + 800;
                     yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES})...` };
-                    await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else {
                     throw new Error(`Model cannot be reached: ${errMsg}`);
                 }
@@ -196,11 +204,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         let turnText = '';
+        let lastToolSniffed = null;
+
         for await (const chunk of stream) {
             if (TERMINATION_SIGNAL) break;
             if (chunk.text) {
                 turnText += chunk.text;
                 yield { type: 'text', content: chunk.text };
+
+                // [LIVE TOOL SNIFFING] - Zero latency feedback
+                if (turnText.includes('tool:functions.')) {
+                    const parts = turnText.split('tool:functions.');
+                    const potentialTool = parts[parts.length - 1].split('(')[0].trim();
+                    // Regex validation to ensure it's a valid-looking tool name and not stray text
+                    if (potentialTool && /^[a-z_]+$/.test(potentialTool) && potentialTool !== lastToolSniffed) {
+                        lastToolSniffed = potentialTool;
+                        yield { type: 'status', content: `Working (${potentialTool})...` };
+                    }
+                }
             }
             if (chunk.usageMetadata) {
                 lastUsage = chunk.usageMetadata;
@@ -384,6 +405,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     yield { type: 'memory_updated' };
                 }
             }
+            yield { type: 'status', content: 'Working...' };
         }
 
         const cleanedTurnText = turnText
