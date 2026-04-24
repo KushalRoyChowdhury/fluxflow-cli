@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -23,15 +23,18 @@
 		"dist",
 		"README.md",
 		"package.json",
-		"ARCHITECTURE.md"
+		"ARCHITECTURE.md",
+		"TOOLS.md",
+		"UI_FEATURES.md"
 	],
 	"type": "module",
 	"bin": {
-		"fluxflow-cli": "dist/index.js"
+		"fluxflow-cli": "dist/fluxflow.js",
+		"fluxflow": "dist/fluxflow.js"
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/index.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:duck-duck-scrape --external:nanoid --external:cuimp"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:duck-duck-scrape --external:nanoid --external:cuimp"
 	},
 	"dependencies": {
 		"@google/genai": "^1.50.1",
