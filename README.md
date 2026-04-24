@@ -26,8 +26,19 @@ Whether you need a conversational partner or an autonomous developer that can wr
 - [Node.js](https://nodejs.org/) (v18 or higher recommended)
 - `npm`, `yarn`, or `pnpm`
 
-### Installation
+### Via NPM (Global & Instant)
+You can run the agent instantly or install it globally for high-speed access:
 
+```bash
+# Run instantly (Zero Setup)
+npx fluxflow-cli
+
+# OR Install Globally
+npm install -g fluxflow-cli
+fluxflow-cli
+```
+
+### From Source (Local Development)
 1. Clone the repository and install dependencies:
    ```bash
    git clone <repository-url>
