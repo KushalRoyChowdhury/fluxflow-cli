@@ -39,8 +39,8 @@ export const memory = async (rawArgs, context = {}) => {
         const tempStorage = readEncryptedJson(TEMP_MEM_PATH, {});
         if (!tempStorage[chatId]) tempStorage[chatId] = [];
 
-        // LIMIT CHECK: Combined length should not exceed 4000 * 4 = 16000 chars
-        const MAX_CHARS = 4000 * 4;
+        // LIMIT CHECK: Combined length should not exceed 3000 * 4 = 12000 chars
+        const MAX_CHARS = 3000 * 4;
         let currentTotalLength = tempStorage[chatId].reduce((acc, m) => acc + m.length, 0);
 
         // Prune oldest until there is room for the new content
@@ -61,8 +61,8 @@ export const memory = async (rawArgs, context = {}) => {
         if (method === 'add') {
             if (!content) return "ERROR: Missing 'content' for memory addition.";
 
-            // LIMIT CHECK: Combined length should not exceed 3000 * 4 = 12000 chars
-            const MAX_CHARS = 3000 * 4;
+            // LIMIT CHECK: Combined length should not exceed 2000 * 4 = 8000 chars
+            const MAX_CHARS = 2000 * 4;
             let currentTotalLength = memories.reduce((acc, m) => acc + (m.memory?.length || 0), 0);
 
             // Prune oldest until there is room

@@ -98,7 +98,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     let modifiedHistory = [...history.slice(0, -1)];
 
     // Truncation Logic (Compression 0.0)
-    if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 128000) {
+    if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 196000) {
         modifiedHistory = getTruncatedHistory(modifiedHistory, 4);
     }
 
@@ -241,7 +241,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const url = parseArgs(toolCall.args).url || '...';
                     label = `📖 READING SITE: ${url}`.toUpperCase();
                 } else if (toolCall.toolName === 'view_file') {
-                    label = `📄 READING FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(toolCall.args);
+                    let totalLines = '...';
+                    try {
+                        const absPath = path.resolve(process.cwd(), targetPath);
+                        if (fs.existsSync(absPath)) {
+                            const content = fs.readFileSync(absPath, 'utf8');
+                            totalLines = content.split('\n').length;
+                        }
+                    } catch (e) {}
+                    label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${end_line} FROM ${totalLines}`.toUpperCase();
                 } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                     const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
                     label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
@@ -276,7 +285,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             /\.\.[\\\/]/,       // Parent directory traversal
                             /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\// // Sensitive Linux paths
                         ];
-                        
+
                         const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase(); // e.g. "d:\"
                         const isViolating = riskyPatterns.some(pattern => {
                             if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
@@ -336,8 +345,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                const result = await dispatchTool(toolCall.toolName, toolCall.args, { 
-                    chatId, 
+                const result = await dispatchTool(toolCall.toolName, toolCall.args, {
+                    chatId,
                     history,
                     onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null
                 });
@@ -460,7 +469,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // EXPLICIT CONTEXT SYNC: Force chatId into the tool context and arguments for absolute persistence
                     const toolContext = { chatId: chatId, sessionId: chatId, history };
                     const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
-                    
+
                     // Log the tool result for high-fidelity debugging
                     const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
                     const janitorLogDir = path.join(AGENT_ROOT, 'logs', 'janitor');

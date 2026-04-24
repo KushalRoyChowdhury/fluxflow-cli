@@ -32,7 +32,7 @@ export default function StatusBar({ mode, thinkingLevel, tokens = '0.0k', chatId
                 <Text color="gray">MEM: </Text>
                 <Text color={memStatus === 'ON' ? 'green' : 'red'}>{memStatus}</Text>
                 <Text color="gray"> │ </Text>
-                <Text color="blue"> Tokens {tokens > 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} ({Math.round((tokens / 128000) * 100)}%)</Text>
+                <Text color="blue"> Tokens {tokens > 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} ({Math.round((tokens / 196000) * 100)}%)</Text>
                 <Text color="gray"> │ </Text>
                 <Text color="dim">ID: {chatId} </Text>
             </Box>
