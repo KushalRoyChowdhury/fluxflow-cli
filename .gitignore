@@ -4,4 +4,5 @@ logs/
 secret/
 settings.json
 readme-npm.md
+readme-git.md
 dist/
