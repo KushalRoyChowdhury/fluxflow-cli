@@ -62,7 +62,8 @@ To keep this README concise, detailed information about specific components of F
 ## 🔒 Security & Privacy
 
 Flux Flow runs entirely locally on your machine.
-- **Local Storage**: All history, memories, and API keys are stored locally in the `secret/` directory. Sensitive data is encrypted.
+- **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`. Sensitive data is encrypted.
+- **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
 - **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
 - **API Keys**: You supply your own Gemini/Google AI Studio API keys.
 
