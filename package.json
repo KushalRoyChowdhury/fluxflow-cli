@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -12,12 +12,18 @@
 		"flux"
 	],
 	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/KushalRoyChowdhury/fluxflow-cli.git"
+	},
+	"engines": {
+		"node": ">=20"
+	},
 	"files": [
 		"dist",
 		"README.md",
 		"package.json",
-		"ARCHITECTURE.md",
-		"fluxflow.png"
+		"ARCHITECTURE.md"
 	],
 	"type": "module",
 	"bin": {

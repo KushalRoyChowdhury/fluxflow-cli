@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout, Static } from 'ink';
+import fs from 'fs-extra';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { MultilineInput } from 'ink-multiline-input';
 import TextInput from 'ink-text-input';
 import ChatLayout from './components/ChatLayout.jsx';
@@ -230,7 +233,7 @@ export default function App() {
         }
     };
 
-    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/help', '/clear', '/quit'];
+    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit'];
 
     const handleSubmit = (value) => {
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
@@ -406,6 +409,37 @@ export default function App() {
                 }
                 case '/memory': {
                     setActiveView('memory');
+                    break;
+                }
+                case '/reset': {
+                    const runReset = async () => {
+                        const AGENT_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '../');
+                        const logsDir = path.join(AGENT_ROOT, 'logs');
+                        const secretDir = path.join(AGENT_ROOT, 'secret');
+                        const settingsFile = path.join(AGENT_ROOT, 'settings.json');
+
+                        try {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: '☢️ [NUCLEAR] Initiating reset...' }];
+                            });
+
+                            if (fs.existsSync(logsDir)) fs.removeSync(logsDir);
+                            if (fs.existsSync(secretDir)) fs.removeSync(secretDir);
+                            if (fs.existsSync(settingsFile)) fs.removeSync(settingsFile);
+
+                            setTimeout(() => {
+                                setActiveView('exit');
+                                setTimeout(() => process.exit(0), 500);
+                            }, 500);
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESET ERROR] Failed to purge data: ${err.message}` }];
+                            });
+                        }
+                    };
+                    runReset();
                     break;
                 }
                 case '/help': {
