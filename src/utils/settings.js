@@ -1,4 +1,5 @@
 import fs from 'fs-extra';
+import path from 'path';
 import { SETTINGS_FILE } from './paths.js';
 
 const DEFAULT_SETTINGS = {
@@ -57,6 +58,7 @@ export const saveSettings = async (settings) => {
     try {
         const current = await loadSettings();
         const updated = { ...current, ...settings };
+        await fs.ensureDir(path.dirname(SETTINGS_FILE));
         await fs.writeJson(SETTINGS_FILE, updated, { spaces: 2 });
         return true;
     } catch (err) {

@@ -1,4 +1,5 @@
 import fs from 'fs-extra';
+import path from 'path';
 import { USAGE_FILE } from './paths.js';
 
 /**
@@ -20,6 +21,7 @@ export const getDailyUsage = async () => {
 
     // Reset for new day
     const defaultStats = { agent: 0, background: 0, search: 0 };
+    await fs.ensureDir(path.dirname(USAGE_FILE));
     await fs.writeJson(USAGE_FILE, { date: today, stats: defaultStats }, { spaces: 2 });
     return defaultStats;
 };
@@ -38,6 +40,7 @@ export const incrementUsage = async (key) => {
 
     if (data.stats[key] !== undefined) {
         data.stats[key]++;
+        await fs.ensureDir(path.dirname(USAGE_FILE));
         await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
     }
 };
