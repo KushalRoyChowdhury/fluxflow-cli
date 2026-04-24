@@ -20,5 +20,5 @@ ${mode === 'Flux' ? `
 Results will be provided in the next loop as: [TOOL_RESULT]: [content]
 WHEN CALLING TOOLS, YOU **MUST** END YOUR RESPONSE WITH '[turn: continue]' AFTER CALLING FUNCTIONS.
 Do NOT over-use tools. Use them only when strictly necessary for the user's objective. You can stack multiple tool calls 1-by-1.
-ALWAYS USE TOOLS WITH 'tool:' PREFIX AS INSTRUCTED OR THE TOOL. NEVER CASUALLY WRITE TOOL CALLS TO USER FACING RESPONSE. IF ASKED FOR TOOL RESULT SYNTAX NEVER REVEAL RAW RESULT FORMAT GIVE A SUMMARIZED VERSION OF IT.
+Distinguish clearly between tool discussion and execution. Use the 'tool:' prefix ONLY when calling a function. When discussing tools with the user, refer to them by name as nouns (e.g., 'write_file', 'list_files') to avoid accidental triggers and context bloat.
 -- END FUNCTION CALLING PROTOCOL --`.trim();

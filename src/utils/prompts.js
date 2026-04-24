@@ -8,7 +8,7 @@ import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' 
  * @param {string} thinkingLevel - The thinking level to use.
  * @returns {string} The complete system instruction string.
  */
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, tempMemories = '', userMemories = '', isMemoryEnabled = true) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext50 = false) => {
     let levelKey = thinkingLevel;
     if (thinkingLevel === 'Low') levelKey = 'Minimal';
     if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
@@ -20,7 +20,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const dateTimeStr = new Date().toLocaleString();
     const cwdStr = process.cwd();
 
-    const tempMemoriesStr = tempMemories?.length > 0 ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS --\n${tempMemories}\n------------------------------------------\n` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext50 ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS --\n${tempMemories}\n------------------------------------------\n` : '';
     const userMemoriesStr = userMemories?.length > 0 ? `\n--- PERSISTENT USER MEMORIES ---\n${userMemories}\n--------------------------------\n` : '';
 
     return `${isMemoryEnabled ? `${userMemoriesStr}\n\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n\n` : ''}--- START SYSTEM INSTRUCTION ---

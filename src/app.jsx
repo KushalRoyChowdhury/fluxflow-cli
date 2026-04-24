@@ -140,6 +140,7 @@ export default function App() {
     const [messages, setMessages] = useState([
         { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.\n' }
     ]);
+    const queuedPromptRef = useRef(null);
     const [completedIndex, setCompletedIndex] = useState(1);
 
     // Global Key Listener (ONE listener to rule them all)
@@ -264,6 +265,7 @@ export default function App() {
             // STEERING HINT ENGINE
             const hintText = absoluteClean.trim();
             setQueuedPrompt(hintText);
+            queuedPromptRef.current = hintText;
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: 'hint-' + Date.now(), role: 'user', text: `[STEERING HINT: QUEUED] \n${hintText}`, color: 'magenta' }];
@@ -521,9 +523,22 @@ OUTPUT: ${execOutputRef.current}`;
                         },
                         async () => {
                             // STEERING CALLBACK
-                            if (queuedPrompt) {
-                                const p = queuedPrompt;
+                            if (queuedPromptRef.current) {
+                                const p = queuedPromptRef.current;
                                 setQueuedPrompt(null);
+                                queuedPromptRef.current = null;
+
+                                // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
+                                setMessages(prev => {
+                                    const newMsgs = [...prev];
+                                    const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                                    if (hintMsg) {
+                                        hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
+                                        hintMsg.color = 'cyan';
+                                    }
+                                    return newMsgs.reverse();
+                                });
+
                                 return p;
                             }
                             return null;
@@ -663,9 +678,22 @@ OUTPUT: ${execOutputRef.current}`;
                     setStatusText(null);
 
                     // If a prompt was queued but the agent finished, show resolution modal
-                    if (queuedPrompt) {
-                        setResolutionData(queuedPrompt);
+                    if (queuedPromptRef.current) {
+                        setResolutionData(queuedPromptRef.current);
                         setQueuedPrompt(null);
+                        const hintToResolve = queuedPromptRef.current;
+                        queuedPromptRef.current = null;
+                        
+                        // [SYNC] Mark as "BUFFERED" (waiting for resolution)
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                            if (hintMsg) {
+                                hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: FINISHED_TURN]');
+                            }
+                            return newMsgs.reverse();
+                        });
+
                         setActiveView('resolution');
                     }
 

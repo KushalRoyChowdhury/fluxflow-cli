@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { readEncryptedJson, writeEncryptedJson } from '../utils/crypto.js';
-import path from 'path';
-
-const MEMORIES_PATH = path.join(process.cwd(), 'secret', 'memories.json');
+import { MEMORIES_FILE } from '../utils/paths.js';
 
 export default function MemoryModal({ onClose }) {
     const [memories, setMemories] = useState([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     const loadMemories = () => {
-        const data = readEncryptedJson(MEMORIES_PATH, []);
+        const data = readEncryptedJson(MEMORIES_FILE, []);
         setMemories(data);
     };
 
@@ -25,7 +23,7 @@ export default function MemoryModal({ onClose }) {
         if (input === 'x' && memories.length > 0) {
             const idToDelete = memories[selectedIndex].id;
             const updated = memories.filter(m => m.id !== idToDelete);
-            writeEncryptedJson(MEMORIES_PATH, updated);
+            writeEncryptedJson(MEMORIES_FILE, updated);
             setMemories(updated);
             if (selectedIndex >= updated.length && updated.length > 0) {
                 setSelectedIndex(updated.length - 1);

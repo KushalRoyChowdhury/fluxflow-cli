@@ -111,7 +111,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-    const systemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled);
+    // [CONTEXT-AWARE THROTTLE]
+    const isContext50 = (sessionStats.tokens || 0) >= 54000;
+
+    const systemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50);
 
     const firstUserMsg = `${systemInstruction}\n\nUSER_PROMPT: ${agentText}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
@@ -399,7 +402,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 toolResults.push(`[TOOL_RESULT]: ${cleanResultForAI}`);
 
                 // Yield result for UI preservation (WITH context for the user)
-                yield { type: 'tool_result', content: `[TOOL_RESULT]: ${result}` };
+                // Resilience: For large files (view_file), we hide the raw content in the UI thread to prevent pollution
+                let uiContent = `[TOOL_RESULT]: ${result}`;
+                if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
+                    uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
+                }
+                yield { type: 'tool_result', content: uiContent };
 
                 if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) {
                     yield { type: 'memory_updated' };
