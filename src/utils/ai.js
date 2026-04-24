@@ -239,14 +239,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else if (toolCall.toolName === 'view_file') {
                     const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(toolCall.args);
                     let totalLines = '...';
+                    let actualEndLine = end_line;
                     try {
                         const absPath = path.resolve(process.cwd(), targetPath);
                         if (fs.existsSync(absPath)) {
                             const content = fs.readFileSync(absPath, 'utf8');
-                            totalLines = content.split('\n').length;
+                            const lines = content.split('\n').length;
+                            totalLines = lines;
+                            actualEndLine = Math.min(end_line, lines);
                         }
                     } catch (e) {}
-                    label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${end_line} FROM ${totalLines}`.toUpperCase();
+                    label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
                 } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                     const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
                     label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
