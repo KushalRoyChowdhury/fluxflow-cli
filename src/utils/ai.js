@@ -282,8 +282,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
                     const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
                     label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                } else if (toolCall.toolName === 'exec_command') {
-                    label = ''; // handled by the high-fidelity TerminalBox component
+                } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
+                    label = ''; // handled by high-fidelity components
                 } else {
                     label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
                 }
@@ -373,7 +373,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const result = await dispatchTool(toolCall.toolName, toolCall.args, {
                     chatId,
                     history,
-                    onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null
+                    onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null,
+                    onAskUser: settings.onAskUser
                 });
 
                 if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {

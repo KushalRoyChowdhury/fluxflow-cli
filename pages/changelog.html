@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flux Flow | Changelog</title>
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --text: #e0e0e0;
+            --cyan: #00ffff;
+            --magenta: #ff00ff;
+            --yellow: #ffff00;
+            --green: #4dff88;
+            --red: #ff4d4d;
+            --gray: #888888;
+            --card-bg: #1a1a1a;
+            --border: #333333;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            cursor: default;
+            overflow-x: hidden;
+        }
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.8;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 50px 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        h1 {
+            font-size: 3em;
+            margin: 0;
+            background: linear-gradient(90deg, var(--cyan), #0077ff, var(--magenta));
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            color: var(--gray);
+            font-size: 1.2em;
+            margin-top: 10px;
+        }
+        .version-card {
+            background: transparent;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .version-card:hover {
+            transform: translateY(-2px);
+            border-color: #3d3d3d;
+        }
+        .version-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .version-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .badge {
+            font-size: 0.45em;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            vertical-align: middle;
+        }
+        .section-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .added-title { color: var(--green); }
+        .changed-title { color: var(--yellow); }
+        .fixes-title { color: var(--red); }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        li {
+            margin-bottom: 10px;
+            padding-left: 24px;
+            position: relative;
+            color: #cccccc;
+        }
+        li::before {
+            content: '❯';
+            position: absolute;
+            left: 0;
+            color: var(--gray);
+            font-size: 0.9em;
+            top: 2px;
+        }
+        code {
+            background: #2d2d2d;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: var(--cyan);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <header>
+            <h1>Flux Flow CLI</h1>
+            <div class="subtitle">Changelog & Release Notes</div>
+        </header>
+        <div id="changelog-container"></div>
+    </div>
+
+    <script>
+        // Store original URL to restore before refresh
+        const ORIGINAL_URL = window.location.href;
+        const MASK_PATH = "changelog";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Modify the path visually to hide complex routing on hosts like Render
+            try {
+                // We use replaceState so it doesn't push a new history entry
+                window.history.replaceState(null, '', '/' + MASK_PATH);
+            } catch(e) {
+                console.warn("URL masking failed (likely cross-origin restrictions):", e);
+            }
+
+            renderChangelog();
+        });
+
+        // Attempt to restore original URL before refresh so 404s don't happen
+        window.addEventListener('beforeunload', () => {
+            try {
+                window.history.replaceState(null, '', ORIGINAL_URL);
+            } catch(e) {}
+        });
+
+        // ==========================================
+        // DATABASE: Update this object for new versions
+        // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
+        // ==========================================
+        const changelogData = {
+            "1.1.0": {
+                "added": [
+                    "Ask User feature where Agent can ask for User decision / confirmation directly during work.",
+                    "Support for /changelog to view release notes easily.",
+                    "'Update Available' modal to notify users of new versions."
+                ],
+                "changed": [
+                    "Improved `write_file` tool to increase reliability of reversals.",
+                    "Improved Context retention to 254k tokens."
+                ],
+                "fixes": [
+                    "Performance issues in LOOONG Chats.",
+                    "Improved Markdown rendering.",
+                    "Improved anti-flicker for long chats.",
+                    "Incomplete Tool calls.",
+                    "Reduced memory failures."
+                ]
+            },
+            "1.0.13": {
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Infinite Loops in MAX thinking.",
+                    "UI Improvements."
+                ]
+            },
+
+            "1.0.9": {
+                "added": [
+                    "Improved Error handling.",
+                    "Retry Loops to increase reliability.",
+                    "Markdown support for chat messages."
+                ],
+                "changed": [
+                    "Improved Context retention to 196k tokens."
+                ],
+                "fixes": []
+            },
+
+            "1.0.0": {
+                "added": [
+                    "Initial release of **Flux Flow CLI**",
+                    "Agentic CLI with *Gemini* integration",
+                    "Human-in-the-loop security gates for terminal commands and file system writes",
+                    "Dual operation modes: **Flux** (Dev) and **Flow** (Chat)",
+                    "Background model for memory extraction process",
+                    "Personalized Memory"
+                ],
+                "changed": [],
+                "fixes": []
+            }
+        };
+
+        function parseMarkdown(text) {
+            if (!text) return '';
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`(.*?)`/g, '<code>$1</code>');
+        }
+
+        function renderChangelog() {
+            const container = document.getElementById('changelog-container');
+
+            // Sort versions descending (semver logic)
+            const versions = Object.keys(changelogData).sort((a, b) => {
+                const partsA = a.split('.').map(Number);
+                const partsB = b.split('.').map(Number);
+                for(let i=0; i<Math.max(partsA.length, partsB.length); i++) {
+                    const numA = partsA[i] || 0;
+                    const numB = partsB[i] || 0;
+                    if (numA > numB) return -1;
+                    if (numA < numB) return 1;
+                }
+                return 0;
+            });
+
+            let html = '';
+
+            versions.forEach((version, index) => {
+                const data = changelogData[version];
+                const isLatest = index === 0;
+
+                let cardHtml = `
+                    <div class="version-card">
+                        <div class="version-header">
+                            <div class="version-number">
+                                v${version}
+                                ${isLatest ? '<span class="badge">Latest</span>' : ''}
+                            </div>
+                        </div>
+                `;
+
+                if (data.added && data.added.length > 0) {
+                    cardHtml += `
+                        <div class="section-title added-title">✨ Added</div>
+                        <ul>${data.added.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
+                    `;
+                }
+
+                if (data.changed && data.changed.length > 0) {
+                    cardHtml += `
+                        <div class="section-title changed-title">🔄 Changed</div>
+                        <ul>${data.changed.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
+                    `;
+                }
+
+                if (data.fixes && data.fixes.length > 0) {
+                    cardHtml += `
+                        <div class="section-title fixes-title">🐛 Fixes</div>
+                        <ul>${data.fixes.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
+                    `;
+                }
+
+                cardHtml += `</div>`;
+                html += cardHtml;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // BACKGROUND ANIMATION ENGINE
+        // ==========================================
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let fluxConstellation = {
+            x: 0, y: 0, vx: 0.18, vy: 0.12,
+            nodes: [
+                {dx: -30, dy: -20}, // 0: L Ear base
+                {dx: 30, dy: -20},  // 1: R Ear base
+                {dx: -45, dy: -50}, // 2: L Ear tip
+                {dx: 45, dy: -50},  // 3: R Ear tip
+                {dx: -50, dy: 10},  // 4: L Cheek
+                {dx: 50, dy: 10},   // 5: R Cheek
+                {dx: 0, dy: 45},    // 6: Chin
+                {dx: -15, dy: 0},   // 7: L Eye
+                {dx: 15, dy: 0},    // 8: R Eye
+                {dx: 0, dy: 15}     // 9: Nose
+            ],
+            edges: [
+                [0,2], [2,4], [4,6], [6,5], [5,3], [3,1], [1,0], // Outline
+                [0,7], [1,8], [7,9], [8,9], [9,6] // Inner features
+            ]
+        };
+
+        function initCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            particles = [];
+
+            // Randomly position the Easter egg
+            fluxConstellation.x = Math.random() * canvas.width;
+            fluxConstellation.y = Math.random() * canvas.height;
+
+            for (let i = 0; i < 40; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 1,
+                    speedX: (Math.random() - 0.5) * 0.5,
+                    speedY: (Math.random() - 0.5) * 0.5,
+                    color: Math.random() > 0.5 ? '#00ffff' : '#ff00ff'
+                });
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update & Draw Easter Egg Constellation
+            fluxConstellation.x += fluxConstellation.vx;
+            fluxConstellation.y += fluxConstellation.vy;
+            if (fluxConstellation.x < 0 || fluxConstellation.x > canvas.width) fluxConstellation.vx *= -1;
+            if (fluxConstellation.y < 0 || fluxConstellation.y > canvas.height) fluxConstellation.vy *= -1;
+
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 1;
+            fluxConstellation.edges.forEach(edge => {
+                const n1 = fluxConstellation.nodes[edge[0]];
+                const n2 = fluxConstellation.nodes[edge[1]];
+                ctx.beginPath();
+                ctx.globalAlpha = 0.3;
+                ctx.moveTo(fluxConstellation.x + n1.dx, fluxConstellation.y + n1.dy);
+                ctx.lineTo(fluxConstellation.x + n2.dx, fluxConstellation.y + n2.dy);
+                ctx.stroke();
+            });
+            fluxConstellation.nodes.forEach(node => {
+                ctx.beginPath();
+                ctx.globalAlpha = 0.6;
+                ctx.fillStyle = '#00ffff';
+                ctx.arc(fluxConstellation.x + node.dx, fluxConstellation.y + node.dy, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            particles.forEach((p, i) => {
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+                if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+
+                // Draw lines between nearby particles
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 150) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = p.color;
+                        ctx.globalAlpha = 1 - (dist / 150);
+                        ctx.lineWidth = 0.5;
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                        ctx.globalAlpha = 1;
+                    }
+                }
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
+        animate();
+    </script>
+</body>
+</html>

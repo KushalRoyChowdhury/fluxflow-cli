@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-export const TerminalBox = ({ command, output, completed = false }) => {
+export const TerminalBox = React.memo(({ command, output, completed = false }) => {
     // Clean output of \r and excessive trailing newlines
     const cleanOutput = (output || '')
         .replace(/\r/g, '')
@@ -32,4 +32,4 @@ export const TerminalBox = ({ command, output, completed = false }) => {
             )}
         </Box>
     );
-};
+});

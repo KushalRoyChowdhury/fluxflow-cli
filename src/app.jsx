@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Box, Text, useInput, useStdout, Static } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 import fs from 'fs-extra';
 import path from 'path';
+import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { MultilineInput } from 'ink-multiline-input';
 import TextInput from 'ink-text-input';
-import ChatLayout from './components/ChatLayout.jsx';
+import ChatLayout, { MessageItem } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
 import ProfileForm from './components/ProfileForm.jsx';
+import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey } from './utils/secrets.js';
 import { initAI, getAIStream, signalTermination } from './utils/ai.js';
@@ -23,6 +25,8 @@ import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
+const CHANGELOG_URL = 'https://fluxflow-cli-changes.onrender.com';
+const versionFluxflow = '1.1.0';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -86,6 +90,32 @@ export default function App() {
         };
     }, [stdout]);
 
+    useEffect(() => {
+        const checkVersion = async () => {
+            try {
+                const response = await fetch('https://registry.npmjs.org/fluxflow-cli/latest');
+                const data = await response.json();
+                const latestVersion = data?.version;
+                if (latestVersion && latestVersion !== versionFluxflow) {
+                    setMessages(prev => {
+                        // Insert after the welcome message (index 0)
+                        const newMsgs = [...prev];
+                        newMsgs.splice(1, 0, {
+                            id: 'update-' + Date.now(),
+                            role: 'system',
+                            text: `🚀 **New version '${latestVersion}' is available!**\nType \`npm i -g fluxflow-cli\` to update.\nCheck what's new using \`/changelog\` command.`,
+                            isUpdateNotification: true
+                        });
+                        return newMsgs;
+                    });
+                }
+            } catch (err) {
+                // Silently fail version check to avoid blocking the user
+            }
+        };
+        checkVersion();
+    }, []);
+
     // ... (rest of the component logic)
     const [thinkingLevel, setThinkingLevel] = useState('Medium');
     const [showFullThinking, setShowFullThinking] = useState(false);
@@ -118,6 +148,7 @@ export default function App() {
 
     const [autoAcceptWrites, setAutoAcceptWrites] = useState(false);
     const [pendingApproval, setPendingApproval] = useState(null);
+    const [pendingAsk, setPendingAsk] = useState(null);
 
     const formatDuration = (totalSecs) => {
         const h = Math.floor(totalSecs / 3600);
@@ -142,6 +173,39 @@ export default function App() {
     ]);
     const queuedPromptRef = useRef(null);
     const [completedIndex, setCompletedIndex] = useState(1);
+
+    const windowedHistory = useMemo(() => {
+        const MAX_LINES = 1000;
+        const width = stdout?.columns || 80;
+        let totalLines = 0;
+        let startIdx = 0;
+
+        // Iterate backwards to find how many messages fit in the window
+        for (let i = completedIndex - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (!msg) continue;
+
+            // Estimate lines for this message
+            let lines = (msg.text || '').split('\n').length;
+            msg.text.split('\n').forEach(l => {
+                lines += Math.floor(l.length / width);
+            });
+            lines += msg.role === 'think' ? 3 : 2; // Padding/overhead
+
+            // If adding this message exceeds the limit, stop here
+            // (But always show at least the 2 most recent completed messages to avoid an empty-looking screen)
+            if (totalLines + lines > MAX_LINES && (completedIndex - i) > 2) {
+                startIdx = i + 1;
+                break;
+            }
+            totalLines += lines;
+        }
+
+        return {
+            items: messages.slice(startIdx, completedIndex),
+            isTruncated: startIdx > 0
+        };
+    }, [messages, completedIndex, stdout?.columns]);
 
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
@@ -236,7 +300,7 @@ export default function App() {
         }
     };
 
-    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit'];
+    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit', '/changelog'];
 
     const handleSubmit = (value) => {
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
@@ -299,9 +363,17 @@ export default function App() {
                             const h = await loadHistory();
                             const target = h[targetId] || Object.values(h).find(h => h.name.toLowerCase() === targetId.toLowerCase());
                             if (target) {
-                                process.stdout.write('\x1Bc'); // Clear for fresh context
+                                stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                 setChatId(targetId);
-                                setMessages(target.messages);
+
+                                // Ensure logo is present at the start of resumed history
+                                const resumedMsgs = [...target.messages];
+                                const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
+                                if (!hasLogo) {
+                                    resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...\n' });
+                                }
+
+                                setMessages(resumedMsgs);
                                 setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${targetId}]` }]);
                                 setCompletedIndex(0);
                             } else {
@@ -316,10 +388,10 @@ export default function App() {
                 }
 
                 case '/clear': {
-                    // Perform full terminal hardware reset for Static mode
-                    process.stdout.write('\x1Bc');
+                    // Perform full terminal hardware reset + clear scrollback buffer
+                    stdout.write('\x1b[2J\x1b[3J\x1b[H');
                     setMessages([{ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome back to Flux Flow! Context cleared.\n' }]);
-                    setCompletedIndex(0); // Trigger full Static re-flush to show logo
+                    setCompletedIndex(0); // Trigger re-flush
                     setChatId(generateChatId()); // Brand new identity for the new chat
                     setSessionStats({ tokens: 0 });
                     break;
@@ -447,6 +519,16 @@ export default function App() {
                     runReset();
                     break;
                 }
+                case '/changelog': {
+                    const platform = process.platform;
+                    const command = platform === 'win32' ? 'start' : platform === 'darwin' ? 'open' : 'xdg-open';
+                    exec(`${command} ${CHANGELOG_URL}`);
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}` }];
+                    });
+                    break;
+                }
                 case '/help': {
                     setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Available commands: ' + COMMANDS.join(', ') }]; });
                     break;
@@ -519,27 +601,49 @@ OUTPUT: ${execOutputRef.current}`;
                                     setPendingApproval({ tool, args, resolve });
                                     setActiveView('approval');
                                 });
+                            },
+                            onAskUser: async (question, options) => {
+                                return new Promise((resolve) => {
+                                    setPendingAsk({
+                                        question,
+                                        options,
+                                        resolve: (val) => {
+                                            setMessages(prev => [
+                                                ...prev,
+                                                {
+                                                    id: 'ask-' + Date.now(),
+                                                    role: 'system',
+                                                    text: `💬 **Ask User**\nSelection: ${val}`,
+                                                    isAskRecord: true
+                                                }
+                                            ]);
+                                            resolve(val);
+                                        }
+                                    });
+                                    setActiveView('ask');
+                                });
                             }
                         },
-                        async () => {
-                            // STEERING CALLBACK
-                            if (queuedPromptRef.current) {
-                                const p = queuedPromptRef.current;
-                                setQueuedPrompt(null);
-                                queuedPromptRef.current = null;
+                        async (hint) => {
+                            if (queuedPrompt) {
+                                if (queuedPromptRef.current) {
+                                    const p = queuedPromptRef.current;
+                                    setQueuedPrompt(null);
+                                    queuedPromptRef.current = null;
 
-                                // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
-                                setMessages(prev => {
-                                    const newMsgs = [...prev];
-                                    const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
-                                    if (hintMsg) {
-                                        hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
-                                        hintMsg.color = 'cyan';
-                                    }
-                                    return newMsgs.reverse();
-                                });
+                                    // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
+                                    setMessages(prev => {
+                                        const newMsgs = [...prev];
+                                        const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                                        if (hintMsg) {
+                                            hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
+                                            hintMsg.color = 'cyan';
+                                        }
+                                        return newMsgs.reverse();
+                                    });
 
-                                return p;
+                                    return p;
+                                }
                             }
                             return null;
                         }
@@ -613,9 +717,11 @@ OUTPUT: ${execOutputRef.current}`;
 
                             if (inThinkMode) {
                                 setMessages(prev => {
-                                    const newMsgs = [...prev];
-                                    const thinkMsg = newMsgs.find(m => m.id === currentThinkId);
-                                    if (thinkMsg) thinkMsg.text += thinkPart.replace(signalRegex, '');
+                                    const newMsgs = prev.map(m =>
+                                        m.id === currentThinkId
+                                            ? { ...m, text: m.text + thinkPart.replace(signalRegex, '') }
+                                            : m
+                                    );
 
                                     currentAgentId = 'agent-' + Date.now();
                                     const cleanedAgentPart = (agentPart || '').replace(signalRegex, '');
@@ -629,12 +735,11 @@ OUTPUT: ${execOutputRef.current}`;
                                     currentAgentId = 'agent-' + Date.now();
                                     setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedContent }]);
                                 } else {
-                                    setMessages(prev => {
-                                        const newMsgs = [...prev];
-                                        const msg = newMsgs.find(m => m.id === currentAgentId);
-                                        if (msg) msg.text += cleanedContent;
-                                        return newMsgs;
-                                    });
+                                    setMessages(prev => prev.map(m =>
+                                        m.id === currentAgentId
+                                            ? { ...m, text: m.text + cleanedContent }
+                                            : m
+                                    ));
                                 }
                             }
                             continue;
@@ -642,12 +747,11 @@ OUTPUT: ${execOutputRef.current}`;
 
                         // 3. Append to target role
                         if (inThinkMode && currentThinkId) {
-                            setMessages(prev => {
-                                const newMsgs = [...prev];
-                                const msg = newMsgs.find(m => m.id === currentThinkId);
-                                if (msg) msg.text += chunkText.replace(signalRegex, '');
-                                return newMsgs;
-                            });
+                            setMessages(prev => prev.map(m =>
+                                m.id === currentThinkId
+                                    ? { ...m, text: m.text + chunkText.replace(signalRegex, '') }
+                                    : m
+                            ));
                         } else if (!inThinkMode) {
                             // IMPROVED: Aggressively strip ANY think tags to prevent raw "leaking" in the UI
                             const cleanedText = chunkText
@@ -659,12 +763,11 @@ OUTPUT: ${execOutputRef.current}`;
                                 currentAgentId = 'agent-' + Date.now();
                                 setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
                             } else {
-                                setMessages(prev => {
-                                    const newMsgs = [...prev];
-                                    const msg = newMsgs.find(m => m.id === currentAgentId);
-                                    if (msg) msg.text += cleanedText;
-                                    return newMsgs;
-                                });
+                                setMessages(prev => prev.map(m =>
+                                    m.id === currentAgentId
+                                        ? { ...m, text: m.text + cleanedText }
+                                        : m
+                                ));
                             }
                         }
                     }
@@ -683,7 +786,7 @@ OUTPUT: ${execOutputRef.current}`;
                         setQueuedPrompt(null);
                         const hintToResolve = queuedPromptRef.current;
                         queuedPromptRef.current = null;
-                        
+
                         // [SYNC] Mark as "BUFFERED" (waiting for resolution)
                         setMessages(prev => {
                             const newMsgs = [...prev];
@@ -1104,6 +1207,22 @@ OUTPUT: ${execOutputRef.current}`;
                         </Box>
                     </Box>
                 );
+            case 'ask':
+                return (
+                    <Box width="100%">
+                        <AskUserModal
+                            question={pendingAsk?.question}
+                            options={pendingAsk?.options}
+                            onResolve={(choice) => {
+                                if (pendingAsk?.resolve) {
+                                    pendingAsk.resolve(choice);
+                                }
+                                setPendingAsk(null);
+                                setActiveView('chat');
+                            }}
+                        />
+                    </Box>
+                );
             case 'resume':
                 return (
                     <Box width="100%" alignItems="center" justifyContent="center">
@@ -1111,8 +1230,17 @@ OUTPUT: ${execOutputRef.current}`;
                             onSelect={async (id) => {
                                 const h = await loadHistory();
                                 if (h[id]) {
+                                    stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                     setChatId(id);
-                                    setMessages(h[id].messages);
+
+                                    // Ensure logo is present at the start of resumed history
+                                    const resumedMsgs = [...h[id].messages];
+                                    const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
+                                    if (!hasLogo) {
+                                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...\n' });
+                                    }
+
+                                    setMessages(resumedMsgs);
                                     setActiveView('chat');
                                     setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${id}]` }]);
                                     setCompletedIndex(0);
@@ -1339,14 +1467,21 @@ OUTPUT: ${execOutputRef.current}`;
 
     return (
         <Box flexDirection="column" width="100%">
+            {windowedHistory.isTruncated && (
+                <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1} width="100%" justifyContent="center">
+                    <Text color="gray" dimColor italic>
+                        [ ↑ History truncated for performance (showing last ~1000 lines) ]
+                    </Text>
+                </Box>
+            )}
             <Box flexDirection="column">
-                {messages.slice(0, completedIndex).map((msg, idx) => (
-                    <ChatLayout key={msg.id || idx} messages={[msg]} showFullThinking={showFullThinking} />
+                {windowedHistory.items.map((msg, idx) => (
+                    <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} />
                 ))}
             </Box>
 
             <Box flexDirection="column" padding={1} width="100%">
-                {activeView === 'chat' && (
+                {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
                     <Box flexDirection="column" width="100%">
                         <ChatLayout messages={messages.slice(completedIndex)} showFullThinking={showFullThinking} />
                         {activeCommand && (

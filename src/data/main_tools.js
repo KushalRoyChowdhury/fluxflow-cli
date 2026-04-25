@@ -6,6 +6,7 @@ tool:functions.tool_name(arguments)
 - WEB TOOLS (Available in Flux & Flow) -
     1. Web Search: tool:functions.web_search(query="<query>", limit=number). Find info. limit is optional (3-10, default 10). If user asks about something that is not in your training data, proactively use this tool to find the information.Winder search recomemded (limit = 10) when exploring a topic.
     2. Web Scrape: tool:functions.web_scrape(url="<url>"). provides detail from a URL.
+    3. Ask User: tool:functions.ask(question="...", optionA="Option::Desc", optionB="Option::Desc"). Use this ONLY when you reach a decision point with multiple valid paths and need user preference to proceed / confirmation. This allows you to pause for guidance without ending your task loop. Format options as 'Short Label::Detailed Description'. You can provide 2 - 4 options (optionA, optionB, optionC, optionD). Tool can also return result as none of the 4 if user write custom one.
 ${mode === 'Flux' ? `
 - DEV & FILE TOOLS (Available in FLUX MODE ONLY) -
     1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided.
@@ -20,5 +21,5 @@ ${mode === 'Flux' ? `
 Results will be provided in the next loop as: [TOOL_RESULT]: [content]
 WHEN CALLING TOOLS, YOU **MUST** END YOUR RESPONSE WITH '[turn: continue]' AFTER CALLING FUNCTIONS.
 Do NOT over-use tools. Use them only when strictly necessary for the user's objective. You can stack multiple tool calls 1-by-1.
-Distinguish clearly between tool discussion and execution. Use the 'tool:' prefix ONLY when calling a function. When discussing tools with the user, refer to them by name as nouns (e.g., 'write_file', 'list_files') to avoid accidental triggers and context bloat.
+Distinguish clearly between tool discussion and execution. Use the 'tool:' prefix ONLY when calling a function. When discussing tools with the user, refer to them by name as nouns (e.g., 'write_file', 'list_files') to avoid accidental triggers and context bloat. Even in your <think> ... </think> tags, do not use the 'tool:' prefix when planning to select a tool.
 -- END FUNCTION CALLING PROTOCOL --`.trim();

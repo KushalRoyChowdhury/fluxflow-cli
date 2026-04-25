@@ -8,6 +8,7 @@ import { write_file } from '../tools/write_file.js';
 import { update_file } from '../tools/update_file.js';
 import { exec_command } from '../tools/exec_command.js';
 import { read_folder } from '../tools/read_folder.js';
+import { ask_user } from '../tools/ask_user.js';
 
 const TOOL_MAP = {
     web_search,
@@ -19,7 +20,8 @@ const TOOL_MAP = {
     write_file,
     update_file,
     exec_command,
-    read_folder
+    read_folder,
+    ask: ask_user
 };
 
 /**

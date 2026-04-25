@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-export default function StatusBar({ mode, thinkingLevel, tokens = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
 
@@ -38,4 +38,6 @@ export default function StatusBar({ mode, thinkingLevel, tokens = '0.0k', chatId
             </Box>
         </Box>
     );
-}
+});
+
+export default StatusBar;
