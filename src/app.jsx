@@ -26,7 +26,8 @@ import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.1.0';
+const versionFluxflow = '1.1.1';
+const updatedOn = '2026-04-26';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -96,6 +97,7 @@ export default function App() {
                 const response = await fetch('https://registry.npmjs.org/fluxflow-cli/latest');
                 const data = await response.json();
                 const latestVersion = data?.version;
+                if (latestVersion) setLatestVer(latestVersion);
                 if (latestVersion && latestVersion !== versionFluxflow) {
                     setMessages(prev => {
                         // Insert after the welcome message (index 0)
@@ -103,7 +105,7 @@ export default function App() {
                         newMsgs.splice(1, 0, {
                             id: 'update-' + Date.now(),
                             role: 'system',
-                            text: `🚀 **New version '${latestVersion}' is available!**\nType \`npm i -g fluxflow-cli\` to update.\nCheck what's new using \`/changelog\` command.`,
+                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`npm i -g fluxflow-cli\` to update.\nCheck what's new using \`/changelog\` command.`,
                             isUpdateNotification: true
                         });
                         return newMsgs;
@@ -118,6 +120,7 @@ export default function App() {
 
     // ... (rest of the component logic)
     const [thinkingLevel, setThinkingLevel] = useState('Medium');
+    const [latestVer, setLatestVer] = useState(null);
     const [showFullThinking, setShowFullThinking] = useState(false);
     const [activeModel, setActiveModel] = useState('gemma-4-31b-it');
     const [janitorModel, setJanitorModel] = useState('gemma-4-26b-a4b-it');
@@ -300,7 +303,7 @@ export default function App() {
         }
     };
 
-    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit', '/changelog'];
+    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit', '/changelog', '/about'];
 
     const handleSubmit = (value) => {
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
@@ -517,6 +520,19 @@ export default function App() {
                         }
                     };
                     runReset();
+                    break;
+                }
+                case '/about': {
+                    const updateStatus = latestVer
+                        ? (latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'No Update Available')
+                        : 'Checking for updates...';
+                    const aboutText = `ℹ️  **FluxFlow Version:** v${versionFluxflow}\n` +
+                                     `🔄 **Status:** ${updateStatus}\n` +
+                                     `📅 **Updated on:** ${updatedOn}`;
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: Date.now(), role: 'system', text: aboutText }];
+                    });
                     break;
                 }
                 case '/changelog': {
