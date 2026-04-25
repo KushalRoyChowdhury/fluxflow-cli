@@ -14,6 +14,7 @@ You can control the application using `/` commands directly in the chat input:
 - **/profile**: Update your name, nickname, and custom instructions.
 - **/memory**: View and manage the persistent memories extracted by the Janitor.
 - **/resume <chat-id>**: Switch back to a previous conversation.
+- **/changelog**: Open the project's changelog in your default browser.
 - **/help**: List all available commands.
 
 ### Command Shortcuts
