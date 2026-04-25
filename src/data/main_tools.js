@@ -8,11 +8,11 @@ tool:functions.tool_name(arguments)
     2. Web Scrape: tool:functions.web_scrape(url="<url>"). provides detail from a URL.
 ${mode === 'Flux' ? `
 - DEV & FILE TOOLS (Available in FLUX MODE ONLY) -
-    1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content.
+    1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided.
     2. List Files: tool:functions.list_files(path="relative/path"). Lists content of a directory.
     3. Read Folder: tool:functions.read_folder(path="relative/path"). Detailed stats of a directory.
-    4. Write File: tool:functions.write_file(path="relative/path", content="full content"). Creates/Overwrites a file. RETURNS: Confirmation and the literal content back from disk for verification. DONT WRAP WRITE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS.
-    5. Update File: tool:functions.update_file(path="relative/path", content_to_replace="old", content_to_add="new"). Surgical patching. RETURNS: High-fidelity visual diff and old code block. You MUST verify that the change specifically matches your intent using the returned diff. PREFFER UPDATE FILE OVER WRITE FILE if file already exists. DONT WRAP UPDATE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS.
+    4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility.
+    5. Update File: tool:functions.update_file(path="relative/path", content_to_replace="old", content_to_add="new"). Surgical patching. RETURNS: High-fidelity visual diff and old code block. You MUST verify that the change specifically matches your intent using the returned diff. PREFFER UPDATE FILE OVER WRITE FILE if file already exists for better reversal tracking (if a file has 500+ lines, try to stick with update_file over full-rewrite). DONT WRAP UPDATE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS.
     6. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command.`.trim() : `
     - DEV & FILE TOOLS are not available in FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }

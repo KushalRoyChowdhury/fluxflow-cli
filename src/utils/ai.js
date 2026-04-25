@@ -94,7 +94,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     let modifiedHistory = [...history.slice(0, -1)];
 
     // Truncation Logic (Compression 0.0)
-    if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 196000) {
+    if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
         modifiedHistory = getTruncatedHistory(modifiedHistory, 4);
     }
 
@@ -163,13 +163,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     throw new Error("Error: Daily Quota Exausted for Agent");
                 }
 
-                // [HIGH RELIABILITY FALLBACK]
+                // [HIGH RELIABILITY FALLBACK SPECTRUM]
                 let targetModel = modelName;
-                if (retryCount >= 5) {
+                if (retryCount === 5) {
+                    targetModel = 'gemini-3-flash-preview';
+                    yield { type: 'model_update', content: 'Trying with fallback model (v3)' };
+                } else if (retryCount >= 6) {
                     targetModel = 'gemini-3.1-flash-lite-preview';
-                    yield { type: 'model_update', content: 'Trying with fallback model' };
+                    yield { type: 'model_update', content: 'Trying with fallback model (v3.1)' };
                 } else if (retryCount > 0) {
-                    // Reset name display if we are back to normal (e.g. on retry 6)
                     yield { type: 'model_update', content: null };
                 }
 
@@ -177,7 +179,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: targetModel,
                     contents,
                     config: {
-                        temperature: mode === "Flux" ? 0.9 : 1.3,
+                        temperature: mode === "Flux" ? 1 : 1.4,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
@@ -198,10 +200,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (retryCount < MAX_RETRIES) {
                     retryCount++;
                     const waitTime = Math.floor(Math.random() * (2000 - 800 + 1)) + 800;
-                    yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES})...` };
+                    yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES + 1})...` };
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else {
-                    throw new Error(`Model cannot be reached: ${errMsg}`);
+                    throw new Error(`Model cannot be reached: ${errMsg}. (Failed ${MAX_RETRIES + 1} times)`);
                 }
             }
         }

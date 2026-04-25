@@ -8,7 +8,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  */
 export const write_file = async (args) => {
     let { path: targetPath, content } = parseArgs(args);
-    
+
     if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';
     if (content === undefined) return 'ERROR: Missing "content" argument for write_file.';
 
@@ -19,6 +19,18 @@ export const write_file = async (args) => {
     const parentDir = path.dirname(absolutePath);
 
     try {
+        // --- ANCESTRY CAPTURE (For v1.1.x Reliability & Reversal) ---
+        let ancestry = '';
+        if (fs.existsSync(absolutePath)) {
+            try {
+                const oldData = fs.readFileSync(absolutePath, 'utf8');
+                const lines = oldData.split(/\r?\n/);
+                ancestry = `Old File contents:\n${lines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+            } catch (e) {
+                ancestry = `[Note: Could not read existing file for reversal reference]\n\n`;
+            }
+        }
+
         // Ensure directory exists
         if (!fs.existsSync(parentDir)) {
             fs.mkdirSync(parentDir, { recursive: true });
@@ -27,7 +39,7 @@ export const write_file = async (args) => {
         const lineCount = content.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(content, 'utf8');
         fs.writeFileSync(absolutePath, content, 'utf8');
-        
+
         // --- HIGH-FIDELITY VERIFICATION ---
         let verifiedContent = fs.readFileSync(absolutePath, 'utf8');
         const verifiedSize = Buffer.byteLength(verifiedContent, 'utf8');
@@ -51,8 +63,8 @@ export const write_file = async (args) => {
         }
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
-        
-        return `SUCCESS: File [${targetPath}] verified and persisted.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n- Content Preview:\n${snippet}`;
+
+        return `SUCCESS: File [${targetPath}] verified and persisted.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}`;
     } catch (err) {
         return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
     }

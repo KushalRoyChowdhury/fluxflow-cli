@@ -2,7 +2,6 @@ import { web_search } from '../tools/web_search.js';
 import { web_scrape } from '../tools/web_scrape.js';
 import { memory } from '../tools/memory.js';
 import { chat } from '../tools/chat.js';
-import { summary } from '../tools/summary.js';
 import { list_files } from '../tools/list_files.js';
 import { view_file } from '../tools/view_file.js';
 import { write_file } from '../tools/write_file.js';
@@ -15,7 +14,6 @@ const TOOL_MAP = {
     web_scrape,
     memory,
     chat,
-    summary,
     list_files,
     view_file,
     write_file,
@@ -32,7 +30,7 @@ const TOOL_MAP = {
  */
 export const dispatchTool = async (toolName, args, context = {}) => {
     const tool = TOOL_MAP[toolName];
-    
+
     if (!tool) {
         return `ERROR: Tool [${toolName}] not found in registry.`;
     }

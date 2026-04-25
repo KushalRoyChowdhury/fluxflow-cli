@@ -649,9 +649,9 @@ OUTPUT: ${execOutputRef.current}`;
                                 return newMsgs;
                             });
                         } else if (!inThinkMode) {
-                            // Strip protocol signals and any stray opening tags
+                            // IMPROVED: Aggressively strip ANY think tags to prevent raw "leaking" in the UI
                             const cleanedText = chunkText
-                                .replace('<think>', '')
+                                .replace(/<\/?think>/gi, '') // Strip <think> and </think> (case-insensitive)
                                 .replace(signalRegex, '');
 
                             // Ensure an agent message exists
