@@ -25,7 +25,7 @@ import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
-const CHANGELOG_URL = 'https://fluxflow-cli-changes.onrender.com';
+const CHANGELOG_URL = 'https://fluxflow-cli-changes.onrender.com/changelog.html';
 const versionFluxflow = '1.1.0';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
