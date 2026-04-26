@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
 
@@ -32,7 +32,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', chatId = '
                 <Text color="gray">MEM: </Text>
                 <Text color={memStatus === 'ON' ? 'green' : 'red'}>{memStatus}</Text>
                 <Text color="gray"> │ </Text>
-                <Text color="blue"> Tokens {tokens > 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} ({Math.round((tokens / 254000) * 100)}%)</Text>
+                <Text color="blue"> Tokens {tokensTotal > 1000 ? `${(tokensTotal / 1000).toFixed(1)}k` : tokensTotal} ({Math.round((tokens / 254000) * 100)}%)</Text>
                 <Text color="gray"> │ </Text>
                 <Text color="dim">ID: {chatId} </Text>
             </Box>

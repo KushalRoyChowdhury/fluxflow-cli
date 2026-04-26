@@ -53,7 +53,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1} width="100%">
             <Text color="cyan" bold underline>💬 ASK USER</Text>
-            
+
             <Box marginTop={1} marginBottom={1}>
                 <Text bold>{question}</Text>
             </Box>

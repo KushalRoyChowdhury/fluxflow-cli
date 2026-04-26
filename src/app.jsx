@@ -22,12 +22,13 @@ import { getDailyUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
+import { emojiSpace } from './utils/terminal.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.1.2';
-const updatedOn = '2026-04-26';
+const versionFluxflow = '1.1.3';
+const updatedOn = '2026-04-27';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -69,6 +70,7 @@ export default function App() {
     const { stdout } = useStdout();
 
     const [input, setInput] = useState('');
+    const [isExpanded, setIsExpanded] = useState(false);
     const [mode, setMode] = useState('Flux');
     const [terminalSize, setTerminalSize] = useState({
         columns: stdout?.columns || 80,
@@ -190,8 +192,8 @@ export default function App() {
             if (!msg) continue;
 
             // Estimate lines for this message
-            let lines = (msg.text || '').split('\n').length;
-            msg.text.split('\n').forEach(l => {
+            let lines = (msg.text || '').split(/\r?\n/).length;
+            msg.text.split(/\r?\n/).forEach(l => {
                 lines += Math.floor(l.length / width);
             });
             lines += msg.role === 'think' ? 3 : 2; // Padding/overhead
@@ -211,8 +213,28 @@ export default function App() {
         };
     }, [messages, completedIndex, stdout?.columns]);
 
+    // Calculate visual line count for the input buffer (used for Paste UI)
+    const terminalWidth = stdout?.columns || 80;
+    const wrapWidth = Math.max(20, terminalWidth - 10);
+    const wrappedLinesCount = input.split(/\r?\n/).reduce((acc, line) => {
+        return acc + Math.max(1, Math.ceil(line.length / wrapWidth));
+    }, 0);
+    const maxLines = Math.max(1, wrappedLinesCount);
+
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
+        // 0. Atomic Paste Expansion Logic
+        if (maxLines > 2 && !isExpanded && activeView === 'chat') {
+            if (key.backspace || key.delete) {
+                setInput('');
+                return;
+            }
+            if (key.return) {
+                setIsExpanded(true);
+                return;
+            }
+        }
+
         // 1. ESC Logic
         if (key.escape) {
             if (isProcessing) {
@@ -322,7 +344,7 @@ export default function App() {
         // 3. Final Scrub: Strip terminal ghosts and manual breaks
         const absoluteClean = normalizedValue
             .replace(/\\\s*\n/g, '\n')
-            .split('\n')
+            .split(/\r?\n/)
             .map(l => l.replace(/\\$/, ''))
             .join('\n');
 
@@ -398,6 +420,7 @@ export default function App() {
                     setCompletedIndex(0); // Trigger re-flush
                     setChatId(generateChatId()); // Brand new identity for the new chat
                     setSessionStats({ tokens: 0 });
+                    setIsExpanded(false);
                     break;
                 }
                 case '/mode': {
@@ -527,7 +550,8 @@ export default function App() {
                     const updateStatus = latestVer
                         ? (latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'No Update Available')
                         : 'Checking for updates...';
-                    const aboutText = `ℹ️  **FluxFlow Version:** v${versionFluxflow}\n` +
+                    const s = emojiSpace(2);
+                    const aboutText = `ℹ️${s}**FluxFlow Version:** v${versionFluxflow}\n` +
                                      `🔄 **Status:** ${updateStatus}\n` +
                                      `📅 **Updated on:** ${updatedOn}`;
                     setMessages(prev => {
@@ -564,8 +588,8 @@ export default function App() {
 
             const streamChat = async () => {
                 setIsProcessing(true);
-                try {
-                    const cleanHistoryForAI = [...messages, userMessage].filter(m =>
+                setIsExpanded(false);
+                try {                    const cleanHistoryForAI = [...messages, userMessage].filter(m =>
                         m.role !== 'think' &&
                         !String(m.id).startsWith('welcome')
                     );
@@ -831,6 +855,7 @@ OUTPUT: ${execOutputRef.current}`;
         }
 
         setInput('');
+        setIsExpanded(false);
     };
 
     const getSuggestions = () => {
@@ -903,11 +928,12 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
                         title="System Settings"
                         items={[
-                            { label: `Toggle Memory [ ${systemSettings.memory ? 'ON' : 'OFF'} ]`, value: 'memory' },
-                            { label: `Toggle Auto-Exec [ ${systemSettings.autoExec ? 'ON' : 'OFF'} ]`, value: 'autoExec' },
-                            { label: `External Workspace Access [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
-                            { label: `API Tier [ ${apiTier} ]`, value: 'apiTier' },
-                            { label: `Auto-Delete History [ ${systemSettings.autoDeleteHistory} ]`, value: 'autoDelete' },
+                            { label: `Toggle Memory                           [ ${systemSettings.memory ? 'ON' : 'OFF'} ]`, value: 'memory' },
+                            { label: `Toggle Auto-Exec                        [ ${systemSettings.autoExec ? 'ON' : 'OFF'} ]`, value: 'autoExec' },
+                            { label: `Alternate Screen Buffer (Experimental)  [ ${systemSettings.useAlternateBuffer ? 'ON' : 'OFF'} ]`, value: 'altBuffer' },
+                            { label: `External Workspace Access               [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
+                            { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
+                            { label: `Auto-Delete History                     [ ${systemSettings.autoDeleteHistory} ]`, value: 'autoDelete' },
                             { label: 'Exit Settings', value: 'Cancel' }
                         ]}
                         onSelect={(item) => {
@@ -1376,15 +1402,6 @@ OUTPUT: ${execOutputRef.current}`;
                     </Box>
                 );
             default:
-                const terminalWidth = stdout.columns || 80;
-                const wrapWidth = Math.max(20, terminalWidth - 10);
-
-                // Simple wrap-count for the payload indicator decision
-                const wrappedLines = input.split('\n').reduce((acc, line) => {
-                    return acc + Math.max(1, Math.ceil(line.length / wrapWidth));
-                }, 0);
-                const maxLines = Math.max(1, wrappedLines);
-
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
@@ -1405,43 +1422,35 @@ OUTPUT: ${execOutputRef.current}`;
                         )}
                         <Box backgroundColor="#333333" paddingX={1} paddingY={1} width="100%">
                             <Box flexDirection="column" width="100%">
-                                {maxLines > 3 ? (
-                                    <Box flexDirection="column" width="100%" paddingY={0}>
-                                        <Text color="gray" dimColor>
-                                            [📦 {maxLines} lines of text in buffer - Full content will be sent]
-                                        </Text>
-                                        <Box
-                                            flexDirection="row"
-                                            width="100%"
-                                            height={1}
-                                            overflow="hidden"
-                                            alignItems="flex-end"
-                                        >
-                                            <Box flexShrink={0} width={3}>
-                                                <Text color="yellow">❯ </Text>
+                                {maxLines > 2 && !isExpanded ? (
+                                    <Box flexDirection="row" width="100%" paddingY={0} height={1} overflow="hidden">
+                                        <Box flexShrink={0} width={3}>
+                                            <Text color="yellow">❯ </Text>
+                                        </Box>
+                                        <Box flexGrow={1} flexDirection="row">
+                                            {/* Atomic Paste Tag - Properly colored */}
+                                            <Box flexShrink={0}>
+                                                <Text color="magenta" bold>[Pasted {maxLines} Lines]</Text>
                                             </Box>
-                                            <Box flexGrow={1}>
-                                                <Box flexGrow={1} position="relative">
-                                                    {input.split('\n').pop() === '' && !isProcessing && (
-                                                        <Box position="absolute" paddingLeft={0}>
-                                                            <Text color="gray" dimColor>Type your message...</Text>
-                                                        </Box>
-                                                    )}
-                                                    <MultilineInput
-                                                        value={input.split('\n').pop() || ''}
-                                                        onChange={(val) => {
-                                                            const cleanVal = val.replace(/\\$/, '');
-                                                            const lines = input.split('\n');
-                                                            lines[lines.length - 1] = cleanVal;
-                                                            setInput(lines.join('\n'));
-                                                        }}
-                                                        onSubmit={handleSubmit}
-                                                        keyBindings={{
-                                                            submit: (key) => key.return && !key.shift && !key.ctrl,
-                                                            newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
-                                                        }}
-                                                    />
-                                                </Box>
+
+                                            {/* Input for Expansion/Submit */}
+                                            <Box flexGrow={1} marginLeft={1}>
+                                                <MultilineInput
+                                                    value=""
+                                                    placeholder=" (Backspace to delete / Enter to expand)"
+                                                    onChange={(val) => {
+                                                        // Any typing expands
+                                                        if (val.length > 0) {
+                                                            setIsExpanded(true);
+                                                            setInput(input + val);
+                                                        }
+                                                    }}
+                                                    onSubmit={() => setIsExpanded(true)}
+                                                    keyBindings={{
+                                                        submit: (key) => key.return && !key.shift && !key.ctrl,
+                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
+                                                    }}
+                                                />
                                             </Box>
                                         </Box>
                                     </Box>
@@ -1461,7 +1470,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                     value={input}
                                                     onChange={(val) => {
                                                         // Handle manual backslash escapes without stripping them prematurely
-                                                        const cleanVal = val.replace(/\\\s*\n/g, '\n');
+                                                        const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
                                                     }}
                                                     onSubmit={handleSubmit}
@@ -1536,6 +1545,7 @@ OUTPUT: ${execOutputRef.current}`;
                         mode={mode}
                         thinkingLevel={thinkingLevel}
                         tokens={sessionStats.tokens}
+                        tokensTotal={sessionTotalTokens}
                         chatId={chatId}
                         isMemoryEnabled={systemSettings.memory}
                     />

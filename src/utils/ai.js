@@ -429,11 +429,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             .replace(/\[?\s*(turn\s*:)?\s*(continue|finish)\s*\]?/gi, '')
             .trim();
 
-        // [SNEAKY BUG FIX]
-        // Break if we have a finish signal.
-        // If we don't have a finish signal, but we also have NO tools and NO continue signal, 
-        // we used to break. Now we only break if it's REALLY silent or the model explicitly finishes.
-        const isActuallyFinished = hasFinish || (!shouldContinue && toolResults.length === 0 && turnText.length < 5);
+        // [STRICT PROTOCOL ENFORCEMENT]
+        // The loop now breaks ONLY if the model explicitly emits the [turn: finish] signal.
+        // This ensures the agent never "gives up" or stops prematurely if the model forgets
+        // to signal the end of its work or is interrupted.
+        const isActuallyFinished = hasFinish;
 
         if (isActuallyFinished) {
             // RACE CONDITION PROTECTION: Check for late-arrival steering hints one last time
@@ -552,10 +552,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const nextAgentMsg = cleanedTurnText.trim() || '*Working...*';
         modifiedHistory.push({ role: 'agent', text: nextAgentMsg });
 
-        const nextUserMsg = toolResults.length > 0 ? `${toolResults.join('\n')}` : '';
-        if (nextUserMsg) {
-            modifiedHistory.push({ role: 'user', text: nextUserMsg });
-        }
+        // If the model hasn't finished, we must provide a user turn to keep the loop going.
+        // If there are no tool results, we send a 'continue' signal to prompt the model.
+        const nextUserMsg = toolResults.length > 0 ? toolResults.join('\n') : '[turn: continue]';
+        modifiedHistory.push({ role: 'user', text: nextUserMsg });
     }
     yield { type: 'status', content: null };
 };

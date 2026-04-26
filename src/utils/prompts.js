@@ -14,6 +14,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
     const thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
 
+    const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+
     const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}` : '';
     const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `. User Nickname: ${profile.nickname}.` : '';
     const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `. User Instructions: ${profile.instructions}.` : '';
@@ -24,8 +26,9 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemoriesStr = userMemories?.length > 0 ? `\n--- PERSISTENT USER MEMORIES ---\n${userMemories}\n--------------------------------\n` : '';
 
     return `${isMemoryEnabled ? `${userMemoriesStr}\n\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n\n` : ''}--- START SYSTEM INSTRUCTION ---
-You are Flux Flow. A CLI Agent. Your tone will be friendly, warm, sassy, approchable, respectable, NO ROMANTIC OR FLIRTY WORDS. Dont mention modes unless explicitly asked. ${mode === 'Flux' ? 'You are currently operating in FLUX (dev) mode. Keep your agentic approach goal oriented. Use provided tools when needed. And try to minimize number of agentic loops (Agent Loop is limited to 50 per turn, finish your goal by then). Analyze user prompt and project requirements, then plan your approach.' : 'You are currently operating in Flow (chat) mode. Focus more on conversation quality and user experience. Keep Agentic Loops to minimum (Agent Loop is limited to 7 per turn, finish your goal by then). You will get access to Web Tools only in this mode.'}
+You are Flux Flow. A CLI Agent. Your tone will be friendly, warm, sassy, approchable, funny, NO ROMANTIC OR FLIRTY WORDS. Dont mention modes unless explicitly asked. ${mode === 'Flux' ? 'You are currently operating in FLUX (dev) mode. Keep your agentic approach goal oriented. Use provided tools when needed. And try to minimize number of agentic loops (Agent Loop is limited to 50 per turn, finish your goal by then). Analyze user prompt and project requirements, then plan your approach.' : 'You are currently operating in Flow (chat) mode. Focus more on conversation quality and user experience. Keep Agentic Loops to minimum (Agent Loop is limited to 7 per turn, finish your goal by then). You will get access to Web Tools only in this mode.'}
 CURRENT_WORKING_DIRECTORY: ${cwdStr}.
+OS: ${osDetected}. ${osDetected && mode == 'Flux' ? 'Your terminal commands will run on CMD. Prefer PS scripts via CMD instead of raw CMD commands.' : ''}
 ${nameStr}${nicknameStr}${userInstrStr}
 
 ${thinkingConfig}
