@@ -27,7 +27,7 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.1.3';
+const versionFluxflow = '1.1.5';
 const updatedOn = '2026-04-27';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
