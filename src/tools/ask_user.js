@@ -8,7 +8,7 @@ export const ask_user = async (args, context) => {
     const parsed = parseArgs(args);
     const { question } = parsed;
 
-    if (!question) return 'ERROR: Missing "question" argument for ask_user.';
+    if (!question) return 'ERROR: Missing "question" argument for ask.';
     if (!context.onAskUser) return 'ERROR: onAskUser callback not provided in tool context.';
 
     // Parse options: optionA, optionB, etc.
@@ -18,16 +18,16 @@ export const ask_user = async (args, context) => {
             const val = parsed[key];
             if (typeof val === 'string' && val.includes('::')) {
                 const [label, desc] = val.split('::');
-                options.push({ 
-                    id: key, 
-                    label: label.trim(), 
-                    description: desc.trim() 
+                options.push({
+                    id: key,
+                    label: label.trim(),
+                    description: desc.trim()
                 });
             } else {
-                options.push({ 
-                    id: key, 
-                    label: String(val).trim(), 
-                    description: '' 
+                options.push({
+                    id: key,
+                    label: String(val).trim(),
+                    description: ''
                 });
             }
         }

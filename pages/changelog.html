@@ -180,6 +180,16 @@
         // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
         const changelogData = {
+            "1.1.2": {
+                "added": [],
+                "changed": [
+                    "More robust tool parsing to handle edge case model quirks."
+                ],
+                "fixes": [
+                    "Fixed the issue where agent might accidently get terminated after reading a file.",
+                    "Improved Ask User Tool for better real-world use."
+                ]
+            },
             "1.1.1": {
                 "added": [
                     "Ask User feature where Agent can ask for User decision / confirmation directly during work.",

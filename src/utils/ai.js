@@ -21,44 +21,49 @@ export const signalTermination = () => {
 
 const detectToolCalls = (text) => {
     const results = [];
-    const trigger = 'tool:functions.';
-    let searchIdx = 0;
+    // More flexible regex to catch variations in spacing and formatting
+    // Matches: tool:functions.name(...), [tool:functions.name(...)], etc.
+    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(([\s\S]*?)\)(?:\s*\]?)/gi;
+    
+    let match;
+    while ((match = toolRegex.exec(text)) !== null) {
+        const fullMatch = match[0];
+        const toolName = match[1];
+        const args = match[2];
 
-    while (true) {
-        const startIdx = text.indexOf(trigger, searchIdx);
-        if (startIdx === -1) break;
-
-        // Find the opening parenthesis
-        const openParenIdx = text.indexOf('(', startIdx + trigger.length);
-        if (openParenIdx === -1) {
-            searchIdx = startIdx + trigger.length;
-            continue;
+        // Basic balanced parenthesis check for complex nested JSON
+        let openCount = (args.match(/\(/g) || []).length;
+        let closeCount = (args.match(/\)/g) || []).length;
+        
+        let finalArgs = args;
+        let finalFullMatch = fullMatch;
+        
+        // If we clipped a nested structure, try to recover it from the original text
+        if (openCount > closeCount) {
+             const startIdx = match.index + fullMatch.indexOf('(');
+             let balance = 0;
+             let endIdx = -1;
+             for (let i = startIdx; i < text.length; i++) {
+                 if (text[i] === '(') balance++;
+                 if (text[i] === ')') balance--;
+                 if (balance === 0) {
+                     endIdx = i;
+                     break;
+                 }
+             }
+             if (endIdx !== -1) {
+                 finalArgs = text.substring(startIdx + 1, endIdx);
+                 finalFullMatch = text.substring(match.index, endIdx + 1);
+                 // Advance regex index
+                 toolRegex.lastIndex = endIdx + 1;
+             }
         }
 
-        const toolName = text.substring(startIdx + trigger.length, openParenIdx).trim();
-
-        // Balanced bracket search
-        let balance = 1;
-        let endIdx = -1;
-        for (let i = openParenIdx + 1; i < text.length; i++) {
-            if (text[i] === '(') balance++;
-            if (text[i] === ')') balance--;
-            if (balance === 0) {
-                endIdx = i;
-                break;
-            }
-        }
-
-        if (endIdx === -1) {
-            searchIdx = openParenIdx + 1;
-            continue;
-        }
-
-        const fullMatch = text.substring(startIdx, endIdx + 1);
-        const args = text.substring(openParenIdx + 1, endIdx);
-
-        results.push({ fullMatch, toolName, args });
-        searchIdx = endIdx + 1;
+        results.push({ 
+            fullMatch: finalFullMatch, 
+            toolName: toolName.trim(), 
+            args: finalArgs.trim() 
+        });
     }
 
     return results;
@@ -424,8 +429,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             .replace(/\[?\s*(turn\s*:)?\s*(continue|finish)\s*\]?/gi, '')
             .trim();
 
-        // Break if we have a finish signal or if there was no reason to continue
-        if (hasFinish || (!shouldContinue && toolResults.length === 0)) {
+        // [SNEAKY BUG FIX]
+        // Break if we have a finish signal.
+        // If we don't have a finish signal, but we also have NO tools and NO continue signal, 
+        // we used to break. Now we only break if it's REALLY silent or the model explicitly finishes.
+        const isActuallyFinished = hasFinish || (!shouldContinue && toolResults.length === 0 && turnText.length < 5);
+
+        if (isActuallyFinished) {
             // RACE CONDITION PROTECTION: Check for late-arrival steering hints one last time
             const lateHint = await steeringCallback();
             if (lateHint) {
@@ -536,7 +546,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             break;
         }
 
-        if (!shouldContinue && toolResults.length === 0) break;
+        if (isActuallyFinished) break;
 
         // SDK PROTECTION: Ensure agent response is never empty before next turn
         const nextAgentMsg = cleanedTurnText.trim() || '*Working...*';
