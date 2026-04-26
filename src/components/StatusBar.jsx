@@ -32,9 +32,9 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color="gray">MEM: </Text>
                 <Text color={memStatus === 'ON' ? 'green' : 'red'}>{memStatus}</Text>
                 <Text color="gray"> │ </Text>
-                <Text color="blue"> Tokens {tokensTotal > 1000 ? `${(tokensTotal / 1000).toFixed(1)}k` : tokensTotal} ({Math.round((tokens / 254000) * 100)}%)</Text>
+                <Text color="blue">{tokensTotal > 1000 ? `${(tokensTotal / 1000).toFixed(1)}k` : tokensTotal} ({Math.round((tokens / 254000) * 100)}%)</Text>
                 <Text color="gray"> │ </Text>
-                <Text color="dim">ID: {chatId} </Text>
+                <Text color="dim">{chatId} </Text>
             </Box>
         </Box>
     );
