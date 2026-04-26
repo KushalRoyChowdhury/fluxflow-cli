@@ -27,11 +27,11 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 
 ### ✍️ Code Editing
 - **`write_file`**: Creates a new file or completely overwrites an existing one with new content.
-- **`update_file` (Smart Patching)**: Surgically replaces a specific block of text within a file. 
+- **`update_file` (Smart Patching)**: Surgically replaces a specific block of text within a file.
   - *Diff Generation*: It returns a high-fidelity visual diff (Red/Green changes with context lines) to the UI, allowing the user to see exactly what the agent modified.
 
 ### 💻 Terminal Execution
-- **`exec_command`**: Runs a shell command directly in the terminal using Node's `child_process.spawn`. 
+- **`exec_command`**: Runs a shell command directly in the terminal using Node's `child_process.spawn`.
   - *Context Aware*: Runs in the current working directory.
   - *Cross-Platform*: Uses `shell: true` to handle Windows `.cmd`/`.bat` files natively.
 
@@ -42,7 +42,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 The memory tool (`memory.js`) is primarily used by the background **Janitor** model, but can be accessed by the main agent if necessary.
 
 - **Temporary Context (`action='temp'`)**: Saves a rolling summary of the current session to maintain conversational context without bloating the main prompt history.
-- **Persistent User Memory (`action='user'`)**: 
+- **Persistent User Memory (`action='user'`)**:
   - The Janitor analyzes conversations to detect user preferences, hobbies, or instructions.
   - It uses `add`, `update`, or `delete` methods to manage facts in the encrypted `memories.json` vault.
   - These memories are injected into the system prompt of *future* sessions, allowing Flux Flow to learn and adapt to the user over time.

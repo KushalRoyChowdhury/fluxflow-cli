@@ -30,7 +30,7 @@ For power users, several commands support direct arguments to skip the menus:
 Flux Flow separates the model's "internal monologue" (reasoning) from its final response using `<think>` tags.
 
 - **Thinking Levels**: Depending on the mode, you can choose from **Low**, **Medium**, **High**, or **Max**. Higher levels allow the agent more "space" to reason through complex architecture or debugging problems.
-- **Show/Hide Thinking**: You can toggle the visibility of the thinking process using `/thinking show/hide`. 
+- **Show/Hide Thinking**: You can toggle the visibility of the thinking process using `/thinking show/hide`.
   - When **Hidden**, the agent doesn't just disappear; it provides a "minimalist" view showing only the core **Headings** and **Action Steps** (bolded lines) from its reasoning. This keeps you informed of its current "step" without cluttering the screen with detailed internal monologue.
 
 ## 🛡️ Human-in-the-Loop (HITL) Verification
@@ -44,7 +44,7 @@ By default, the agent **cannot** execute dangerous actions without your consent.
 - **Safe Commands**: Basic read-only commands (like `ls`, `git status`, `pwd`) are automatically allowed to minimize friction.
 
 ### Auto-Execution (Advanced)
-For power users, **Auto-Exec** can be enabled in `/settings`. 
+For power users, **Auto-Exec** can be enabled in `/settings`.
 - **⚠️ Warning**: This allows the agent to run any tool and execute any command autonomously.
 - **External Access**: You can also toggle whether the agent is allowed to access files outside of its current working directory.
 
