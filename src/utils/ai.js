@@ -151,7 +151,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         yield { type: 'turn_reset', content: true };
         // Convert current history to GenAI format
         const contents = modifiedHistory
-            .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome'))
+            .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
             .map(msg => ({
                 role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
                 parts: [{ text: msg.text }]

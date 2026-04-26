@@ -106,7 +106,8 @@ export default function App() {
                             id: 'update-' + Date.now(),
                             role: 'system',
                             text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`npm i -g fluxflow-cli\` to update.\nCheck what's new using \`/changelog\` command.`,
-                            isUpdateNotification: true
+                            isUpdateNotification: true,
+                            isMeta: true
                         });
                         return newMsgs;
                     });
@@ -403,7 +404,7 @@ export default function App() {
                     if (parts[1]) {
                         const newMode = parts[1].toLowerCase() === 'flow' ? 'Flow' : 'Flux';
                         setMode(newMode);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Mode switched to ${newMode}` }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
                     }
@@ -413,10 +414,10 @@ export default function App() {
                     const arg = parts[1]?.toLowerCase();
                     if (arg === 'show') {
                         setShowFullThinking(true);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: VISIBLE' }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: VISIBLE', isMeta: true }]; });
                     } else if (arg === 'hide') {
                         setShowFullThinking(false);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: HIDDEN (Headings only)' }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: HIDDEN (Headings only)', isMeta: true }]; });
                     } else if (parts[1]) {
                         let val = parts[1].toLowerCase();
                         if (val === 'xhigh') val = 'max';
@@ -430,7 +431,7 @@ export default function App() {
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Thinking level set to ${formattedLevel}` }]; });
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Thinking level set to ${formattedLevel}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('thinking');
@@ -441,7 +442,7 @@ export default function App() {
                     if (parts[1]) {
                         const mod = parts.slice(1).join(' ');
                         setActiveModel(mod);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Model switched to ${mod}` }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
                     } else {
                         setActiveView('model');
                     }
@@ -471,7 +472,7 @@ export default function App() {
                 case '/save': {
                     const name = parts.slice(1).join(' ') || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `💾 [MEMORY] Chat saved as "${name}" (ID: ${chatId})` }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `💾 [MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
                     break;
                 }
                 case '/chats': {
@@ -480,7 +481,7 @@ export default function App() {
                         const list = Object.entries(history).map(([id, info]) => `• ${id}: ${info.name}`).join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `🗃️ [HISTORY] Saved Chats:\n${list || 'No saved chats found.'}` }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `🗃️ [HISTORY] Saved Chats:\n${list || 'No saved chats found.'}`, isMeta: true }];
                         });
                     };
                     run();
@@ -495,7 +496,7 @@ export default function App() {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: '☢️ [NUCLEAR] Initiating reset...' }];
+                                return [...prev, { id: Date.now(), role: 'system', text: '☢️ [NUCLEAR] Initiating reset...', isMeta: true }];
                             });
 
                             if (fs.existsSync(LOGS_DIR)) fs.removeSync(LOGS_DIR);
@@ -531,7 +532,7 @@ export default function App() {
                                      `📅 **Updated on:** ${updatedOn}`;
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: aboutText }];
+                        return [...prev, { id: Date.now(), role: 'system', text: aboutText, isMeta: true }];
                     });
                     break;
                 }
@@ -541,16 +542,16 @@ export default function App() {
                     exec(`${command} ${CHANGELOG_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}` }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
                     });
                     break;
                 }
                 case '/help': {
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Available commands: ' + COMMANDS.join(', ') }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Available commands: ' + COMMANDS.join(', '), isMeta: true }]; });
                     break;
                 }
                 default:
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Unknown command: ${cmd}` }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
