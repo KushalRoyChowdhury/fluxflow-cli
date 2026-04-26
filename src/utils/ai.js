@@ -24,7 +24,7 @@ const detectToolCalls = (text) => {
     // More flexible regex to catch variations in spacing and formatting
     // Matches: tool:functions.name(...), [tool:functions.name(...)], etc.
     const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(([\s\S]*?)\)(?:\s*\]?)/gi;
-    
+
     let match;
     while ((match = toolRegex.exec(text)) !== null) {
         const fullMatch = match[0];
@@ -34,10 +34,10 @@ const detectToolCalls = (text) => {
         // Basic balanced parenthesis check for complex nested JSON
         let openCount = (args.match(/\(/g) || []).length;
         let closeCount = (args.match(/\)/g) || []).length;
-        
+
         let finalArgs = args;
         let finalFullMatch = fullMatch;
-        
+
         // If we clipped a nested structure, try to recover it from the original text
         if (openCount > closeCount) {
              const startIdx = match.index + fullMatch.indexOf('(');
@@ -59,10 +59,10 @@ const detectToolCalls = (text) => {
              }
         }
 
-        results.push({ 
-            fullMatch: finalFullMatch, 
-            toolName: toolName.trim(), 
-            args: finalArgs.trim() 
+        results.push({
+            fullMatch: finalFullMatch,
+            toolName: toolName.trim(),
+            args: finalArgs.trim()
         });
     }
 
@@ -279,7 +279,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             totalLines = lines;
                             actualEndLine = Math.min(end_line, lines);
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        
+                    }
                     label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
                 } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                     const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
