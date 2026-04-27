@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 /**
  * AUTO-HEAP SCALER (4GB)
- * This ensures the agent can handle massive 3.1M+ token sessions and large project scans
+ * This ensures the agent can handle massive sessions and large project scans
  * without hitting Node's default memory limits.
  */
 const HEAP_LIMIT = 4096;

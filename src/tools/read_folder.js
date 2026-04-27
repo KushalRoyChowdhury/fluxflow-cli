@@ -19,7 +19,7 @@ export const read_folder = async (args) => {
         if (!stats.isDirectory()) {
             return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
         }
-
+        const files = fs.readdirSync(absolutePath);
         const totalItems = files.length;
         const maxDisplay = 100;
         const displayItems = files.slice(0, maxDisplay);

@@ -205,8 +205,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.2.0"]
+        const stableVersions = ["1.2.0", "1.2.2"]
         const changelogData = {
+            "1.2.2": {
+                "added": [
+                    "Real-time context counter window update."
+                ],
+                "changed": [],
+                "fixes": [
+                    "Fixed the `read-folder` tool to get a detailed file structure",
+                    "Fixed the issue where *Agent Called* counter was higher than actual agent calls."
+                ]
+            },
             "1.2.0": {
                 "added": [
                     "Added `STREERING HINT` to let users adjust agent's congitive path in real time. (Just send the prompt during agent is working)"

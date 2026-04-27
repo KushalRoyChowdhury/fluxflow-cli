@@ -240,12 +240,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
             lastUsage = chunk.usageMetadata;
             if (lastUsage) {
-                yield { type: 'usage', content: lastUsage };
+                yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
             }
         }
 
         // Count the successful call
         await incrementUsage('agent');
+        if (lastUsage) {
+            yield { type: 'usage', content: lastUsage };
+        }
 
         fullAgentResponseChunks.push(turnText);
 
@@ -444,106 +447,106 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let isActuallyFinished = hasFinish && !shouldContinue;
 
 
-            if (isActuallyFinished) {
-                yield { type: 'status', content: 'Finalizing...' };
+        if (isActuallyFinished) {
+            yield { type: 'status', content: 'Finalizing...' };
 
 
-                const janitorContents = history.slice(-3)
-                    .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
-                    .map(msg => ({
-                        role: msg.role === 'user' ? 'user' : 'model',
-                        parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
-                    }));
+            const janitorContents = history.slice(-3)
+                .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
+                .map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'model',
+                    parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
+                }));
 
-                const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
-                const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-                const janitorPrompt = getJanitorInstruction(
-                    agentText,
-                    cleanedFullResponse,
-                    janitorUserMemories,
-                    isMemoryEnabled,
-                    needTitle
-                );
-                janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
+            const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
+            const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            const janitorPrompt = getJanitorInstruction(
+                agentText,
+                cleanedFullResponse,
+                janitorUserMemories,
+                isMemoryEnabled,
+                needTitle
+            );
+            janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
 
-                let finalSynthesis = '';
-                // fs.writeFileSync('janitor-prompt.txt', janitorPrompt);
-                try {
-                    // Quota Check for Background
-                    if (!(await checkQuota('background', settings))) {
-                        console.warn("Quota Exhausted for Background Model. Skipping refinement.");
-                        throw new Error("QUOTA_BLOCKED");
-                    }
+            let finalSynthesis = '';
+            // fs.writeFileSync('janitor-prompt.txt', janitorPrompt);
+            try {
+                // Quota Check for Background
+                if (!(await checkQuota('background', settings))) {
+                    console.warn("Quota Exhausted for Background Model. Skipping refinement.");
+                    throw new Error("QUOTA_BLOCKED");
+                }
 
-                    const janitorResult = await client.models.generateContent({
-                        model: janitorModel || 'gemma-4-26b-a4b-it',
-                        contents: janitorContents,
-                        config: {
-                            thinkingConfig: {
-                                includeThoughts: false,
-                                thinkingLevel: ThinkingLevel.MINIMAL
-                            }
-                        }
-                    });
-
-                    const parts = janitorResult.candidates?.[0]?.content?.parts;
-                    if (parts && parts[1]?.text) {
-                        finalSynthesis = parts[1].text;
-                        // Append /logs/janitor/debug.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
-                        const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                        const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                        // Create folder if it doesn't exist
-                        if (!fs.existsSync(janitorLogDir)) {
-                            fs.mkdirSync(janitorLogDir, { recursive: true });
-                        }
-                        fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: ${finalSynthesis}\n`);
-                    }
-                    else if (parts && parts[0]?.text) finalSynthesis = parts[0].text;
-                    else if (janitorResult.response && janitorResult.response.text) finalSynthesis = janitorResult.response.text();
-                    else throw new Error("No synthesis generated by Janitor.");
-
-                    await incrementUsage('background');
-                    yield { type: 'background_increment' };
-
-                    const janitorToolCalls = detectToolCalls(finalSynthesis);
-
-                    // Execute background tools only
-                    for (const janitorToolCall of janitorToolCalls) {
-                        // EXPLICIT CONTEXT SYNC: Force chatId into the tool context and arguments for absolute persistence
-                        const toolContext = { chatId: chatId, sessionId: chatId, history };
-                        const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
-
-                        // Log the tool result for high-fidelity debugging
-                        const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                        const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                        fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
-
-                        // Only signal UI if it's a permanent memory change (not temp context)
-                        if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
-                            yield { type: 'memory_updated' };
+                const janitorResult = await client.models.generateContent({
+                    model: janitorModel || 'gemma-4-26b-a4b-it',
+                    contents: janitorContents,
+                    config: {
+                        thinkingConfig: {
+                            includeThoughts: false,
+                            thinkingLevel: ThinkingLevel.MINIMAL
                         }
                     }
-                } catch (janitorErr) {
-                    // Append /logs/janitor/error.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
+                });
+
+                const parts = janitorResult.candidates?.[0]?.content?.parts;
+                if (parts && parts[1]?.text) {
+                    finalSynthesis = parts[1].text;
+                    // Append /logs/janitor/debug.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
                     const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                    const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                     // Create folder if it doesn't exist
-                    if (!fs.existsSync(janitorErrDir)) {
-                        fs.mkdirSync(janitorErrDir, { recursive: true });
+                    if (!fs.existsSync(janitorLogDir)) {
+                        fs.mkdirSync(janitorLogDir, { recursive: true });
                     }
-                    fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${janitorErr.message}\n`);
-                    console.error("Janitor Background Tasks Failed:", janitorErr.message);
+                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: ${finalSynthesis}\n`);
                 }
+                else if (parts && parts[0]?.text) finalSynthesis = parts[0].text;
+                else if (janitorResult.response && janitorResult.response.text) finalSynthesis = janitorResult.response.text();
+                else throw new Error("No synthesis generated by Janitor.");
 
-                const timestamp = `Responded on ${new Date().toLocaleString()}`;
-                const finalWithTime = `${cleanedFullResponse}\n\n${timestamp}`;
+                await incrementUsage('background');
+                yield { type: 'background_increment' };
 
-                // Replace the last (potentially messy) agent message with the final response
-                if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'agent') {
-                    modifiedHistory[modifiedHistory.length - 1].text = finalWithTime;
-                } else {
-                    modifiedHistory.push({ role: 'agent', text: finalWithTime });
+                const janitorToolCalls = detectToolCalls(finalSynthesis);
+
+                // Execute background tools only
+                for (const janitorToolCall of janitorToolCalls) {
+                    // EXPLICIT CONTEXT SYNC: Force chatId into the tool context and arguments for absolute persistence
+                    const toolContext = { chatId: chatId, sessionId: chatId, history };
+                    const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
+
+                    // Log the tool result for high-fidelity debugging
+                    const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
+
+                    // Only signal UI if it's a permanent memory change (not temp context)
+                    if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
+                        yield { type: 'memory_updated' };
+                    }
                 }
+            } catch (janitorErr) {
+                // Append /logs/janitor/error.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
+                const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+                // Create folder if it doesn't exist
+                if (!fs.existsSync(janitorErrDir)) {
+                    fs.mkdirSync(janitorErrDir, { recursive: true });
+                }
+                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${janitorErr.message}\n`);
+                console.error("Janitor Background Tasks Failed:", janitorErr.message);
+            }
+
+            const timestamp = `Responded on ${new Date().toLocaleString()}`;
+            const finalWithTime = `${cleanedFullResponse}\n\n${timestamp}`;
+
+            // Replace the last (potentially messy) agent message with the final response
+            if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'agent') {
+                modifiedHistory[modifiedHistory.length - 1].text = finalWithTime;
+            } else {
+                modifiedHistory.push({ role: 'agent', text: finalWithTime });
+            }
         }
 
         if (isActuallyFinished) break;
