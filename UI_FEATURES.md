@@ -12,6 +12,7 @@ You can control the application using `/` commands directly in the chat input:
 - **/key**: Open the API Key management view to update or remove your credentials.
 - **/settings**: Access the system configuration menu.
 - **/profile**: Update your name, nickname, and custom instructions.
+- **/update**: Update Flux Flow to the latest version.
 - **/memory**: View and manage the persistent memories extracted by the Janitor.
 - **/resume <chat-id>**: Switch back to a previous conversation.
 - **/changelog**: Open the project's changelog in your default browser.
@@ -24,6 +25,7 @@ For power users, several commands support direct arguments to skip the menus:
 - ` /thinking low ` / ` /thinking medium ` / ` /thinking high ` / ` /thinking max `
 - ` /thinking show ` / ` /thinking hide ` (Toggles thinking process visibility)
 - ` /model gemini-3.1-pro-preview ` (Switches model directly)
+- ` /update check ` (Checks for updates)
 
 ## 🧠 Thinking Levels & Visualization
 
