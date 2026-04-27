@@ -3,7 +3,7 @@ import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 
 const CustomItem = ({ label, isSelected }) => {
-    const isCancel = label === 'Cancel' || label.toLowerCase().includes('exit');
+    const isCancel = label === 'Cancel' || label === 'Back' || label.toLowerCase().includes('exit') || label.toLowerCase().includes('back');
     return (
         <Box marginTop={isCancel ? 1 : 0}>
             <Text color={isSelected ? 'cyan' : 'white'}>
@@ -13,10 +13,11 @@ const CustomItem = ({ label, isSelected }) => {
     );
 };
 
-export default function CommandMenu({ title, items, onSelect }) {
+export default function CommandMenu({ title, subtitle, items, onSelect }) {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="magenta" padding={1} marginTop={1} flexShrink={0}>
             <Text color="magenta" bold>{title}</Text>
+            {subtitle && <Text color="yellow" dimColor marginTop={1} italic>{subtitle}</Text>}
             <Box marginTop={1} flexDirection="column">
                 <SelectInput 
                     items={items} 

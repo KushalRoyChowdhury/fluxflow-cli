@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
+import Spinner from 'ink-spinner';
 import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
@@ -18,6 +19,7 @@ import { loadSettings, saveSettings } from './utils/settings.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
+import UpdateProcessor from './components/UpdateProcessor.jsx';
 import { getDailyUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
@@ -27,8 +29,8 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.2.1';
-const updatedOn = '2026-04-27';
+const versionFluxflow = '1.2.2';
+const updatedOn = '2026-04-28';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -77,6 +79,52 @@ export default function App() {
         rows: stdout?.rows || 24
     });
 
+    const performVersionCheck = async (manual = false, settingsOverride = null) => {
+        const settingsToUse = settingsOverride || systemSettings;
+        if (manual) {
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, { id: 'check-' + Date.now(), role: 'system', text: '🔍 Checking for updates...', isMeta: true }];
+            });
+        }
+        try {
+            const response = await fetch('https://registry.npmjs.org/fluxflow-cli/latest', { cache: 'no-store' });
+            const data = await response.json();
+            const latestVersion = data?.version;
+            if (latestVersion) setLatestVer(latestVersion);
+
+            if (latestVersion && latestVersion !== versionFluxflow) {
+                if (!manual && settingsToUse.autoUpdate) {
+                    setActiveView('update');
+                } else {
+                    setMessages(prev => {
+                        const newMsgs = [...prev];
+                        newMsgs.splice(manual ? newMsgs.length : 1, 0, {
+                            id: 'update-' + Date.now(),
+                            role: 'system',
+                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`/update\` to upgrade immediately.\nCheck what's new using \`/changelog\` command.`,
+                            isUpdateNotification: true,
+                            isMeta: true
+                        });
+                        return newMsgs;
+                    });
+                }
+            } else if (manual) {
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: '✅ [SYSTEM] Flux Flow is already up to date.', isMeta: true }];
+                });
+            }
+        } catch (err) {
+            if (manual) {
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to check for updates: ${err.message}` }];
+                });
+            }
+        }
+    };
+
     useEffect(() => {
         const handleResize = () => {
             // Force a HARD terminal reset (powerful for Windows) to prevent background spill
@@ -93,34 +141,6 @@ export default function App() {
         };
     }, [stdout]);
 
-    useEffect(() => {
-        const checkVersion = async () => {
-            try {
-                const response = await fetch('https://registry.npmjs.org/fluxflow-cli/latest');
-                const data = await response.json();
-                const latestVersion = data?.version;
-                if (latestVersion) setLatestVer(latestVersion);
-                if (latestVersion && latestVersion !== versionFluxflow) {
-                    setMessages(prev => {
-                        // Insert after the welcome message (index 0)
-                        const newMsgs = [...prev];
-                        newMsgs.splice(1, 0, {
-                            id: 'update-' + Date.now(),
-                            role: 'system',
-                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`npm i -g fluxflow-cli\` to update.\nCheck what's new using \`/changelog\` command.`,
-                            isUpdateNotification: true,
-                            isMeta: true
-                        });
-                        return newMsgs;
-                    });
-                }
-            } catch (err) {
-                // Silently fail version check to avoid blocking the user
-            }
-        };
-        checkVersion();
-    }, []);
-
     // ... (rest of the component logic)
     const [thinkingLevel, setThinkingLevel] = useState('Medium');
     const [latestVer, setLatestVer] = useState(null);
@@ -135,7 +155,7 @@ export default function App() {
     const [apiTier, setApiTier] = useState('Free');
     const [quotas, setQuotas] = useState({ agentLimit: 1500, backgroundLimit: 1500, searchLimit: 100, customModelId: '', customLimit: 0 });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
-    const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d' });
+    const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
@@ -161,10 +181,12 @@ export default function App() {
         const m = Math.floor((totalSecs % 3600) / 60);
         const s = totalSecs % 60;
 
-        if (h > 0) {
-            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        }
-        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        let parts = [];
+        if (h > 0) parts.push(`${h}h`);
+        if (m > 0 || h > 0) parts.push(`${m}m`);
+        parts.push(`${s}s`);
+
+        return parts.join(' ');
     };
     const [statusText, setStatusText] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -279,7 +301,17 @@ export default function App() {
             setShowFullThinking(saved.showFullThinking);
             setApiTier(saved.apiTier || 'Free');
             setQuotas(saved.quotas || { agentLimit: 1500, searchLimit: 100, customModelId: '', customLimit: 0 });
-            setSystemSettings(saved.systemSettings);
+            const freshSettings = {
+                memory: true,
+                compression: 0.0,
+                autoExec: false,
+                autoDeleteHistory: '7d',
+                autoUpdate: false,
+                updateManager: 'npm',
+                customUpdateCommand: '',
+                ...(saved.systemSettings || {})
+            };
+            setSystemSettings(freshSettings);
             setProfileData(saved.profileData);
 
             // 2. Load API key
@@ -293,6 +325,9 @@ export default function App() {
             if (saved.systemSettings?.autoDeleteHistory) {
                 cleanupOldHistory(saved.systemSettings.autoDeleteHistory);
             }
+
+            // 4. Check for updates after settings are loaded
+            performVersionCheck(false, freshSettings);
 
             setIsInitializing(false);
         }
@@ -326,7 +361,7 @@ export default function App() {
         }
     };
 
-    const COMMANDS = ['/mode', '/thinking', '/model', '/resume', '/memory', '/profile', '/settings', '/key', '/stats', '/reset', '/help', '/clear', '/quit', '/changelog', '/about'];
+    const COMMANDS = ['/quit', '/help', '/clear', '/resume', '/save', '/chats', '/mode', '/thinking', '/model', '/settings', '/key', '/profile', '/memory', '/stats', '/reset', '/about', '/changelog', '/update'];
 
     const handleSubmit = (value) => {
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
@@ -427,6 +462,11 @@ export default function App() {
                     if (parts[1]) {
                         const newMode = parts[1].toLowerCase() === 'flow' ? 'Flow' : 'Flux';
                         setMode(newMode);
+                        if (newMode === 'Flow') {
+                            setThinkingLevel('Low');
+                        } else if (newMode === 'Flux') {
+                            setThinkingLevel('High');
+                        }
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
@@ -450,7 +490,7 @@ export default function App() {
                         if (mode === 'Flow' && (formattedLevel === 'High' || formattedLevel === 'Max')) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to /mode Flux to enable Deep Thinking.` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Deep Thinking.` }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
@@ -568,6 +608,16 @@ export default function App() {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
                     });
+                    break;
+                }
+                case '/update': {
+                    const arg = parts[1]?.toLowerCase();
+                    if (arg === 'check') {
+                        performVersionCheck(true);
+                        break;
+                    }
+                    const isForce = parts.includes('--force');
+                    setActiveView('update');
                     break;
                 }
                 case '/help': {
@@ -885,13 +935,13 @@ OUTPUT: ${execOutputRef.current}`;
                 return (
                     <CommandMenu
                         title="⚡ Select Operating Mode"
-                        items={[{ label: 'Flux (Dev mode - Tools Enabled)', value: 'Flux' }, { label: 'Flow (Chat mode - No Tools)', value: 'Flow' }, { label: 'Cancel', value: 'Cancel' }]}
+                        items={[{ label: 'Flux (Dev mode  - Extended Toolset)', value: 'Flux' }, { label: 'Flow (Chat mode - Basic Toolset)', value: 'Flow' }, { label: 'Cancel', value: 'Cancel' }]}
                         onSelect={(item) => {
                             if (item.value !== 'Cancel') {
                                 setMode(item.value);
                                 // Auto-clamp thinking levels based on the new mode
                                 if (item.value === 'Flow') {
-                                    setThinkingLevel('Medium');
+                                    setThinkingLevel('Low');
                                 } else if (item.value === 'Flux') {
                                     setThinkingLevel('High');
                                 }
@@ -903,14 +953,14 @@ OUTPUT: ${execOutputRef.current}`;
             case 'thinking': {
                 const options = mode === 'Flow'
                     ? [
-                        { label: 'Low (Fastest)', value: 'Low' },
+                        { label: 'Low    (Fastest)', value: 'Low' },
                         { label: 'Medium (Balanced)', value: 'Medium' }
                     ]
                     : [
-                        { label: 'Low (Fastest)', value: 'Low' },
+                        { label: 'Low    (Fastest)', value: 'Low' },
                         { label: 'Medium (Balanced)', value: 'Medium' },
-                        { label: 'High (Complex coding)', value: 'High' },
-                        { label: 'Max (Architecture)', value: 'Max' }
+                        { label: 'High   (Complex coding)', value: 'High' },
+                        { label: 'Max    (Architecture)', value: 'Max' }
                     ];
                 options.push({ label: 'Cancel', value: 'Cancel' });
 
@@ -947,7 +997,8 @@ OUTPUT: ${execOutputRef.current}`;
                             { label: `Alternate Screen Buffer (Experimental)  [ ${systemSettings.useAlternateBuffer ? 'ON' : 'OFF'} ]`, value: 'altBuffer' },
                             { label: `External Workspace Access               [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
                             { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
-                            { label: `Auto-Delete History                     [ ${systemSettings.autoDeleteHistory} ]`, value: 'autoDelete' },
+                            { label: `Auto-Update                             [ ${systemSettings.autoUpdate ? 'ON' : 'OFF'} ]`, value: 'autoUpdate' },
+                            { label: `Preferred Updater                       [ ${(systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase()} ]`, value: 'updateManager' },
                             { label: 'Exit Settings', value: 'Cancel' }
                         ]}
                         onSelect={(item) => {
@@ -980,6 +1031,12 @@ OUTPUT: ${execOutputRef.current}`;
                                 const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || '30d');
                                 const nextIndex = (currentIndex + 1) % options.length;
                                 setSystemSettings(s => ({ ...s, autoDeleteHistory: options[nextIndex] }));
+                            }
+                            else if (item.value === 'autoUpdate') {
+                                setSystemSettings(s => ({ ...s, autoUpdate: !s.autoUpdate }));
+                            }
+                            else if (item.value === 'updateManager') {
+                                setActiveView('updateManager');
                             }
                             else if (item.value === 'Cancel') setActiveView('chat');
                         }}
@@ -1101,10 +1158,10 @@ OUTPUT: ${execOutputRef.current}`;
             case 'stats':
                 return (
                     <Box flexDirection="column" borderStyle="round" paddingX={2} paddingY={1}>
-                        <Text color="cyan" bold>📊 DAILY PERFORMANCE LEDGER</Text>
+                        <Text color="cyan" bold>📊 DAILY USAGE TRACKER</Text>
                         <Box flexDirection="column" marginTop={1}>
                             <Text>• Agent Model Calls:    <Text color="green">{dailyUsage?.agent || 0}</Text></Text>
-                            <Text>• Background Tasks:     <Text color="blue">{dailyUsage?.background || 0}</Text></Text>
+                            <Text>• Memory Tasks:         <Text color="blue">{dailyUsage?.background || 0}</Text></Text>
                         </Box>
                         <Text dimColor marginTop={1}>(Press ESC to return to chat)</Text>
                     </Box>
@@ -1241,8 +1298,8 @@ OUTPUT: ${execOutputRef.current}`;
                         <Text color="red" bold>🏁 SESSION DASHBOARD</Text>
                         <Box flexDirection="column" marginTop={1}>
                             <Text>• Agent Active For:      <Text color="yellow">{formatDuration(Math.floor((Date.now() - SESSION_START_TIME) / 1000))}</Text></Text>
-                            <Text>• Total Agent Queries:  <Text color="green">{sessionAgentCalls}</Text></Text>
-                            <Text>• Memory Tasks:        <Text color="blue">{sessionBackgroundCalls}</Text></Text>
+                            <Text>• Total Model Queries:   <Text color="green">{sessionAgentCalls}</Text></Text>
+                            <Text>• Memory Tasks:          <Text color="blue">{sessionBackgroundCalls}</Text></Text>
                             <Text>• Total Tokens Consumed: <Text color="magenta">{(sessionTotalTokens / 1000).toFixed(2)}k</Text></Text>
                         </Box>
                         <Text marginTop={1}>Are you sure you want to exit?</Text>
@@ -1394,6 +1451,67 @@ OUTPUT: ${execOutputRef.current}`;
                         </Box>
                     </Box>
                 );
+            case 'updateManager':
+                return (
+                    <CommandMenu
+                        title="Select Preferred Update Manager"
+                        subtitle="NOTE: If you are unsure about these, go with NPM"
+                        items={[
+                            { label: 'NPM   (Standard)', value: 'npm' },
+                            { label: 'PNPM  (Recommended)', value: 'pnpm' },
+                            { label: 'BUN   (Ultra Fast)', value: 'bun' },
+                            { label: 'YARN  (Classic)', value: 'yarn' },
+                            { label: 'Custom Command', value: 'custom' },
+                            { label: 'Back', value: 'settings' }
+                        ]}
+                        onSelect={(item) => {
+                            if (item.value === 'settings' || item.value === 'Back') {
+                                setActiveView('settings');
+                                return;
+                            }
+
+                            if (item.value === 'custom') {
+                                setInputConfig({
+                                    label: "Enter Custom Update Command (Global install recommended):",
+                                    key: 'customUpdateCommand',
+                                    value: systemSettings.customUpdateCommand,
+                                    next: (val) => {
+                                        setSystemSettings(s => ({ ...s, updateManager: 'custom', customUpdateCommand: val }));
+                                        return null; // Return to settings handled below
+                                    }
+                                });
+                                setActiveView('input');
+                            } else {
+                                setSystemSettings(s => ({ ...s, updateManager: item.value }));
+                                setActiveView('settings');
+                            }
+                        }}
+                    />
+                );
+            case 'update':
+                return (
+                    <UpdateProcessor
+                        latest={latestVer}
+                        current={versionFluxflow}
+                        settings={systemSettings}
+                        onClose={() => setActiveView('chat')}
+                        onSuccess={() => {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: 'update-success-' + Date.now(),
+                                    role: 'system',
+                                    text: `✨ **[UPDATE COMPLETED]** Flux Flow successfully upgraded to v${latestVer}.\n🚀 **Restart Flux Flow to see changes.**`,
+                                    isMeta: true
+                                }];
+                            });
+                            setActiveView('chat');
+                        }}
+                        onUpdateSettings={(manager) => {
+                            setActiveView('updateManager');
+                        }}
+                    />
+                );
             case 'terminalApproval':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1} width="100%">
@@ -1424,7 +1542,10 @@ OUTPUT: ${execOutputRef.current}`;
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                             <Box>
                                 {statusText && (
-                                    <Text color="magenta" italic>⏳ {statusText}</Text>
+                                    <Box>
+                                        <Text color="magenta"><Spinner type="dots" /></Text>
+                                        <Text color="magenta" italic> {statusText}</Text>
+                                    </Box>
                                 )}
                             </Box>
                             <Text color="gray" dimColor>({tempModelOverride || activeModel})</Text>

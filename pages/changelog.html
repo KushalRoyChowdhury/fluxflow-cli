@@ -205,16 +205,22 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.2.0", "1.2.2"]
+        const stableVersions = ["1.2.0", "1.3.0"]
         const changelogData = {
-            "1.2.2": {
-                "added": [
-                    "Real-time context counter window update."
+            "1.3.0": {
+                "added":
+                [
+                    "Added `Auto Updater` with user prefered package manager.",
+                    "Added `/update` & `/update check` commands."
                 ],
-                "changed": [],
+                "changed": [
+                    "Real-time context counter window update.",
+                    "Improved Session Dashboard."
+                ],
                 "fixes": [
                     "Fixed the `read-folder` tool to get a detailed file structure",
-                    "Fixed the issue where *Agent Called* counter was higher than actual agent calls."
+                    "Fixed the issue where `Agent Called` counter was higher than actual agent calls.",
+                    "Improved UI spacing."
                 ]
             },
             "1.2.0": {
