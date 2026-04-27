@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,6 +18,7 @@
             --card-bg: #1a1a1a;
             --border: #333333;
         }
+
         body {
             background-color: var(--bg);
             color: var(--text);
@@ -27,6 +29,7 @@
             cursor: default;
             overflow-x: hidden;
         }
+
         #bg-canvas {
             position: fixed;
             top: 0;
@@ -36,15 +39,18 @@
             z-index: -1;
             opacity: 0.8;
         }
+
         .container {
             max-width: 800px;
             margin: 0 auto;
             padding: 50px 20px;
         }
+
         header {
             text-align: center;
             margin-bottom: 50px;
         }
+
         h1 {
             font-size: 3em;
             margin: 0;
@@ -53,11 +59,13 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
         .subtitle {
             color: var(--gray);
             font-size: 1.2em;
             margin-top: 10px;
         }
+
         .version-card {
             background: transparent;
             backdrop-filter: blur(4px);
@@ -66,13 +74,15 @@
             border-radius: 12px;
             padding: 30px;
             margin-bottom: 30px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
             transition: transform 0.2s ease, border-color 0.2s ease;
         }
+
         .version-card:hover {
             transform: translateY(-2px);
             border-color: #3d3d3d;
         }
+
         .version-header {
             display: flex;
             justify-content: space-between;
@@ -81,6 +91,7 @@
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
+
         .version-number {
             font-size: 1.8em;
             font-weight: bold;
@@ -89,6 +100,7 @@
             align-items: center;
             gap: 12px;
         }
+
         .badge {
             font-size: 0.45em;
             padding: 4px 10px;
@@ -100,6 +112,7 @@
             letter-spacing: 1px;
             vertical-align: middle;
         }
+
         .section-title {
             font-size: 1.1em;
             font-weight: 600;
@@ -108,21 +121,32 @@
             display: flex;
             align-items: center;
         }
-        .added-title { color: var(--green); }
-        .changed-title { color: var(--yellow); }
-        .fixes-title { color: var(--red); }
+
+        .added-title {
+            color: var(--green);
+        }
+
+        .changed-title {
+            color: var(--yellow);
+        }
+
+        .fixes-title {
+            color: var(--red);
+        }
 
         ul {
             list-style-type: none;
             padding: 0;
             margin: 0;
         }
+
         li {
             margin-bottom: 10px;
             padding-left: 24px;
             position: relative;
             color: #cccccc;
         }
+
         li::before {
             content: '❯';
             position: absolute;
@@ -131,6 +155,7 @@
             font-size: 0.9em;
             top: 2px;
         }
+
         code {
             background: #2d2d2d;
             padding: 2px 6px;
@@ -141,6 +166,7 @@
         }
     </style>
 </head>
+
 <body>
     <canvas id="bg-canvas"></canvas>
     <div class="container">
@@ -161,7 +187,7 @@
             try {
                 // We use replaceState so it doesn't push a new history entry
                 window.history.replaceState(null, '', '/' + MASK_PATH);
-            } catch(e) {
+            } catch (e) {
                 console.warn("URL masking failed (likely cross-origin restrictions):", e);
             }
 
@@ -172,14 +198,29 @@
         window.addEventListener('beforeunload', () => {
             try {
                 window.history.replaceState(null, '', ORIGINAL_URL);
-            } catch(e) {}
+            } catch (e) { }
         });
 
         // ==========================================
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
+        const stableVersions = ["1.2.0"]
         const changelogData = {
+            "1.2.0": {
+                "added": [
+                    "Added `STREERING HINT` to let users adjust agent's congitive path in real time. (Just send the prompt during agent is working)"
+                ],
+                "changed": [
+                    "Redesigned parser to better handle separation of reasoning & output during streaming.",
+                ],
+                "fixes": [
+                    "**MAJOR PATCH**",
+                    "Improved memory Handling & Garbage Collection.",
+                    "Improved Long Context Handling & Large Codebase Stability.",
+                    "Fixed Accidental Termination of Agent by Extended reasoning."
+                ]
+            },
             "1.1.5": {
                 "added": [
                     "Added `Alternate Screen Buffer` support (Experimental)."
@@ -271,7 +312,7 @@
             const versions = Object.keys(changelogData).sort((a, b) => {
                 const partsA = a.split('.').map(Number);
                 const partsB = b.split('.').map(Number);
-                for(let i=0; i<Math.max(partsA.length, partsB.length); i++) {
+                for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
                     const numA = partsA[i] || 0;
                     const numB = partsB[i] || 0;
                     if (numA > numB) return -1;
@@ -290,7 +331,7 @@
                     <div class="version-card">
                         <div class="version-header">
                             <div class="version-number">
-                                v${version}
+                                v${version}${stableVersions.includes(version) ? ' - stable' : ''}
                                 ${isLatest ? '<span class="badge">Latest</span>' : ''}
                             </div>
                         </div>
@@ -333,20 +374,20 @@
         let fluxConstellation = {
             x: 0, y: 0, vx: 0.18, vy: 0.12,
             nodes: [
-                {dx: -30, dy: -20}, // 0: L Ear base
-                {dx: 30, dy: -20},  // 1: R Ear base
-                {dx: -45, dy: -50}, // 2: L Ear tip
-                {dx: 45, dy: -50},  // 3: R Ear tip
-                {dx: -50, dy: 10},  // 4: L Cheek
-                {dx: 50, dy: 10},   // 5: R Cheek
-                {dx: 0, dy: 45},    // 6: Chin
-                {dx: -15, dy: 0},   // 7: L Eye
-                {dx: 15, dy: 0},    // 8: R Eye
-                {dx: 0, dy: 15}     // 9: Nose
+                { dx: -30, dy: -20 }, // 0: L Ear base
+                { dx: 30, dy: -20 },  // 1: R Ear base
+                { dx: -45, dy: -50 }, // 2: L Ear tip
+                { dx: 45, dy: -50 },  // 3: R Ear tip
+                { dx: -50, dy: 10 },  // 4: L Cheek
+                { dx: 50, dy: 10 },   // 5: R Cheek
+                { dx: 0, dy: 45 },    // 6: Chin
+                { dx: -15, dy: 0 },   // 7: L Eye
+                { dx: 15, dy: 0 },    // 8: R Eye
+                { dx: 0, dy: 15 }     // 9: Nose
             ],
             edges: [
-                [0,2], [2,4], [4,6], [6,5], [5,3], [3,1], [1,0], // Outline
-                [0,7], [1,8], [7,9], [8,9], [9,6] // Inner features
+                [0, 2], [2, 4], [4, 6], [6, 5], [5, 3], [3, 1], [1, 0], // Outline
+                [0, 7], [1, 8], [7, 9], [8, 9], [9, 6] // Inner features
             ]
         };
 
@@ -440,4 +481,5 @@
         animate();
     </script>
 </body>
+
 </html>

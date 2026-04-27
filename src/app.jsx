@@ -27,7 +27,7 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.1.8';
+const versionFluxflow = '1.2.0';
 const updatedOn = '2026-04-27';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -665,26 +665,30 @@ OUTPUT: ${execOutputRef.current}`;
                                 });
                             }
                         },
-                        async (hint) => {
-                            if (queuedPrompt) {
-                                if (queuedPromptRef.current) {
-                                    const p = queuedPromptRef.current;
-                                    setQueuedPrompt(null);
-                                    queuedPromptRef.current = null;
+                        async () => {
+                            // Use the Ref directly to avoid stale closure issues with current state
+                            if (queuedPromptRef.current) {
+                                const p = queuedPromptRef.current;
+                                setQueuedPrompt(null);
+                                queuedPromptRef.current = null;
 
-                                    // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
-                                    setMessages(prev => {
+                                // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
+                                setMessages(prev => {
+                                    const index = [...prev].reverse().findIndex(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                                    if (index !== -1) {
+                                        const actualIndex = prev.length - 1 - index;
                                         const newMsgs = [...prev];
-                                        const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
-                                        if (hintMsg) {
-                                            hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
-                                            hintMsg.color = 'cyan';
-                                        }
-                                        return newMsgs.reverse();
-                                    });
+                                        newMsgs[actualIndex] = {
+                                            ...newMsgs[actualIndex],
+                                            text: newMsgs[actualIndex].text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]'),
+                                            color: 'cyan'
+                                        };
+                                        return newMsgs;
+                                    }
+                                    return prev;
+                                });
 
-                                    return p;
-                                }
+                                return p;
                             }
                             return null;
                         }
@@ -745,61 +749,67 @@ OUTPUT: ${execOutputRef.current}`;
                         let chunkText = packet.content;
 
                         // 1. Detect transition to THINK mode
-                        if (chunkText.includes('<think>') && !inThinkMode) {
+                        if (chunkText.toLowerCase().includes('<think') && !inThinkMode) {
                             inThinkMode = true;
-                            chunkText = chunkText.replace('<think>', '');
+                            // Clean up any partial tags from the visible text
+                            chunkText = chunkText.replace(/<think>/gi, '');
                             currentThinkId = 'think-' + Date.now();
                             setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '' }]);
                         }
 
-                        // 2. Detect transition to AGENT mode (Normal or Stray)
-                        if (chunkText.includes('</think>')) {
-                            const [thinkPart, agentPart] = chunkText.split('</think>');
+                        // 2. Aggressive Transition Analysis
+                        // We check for </think> in EVERY chunk if we are in think mode
+                        if (chunkText.toLowerCase().includes('</think>')) {
+                            const parts = chunkText.split(/<\/think>/gi);
+                            const thinkPart = parts[0] || '';
+                            const agentPart = parts.slice(1).join('</think>') || '';
 
-                            if (inThinkMode) {
-                                setMessages(prev => {
-                                    const newMsgs = prev.map(m =>
-                                        m.id === currentThinkId
-                                            ? { ...m, text: m.text + thinkPart.replace(signalRegex, '') }
-                                            : m
-                                    );
+                            setMessages(prev => {
+                                const newMsgs = prev.map(m =>
+                                    m.id === currentThinkId
+                                        ? { ...m, text: m.text + thinkPart }
+                                        : m
+                                );
 
-                                    currentAgentId = 'agent-' + Date.now();
-                                    const cleanedAgentPart = (agentPart || '').replace(signalRegex, '');
-                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: cleanedAgentPart }];
-                                });
                                 inThinkMode = false;
-                            } else {
-                                // Stray </think> case - clean it and ensure agent mode
-                                const cleanedContent = (agentPart || thinkPart || '').replace(signalRegex, '');
-                                if (!currentAgentId) {
-                                    currentAgentId = 'agent-' + Date.now();
-                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedContent }]);
-                                } else {
-                                    setMessages(prev => prev.map(m =>
-                                        m.id === currentAgentId
-                                            ? { ...m, text: m.text + cleanedContent }
-                                            : m
-                                    ));
-                                }
-                            }
+                                currentAgentId = 'agent-' + Date.now();
+                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart.replace(/<\/?think>/gi, '') }];
+                            });
                             continue;
                         }
 
-                        // 3. Append to target role
+                        // 3. Append to target role with Leak Protection
                         if (inThinkMode && currentThinkId) {
-                            setMessages(prev => prev.map(m =>
-                                m.id === currentThinkId
-                                    ? { ...m, text: m.text + chunkText.replace(signalRegex, '') }
-                                    : m
-                            ));
-                        } else if (!inThinkMode) {
-                            // IMPROVED: Aggressively strip ANY think tags to prevent raw "leaking" in the UI
-                            const cleanedText = chunkText
-                                .replace(/<\/?think>/gi, '') // Strip <think> and </think> (case-insensitive)
-                                .replace(signalRegex, '');
+                            // Even if the tag was split across chunks (e.g. </th then ink>),
+                            // we catch the 'ink>' part here by checking if the resulting thought block
+                            // now contains the full tag.
+                            setMessages(prev => {
+                                let transitioning = false;
+                                let transitionContent = '';
 
-                            // Ensure an agent message exists
+                                const newMsgs = prev.map(m => {
+                                    if (m.id === currentThinkId) {
+                                        const newText = m.text + chunkText;
+                                        if (newText.toLowerCase().includes('</think>')) {
+                                            transitioning = true;
+                                            const parts = newText.split(/<\/think>/gi);
+                                            transitionContent = parts.slice(1).join('</think>') || '';
+                                            return { ...m, text: parts[0] };
+                                        }
+                                        return { ...m, text: newText };
+                                    }
+                                    return m;
+                                });
+
+                                if (transitioning) {
+                                    inThinkMode = false;
+                                    currentAgentId = 'agent-' + Date.now();
+                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?think>/gi, '') }];
+                                }
+                                return newMsgs;
+                            });
+                        } else if (!inThinkMode) {
+                            const cleanedText = chunkText.replace(/<\/?think>/gi, '').replace(signalRegex, '');
                             if (!currentAgentId) {
                                 currentAgentId = 'agent-' + Date.now();
                                 setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
@@ -1322,7 +1332,10 @@ OUTPUT: ${execOutputRef.current}`;
                             onResolve={(val) => {
                                 setResolutionData(null);
                                 setActiveView('chat');
-                                handleSubmit(val);
+                                // Defer execution to ensure state has settled and modal is unmounted
+                                setTimeout(() => {
+                                    handleSubmit(val);
+                                }, 50);
                             }}
                             onEdit={(val) => {
                                 setResolutionData(null);

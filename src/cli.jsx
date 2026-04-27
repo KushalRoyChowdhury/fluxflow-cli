@@ -1,35 +1,52 @@
 #!/usr/bin/env node
-import React from 'react';
-import { render } from 'ink';
-import App from './app.jsx';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 
-// 1. SUPPRESS NOISE: Block Node.js deprecation warnings and internal library logs
-process.env.NODE_NO_WARNINGS = '1';
+/**
+ * AUTO-HEAP SCALER (4GB)
+ * This ensures the agent can handle massive 3.1M+ token sessions and large project scans
+ * without hitting Node's default memory limits.
+ */
+const HEAP_LIMIT = 4096;
+const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
-// 2. LOG HIJACKER: Silence diagnostic noise from libraries (like cuimp) that leak to stdout
-const silentPatterns = [
-    'cuimp',
-    'Found existing binary',
-    'Binary verified',
-    'curl.exe not found',
-    'Falling back to .bat file',
-    'DeprecationWarning'
-];
+if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
+    const cp = spawn(process.execPath, [
+        `--max-old-space-size=${HEAP_LIMIT}`,
+        fileURLToPath(import.meta.url),
+        ...process.argv.slice(2)
+    ], { stdio: 'inherit' });
+    cp.on('exit', (code) => process.exit(code || 0));
+} else {
+    // START APPLICATION
+    const { default: React } = await import('react');
+    const { render } = await import('ink');
+    const { default: App } = await import('./app.jsx');
 
-const originalLog = console.log;
-const originalWarn = console.warn;
-const originalError = console.error;
+    // 1. SUPPRESS NOISE
+    process.env.NODE_NO_WARNINGS = '1';
 
-const isNoise = (args) => {
-    const msg = args.map(String).join(' ');
-    return silentPatterns.some(p => msg.includes(p));
-};
+    // 2. LOG HIJACKER
+    const silentPatterns = [
+        'cuimp', 'Found existing binary', 'Binary verified',
+        'curl.exe not found', 'Falling back to .bat file', 'DeprecationWarning'
+    ];
 
-console.log = (...args) => !isNoise(args) && originalLog(...args);
-console.warn = (...args) => !isNoise(args) && originalWarn(...args);
-console.error = (...args) => !isNoise(args) && originalError(...args);
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
 
-// 3. CLEAN SLATE: Hard reset terminal for Ink rendering
-process.stdout.write('\x1Bc');
+    const isNoise = (args) => {
+        const msg = args.map(String).join(' ');
+        return silentPatterns.some(p => msg.includes(p));
+    };
 
-render(<App />);
+    console.log = (...args) => !isNoise(args) && originalLog(...args);
+    console.warn = (...args) => !isNoise(args) && originalWarn(...args);
+    console.error = (...args) => !isNoise(args) && originalError(...args);
+
+    // 3. CLEAN SLATE
+    process.stdout.write('\x1Bc');
+
+    render(<App />);
+}
