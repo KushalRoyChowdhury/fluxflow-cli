@@ -29,7 +29,7 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.3.3';
+const versionFluxflow = '1.3.4';
 const updatedOn = '2026-04-29';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1040,7 +1040,7 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
 
                         title="🤖 Select AI Model"
-                        items={[{ label: 'Gemma 4 31B            (Recomended - Default)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Recomended - Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
+                        items={[{ label: 'Gemma 4 31B            (Recomended - Default, Use Free Tier Key)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Recomended - Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
                         onSelect={(item) => {
                             if (item.value !== 'Cancel') setActiveModel(item.value);
                             setActiveView('chat');
