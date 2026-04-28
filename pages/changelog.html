@@ -205,8 +205,19 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.3.4", "1.3.3"]
+        const stableVersions = ["1.3.4", "1.3.3", "1.3.5"]
         const changelogData = {
+            "1.3.5": {
+                "added": [
+                    "Smart Word Wrap for better reading experience."
+                ],
+                "changed": [
+                    "Removed few modals and implemented their functionality directly in command shortcuts to reduce Context Switching during workflow."
+                ],
+                "fixes": [
+                    "Better `Table` markdown rendering."
+                ]
+            },
             "1.3.4": {
                 "added": [],
                 "changed": [

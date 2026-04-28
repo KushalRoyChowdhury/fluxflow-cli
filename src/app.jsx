@@ -29,7 +29,7 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.3.4';
+const versionFluxflow = '1.3.5';
 const updatedOn = '2026-04-29';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1022,15 +1022,6 @@ OUTPUT: ${execOutputRef.current}`;
             return COMMANDS.filter(c => {
                 const cleanCmd = c.cmd.startsWith('/') ? c.cmd.slice(1) : c.cmd;
                 return cleanCmd.includes(cleanQuery);
-            })
-            .sort((a, b) => {
-                const cleanA = a.cmd.startsWith('/') ? a.cmd.slice(1) : a.cmd;
-                const cleanB = b.cmd.startsWith('/') ? b.cmd.slice(1) : b.cmd;
-                const aStarts = cleanA.startsWith(cleanQuery);
-                const bStarts = cleanB.startsWith(cleanQuery);
-                if (aStarts && !bStarts) return -1;
-                if (!aStarts && bStarts) return 1;
-                return a.cmd.localeCompare(b.cmd);
             });
         }
 
@@ -1038,14 +1029,7 @@ OUTPUT: ${execOutputRef.current}`;
         if (parts.length === 2) {
             const parent = COMMANDS.find(c => c.cmd === parts[0].toLowerCase());
             if (parent && parent.subs) {
-                return parent.subs.filter(s => s.cmd.includes(query))
-                    .sort((a, b) => {
-                        const aStarts = a.cmd.startsWith(query);
-                        const bStarts = b.cmd.startsWith(query);
-                        if (aStarts && !bStarts) return -1;
-                        if (!aStarts && bStarts) return 1;
-                        return a.cmd.localeCompare(b.cmd);
-                    });
+                return parent.subs.filter(s => s.cmd.includes(query));
             }
         }
 
@@ -1833,7 +1817,7 @@ OUTPUT: ${execOutputRef.current}`;
                             {visible.map((s, i) => {
                                 const actualIdx = startIdx + i;
                                 const isActive = actualIdx === selectedIndex;
-                                const cmdText = s.cmd.padEnd(12); // Ensure description starts at col 12
+                                const cmdText = s.cmd.padEnd(32); // Ensure description starts at col 32
 
                                 return (
                                     <Box key={s.cmd} flexDirection="row">
