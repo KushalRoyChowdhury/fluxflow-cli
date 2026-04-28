@@ -43,6 +43,10 @@ const cleanSignals = (text) => {
         .replace(/\n\nResponded on .*/g, '')
         .replace(/\n\n\[Prompted on: .*\]/g, '')
         .replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
+        .replace(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
+        .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
+        .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
+        .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
         .trim();
 };
 
@@ -72,66 +76,177 @@ const formatThinkText = (cleaned) => {
     });
 };
 
-const MarkdownText = React.memo(({ text, color = 'white' }) => {
+const InlineMarkdown = React.memo(({ text, color }) => {
+    if (!text) return null;
+    // Split by Bold, Italic, Inline Code, \viewtext{...} and [text](url)
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\$\\viewtext\{.*?\}\$|\[.*?\]\(.*?\))/g);
+    return (
+        <Text color={color} wrap="anywhere">
+            {parts.map((part, j) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <Text key={j} bold color="white">{part.slice(2, -2)}</Text>;
+                }
+                if (part.startsWith('*') && part.endsWith('*')) {
+                    return <Text key={j} italic color="gray">{part.slice(1, -1)}</Text>;
+                }
+                if (part.startsWith('`') && part.endsWith('`')) {
+                    return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
+                }
+                if (part.startsWith('$\\viewtext{') && part.endsWith('}$')) {
+                    const content = part.slice(11, -2);
+                    return (
+                        <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {content} </Text>
+                    );
+                }
+                if (part.startsWith('[') && part.includes('](')) {
+                    const match = part.match(/\[(.*?)\]\((.*?)\)/);
+                    if (match) {
+                        return (
+                            <Text key={j}>
+                                <Text color="cyan" underline>{match[1]}</Text>
+                                <Text color="gray" dimColor> ({match[2]})</Text>
+                            </Text>
+                        );
+                    }
+                }
+                return part;
+            })}
+        </Text>
+    );
+});
+
+const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
+    if (buffer.length < 2) return null;
+
+    const rows = buffer.map(line => 
+        line.split('|')
+            .filter((_, i, arr) => i > 0 && i < arr.length - 1)
+            .map(cell => cell.trim())
+    );
+
+    const header = rows[0];
+    const data = rows.slice(2);
+
+    // Calculate max-content widths for each column
+    const colWidths = header.map((_, i) => {
+        let max = header[i].replace(/\*|`/g, '').length;
+        data.forEach(row => {
+            const cleanCell = (row[i] || '').replace(/\*|`/g, '');
+            if (cleanCell.length > max) max = cleanCell.length;
+        });
+        return max;
+    });
+
+    return (
+        <Box flexDirection="column" borderStyle="single" borderColor="#333" paddingX={1} marginY={1} alignSelf="flex-start">
+            {/* Header */}
+            <Box flexDirection="row" marginBottom={1}>
+                {header.map((cell, i) => (
+                    <Box key={i} width={colWidths[i] + 4} paddingRight={4}>
+                        <InlineMarkdown text={cell} color="cyan" />
+                    </Box>
+                ))}
+            </Box>
+            
+            {/* Divider Line */}
+            <Box borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} borderColor="#444" width="100%" marginBottom={1} />
+
+            {/* Rows */}
+            {data.map((row, ri) => (
+                <Box key={ri} flexDirection="row" marginBottom={ri === data.length - 1 ? 0 : 1}>
+                    {row.map((cell, ci) => (
+                        <Box key={ci} width={colWidths[ci] + 4} paddingRight={4} flexDirection="column">
+                            <InlineMarkdown text={cell} color="white" />
+                        </Box>
+                    ))}
+                </Box>
+            ))}
+        </Box>
+    );
+});
+
+const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
     if (!text) return null;
 
     const lines = text.split('\n');
-    return (
-        <Box flexDirection="column" width="100%">
-            {lines.map((line, i) => {
-                const trimmed = line.trim();
+    const result = [];
+    let tableBuffer = [];
+    let quoteBuffer = [];
 
-                // Horizontal Rule
-                if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
-                    return <Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor="#333" />;
-                }
+    const flushBuffers = (key) => {
+        if (tableBuffer.length > 0) {
+            result.push(<TableRenderer key={`table-${key}`} buffer={[...tableBuffer]} terminalWidth={columns} />);
+            tableBuffer = [];
+        }
+        if (quoteBuffer.length > 0) {
+            result.push(
+                <Box key={`quote-${key}`} borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor="gray" paddingLeft={1} marginY={1} flexDirection="column">
+                    {quoteBuffer.map((line, qi) => (
+                        <InlineMarkdown key={qi} text={line} color="gray" />
+                    ))}
+                </Box>
+            );
+            quoteBuffer = [];
+        }
+    };
 
-                // Headings
-                const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)/);
-                if (headingMatch) {
-                    const level = headingMatch[1].length;
-                    const hText = headingMatch[2];
-                    return (
-                        <Box key={i} marginTop={1} marginBottom={0} width="100%">
-                            <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : 'yellow'} underline>
-                                {hText.toUpperCase()}
-                            </Text>
-                        </Box>
-                    );
-                }
+    lines.forEach((line, i) => {
+        const trimmed = line.trim();
+        const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+        const isQuote = trimmed.startsWith('>');
 
-                const isUnordered = trimmed.startsWith('* ') || trimmed.startsWith('- ');
-                const isOrdered = /^\d+\.\s/.test(trimmed);
+        if (isTableRow) {
+            if (quoteBuffer.length > 0) flushBuffers(i); // Only flush OTHER buffers
+            tableBuffer.push(line);
+        } else if (isQuote) {
+            if (tableBuffer.length > 0) flushBuffers(i); // Only flush OTHER buffers
+            quoteBuffer.push(trimmed.replace(/^>\s*/, ''));
+        } else {
+            flushBuffers(i); // Flush everything for normal text
+            
+            if (trimmed === '') {
+                result.push(<Box key={i} height={1} />);
+                return;
+            }
+          // Horizontal Rule
+            if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+                result.push(<Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor="#333" />);
+                return;
+            }
 
-                let content = trimmed;
-                if (isUnordered || isOrdered) {
-                    content = (isUnordered ? '  • ' : '') + trimmed.replace(/^[\*\-\d+\.]+\s/, '');
-                }
-
-                // Split by Bold, Italic, and Inline Code
-                const parts = content.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
-
-                return (
-                    <Box key={i} width="100%">
-                        <Text color={color} wrap="anywhere">
-                            {parts.map((part, j) => {
-                                if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <Text key={j} bold color="white">{part.slice(2, -2)}</Text>;
-                                }
-                                if (part.startsWith('*') && part.endsWith('*')) {
-                                    return <Text key={j} italic color="gray">{part.slice(1, -1)}</Text>;
-                                }
-                                if (part.startsWith('`') && part.endsWith('`')) {
-                                    return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
-                                }
-                                return part;
-                            })}
+            // Headings
+            const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)/);
+            if (headingMatch) {
+                const level = headingMatch[1].length;
+                const hText = headingMatch[2];
+                result.push(
+                    <Box key={i} marginTop={1} marginBottom={0} width="100%">
+                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : 'yellow'} underline>
+                            {hText.toUpperCase()}
                         </Text>
                     </Box>
                 );
-            })}
-        </Box>
-    );
+                return;
+            }
+
+            const isUnordered = trimmed.startsWith('* ') || trimmed.startsWith('- ');
+            const isOrdered = /^\d+\.\s/.test(trimmed);
+
+            let content = trimmed;
+            if (isUnordered || isOrdered) {
+                content = (isUnordered ? '  • ' : '') + trimmed.replace(/^[\*\-\d+\.]+\s/, '');
+            }
+
+            result.push(
+                <Box key={i} width="100%">
+                    <InlineMarkdown text={content} color={color} />
+                </Box>
+            );
+        }
+    });
+
+    flushBuffer('final');
+    return <Box flexDirection="column" width="100%">{result}</Box>;
 });
 
 const DiffLine = React.memo(({ line }) => {
@@ -161,7 +276,7 @@ const DiffLine = React.memo(({ line }) => {
     );
 });
 
-const DiffBlock = React.memo(({ text }) => {
+const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const beforeDiff = text.substring(0, text.indexOf('[DIFF_START]')).trim();
     const afterDiff = text.substring(text.indexOf('[DIFF_END]') + 10).trim();
     const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
@@ -170,23 +285,23 @@ const DiffBlock = React.memo(({ text }) => {
 
     return (
         <Box flexDirection="column" width="100%">
-            {beforeDiff && <MarkdownText text={beforeDiff} />}
+            {beforeDiff && <MarkdownText text={beforeDiff} columns={columns} />}
             <Box flexDirection="column" marginTop={1} backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
                     <DiffLine key={i} line={line} />
                 ))}
             </Box>
-            {afterDiff && <MarkdownText text={afterDiff} />}
+            {afterDiff && <MarkdownText text={afterDiff} columns={columns} />}
         </Box>
     );
 });
 
-const CodeRenderer = React.memo(({ text }) => {
+const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     if (!text) return null;
 
     // SCENARIO 1: Surgical Diff [DIFF_START]
     if (text.includes('[DIFF_START]')) {
-        return <DiffBlock text={text} />;
+        return <DiffBlock text={text} columns={columns} />;
     }
 
     // SCENARIO 2: Standard Markdown Fenced Code Blocks ```
@@ -211,22 +326,22 @@ const CodeRenderer = React.memo(({ text }) => {
                             </Box>
                         );
                     }
-                    return <MarkdownText key={i} text={part} />;
+                    return <MarkdownText key={i} text={part} columns={columns} />;
                 })}
             </Box>
         );
     }
 
     // SCENARIO 3: Standard Markdown
-    return <MarkdownText text={text} />;
+    return <MarkdownText text={text} columns={columns} />;
 });
 
-export const MessageItem = React.memo(({ msg, showFullThinking }) => {
+export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START]
-    const isDiffResult = msg.role === 'system' && msg.text.includes('[DIFF_START]');
+    const isDiffResult = msg.role === 'system' && msg.text?.includes('[DIFF_START]');
     const isTerminalRecord = msg.isTerminalRecord;
 
-    if (msg.role === 'system' && msg.text.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord) return null;
+    if (msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord) return null;
 
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
@@ -250,7 +365,42 @@ export const MessageItem = React.memo(({ msg, showFullThinking }) => {
                 <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} width="100%">
                     <Text color="yellow" bold underline>🚀 UPDATE AVAILABLE</Text>
                     <Box marginTop={1}>
-                        <CodeRenderer text={msg.text} />
+                        <CodeRenderer text={msg.text} columns={columns} />
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (msg.isHelpRecord) {
+        const commandList = [
+            { cmd: '/mode', desc: 'Switch dev/chat mode' },
+            { cmd: '/thinking', desc: 'Set reasoning level' },
+            { cmd: '/model', desc: 'Change AI model' },
+            { cmd: '/settings', desc: 'Open system settings' },
+            { cmd: '/stats', desc: 'View usage statistics' },
+            { cmd: '/profile', desc: 'Manage your persona' },
+            { cmd: '/update', desc: 'Check/apply updates' },
+            { cmd: '/memory', desc: 'Manage agent memories' },
+            { cmd: '/save', desc: 'Save current session' },
+            { cmd: '/chats', desc: 'List saved sessions' },
+            { cmd: '/reset', desc: 'Purge all app data' },
+            { cmd: '/exit', desc: 'Close Flux Flow' }
+        ];
+
+        return (
+            <Box marginBottom={1} paddingX={1} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
+                    <Text color="magenta" bold underline>📜 COMMAND REFERENCE</Text>
+                    <Box flexDirection="column" marginTop={1}>
+                        {commandList.map((c, i) => (
+                            <Box key={i} flexDirection="row">
+                                <Box width={15}>
+                                    <Text color="cyan" bold>{c.cmd}</Text>
+                                </Box>
+                                <Text color="gray"> - {c.desc}</Text>
+                            </Box>
+                        ))}
                     </Box>
                 </Box>
             </Box>
@@ -326,7 +476,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking }) => {
                 </Box>
             ) : (
                 <Box flexDirection="column" paddingX={1} marginTop={1} width="100%">
-                    <CodeRenderer text={finalContent} />
+                    <CodeRenderer text={finalContent} columns={columns} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
                             <Text color="yellow" italic>✨ [Memory Updated]</Text>
@@ -338,7 +488,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking }) => {
     );
 });
 
-const ChatLayout = React.memo(({ messages, showFullThinking }) => {
+const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80 }) => {
     return (
         <Box flexDirection="column" width="100%">
             {messages.map((msg, idx) => (
@@ -346,6 +496,7 @@ const ChatLayout = React.memo(({ messages, showFullThinking }) => {
                     key={msg.id || idx} 
                     msg={msg} 
                     showFullThinking={showFullThinking} 
+                    columns={columns}
                 />
             ))}
         </Box>

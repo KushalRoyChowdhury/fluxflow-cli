@@ -50,6 +50,6 @@ export const web_scrape = async (args) => {
         return `CONTENT FROM [${url}]:\n\n${finalContent}${text.length > 20000 ? '\n\n[TRUNCATED AT 20K CHARS]' : ''}`;
 
     } catch (err) {
-        return `ERROR: Failed to read page at ${url}. ${err.message}`;
+        return `ERROR: Failed to read page at ${url}. Unable to read.`;
     }
 };

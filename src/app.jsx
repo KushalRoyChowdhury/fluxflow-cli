@@ -29,7 +29,7 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.3.0';
+const versionFluxflow = '1.3.1';
 const updatedOn = '2026-04-28';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -78,6 +78,8 @@ export default function App() {
         columns: stdout?.columns || 80,
         rows: stdout?.rows || 24
     });
+
+    const [selectedIndex, setSelectedIndex] = useState(0);
 
     const performVersionCheck = async (manual = false, settingsOverride = null) => {
         const settingsToUse = settingsOverride || systemSettings;
@@ -214,10 +216,17 @@ export default function App() {
             if (!msg) continue;
 
             // Estimate lines for this message
-            let lines = (msg.text || '').split(/\r?\n/).length;
-            msg.text.split(/\r?\n/).forEach(l => {
+            const text = msg.text || '';
+            let lines = text.split(/\r?\n/).length;
+            text.split(/\r?\n/).forEach(l => {
                 lines += Math.floor(l.length / width);
             });
+
+            // Adjust for UI-only records
+            if (msg.isHelpRecord) lines = 15;
+            if (msg.isUpdateNotification) lines = 8;
+            if (msg.isTerminalRecord) lines = 10;
+
             lines += msg.role === 'think' ? 3 : 2; // Padding/overhead
 
             // If adding this message exceeds the limit, stop here
@@ -274,10 +283,27 @@ export default function App() {
             }
         }
 
-        // 2. Tab Completion (only if input mode)
+        // 2. Suggestion Interaction (Arrows & Enter)
+        if (suggestions.length > 0 && activeView === 'chat') {
+            if (key.upArrow) {
+                setSelectedIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+                return;
+            }
+            if (key.downArrow) {
+                setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+                return;
+            }
+            if (key.return) {
+                // Return handling is now coordinated with TextInput onSubmit for stability
+                return;
+            }
+        }
+
+        // 3. Tab Completion (legacy support)
         if (key.tab && suggestions.length > 0 && activeView === 'chat') {
-            const nextCmd = suggestions[0];
+            const nextCmd = suggestions[selectedIndex] || suggestions[0];
             setInput(nextCmd + ' ');
+            setSelectedIndex(0);
         }
 
         // 3. CTRL+C Exit Protocol
@@ -364,6 +390,14 @@ export default function App() {
     const COMMANDS = ['/quit', '/help', '/clear', '/resume', '/save', '/chats', '/mode', '/thinking', '/model', '/settings', '/key', '/profile', '/memory', '/stats', '/reset', '/about', '/changelog', '/update'];
 
     const handleSubmit = (value) => {
+        // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
+        if (suggestions.length > 0) {
+            const nextCmd = suggestions[selectedIndex] || suggestions[0];
+            setInput(nextCmd + ' ');
+            setSelectedIndex(0);
+            return;
+        }
+
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
         const normalizedValue = value
             .replace(/\r\n/g, '\n')
@@ -621,11 +655,15 @@ export default function App() {
                     break;
                 }
                 case '/help': {
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Available commands: ' + COMMANDS.join(', '), isMeta: true }]; });
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: Date.now(), role: 'system', isHelpRecord: true, isMeta: true }];
+                    });
                     break;
                 }
                 default:
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
+                    const s = emojiSpace(2);
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️${s}[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
@@ -922,12 +960,15 @@ OUTPUT: ${execOutputRef.current}`;
         setIsExpanded(false);
     };
 
-    const getSuggestions = () => {
+    const suggestions = useMemo(() => {
         if (!input.startsWith('/') || input.includes(' ')) return [];
         return COMMANDS.filter(c => c.startsWith(input.toLowerCase()));
-    };
+    }, [input]);
 
-    const suggestions = getSuggestions();
+    // Reset selected index when input changes to avoid OOB
+    useEffect(() => {
+        setSelectedIndex(0);
+    }, [suggestions]);
 
     const renderActiveView = () => {
         switch (activeView) {
@@ -1550,14 +1591,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Text color="gray" dimColor>({tempModelOverride || activeModel})</Text>
                         </Box>
-                        {suggestions.length > 0 && (
-                            <Box paddingX={1} marginBottom={0}>
-                                <Text color="gray">💡 Suggestions: </Text>
-                                {suggestions.map((s, i) => (
-                                    <Text key={s} color="yellow" bold={i === 0}> {s} </Text>
-                                ))}
-                            </Box>
-                        )}
+                        {suggestions.length > 0 && <Box paddingY={0} />}
                         <Box backgroundColor="#333333" paddingX={1} paddingY={1} width="100%">
                             <Box flexDirection="column" width="100%">
                                 {maxLines > 2 && !isExpanded ? (
@@ -1631,6 +1665,7 @@ OUTPUT: ${execOutputRef.current}`;
 
     return (
         <Box flexDirection="column" width="100%">
+
             {windowedHistory.isTruncated && (
                 <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1} width="100%" justifyContent="center">
                     <Text color="gray" dimColor italic>
@@ -1647,7 +1682,11 @@ OUTPUT: ${execOutputRef.current}`;
             <Box flexDirection="column" padding={1} width="100%">
                 {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
                     <Box flexDirection="column" width="100%">
-                        <ChatLayout messages={messages.slice(completedIndex)} showFullThinking={showFullThinking} />
+                        <ChatLayout 
+                            messages={messages.slice(completedIndex)} 
+                            showFullThinking={showFullThinking} 
+                            columns={stdout?.columns || 80}
+                        />
                         {activeCommand && (
                             <Box marginTop={1}>
                                 <TerminalBox command={activeCommand} output={execOutput} />
@@ -1689,6 +1728,19 @@ OUTPUT: ${execOutputRef.current}`;
                     />
                 </Box>
             </Box>
+
+            {/* 💡 Vertical Suggestion Popup - Floating above the input (rendered last to stay on top) */}
+            {suggestions.length > 0 && (
+                <Box position="absolute" bottom={9} left={4} flexDirection="column" backgroundColor="#222" borderStyle="round" borderColor="yellow" paddingX={1} paddingY={0} zIndex={999}>
+                    {suggestions.slice(0, 15).map((s, i) => (
+                        <Box key={s} flexDirection="row">
+                            <Text color={i === selectedIndex ? 'cyan' : 'gray'}>{i === selectedIndex ? '❯ ' : '  '}</Text>
+                            <Text color={i === selectedIndex ? 'yellow' : 'gray'} bold={i === selectedIndex}>{s}</Text>
+                        </Box>
+                    ))}
+                    {suggestions.length > 15 && <Text color="gray" dimColor>  ... ({suggestions.length - 15} more)</Text>}
+                </Box>
+            )}
         </Box>
     );
 }

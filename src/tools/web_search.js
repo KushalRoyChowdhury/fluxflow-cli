@@ -67,6 +67,6 @@ export const web_search = async (argsString) => {
         return `Search results for [${query}]:\n\n${finalResults}`;
 
     } catch (err) {
-        return `ERROR: Stealth Search failed. ${err.message}`;
+        return `ERROR: Search failed. Unable to read.`;
     }
 };

@@ -132,6 +132,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
     let fullAgentResponseChunks = [];
+    
+    // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
+    // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
+    // and ensures steering hints don't carry reasoning glitches.
+    modifiedHistory.forEach(msg => {
+        if (msg.text) {
+            msg.text = msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        }
+    });
 
     for (let loop = 0; loop < MAX_LOOPS; loop++) {
         if (TERMINATION_SIGNAL) {
