@@ -134,6 +134,36 @@ const InlineMarkdown = React.memo(({ text, color }) => {
     );
 });
 
+// Helper: Wrap text to a specific width without breaking words
+const wrapText = (text, width) => {
+    if (!text) return '';
+    // Handle manual line breaks first
+    const sourceLines = text.split(/\r?\n/);
+    let finalLines = [];
+
+    sourceLines.forEach(sLine => {
+        const words = sLine.split(' ');
+        let currentLine = '';
+
+        words.forEach(word => {
+            if ((currentLine + word).length > width) {
+                if (currentLine) finalLines.push(currentLine.trim());
+                currentLine = word + ' ';
+                // Handle ultra-long words that exceed column width
+                while (currentLine.length > width) {
+                    finalLines.push(currentLine.substring(0, width));
+                    currentLine = currentLine.substring(width) + ' ';
+                }
+            } else {
+                currentLine += word + ' ';
+            }
+        });
+        if (currentLine) finalLines.push(currentLine.trim());
+    });
+
+    return finalLines.join('\n');
+};
+
 const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     if (buffer.length < 2) return null;
 
@@ -146,16 +176,18 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     const header = rows[0];
     const data = rows.slice(2);
 
-    // Distribution: Split 100% width equally
+    // Distribution Logic
     const colPercentage = Math.floor(100 / header.length);
+    const availableWidth = terminalWidth - 8; // Margin/Border buffer
+    const colChars = Math.floor(availableWidth / header.length) - 2; // Padding buffer
 
     return (
-        <Box flexDirection="column" borderStyle="single" borderColor="#333" paddingX={1} marginY={1} width="100%" flexGrow={1}>
+        <Box flexDirection="column" borderStyle="round" borderColor="#333" paddingX={1} marginY={1} width="100%" flexGrow={1}>
             {/* Header with Integrated Divider */}
-            <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor="#444" marginBottom={1} paddingBottom={1} width="100%">
+            <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor="#444" marginBottom={1} paddingBottom={0} width="100%">
                 {header.map((cell, i) => (
                     <Box key={i} flexBasis={`${colPercentage}%`} flexGrow={1} flexShrink={0} paddingRight={2}>
-                        <InlineMarkdown text={cell} color="cyan" />
+                        <InlineMarkdown text={wrapText(cell, colChars)} color="cyan" />
                     </Box>
                 ))}
             </Box>
@@ -165,7 +197,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
                 <Box key={ri} flexDirection="row" marginBottom={ri === data.length - 1 ? 0 : 1} width="100%">
                     {row.map((cell, ci) => (
                         <Box key={ci} flexBasis={`${colPercentage}%`} flexGrow={1} flexShrink={0} paddingRight={2} flexDirection="column">
-                            <InlineMarkdown text={cell} color="white" />
+                            <InlineMarkdown text={wrapText(cell, colChars)} color="white" />
                         </Box>
                     ))}
                 </Box>
@@ -240,10 +272,18 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
 
             const isUnordered = trimmed.startsWith('* ') || trimmed.startsWith('- ');
             const isOrdered = /^\d+\.\s/.test(trimmed);
+            const isAsciiArt = line.includes('█') || line.includes('╔') || line.includes('╚') || line.includes('═');
 
-            let content = trimmed;
-            if (isUnordered || isOrdered) {
-                content = (isUnordered ? '  • ' : '') + trimmed.replace(/^[\*\-\d+\.]+\s/, '');
+            let content = '';
+            if (isAsciiArt) {
+                content = line; // Preserve exactly as is
+            } else if (isUnordered || isOrdered) {
+                const bullet = isUnordered ? '  • ' : trimmed.match(/^\d+\.\s/)[0];
+                const indent = ' '.repeat(bullet.length);
+                const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ''), columns - (bullet.length + 6));
+                content = bullet + wrappedPart.split('\n').join('\n' + indent);
+            } else {
+                content = wrapText(trimmed, columns - 4);
             }
 
             result.push(
@@ -458,11 +498,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     width="100%"
                     flexDirection="column"
                 >
-                    {finalContent
-                        .replace(/\r\n/g, '\n')
-                        .replace(/\r/g, '\n')
-                        .replace(/\\\n/g, '\n')
-                        .replace(/\\$/, '')
+                    {wrapText(
+                        finalContent
+                            .replace(/\r\n/g, '\n')
+                            .replace(/\r/g, '\n')
+                            .replace(/\\\n/g, '\n')
+                            .replace(/\\$/, ''),
+                        columns - 6
+                    )
                         .split('\n')
                         .map((line, lineIdx) => (
                             <Box key={lineIdx} flexDirection="row" width="100%">

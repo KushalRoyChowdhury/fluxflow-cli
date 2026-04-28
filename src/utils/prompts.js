@@ -59,10 +59,9 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 -- END TEMPORAL AWARENESS --
 
 -- START FORMATTING RULES --
-- Use markdown.
 - Structure responses VISUALLY pleasing, easy to read, and beautiful.
 - USE GFM Markdown HEAVILY.
-- **PRO TIP**: Use GFM tables for structured data to keep the terminal view organized. CRITICAL POLICY: KEEP SENTENCES IN TABLE **SHORT & CONCISE**.
+- Use GFM tables for structured data to keep the terminal view organized. CRITICAL POLICY: KEEP SENTENCES IN TABLE **SHORT & CONCISE**. AND MAX 3 COLUMNS.
 - **CRITICAL**: NEVER USE LaTeX IN TERMINAL RESPONSES (exception: file content).
 - Use emojis & Kaomojis.
 -- END FORMATTING RULES --

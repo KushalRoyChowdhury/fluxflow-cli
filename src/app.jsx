@@ -168,6 +168,15 @@ export default function App() {
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
 
+    // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
+    const terminalEnv = useMemo(() => {
+        const isIDE = process.env.TERM_PROGRAM === 'vscode' || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
+        return {
+            isIDE,
+            shortcut: isIDE ? 'Shift+Enter' : 'Ctrl+Enter'
+        };
+    }, []);
+
     const activeCommandRef = useRef(null);
     const execOutputRef = useRef('');
 
@@ -299,11 +308,9 @@ export default function App() {
             }
         }
 
-        // 3. Tab Completion (legacy support)
-        if (key.tab && suggestions.length > 0 && activeView === 'chat') {
-            const nextCmd = suggestions[selectedIndex] || suggestions[0];
-            setInput(nextCmd + ' ');
-            setSelectedIndex(0);
+        // 3. Tab Completion (Retired - focus on Enter/Arrows)
+        if (key.tab && activeView === 'chat') {
+            // Tab is now ignored for suggestions to prevent [object Object] errors
         }
 
         // 3. CTRL+C Exit Protocol
@@ -311,8 +318,8 @@ export default function App() {
             setActiveView('exit');
         }
 
-        // 4. Ctrl + Enter or Ctrl + J (Reliable Newline on Windows)
-        if (key.return && (key.ctrl || key.meta)) {
+        // 4. Modifier + Enter (Newline Protocol - Supports Shift/Ctrl/Alt/Meta)
+        if (key.return && (key.shift || key.ctrl || key.meta || key.leftAlt || key.rightAlt)) {
             setInput(prev => prev.replace(/\\\r?$/, '').replace(/\r?$/, '') + '\n');
         }
     });
@@ -394,9 +401,24 @@ export default function App() {
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/chats', desc: 'List all chat sessions' },
-        { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
-        { cmd: '/thinking', desc: 'Set AI reasoning depth' },
-        { cmd: '/model', desc: 'Switch AI brain model' },
+        { cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+            { cmd: 'flux', desc: 'Enable Dev toolset' },
+            { cmd: 'flow', desc: 'Enable Chat mode' }
+        ]},
+        { cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
+            { cmd: 'low', desc: 'Fastest reasoning' },
+            { cmd: 'medium', desc: 'Balanced depth' },
+            { cmd: 'high', desc: 'Complex coding' },
+            { cmd: 'max', desc: 'Architectural depth' },
+            { cmd: 'show', desc: 'Show full thoughts' },
+            { cmd: 'hide', desc: 'Show concise thoughts' }
+        ]},
+        { cmd: '/model', desc: 'Switch AI model', subs: [
+            { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
+            { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
+            { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
+            { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+        ]},
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
         { cmd: '/profile', desc: 'Edit developer persona' },
@@ -405,14 +427,23 @@ export default function App() {
         { cmd: '/reset', desc: 'Wipe all project data' },
         { cmd: '/about', desc: 'Project info & credits' },
         { cmd: '/changelog', desc: 'View latest updates' },
-        { cmd: '/update', desc: 'Check/Install updates' }
+        { cmd: '/update', desc: 'Check/Install updates', subs: [
+            { cmd: 'check', desc: 'Check for new version' },
+            { cmd: 'force', desc: 'Force reinstall latest' }
+        ]}
     ];
 
     const handleSubmit = (value) => {
         // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
         if (suggestions.length > 0) {
             const nextMatch = suggestions[selectedIndex] || suggestions[0];
-            setInput(nextMatch.cmd + ' ');
+            const parts = value.split(' ');
+            if (parts.length === 1) {
+                setInput(nextMatch.cmd + ' ');
+            } else {
+                // For sub-commands, preserve the parent command
+                setInput(parts[0] + ' ' + nextMatch.cmd + ' ');
+            }
             setSelectedIndex(0);
             return;
         }
@@ -859,21 +890,22 @@ OUTPUT: ${execOutputRef.current}`;
 
                         let chunkText = packet.content;
 
-                        // 1. Detect transition to THINK mode
-                        if (chunkText.toLowerCase().includes('<think') && !inThinkMode) {
+                        // 1. Detect transition to THINK mode (Handles <think> or <thought>)
+                        if ((chunkText.toLowerCase().includes('<think') || chunkText.toLowerCase().includes('<thought')) && !inThinkMode) {
                             inThinkMode = true;
                             // Clean up any partial tags from the visible text
-                            chunkText = chunkText.replace(/<think>/gi, '');
+                            chunkText = chunkText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
                             setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '' }]);
                         }
 
-                        // 2. Aggressive Transition Analysis
-                        // We check for </think> in EVERY chunk if we are in think mode
-                        if (chunkText.toLowerCase().includes('</think>')) {
-                            const parts = chunkText.split(/<\/think>/gi);
+                        // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
+                        if (chunkText.toLowerCase().includes('</think>') || chunkText.toLowerCase().includes('</thought>')) {
+                            const parts = chunkText.split(/<\/(think|thought)>/gi);
                             const thinkPart = parts[0] || '';
-                            const agentPart = parts.slice(1).join('</think>') || '';
+                            // The split with regex group (thought|think) will include the captured group in parts
+                            // So we join the rest carefully.
+                            const agentPart = parts.slice(2).join('') || '';
 
                             setMessages(prev => {
                                 const newMsgs = prev.map(m =>
@@ -884,7 +916,7 @@ OUTPUT: ${execOutputRef.current}`;
 
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
-                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart.replace(/<\/?think>/gi, '') }];
+                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart.replace(/<\/?(think|thought)>/gi, '') }];
                             });
                             continue;
                         }
@@ -920,7 +952,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 return newMsgs;
                             });
                         } else if (!inThinkMode) {
-                            const cleanedText = chunkText.replace(/<\/?think>/gi, '').replace(signalRegex, '');
+                            const cleanedText = chunkText.replace(/<\/?(think|thought)>/gi, '').replace(signalRegex, '');
                             if (!currentAgentId) {
                                 currentAgentId = 'agent-' + Date.now();
                                 setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
@@ -980,8 +1012,44 @@ OUTPUT: ${execOutputRef.current}`;
     };
 
     const suggestions = useMemo(() => {
-        if (!input.startsWith('/') || input.includes(' ')) return [];
-        return COMMANDS.filter(c => c.cmd.startsWith(input.toLowerCase()));
+        if (!input.startsWith('/')) return [];
+        const parts = input.split(' ');
+        const query = parts[parts.length - 1].toLowerCase();
+
+        // Level 1: Main Commands
+        if (parts.length === 1) {
+            const cleanQuery = query.startsWith('/') ? query.slice(1) : query;
+            return COMMANDS.filter(c => {
+                const cleanCmd = c.cmd.startsWith('/') ? c.cmd.slice(1) : c.cmd;
+                return cleanCmd.includes(cleanQuery);
+            })
+            .sort((a, b) => {
+                const cleanA = a.cmd.startsWith('/') ? a.cmd.slice(1) : a.cmd;
+                const cleanB = b.cmd.startsWith('/') ? b.cmd.slice(1) : b.cmd;
+                const aStarts = cleanA.startsWith(cleanQuery);
+                const bStarts = cleanB.startsWith(cleanQuery);
+                if (aStarts && !bStarts) return -1;
+                if (!aStarts && bStarts) return 1;
+                return a.cmd.localeCompare(b.cmd);
+            });
+        }
+
+        // Level 2: Sub-commands
+        if (parts.length === 2) {
+            const parent = COMMANDS.find(c => c.cmd === parts[0].toLowerCase());
+            if (parent && parent.subs) {
+                return parent.subs.filter(s => s.cmd.includes(query))
+                    .sort((a, b) => {
+                        const aStarts = a.cmd.startsWith(query);
+                        const bStarts = b.cmd.startsWith(query);
+                        if (aStarts && !bStarts) return -1;
+                        if (!aStarts && bStarts) return 1;
+                        return a.cmd.localeCompare(b.cmd);
+                    });
+            }
+        }
+
+        return [];
     }, [input]);
 
     // Reset selected index when input changes to avoid OOB
@@ -1040,7 +1108,7 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
 
                         title="🤖 Select AI Model"
-                        items={[{ label: 'Gemma 4 31B            (Recomended - Default, Use Free Tier Key)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Recomended - Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
+                        items={[{ label: 'Gemma 4 31B            (Recomended - Default, Use Free Tier Key)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Best - Req. Paid Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY, Limited Free Quota)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
                         onSelect={(item) => {
                             if (item.value !== 'Cancel') setActiveModel(item.value);
                             setActiveView('chat');
@@ -1054,7 +1122,6 @@ OUTPUT: ${execOutputRef.current}`;
                         items={[
                             { label: `Toggle Memory                           [ ${systemSettings.memory ? 'ON' : 'OFF'} ]`, value: 'memory' },
                             { label: `Toggle Auto-Exec                        [ ${systemSettings.autoExec ? 'ON' : 'OFF'} ]`, value: 'autoExec' },
-                            { label: `Alternate Screen Buffer (Experimental)  [ ${systemSettings.useAlternateBuffer ? 'ON' : 'OFF'} ]`, value: 'altBuffer' },
                             { label: `External Workspace Access               [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
                             { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
                             { label: `Auto-Update                             [ ${systemSettings.autoUpdate ? 'ON' : 'OFF'} ]`, value: 'autoUpdate' },
@@ -1638,8 +1705,8 @@ OUTPUT: ${execOutputRef.current}`;
                                                     }}
                                                     onSubmit={() => setIsExpanded(true)}
                                                     keyBindings={{
-                                                        submit: (key) => key.return && !key.shift && !key.ctrl,
-                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
+                                                        submit: (key) => key.return && !key.shift && !key.ctrl && !key.leftAlt && !key.rightAlt,
+                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl) || (key.return && key.leftAlt) || (key.return && key.rightAlt)
                                                     }}
                                                 />
                                             </Box>
@@ -1654,7 +1721,7 @@ OUTPUT: ${execOutputRef.current}`;
                                             <Box flexGrow={1} position="relative">
                                                 {input === '' && !isProcessing && (
                                                     <Box position="absolute" paddingLeft={0}>
-                                                        <Text color="gray" dimColor>{escPressed ? "  Press ESC again to cancel the request." : "  Type your message or /command..."}</Text>
+                                                        <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}</Text>
                                                     </Box>
                                                 )}
                                                 <MultilineInput
@@ -1664,6 +1731,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
                                                     }}
+                                                    placeholder={escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}
                                                     onSubmit={handleSubmit}
                                                     maxRows={3}
                                                     keyBindings={{

@@ -132,13 +132,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
     let fullAgentResponseChunks = [];
-    
+
     // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
     // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
     // and ensures steering hints don't carry reasoning glitches.
     modifiedHistory.forEach(msg => {
         if (msg.text) {
-            msg.text = msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            msg.text = msg.text.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').trim();
         }
     });
 
@@ -198,10 +198,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: targetModel,
                     contents,
                     config: {
-                        temperature: mode === "Flux" ? 1 : 1.4,
+                        temperature: mode === "Flux" ? 0.95 : 1.20,
                         thinkingConfig: {
                             includeThoughts: false,
-                            thinkingLevel: ThinkingLevel.MINIMAL
+                            thinkingLevel: targetModel === 'gemini-3.1-pro-preview' ? ThinkingLevel.MEDIUM : ThinkingLevel.MINIMAL
                         },
                     },
                 });
@@ -491,6 +491,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: janitorModel || 'gemma-4-26b-a4b-it',
                     contents: janitorContents,
                     config: {
+                        temperature: 0.5,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
