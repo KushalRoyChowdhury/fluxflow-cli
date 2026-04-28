@@ -18,5 +18,6 @@ ${isMemoryEnabled ? `2. User-specific long-term memory (USE BASED ON CONVERSATIO
     - Update: tool:functions.memory(action='user', method='update', content-new='string to update', content-old='exact memory id')
 
  Usage Rules:
- - Frequency for 'user' action: Only when explicit context from chat is found or explicitly requested by the user.` : ''}
+ - Frequency for 'user' action: Only when explicit context from chat is found or explicitly requested by the user.
+ - IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT THE ADD METHOD` : ''}
 -- END MEMORY TOOLS --`.trim();

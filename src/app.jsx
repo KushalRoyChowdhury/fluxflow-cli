@@ -29,8 +29,8 @@ import { emojiSpace } from './utils/terminal.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.3.1';
-const updatedOn = '2026-04-28';
+const versionFluxflow = '1.3.3';
+const updatedOn = '2026-04-29';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -387,13 +387,32 @@ export default function App() {
         }
     };
 
-    const COMMANDS = ['/quit', '/help', '/clear', '/resume', '/save', '/chats', '/mode', '/thinking', '/model', '/settings', '/key', '/profile', '/memory', '/stats', '/reset', '/about', '/changelog', '/update'];
+    const COMMANDS = [
+        { cmd: '/quit', desc: 'Exit and shutdown Flux' },
+        { cmd: '/help', desc: 'Show all available commands' },
+        { cmd: '/clear', desc: 'Clear terminal screen' },
+        { cmd: '/resume', desc: 'Load previous session' },
+        { cmd: '/save', desc: 'Force save current chat' },
+        { cmd: '/chats', desc: 'List all chat sessions' },
+        { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
+        { cmd: '/thinking', desc: 'Set AI reasoning depth' },
+        { cmd: '/model', desc: 'Switch AI brain model' },
+        { cmd: '/settings', desc: 'Configure system prefs' },
+        { cmd: '/key', desc: 'Manage API keys' },
+        { cmd: '/profile', desc: 'Edit developer persona' },
+        { cmd: '/memory', desc: 'Manage agent memory' },
+        { cmd: '/stats', desc: 'Show session usage' },
+        { cmd: '/reset', desc: 'Wipe all project data' },
+        { cmd: '/about', desc: 'Project info & credits' },
+        { cmd: '/changelog', desc: 'View latest updates' },
+        { cmd: '/update', desc: 'Check/Install updates' }
+    ];
 
     const handleSubmit = (value) => {
         // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
         if (suggestions.length > 0) {
-            const nextCmd = suggestions[selectedIndex] || suggestions[0];
-            setInput(nextCmd + ' ');
+            const nextMatch = suggestions[selectedIndex] || suggestions[0];
+            setInput(nextMatch.cmd + ' ');
             setSelectedIndex(0);
             return;
         }
@@ -962,7 +981,7 @@ OUTPUT: ${execOutputRef.current}`;
 
     const suggestions = useMemo(() => {
         if (!input.startsWith('/') || input.includes(' ')) return [];
-        return COMMANDS.filter(c => c.startsWith(input.toLowerCase()));
+        return COMMANDS.filter(c => c.cmd.startsWith(input.toLowerCase()));
     }, [input]);
 
     // Reset selected index when input changes to avoid OOB
@@ -1021,7 +1040,7 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
 
                         title="🤖 Select AI Model"
-                        items={[{ label: 'Gemma 4 31B (Default)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro (Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash', value: 'gemini-3-flash-preview' }, { label: 'Gemini 3.1 Flash Lite', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
+                        items={[{ label: 'Gemma 4 31B            (Recomended - Default)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Recomended - Req. paid API Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
                         onSelect={(item) => {
                             if (item.value !== 'Cancel') setActiveModel(item.value);
                             setActiveView('chat');
@@ -1673,18 +1692,18 @@ OUTPUT: ${execOutputRef.current}`;
                     </Text>
                 </Box>
             )}
-            <Box flexDirection="column">
+            <Box flexDirection="column" width="100%" flexGrow={1}>
                 {windowedHistory.items.map((msg, idx) => (
-                    <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} />
+                    <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} columns={stdout?.columns || 80} />
                 ))}
             </Box>
 
             <Box flexDirection="column" padding={1} width="100%">
                 {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
                     <Box flexDirection="column" width="100%">
-                        <ChatLayout 
-                            messages={messages.slice(completedIndex)} 
-                            showFullThinking={showFullThinking} 
+                        <ChatLayout
+                            messages={messages.slice(completedIndex)}
+                            showFullThinking={showFullThinking}
                             columns={stdout?.columns || 80}
                         />
                         {activeCommand && (
@@ -1727,20 +1746,45 @@ OUTPUT: ${execOutputRef.current}`;
                         isMemoryEnabled={systemSettings.memory}
                     />
                 </Box>
-            </Box>
 
-            {/* 💡 Vertical Suggestion Popup - Floating above the input (rendered last to stay on top) */}
-            {suggestions.length > 0 && (
-                <Box position="absolute" bottom={9} left={4} flexDirection="column" backgroundColor="#222" borderStyle="round" borderColor="yellow" paddingX={1} paddingY={0} zIndex={999}>
-                    {suggestions.slice(0, 15).map((s, i) => (
-                        <Box key={s} flexDirection="row">
-                            <Text color={i === selectedIndex ? 'cyan' : 'gray'}>{i === selectedIndex ? '❯ ' : '  '}</Text>
-                            <Text color={i === selectedIndex ? 'yellow' : 'gray'} bold={i === selectedIndex}>{s}</Text>
+                {/* 💡 Suggestion "Bottom Shelf" - Clean, isolated, and perfectly stable below the status bar */}
+                {suggestions.length > 0 && (() => {
+                    const windowSize = 5;
+                    const startIdx = Math.max(0, Math.min(selectedIndex - 2, suggestions.length - windowSize));
+                    const visible = suggestions.slice(startIdx, startIdx + windowSize);
+                    const remaining = suggestions.length - (startIdx + visible.length);
+
+                    return (
+                        <Box
+                            flexDirection="column"
+                            backgroundColor="#222" borderStyle="round" borderColor="yellow"
+                            paddingX={1} paddingY={0}
+                            marginTop={0} width="100%"
+                            minHeight={suggestions.length >= 5 ? 7 : 0}
+                        >
+                            {visible.map((s, i) => {
+                                const actualIdx = startIdx + i;
+                                const isActive = actualIdx === selectedIndex;
+                                const cmdText = s.cmd.padEnd(12); // Ensure description starts at col 12
+
+                                return (
+                                    <Box key={s.cmd} flexDirection="row">
+                                        <Text color={isActive ? 'cyan' : 'gray'}>{isActive ? '❯ ' : '  '}</Text>
+                                        <Text color={isActive ? 'yellow' : 'gray'} bold={isActive}>{cmdText}</Text>
+                                        <Text color="gray" dimColor italic>{s.desc}</Text>
+                                    </Box>
+                                );
+                            })}
+                            {/* ⚓ Height Anchor: Reserve space for the 'more' line if our list is long */}
+                            {suggestions.length > 5 && (
+                                <Box height={1}>
+                                    {remaining > 0 && <Text color="gray" dimColor>  ... ({remaining} more)</Text>}
+                                </Box>
+                            )}
                         </Box>
-                    ))}
-                    {suggestions.length > 15 && <Text color="gray" dimColor>  ... ({suggestions.length - 15} more)</Text>}
-                </Box>
-            )}
+                    );
+                })()}
+            </Box>
         </Box>
     );
 }

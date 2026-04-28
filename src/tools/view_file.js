@@ -8,7 +8,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  */
 export const view_file = async (args) => {
     const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(args);
-    
+
     if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
     const absolutePath = path.resolve(process.cwd(), targetPath);
 
