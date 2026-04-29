@@ -35,6 +35,21 @@ Flux Flow separates the model's "internal monologue" (reasoning) from its final 
 - **Show/Hide Thinking**: You can toggle the visibility of the thinking process using `/thinking show/hide`.
   - When **Hidden**, the agent doesn't just disappear; it provides a "minimalist" view showing only the core **Headings** and **Action Steps** (bolded lines) from its reasoning. This keeps you informed of its current "step" without cluttering the screen with detailed internal monologue.
 
+## ⚡ Interactive Sub-Terminal
+
+Flux Flow features a high-fidelity, interactive sub-terminal that allows you to engage with commands spawned by the agent in real-time.
+
+- **Live Interaction**: When an agent executes a command (like `npm init`, `git commit`, or a custom script), the terminal output appears in a dedicated box.
+- **Focus Toggling (`TAB`)**: While a terminal is live, you can press **`TAB`** to shift your keyboard focus from the chat prompt directly into the terminal.
+- **Visual Feedback**:
+  - **Yellow Glow**: When the terminal is focused, its border changes to a "Double Yellow" style to indicate it is capturing input.
+  - **Status Indicator**: The footer will change from `● LIVE` to `▶ TERMINAL FOCUSED`.
+- **Cross-Platform Compatibility**: The input bridge automatically detects your OS and sends the correct line endings (`\r\n` for Windows, `\n` for Unix), ensuring that interactive prompts like `y/n` work seamlessly across environments.
+- **Input Mirroring**: Your keystrokes are mirrored in the terminal box in real-time, providing an IDE-grade responsive feel.
+
+> [!TIP]
+> Use the Interactive Sub-Terminal to handle authentication prompts, confirmation dialogs, or to manually steering a long-running process without leaving the Flux Flow interface.
+
 ## 🛡️ Human-in-the-Loop (HITL) Verification
 
 Security and safety are paramount when an AI has access to your file system and terminal. Flux Flow implements several layers of verification:
