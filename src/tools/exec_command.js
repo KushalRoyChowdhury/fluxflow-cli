@@ -19,6 +19,18 @@ export const writeToActiveCommand = (data) => {
     }
 };
 
+export const terminateActiveCommand = () => {
+    if (activeChildProcess) {
+        try {
+            // Forcefully terminate the process and all its children
+            activeChildProcess.kill('SIGKILL');
+        } catch (err) {
+            // Process might already be dead
+        }
+        activeChildProcess = null;
+    }
+};
+
 export const exec_command = async (args, options = {}) => {
     const { command } = parseArgs(args);
     const { onChunk } = options;

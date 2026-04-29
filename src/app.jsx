@@ -25,12 +25,12 @@ import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
-import { writeToActiveCommand } from './tools/exec_command.js';
+import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_command.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.4.0';
+const versionFluxflow = '1.4.1';
 const updatedOn = '2026-04-29';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -175,7 +175,7 @@ export default function App() {
         const isIDE = process.env.TERM_PROGRAM === 'vscode' || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
         return {
             isIDE,
-            shortcut: isIDE ? 'Shift+Enter' : 'Ctrl+Enter'
+            shortcut: isIDE ? 'Shift + Enter' : 'Ctrl + Enter'
         };
     }, []);
 
@@ -301,13 +301,14 @@ export default function App() {
 
         // 1. ESC Logic
         if (key.escape) {
-            if (isProcessing) {
+            if (isProcessing || activeCommand) {
                 if (!escPressed) {
                     setEscPressed(true);
                     if (escTimer) clearTimeout(escTimer);
                     setEscTimer(setTimeout(() => setEscPressed(false), 3000));
                 } else {
                     signalTermination();
+                    terminateActiveCommand();
                     setEscPressed(false);
                     if (escTimer) clearTimeout(escTimer);
                 }
@@ -1728,14 +1729,14 @@ OUTPUT: ${execOutputRef.current}`;
                                         </Box>
                                         <Box flexGrow={1}>
                                             <Box flexGrow={1} position="relative">
-                                                {input === '' && !isProcessing && (
+                                                {input === '' && (
                                                     <Box position="absolute" paddingLeft={0}>
                                                         {activeCommand && !isTerminalFocused ? (
                                                             <Text color="yellow">  Press TAB to interact with terminal...</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : (
-                                                            <Text color="gray" dimColor>{escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}</Text>
+                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." :  !isProcessing ? `  Type /cmd or message... (${terminalEnv.shortcut} for newline)` : "  You can send a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}

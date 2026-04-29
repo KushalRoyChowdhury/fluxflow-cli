@@ -140,6 +140,26 @@
             margin: 0;
         }
 
+        .version-note {
+            background: rgba(0, 255, 255, 0.05);
+            border-left: 3px solid var(--cyan);
+            padding: 15px 18px;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            color: #d4d4d4;
+            line-height: 1.5;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .version-note::before {
+            content: '📑';
+            font-style: normal;
+            font-size: 1.1em;
+        }
+
         li {
             margin-bottom: 10px;
             padding-left: 24px;
@@ -203,10 +223,21 @@
 
         // ==========================================
         // DATABASE: Update this object for new versions
-        // Format: { "VERSION": { "added": [...], "changed": [...], "fixes": [...] } }
+        // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.4.0", "1.3.7", "1.3.5"]
+        const stableVersions = ["1.4.0", "1.3.7", "1.4.1"]
         const changelogData = {
+            "1.4.1": {
+                "note": "This is a refinement patch to v1.4.0.",
+                "added": [],
+                "changed": [
+                    "Refined terminal interaction feedback and placeholders.",
+                    "Optimized Thinking budgets for better speed vs depth balance."
+                ],
+                "fixes": [
+                    "Implemented Emergency Brake (Double-ESC) to kill hanging interactive terminal processes if running program don't have exit state."
+                ]
+            },
             "1.4.0": {
                 "added": [
                     "Interactive Sub-Terminal when agent runs terminal commands."
@@ -272,6 +303,7 @@
                 ]
             },
             "1.2.0": {
+                "note": "MAJOR PATCH to Flux Flow.",
                 "added": [
                     "Added `STREERING HINT` to let users adjust agent's congitive path in real time. (Just send the prompt during agent is working)"
                 ],
@@ -279,7 +311,6 @@
                     "Redesigned parser to better handle separation of reasoning & output during streaming.",
                 ],
                 "fixes": [
-                    "**MAJOR PATCH**",
                     "Improved memory Handling & Garbage Collection.",
                     "Improved Long Context Handling & Large Codebase Stability.",
                     "Fixed Accidental Termination of Agent by Extended reasoning."
@@ -400,6 +431,12 @@
                             </div>
                         </div>
                 `;
+
+                if (data.note) {
+                    cardHtml += `
+                        <div class="version-note">${parseMarkdown(data.note)}</div>
+                    `;
+                }
 
                 if (data.added && data.added.length > 0) {
                     cardHtml += `
