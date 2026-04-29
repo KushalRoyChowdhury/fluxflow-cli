@@ -315,7 +315,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
 
                 if (label) {
-                    const boxWidth = Math.min(label.length + 4, 85);
+                    const boxWidth = Math.min(label.length + 4, 115);
                     const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                     const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
                     const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
@@ -428,7 +428,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     .filter(line => !line.includes('[UI_CONTEXT]'))
                     .join('\n');
 
-                toolResults.push(`[TOOL_RESULT]: ${cleanResultForAI}`);
+                const aiContent = `[TOOL_RESULT]: ${cleanResultForAI}`;
+                toolResults.push(aiContent);
 
                 // Yield result for UI preservation (WITH context for the user)
                 // Resilience: For large files (view_file), we hide the raw content in the UI thread to prevent pollution
@@ -436,7 +437,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
                     uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
                 }
-                yield { type: 'tool_result', content: uiContent };
+
+                // CRITICAL FIX: Send dual payload to ensure UI stays clean but AI stays smart in next turn
+                yield {
+                    type: 'tool_result',
+                    content: uiContent,
+                    aiContent: aiContent
+                };
 
                 if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) {
                     yield { type: 'memory_updated' };

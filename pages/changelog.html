@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.4.0", "1.3.7", "1.4.1"]
+        const stableVersions = []
         const changelogData = {
+            "1.4.2": {
+                "note": "CRITICAL PATCH FOR AGENT CONTEXT RETENTION. IMMEDIATE UPDATE STRONGLY RECOMMENDED!",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Fixed a issue where the system was aggressively truncating `Tool Results` after the agent finish a turn."
+                ]
+            },
             "1.4.1": {
                 "note": "This is a refinement patch to v1.4.0.",
                 "added": [],

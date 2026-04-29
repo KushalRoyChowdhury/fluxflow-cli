@@ -30,8 +30,8 @@ import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_comma
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.4.1';
-const updatedOn = '2026-04-29';
+const versionFluxflow = '1.4.2';
+const updatedOn = '2026-04-30';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -752,10 +752,15 @@ export default function App() {
             const streamChat = async () => {
                 setIsProcessing(true);
                 setIsExpanded(false);
-                try {                    const cleanHistoryForAI = [...messages, userMessage].filter(m =>
-                        m.role !== 'think' &&
-                        !String(m.id).startsWith('welcome')
-                    );
+                try {                    const cleanHistoryForAI = [...messages, userMessage]
+                        .filter(m =>
+                            m.role !== 'think' &&
+                            !String(m.id).startsWith('welcome')
+                        )
+                        .map(m => ({
+                            ...m,
+                            text: m.fullText || m.text
+                        }));
                     const stream = getAIStream(
                         activeModel,
                         cleanHistoryForAI,
@@ -910,7 +915,12 @@ OUTPUT: ${execOutputRef.current}`;
                             continue;
                         }
                         if (packet.type === 'tool_result') {
-                            setMessages(prev => [...prev, { id: 'tool-' + Date.now(), role: 'system', text: packet.content }]);
+                            setMessages(prev => [...prev, {
+                                id: 'tool-' + Date.now(),
+                                role: 'system',
+                                text: packet.content,
+                                fullText: packet.aiContent // Preserve raw data for next turn
+                            }]);
                             continue;
                         }
 
