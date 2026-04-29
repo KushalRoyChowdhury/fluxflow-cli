@@ -50,27 +50,36 @@ const cleanSignals = (text) => {
         .trim();
 };
 
-const formatThinkText = (cleaned) => {
+const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
-    const lines = cleaned.split('\n').filter(l => l.trim() !== '');
+    const lines = cleaned.split('\n'); // Preserve line breaks for vertical rhythm
+    const availableWidth = columns - 10;
 
     return lines.map((line, i) => {
         const trimmed = line.trim();
+        if (!trimmed) return <Box key={i} height={1} />;
 
-        // Headings (Bold white)
+        // Headings (Bold white with subtle prefix)
         if ((trimmed.startsWith('**') && trimmed.endsWith('**')) || trimmed.startsWith('#')) {
+            const hText = trimmed.replace(/\*|#/g, '').trim();
             return (
                 <Box key={i} marginTop={i === 0 ? 0 : 1} marginBottom={0} width="100%">
-                    <Text bold color="white">{trimmed.replace(/\*|#/g, '').trim()}</Text>
+                    <Text bold color="white">▸ {wrapText(hText, availableWidth - 2)}</Text>
                 </Box>
             );
         }
 
-        // Steps (Bullet + Italics gray)
+        // Content (Steps or Monologue Paragraphs)
         const isBullet = trimmed.startsWith('*');
+        const bulletPrefix = isBullet ? '• ' : '';
+        const cleanText = trimmed.replace(/^\*|\s\*/g, '').trim();
+        const wrapped = wrapText(cleanText, availableWidth - (isBullet ? 2 : 0));
+
         return (
             <Box key={i} marginLeft={isBullet ? 2 : 0} width="100%">
-                <Text italic color="gray" wrap="anywhere">{isBullet ? '• ' : ''}{trimmed.replace(/^\*|\s\*/g, '').trim()}</Text>
+                <Text italic color="gray">
+                    {bulletPrefix}{wrapped.split('\n').join('\n' + ' '.repeat(bulletPrefix.length))}
+                </Text>
             </Box>
         );
     });
@@ -523,7 +532,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                 <Box flexDirection="column" marginTop={1} paddingX={1} width="100%">
                     <Text bold color="white">Thinking...</Text>
                     <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} flexDirection="column" width="100%">
-                        {formatThinkText(finalContent)}
+                        {formatThinkText(finalContent, columns)}
                     </Box>
                 </Box>
             ) : (

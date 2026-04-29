@@ -136,8 +136,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
     // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
     // and ensures steering hints don't carry reasoning glitches.
+    // Only Agent Msgs should be stripped.
     modifiedHistory.forEach(msg => {
-        if (msg.text) {
+        if (msg.text && msg.role === 'agent') {
             msg.text = msg.text.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').trim();
         }
     });
@@ -194,14 +195,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     yield { type: 'model_update', content: null };
                 }
 
+                // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
                     model: targetModel,
                     contents,
                     config: {
-                        temperature: mode === "Flux" ? 0.95 : 1.20,
                         thinkingConfig: {
                             includeThoughts: false,
-                            thinkingLevel: targetModel === 'gemini-3.1-pro-preview' ? ThinkingLevel.MEDIUM : ThinkingLevel.MINIMAL
+                            thinkingLevel: ThinkingLevel.MINIMAL
                         },
                     },
                 });
@@ -491,7 +492,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: janitorModel || 'gemma-4-26b-a4b-it',
                     contents: janitorContents,
                     config: {
-                        temperature: 0.5,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL

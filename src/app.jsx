@@ -25,11 +25,12 @@ import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
+import { writeToActiveCommand } from './tools/exec_command.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.3.5';
+const versionFluxflow = '1.4.0';
 const updatedOn = '2026-04-29';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -167,6 +168,7 @@ export default function App() {
     const [chatId, setChatId] = useState(generateChatId());
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
+    const [isTerminalFocused, setIsTerminalFocused] = useState(false);
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
@@ -263,6 +265,28 @@ export default function App() {
 
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
+        // [LIVE TERMINAL FOCUS TOGGLE]
+        if (key.tab && activeCommand) {
+            setIsTerminalFocused(prev => !prev);
+            return;
+        }
+
+        // [LIVE TERMINAL INPUT FORWARDING]
+        if (isTerminalFocused && activeCommand) {
+            if (key.return) {
+                const isWin = process.platform === 'win32';
+                writeToActiveCommand(isWin ? '\r\n' : '\n');
+                setExecOutput(prev => prev + '\n');
+            } else if (key.backspace || key.delete) {
+                writeToActiveCommand('\b \b');
+                setExecOutput(prev => prev.slice(0, -1)); // Rudimentary backspace mirroring
+            } else if (inputText) {
+                writeToActiveCommand(inputText);
+                setExecOutput(prev => prev + inputText);
+            }
+            return;
+        }
+
         // 0. Atomic Paste Expansion Logic
         if (maxLines > 2 && !isExpanded && activeView === 'chat') {
             if (key.backspace || key.delete) {
@@ -757,6 +781,7 @@ OUTPUT: ${execOutputRef.current}`;
                                     return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
                                 });
                                 setActiveCommand(null);
+                                setIsTerminalFocused(false);
                                 setExecOutput('');
                             },
                             onToolApproval: async (tool, args) => {
@@ -1705,17 +1730,23 @@ OUTPUT: ${execOutputRef.current}`;
                                             <Box flexGrow={1} position="relative">
                                                 {input === '' && !isProcessing && (
                                                     <Box position="absolute" paddingLeft={0}>
-                                                        <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}</Text>
+                                                        {activeCommand && !isTerminalFocused ? (
+                                                            <Text color="yellow">  Press TAB to interact with terminal...</Text>
+                                                        ) : activeCommand && isTerminalFocused ? (
+                                                            <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
+                                                        ) : (
+                                                            <Text color="gray" dimColor>{escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}</Text>
+                                                        )}
                                                     </Box>
                                                 )}
                                                 <MultilineInput
+                                                    focus={!isTerminalFocused}
                                                     value={input}
                                                     onChange={(val) => {
                                                         // Handle manual backslash escapes without stripping them prematurely
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
                                                     }}
-                                                    placeholder={escPressed ? "  Press ESC again to cancel the request." : `  Type /cmd or message... (${terminalEnv.shortcut} for newline)`}
                                                     onSubmit={handleSubmit}
                                                     maxRows={3}
                                                     keyBindings={{
@@ -1760,7 +1791,7 @@ OUTPUT: ${execOutputRef.current}`;
                         />
                         {activeCommand && (
                             <Box marginTop={1}>
-                                <TerminalBox command={activeCommand} output={execOutput} />
+                                <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} />
                             </Box>
                         )}
                     </Box>
