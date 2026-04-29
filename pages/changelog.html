@@ -227,6 +227,12 @@
         // ==========================================
         const stableVersions = []
         const changelogData = {
+            "1.4.3": {
+                "note": "Minor patch to ensure better reliability with `\\n` and '\\n' characters in `write_file` & `update_file` operations.",
+                "added": [],
+                "changed": [],
+                "fixes": []
+            },
             "1.4.2": {
                 "note": "CRITICAL PATCH FOR AGENT CONTEXT RETENTION. IMMEDIATE UPDATE STRONGLY RECOMMENDED!",
                 "added": [],
@@ -442,7 +448,7 @@
 
                 if (data.note) {
                     cardHtml += `
-                        <div class="version-note">${parseMarkdown(data.note)}</div>
+                        <div class="version-note"><div>${parseMarkdown(data.note)}</div></div>
                     `;
                 }
 

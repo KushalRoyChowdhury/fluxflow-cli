@@ -30,7 +30,7 @@ import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_comma
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.4.2';
+const versionFluxflow = '1.4.3';
 const updatedOn = '2026-04-30';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
