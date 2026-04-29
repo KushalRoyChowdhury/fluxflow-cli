@@ -45,6 +45,10 @@ export const saveChat = async (id, name, messages) => {
         const history = await loadHistory();
         const existingChat = history[id];
         
+        // [CLEANUP] Filter out ephemeral messages (like update notices or transient meta alerts)
+        // These should only exist in the live UI session.
+        const persistentMessages = (messages || []).filter(m => !m.isUpdateNotification && !m.isMeta);
+
         // Defensive name selection: 
         // 1. Provided name
         // 2. Existing name on disk
@@ -53,7 +57,7 @@ export const saveChat = async (id, name, messages) => {
 
         history[id] = {
             name: finalName,
-            messages,
+            messages: persistentMessages,
             updatedAt: Date.now()
         };
         await fs.ensureDir(path.dirname(HISTORY_FILE));
