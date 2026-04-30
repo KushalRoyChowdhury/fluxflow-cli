@@ -8,6 +8,7 @@ import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+import { emojiSpace } from './terminal.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, MEMORIES_FILE } from './paths.js';
 
@@ -314,6 +315,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
                     const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
                     label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                } else if (toolCall.toolName === 'write_pdf') {
+                    const s = emojiSpace(2);
+                    label = `🖨️${s}GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                 } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
                     label = ''; // handled by high-fidelity components
                 } else {
@@ -384,7 +388,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 if (settings.onToolApproval) {
                     let shouldPrompt = false;
-                    if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
+                    if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'write_pdf') {
                         shouldPrompt = true;
                     } else if (toolCall.toolName === 'exec_command') {
                         shouldPrompt = true; // Handled internally by app.jsx whitelist
