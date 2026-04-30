@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.6.0",
+	"version": "1.5.2",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -34,12 +34,11 @@
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:duck-duck-scrape --external:nanoid --external:cuimp --external:puppeteer --external:typescript"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:duck-duck-scrape --external:nanoid --external:puppeteer --external:typescript"
 	},
 	"dependencies": {
 		"@google/genai": "^1.50.1",
 		"chalk": "^5.6.2",
-		"cuimp": "^1.10.0",
 		"fs-extra": "^11.3.4",
 		"gradient-string": "^3.0.0",
 		"ink": "^7.0.1",
