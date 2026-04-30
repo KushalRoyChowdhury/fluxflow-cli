@@ -87,33 +87,44 @@ const formatThinkText = (cleaned, columns = 80) => {
 
 const InlineMarkdown = React.memo(({ text, color }) => {
     if (!text) return null;
-    
+
     // Split by the outer-most markdown groups
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\$\\viewtext\{.*?\}\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
-    
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
+
     return (
         <Text color={color} wrap="anywhere">
             {parts.map((part, j) => {
                 if (!part) return null;
-                
+
                 // 🏷️ Recursive Bold: Scan inside for more styles
                 if (part.startsWith('**') && part.endsWith('**')) {
                     return <Text key={j} bold color="white"><InlineMarkdown text={part.slice(2, -2)} color="white" /></Text>;
                 }
-                
+
                 // 🏷️ Recursive Italic: Scan inside for more styles
                 if (part.startsWith('*') && part.endsWith('*')) {
                     return <Text key={j} italic color="gray"><InlineMarkdown text={part.slice(1, -1)} color="gray" /></Text>;
                 }
-                
+
                 if (part.startsWith('`') && part.endsWith('`')) {
                     return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
                 }
-                if (part.startsWith('$\\viewtext{') && part.endsWith('}$')) {
-                    const content = part.slice(11, -2);
-                    return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {content} </Text>;
-                }
                 
+                // 📐 Math & LaTeX-like support
+                if (part.startsWith('$') && part.endsWith('$')) {
+                    let content = part.slice(1, -1);
+                    // Extract content if it was inside $\text{...}$
+                    if (content.startsWith('\\text{') && content.endsWith('}')) {
+                        content = content.slice(6, -1);
+                    }
+                    // Basic math symbol translation
+                    const mathContent = content
+                        .replace(/\\multiply/g, '×')
+                        .replace(/\\divide/g, '÷');
+                        
+                    return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
+                }
+
                 // 🌐 Harmonized Link System
                 if (part.startsWith('[') && (part.includes('](') || part.includes('] ('))) {
                     const match = part.match(/\[(.*?)\]\s*\((.*?)\)/);
@@ -136,7 +147,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 if (part.startsWith('http')) {
                     return <Text key={j} color="cyan" underline italic>{part}</Text>;
                 }
-                
+
                 return part;
             })}
         </Text>
@@ -176,7 +187,7 @@ const wrapText = (text, width) => {
 const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     if (buffer.length < 2) return null;
 
-    const rows = buffer.map(line => 
+    const rows = buffer.map(line =>
         line.split('|')
             .filter((_, i, arr) => i > 0 && i < arr.length - 1)
             .map(cell => cell.trim())

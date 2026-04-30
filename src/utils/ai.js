@@ -387,7 +387,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 if (settings.onToolApproval) {
                     let shouldPrompt = false;
-                    if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'write_pdf') {
+                    if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
                         shouldPrompt = true;
                     } else if (toolCall.toolName === 'exec_command') {
                         shouldPrompt = true; // Handled internally by app.jsx whitelist
