@@ -919,7 +919,8 @@ OUTPUT: ${execOutputRef.current}`;
                                 id: 'tool-' + Date.now(),
                                 role: 'system',
                                 text: packet.content,
-                                fullText: packet.aiContent // Preserve raw data for next turn
+                                fullText: packet.aiContent, // Preserve raw data for next turn
+                                binaryPart: packet.binaryPart // v1.5.0 Multimodal Support
                             }]);
                             continue;
                         }
@@ -1146,6 +1147,7 @@ OUTPUT: ${execOutputRef.current}`;
                             { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
                             { label: `Auto-Update                             [ ${systemSettings.autoUpdate ? 'ON' : 'OFF'} ]`, value: 'autoUpdate' },
                             { label: `Preferred Updater                       [ ${(systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase()} ]`, value: 'updateManager' },
+                            { label: `Save AppData Externally                 [ ${systemSettings.useExternalData ? 'ON' : 'OFF'} ]`, value: 'externalData' },
                             { label: 'Exit Settings', value: 'Cancel' }
                         ]}
                         onSelect={(item) => {
@@ -1181,6 +1183,23 @@ OUTPUT: ${execOutputRef.current}`;
                             }
                             else if (item.value === 'autoUpdate') {
                                 setSystemSettings(s => ({ ...s, autoUpdate: !s.autoUpdate }));
+                            }
+                            else if (item.value === 'externalData') {
+                                if (!systemSettings.useExternalData) {
+                                    setInputConfig({
+                                        label: "Enter absolute path for External AppData:",
+                                        note: "All history, logs and secrets will be stored here. ~/.fluxflow/settings.json stays as anchor.",
+                                        key: 'externalDataPath',
+                                        value: systemSettings.externalDataPath || ''
+                                    });
+                                    setActiveView('input');
+                                } else {
+                                    const newSettings = { ...systemSettings, useExternalData: false };
+                                    setSystemSettings(newSettings);
+                                    saveSettings({ systemSettings: newSettings, apiTier, quotas });
+                                    setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🏠 [STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart.' }]);
+                                    setActiveView('chat');
+                                }
                             }
                             else if (item.value === 'updateManager') {
                                 setActiveView('updateManager');
@@ -1287,6 +1306,11 @@ OUTPUT: ${execOutputRef.current}`;
                                     } else if (key === 'janitorModel') {
                                         setJanitorModel(val);
                                         newSettings.janitorModel = val;
+                                    } else if (key === 'externalDataPath') {
+                                        const newSysSettings = { ...systemSettings, useExternalData: true, externalDataPath: val.trim() };
+                                        setSystemSettings(newSysSettings);
+                                        newSettings.systemSettings = newSysSettings;
+                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '📁 [EXTERNAL STORAGE] Flux Flow will use ' + val.trim() + ' for data after restart.' }]);
                                     }
 
                                     if (next) {

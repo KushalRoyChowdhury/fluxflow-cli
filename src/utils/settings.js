@@ -20,7 +20,9 @@ const DEFAULT_SETTINGS = {
         compression: 0.0,
         autoExec: false,
         allowExternalAccess: false,
-        autoDeleteHistory: '7d'
+        autoDeleteHistory: '7d',
+        useExternalData: false,
+        externalDataPath: ''
     },
     profileData: {
         name: null,

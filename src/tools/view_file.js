@@ -22,6 +22,35 @@ export const view_file = async (args) => {
             return `ERROR: Path [${targetPath}] is a directory. Use list_files instead.`;
         }
 
+        // --- MULTIMODAL DETECTION ---
+        const ext = path.extname(targetPath).toLowerCase();
+        const mimeMap = {
+            '.pdf': 'application/pdf',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.doc': 'application/msword'
+        };
+
+        if (mimeMap[ext]) {
+            const buffer = fs.readFileSync(absolutePath);
+            const base64 = buffer.toString('base64');
+            const mimeType = mimeMap[ext];
+
+            return {
+                text: `[BINARY_FILE]: ${targetPath} (${mimeType}) - Loaded as multimodal part.`,
+                binaryPart: {
+                    inlineData: {
+                        data: base64,
+                        mimeType: mimeType
+                    }
+                }
+            };
+        }
+        // ----------------------------
+
         const content = fs.readFileSync(absolutePath, 'utf8');
         const lines = content.split('\n');
         const totalLines = lines.length;

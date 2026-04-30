@@ -225,8 +225,19 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = []
+        const stableVersions = ["1.4.3"]
         const changelogData = {
+            "1.5.0": {
+                "note": "**THE MULTIMODAL STAGE**. Flux Flow can now see! v1.5.0 introduces native support for reading and analyzing PDFs and Images directly through the `view_file` tool.",
+                "added": [
+                    "Native Multimodal Support (PDF, JPG, PNG, WEBP).",
+                    "High-Fidelity Context Retention for non-text assets."
+                ],
+                "changed": [
+                    "Upgraded `view_file` tool to handle binary detection and base64 encoding."
+                ],
+                "fixes": []
+            },
             "1.4.3": {
                 "note": "Minor patch to ensure better reliability with `\\n` and '\\n' characters in `write_file` & `update_file` operations.",
                 "added": [],

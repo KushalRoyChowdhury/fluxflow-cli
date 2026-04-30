@@ -167,10 +167,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Convert current history to GenAI format
         const contents = modifiedHistory
             .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
-            .map(msg => ({
-                role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
-                parts: [{ text: msg.text }]
-            }));
+            .map(msg => {
+                const parts = [{ text: msg.text }];
+                if (msg.binaryPart) {
+                    parts.push(msg.binaryPart);
+                }
+                return {
+                    role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
+                    parts
+                };
+            });
 
         let stream;
         let success = false;
@@ -396,12 +402,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                const result = await dispatchTool(toolCall.toolName, toolCall.args, {
+                let result = await dispatchTool(toolCall.toolName, toolCall.args, {
                     chatId,
                     history,
                     onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null,
                     onAskUser: settings.onAskUser
                 });
+
+                let binaryPart = null;
+                if (typeof result === 'object' && result.binaryPart) {
+                    binaryPart = result.binaryPart;
+                    result = result.text;
+                }
 
                 if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
                     await new Promise(resolve => setTimeout(resolve, 800)); // Artificial pause for visual persistence
@@ -429,7 +441,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     .join('\n');
 
                 const aiContent = `[TOOL_RESULT]: ${cleanResultForAI}`;
-                toolResults.push(aiContent);
+                toolResults.push({ role: 'user', text: aiContent, binaryPart });
 
                 // Yield result for UI preservation (WITH context for the user)
                 // Resilience: For large files (view_file), we hide the raw content in the UI thread to prevent pollution
@@ -442,7 +454,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield {
                     type: 'tool_result',
                     content: uiContent,
-                    aiContent: aiContent
+                    aiContent: aiContent,
+                    binaryPart: binaryPart // Multi-modal stage (v1.5.0)
                 };
 
                 if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) {
@@ -574,8 +587,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // If the model hasn't finished, we must provide a user turn to keep the loop going.
         // If there are no tool results, we send a 'continue' signal to prompt the model.
-        const nextUserMsg = toolResults.length > 0 ? toolResults.join('\n') : '[turn: continue]';
-        modifiedHistory.push({ role: 'user', text: nextUserMsg });
+        if (toolResults.length > 0) {
+            toolResults.forEach(tr => modifiedHistory.push(tr));
+        } else {
+            modifiedHistory.push({ role: 'user', text: '[turn: continue]' });
+        }
     }
     yield { type: 'status', content: null };
 };
