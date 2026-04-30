@@ -14,7 +14,7 @@ ${mode === 'Flux' ? `
     3. Read Folder: tool:functions.read_folder(path="relative/path"). Detailed stats of a directory.
     4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility.
     5. Update File: tool:functions.update_file(path="relative/path", content_to_replace="old", content_to_add="new"). Surgical patching. RETURNS: High-fidelity visual diff and old code block. You MUST verify that the change specifically matches your intent using the returned diff. PREFFER UPDATE FILE OVER WRITE FILE if file already exists for better reversal tracking (if a file has 500+ lines, try to stick with update_file over full-rewrite). DONT WRAP UPDATE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS.
-    6. Write PDF: tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape", margin="px value"). Generates a professional PDF document. Orientation and margin are optional. A4 size page will be used.
+    6. Write PDF: tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape"). Generates a professional PDF document. Orientation are optional. A4 size page will be used. DO NOT ADD FOOTER MANUALLY, the system will handle it automatically. USE CSS TO VISUALLY BEAUTIFY THE DOCUMENT.
     7. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command.
 
     **NOTE:** WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CHARACTER FOR LINE BREAKS RATHER THAN STRING '\\n'`.trim() : `
@@ -25,4 +25,5 @@ Results will be provided in the next loop as: [TOOL_RESULT]: [content]
 WHEN CALLING TOOLS, YOU **MUST** end your response with '[turn: continue]'. NEVER use '[turn: finish]' in the same turn as a tool call. After receiving the [TOOL_RESULT], acknowledge the output and verify if the goal is met; only then may you use '[turn: finish]', otherwise use '[turn: continue]'.
 Do NOT over-use tools. Use them only when strictly necessary for the user's objective. You can stack multiple tool calls 1-by-1.
 Distinguish clearly between tool discussion and execution. Use the 'tool:' prefix ONLY when calling a function. When discussing tools with the user, refer to them by name as nouns (e.g., 'write_file', 'list_files') to avoid accidental triggers and context bloat. Even in your <think> ... </think> tags, do not use the 'tool:' prefix when planning to select a tool.
+Use tools contextually when needed, don't flood with unnecessary tool calls.
 -- END FUNCTION CALLING PROTOCOL --`.trim();

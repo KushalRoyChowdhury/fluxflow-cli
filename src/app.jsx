@@ -26,12 +26,13 @@ import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_command.js';
+import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.4.3';
-const updatedOn = '2026-04-30';
+const versionFluxflow = '1.5.0';
+const updatedOn = '2026-05-01';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -122,7 +123,7 @@ export default function App() {
             if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to check for updates: ${err.message}` }];
+                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to check for updates: ${err.message}`, isMeta: true }];
                 });
             }
         }
@@ -210,7 +211,7 @@ export default function App() {
     const [tempModelOverride, setTempModelOverride] = useState(null);
 
     const [messages, setMessages] = useState([
-        { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.\n' }
+        { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.\n', isMeta: true }
     ]);
     const queuedPromptRef = useRef(null);
     const [completedIndex, setCompletedIndex] = useState(1);
@@ -351,6 +352,19 @@ export default function App() {
 
     useEffect(() => {
         async function init() {
+            // 0. System Integrity Check (Chromium for PDF)
+            if (!checkPuppeteerReady()) {
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '🔧 [SYSTEM] Installing Required dependencies... (One-time setup)', isMeta: true }];
+                });
+                await installPuppeteerBrowser();
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '✅ [SYSTEM] All dependencies installed successfully.', isMeta: true }];
+                });
+            }
+
             // 1. Load persisted settings
             const saved = await loadSettings();
             setMode(saved.mode);
@@ -412,9 +426,9 @@ export default function App() {
             await saveAPIKey(key);
             setApiKey(key);
             initAI(key); // Initialize Gemini SDK
-            setMessages(prev => [...prev, { role: 'system', text: '✅ API Key saved successfully! Initialization complete.' }]);
+            setMessages(prev => [...prev, { role: 'system', text: '✅ API Key saved successfully! Initialization complete.', isMeta: true }]);
         } else {
-            setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: Gemini API keys must be at least 30 characters.` }]);
+            setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: Gemini API keys must be at least 30 characters.`, isMeta: true }]);
             setTempKey('');
         }
     };
@@ -560,7 +574,7 @@ export default function App() {
                 case '/clear': {
                     // Perform full terminal hardware reset + clear scrollback buffer
                     stdout.write('\x1b[2J\x1b[3J\x1b[H');
-                    setMessages([{ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome back to Flux Flow! Context cleared.\n' }]);
+                    setMessages([{ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome back to Flux Flow! Context cleared.\n', isMeta: true }]);
                     setCompletedIndex(0); // Trigger re-flush
                     setChatId(generateChatId()); // Brand new identity for the new chat
                     setSessionStats({ tokens: 0 });

@@ -316,8 +316,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
                     label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                 } else if (toolCall.toolName === 'write_pdf') {
-                    const s = emojiSpace(2);
-                    label = `🖨️${s}GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                 } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
                     label = ''; // handled by high-fidelity components
                 } else {

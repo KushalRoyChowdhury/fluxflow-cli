@@ -14,8 +14,9 @@ let externalDir = null;
 try {
     if (fs.existsSync(SETTINGS_FILE)) {
         const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-        if (settings.useExternalData && settings.externalDataPath) {
-            externalDir = settings.externalDataPath;
+        const sys = settings.systemSettings || {};
+        if (sys.useExternalData && sys.externalDataPath) {
+            externalDir = sys.externalDataPath;
         }
     }
 } catch (e) {

@@ -54,11 +54,37 @@ export const loadSettings = async () => {
 };
 
 /**
+ * Migrates data from default location to external path
+ */
+const migrateToExternal = async (newPath) => {
+    const { FLUXFLOW_DIR } = await import('./paths.js');
+    const folders = ['logs', 'secret'];
+    for (const folder of folders) {
+        const src = path.join(FLUXFLOW_DIR, folder);
+        const dest = path.join(newPath, folder);
+        try {
+            if (await fs.exists(src)) {
+                await fs.ensureDir(dest);
+                await fs.copy(src, dest, { overwrite: false });
+            }
+        } catch (err) {
+            console.error(`Migration failed for ${folder}:`, err);
+        }
+    }
+};
+
+/**
  * Saves settings to the JSON file
  */
 export const saveSettings = async (settings) => {
     try {
         const current = await loadSettings();
+        
+        // MIGRATION TRIGGER: If useExternalData is being turned ON
+        if (!current.systemSettings.useExternalData && settings.systemSettings?.useExternalData && settings.systemSettings?.externalDataPath) {
+            await migrateToExternal(settings.systemSettings.externalDataPath);
+        }
+
         const updated = { ...current, ...settings };
         await fs.ensureDir(path.dirname(SETTINGS_FILE));
         await fs.writeJson(SETTINGS_FILE, updated, { spaces: 2 });
