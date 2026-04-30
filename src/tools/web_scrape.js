@@ -1,11 +1,11 @@
+import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 import { LOGS_DIR } from '../utils/paths.js';
 
-import * as cuimp from 'cuimp';
-
 /**
- * Advanced Web Scraping Tool with Cuimp Stealth
+ * Advanced Web Scraping Tool (Puppeteer Powered)
+ * Uses a full Chromium instance to handle JS-heavy pages and single-page apps.
  */
 export const web_scrape = async (args) => {
     const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
@@ -15,59 +15,76 @@ export const web_scrape = async (args) => {
     let lastError = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        let browser = null;
         try {
-            // 1. Chameleon Strategy: Rotate User-Agents
-            const userAgents = [
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0'
-            ];
-            const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+            // 1. Launch Browser with stealth args
+            browser = await puppeteer.launch({
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage'
+                ]
+            });
 
-            // 2. Random jitter delay
+            const page = await browser.newPage();
+
+            // 2. Set Realistic Identity
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+            await page.setViewport({ width: 1280, height: 1600 });
+
+            // 3. Jitter Delay
             const jitter = attempt === 1 ? Math.random() * 1000 + 500 : Math.random() * 2000 + 1000;
             await new Promise(r => setTimeout(r, jitter));
 
-            const response = await cuimp.get(url, {
-                headers: {
-                    'User-Agent': randomUA,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Referer': 'https://www.google.com/',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Cache-Control': 'max-age=0'
-                }
+            // 4. Navigate and Wait for Hydration
+            await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+
+            // 5. Deep Hydration Delay: Wait an additional 5s flat before reading data
+            await new Promise(r => setTimeout(r, 5000));
+
+            // 6. Extract Rendered Text with Link Preservation
+            let text = await page.evaluate(() => {
+                // Remove non-content elements
+                const junk = document.querySelectorAll('script, style, nav, footer, header, noscript');
+                junk.forEach(el => el.remove());
+
+                // Transform links into readable markdown-like format
+                const links = document.querySelectorAll('a');
+                links.forEach(a => {
+                    const href = a.href;
+                    const content = a.innerText.trim();
+                    // Only transform meaningful, absolute links
+                    if (href && content && !href.startsWith('javascript:') && !href.startsWith('#')) {
+                        a.innerText = ` [${content}](${href}) `;
+                    }
+                });
+
+                return document.body.innerText;
             });
 
-            let html = response.data;
-            if (!html) throw new Error("EMPTY_RESPONSE");
+            if (!text) throw new Error("EMPTY_RENDER_RESULT");
 
-            // 1. Strip useless tags
-            html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-            html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-            html = html.replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '');
-            html = html.replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '');
-            html = html.replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '');
+            // 6. Clean and Truncate
+            const cleanedText = text
+                .replace(/\s+/g, ' ')
+                .trim()
+                .substring(0, 25000); // Increased limit due to higher fidelity
 
-            // 2. Extract visible text only
-            let text = html
-                .replace(/<[^>]+>/g, ' ') // Strip remaining tags
-                .replace(/\s+/g, ' ')      // Clean up whitespace
-                .trim();
-
-            // 3. Limit size to 20,000 chars to avoid context overflow
-            const finalContent = text.substring(0, 20000);
-
-            // Add general logging
+            // Log for audit
             const toolLogDir = path.join(LOGS_DIR, 'tools');
             if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `RESULTS ${new Date().toISOString()} - \nURL: [${url}]. Content Length: ${finalContent.length}\n\n`);
+            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedText.length}.\n Content:\n${cleanedText}\n\n--------------------------------------------------------\n\n\n`);
 
-            return `CONTENT FROM [${url}]:\n\n${finalContent}${text.length > 20000 ? '\n\n[TRUNCATED AT 20K CHARS]' : ''}`;
+            await browser.close();
+            // fs.writeFileSync('scraped.txt', cleanedText);
+            return `CONTENT FROM [${url}]:\n\n${cleanedText}${text.length > 25000 ? '\n\n[TRUNCATED AT 25K CHARS]' : ''}`;
 
         } catch (err) {
             lastError = err;
+            if (browser) await browser.close();
+
             if (attempt < maxRetries) {
                 const backoff = Math.pow(2, attempt) * 1000;
                 await new Promise(r => setTimeout(r, backoff));
@@ -75,5 +92,5 @@ export const web_scrape = async (args) => {
         }
     }
 
-    return `ERROR: Scrape failed after ${maxRetries} attempts. Last error: ${lastError.message}`;
+    return `ERROR: Scrape failed after ${maxRetries + 1} attempts. Last error: ${lastError.message}`;
 };

@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.5.0", "1.5.1"]
+        const stableVersions = ["1.5.1", "1.6.0"]
         const changelogData = {
+            "1.6.0": {
+                "note": "New and Advanced Web tools.",
+                "added": [],
+                "changed": [
+                    "Re-written `web_search` and `web_scrape` tools to be the most reliable with JS hydration capabilities."
+                ],
+                "fixes": []
+            },
             "1.5.1": {
                 "note": "Optional update.",
                 "added": [],
@@ -516,13 +524,11 @@
                 { dx: -50, dy: 10 },  // 4: L Cheek
                 { dx: 50, dy: 10 },   // 5: R Cheek
                 { dx: 0, dy: 45 },    // 6: Chin
-                { dx: -15, dy: 0 },   // 7: L Eye
-                { dx: 15, dy: 0 },    // 8: R Eye
-                { dx: 0, dy: 15 }     // 9: Nose
+                { dx: -20, dy: 0 },   // 7: L Eye
+                { dx: 20, dy: 0 },    // 8: R Eye
             ],
             edges: [
-                [0, 2], [2, 4], [4, 6], [6, 5], [5, 3], [3, 1], [1, 0], // Outline
-                [0, 7], [1, 8], [7, 9], [8, 9], [9, 6] // Inner features
+                [0, 2], [2, 4], [4, 6], [6, 5], [5, 3], [3, 1], [1, 0] // Outline
             ]
         };
 
