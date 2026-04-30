@@ -85,25 +85,33 @@ Current date and Time is: ${dateTimeStr}
  * @returns {string} The formatted Janitor prompt.
  */
 export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = false) => {
-    return `ORIGINAL USER PROMPT: ${originalText.substring(0, 500)}
+    let agentRes = `${agentRaws.replace(/tool:functions\..*\n/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL_RESULTS\]/g, '').replace(/\[tool_results\]/g, '').substring(0, 3500)}`;
+    if (agentRes.length > 3500) {
+        agentRes += '\n... (truncated) ...';
+    }
+    // replace the [Prompted on: ...] from user prompt
+    let originalTextProcessed = originalText.replace(/\[Prompted on:.*?\]/g, '');
+    return `USER PROMPT: ${originalTextProcessed.substring(0, 600)}${originalTextProcessed.length > 600 ? '\n... (truncated) ...' : ''}
 AGENT RAWS (responses from this turn):
-${agentRaws.substring(0, 2000).replace(/tool:functions\..*\n/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '')}${agentRaws.length > 1500 ? '\n... (truncated) ...' : ''}
+${agentRes}
+${userMemories ? `
+    
+-- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}
 
 --- START SYSTEM INSTRUCTION (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY) ---
-YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALL SYNTAX.
+YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
 1. OUTPUT ONLY 'tool:functions.xxx' CALLS.
-2. DO NOT EXPLAIN. DO NOT SUMMARIZE AGENT RAWS. DO NOT TALK TO THE USER.
+2. DO NOT EXPLAIN. DO NOT TALK TO THE USER.
 3. NON-TOOL TEXT WILL BREAK THE SYSTEM.
-4. DO NOT REPEAT AGENT RAWS IN YOUR RESPONSE.
-5. IF YOU GET ONLY USER RESPONSE AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY.
+4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE.
+5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY.
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks.
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools.` : ''}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 
-${userMemories ? `-- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}
 Current date and Time: ${new Date().toLocaleString()}
 
 --- END SYSTEM INSTRUCTION ---`.trim();
