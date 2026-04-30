@@ -18,6 +18,15 @@ You can control the application using `/` commands directly in the chat input:
 - **/changelog**: Open the project's changelog in your default browser.
 - **/help**: List all available commands.
 
+## 📁 External Data Sanctuary (Redirection)
+
+Flux Flow allows you to "Anchor" your data outside of the default user directory. This is perfect for users who want to keep their logs, chat history, and encrypted memories on an external drive, a VeraCrypt volume, or a specific project folder.
+
+- **How to Enable**: Open `/settings` and toggle **Use External Data**. 
+- **Portability**: Once set, the application will synchronously "pivot" all data operations to your specified `externalDataPath` upon startup.
+- **Privacy**: Keeps sensitive data off your primary system drive.
+
+
 ### Command Shortcuts
 
 For power users, several commands support direct arguments to skip the menus:
@@ -82,3 +91,11 @@ The bottom of the screen features a dynamic status bar showing:
 - **Token Usage**: Real-time tracking of tokens used in the current session.
 - **Agentic Loops**: Counters showing how many times the agent has "looped" to solve the current task.
 - **API Status**: Visual feedback when the model is thinking or executing a tool.
+
+## 🚑 System Integrity & Self-Healing
+
+Flux Flow is a "Self-Healing" agent. It actively monitors its own environment to ensure all complex dependencies (like the Chromium engine for PDF generation) are ready for action.
+
+- **Startup Integrity Check**: On launch, Flux performs a "Heartbeat Check" on its internal engines.
+- **Automatic Recovery**: If a dependency is missing, you will see a `🔧 [SYSTEM] Initializing...` message. Flux will autonomously download and configure the required binaries using `pnpm` or `npx` fallbacks, keeping you informed every step of the way.
+- **Silent Maintenance**: Once the engine is ready, you'll receive a `✅ [SYSTEM] All dependencies installed successfully.` confirmation.

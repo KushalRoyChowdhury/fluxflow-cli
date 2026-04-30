@@ -11,13 +11,16 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
+- **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
+- **Autonomous PDF Engine**: Generate professional, branded PDF documents on the fly using the `write_pdf` tool, complete with custom CSS styling and automatic watermarking.
+- **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
 - **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
 - **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
 - **Two Operating Modes**:
   - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops (up to 45 iterations) to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
-- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, and terminal execution.
+- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and PDF generation.
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Minimal to Max).
 - **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.

@@ -29,6 +29,15 @@ The execution flow of a single user prompt follows this loop:
    - **Multi-Stage Failover**: The loop features a sophisticated 8-attempt retry engine with random backoff (800ms - 2s).
    - **Critical Fallback Pivot**: If the primary model fails 5 consecutive times, the agent surgically pivots to a lighter, high-concurrency fallback model (`gemini-3.1-flash-lite-preview`) for the final 3 attempts to ensure session navigation through API congestion.
 
+## Multimodal Pipeline
+
+Flux Flow implements a native multimodal processing engine in `src/tools/view_file.js`. This allows the agent to move beyond text-based reasoning and analyze visual assets directly.
+
+- **Binary Detection**: The pipeline uses `is-binary-path` to distinguish between text and binary files.
+- **Visual Encoding**: If an image or PDF is detected, the engine reads the raw bytes and converts them into base64-encoded `InlineData` objects.
+- **PDF Extraction**: For PDF documents, the engine extracts visual representation of pages to provide the model with high-fidelity spatial and textual context simultaneously.
+- **Context Injection**: These multimodal assets are injected directly into the Gemini model's multimodal part array, allowing the model to "see" the file as if it were looking at a screenshot.
+
 ## The Dual-Model System
 
 To maintain a fast, snappy UI while still performing complex data management, Flux Flow employs two separate AI models for every interaction:
@@ -46,3 +55,11 @@ To maintain a fast, snappy UI while still performing complex data management, Fl
 
 - **High-Fidelity Lock**: Because both the UI and the Janitor model may attempt to write to the `history.json` file simultaneously, a Promise-based `WRITE_LOCK` (`src/utils/history.js`) is utilized. This prevents race conditions and ensures data integrity.
 - **Encryption**: User secrets and persistent memories (`secret/memories.json`) are handled by `src/utils/crypto.js` to ensure local privacy.
+
+## Redirection & The Anchor Strategy
+
+To support data portability (e.g., storing all app data on an external encrypted drive), Flux Flow utilizes a synchronous "Anchor" strategy in `src/utils/paths.js`.
+
+- **Synchronous Pivot**: Because many core modules (History, Secrets, Usage) initialize their file paths as constants during module loading, the application must determine the "Actual" data root before anything else.
+- **Boot-Sequence Priority**: On every launch, `paths.js` performs a synchronous file system check for `~/.fluxflow/settings.json`. If a redirection path is found (`useExternalData: true`), it immediately overrides the global `DATA_DIR` constant for the entire process.
+- **Sub-Coordinate Resolution**: All secondary directories (`LOGS_DIR`, `SECRET_DIR`) are derived dynamically from the redirected `DATA_DIR`, ensuring that all session data flows to the external sanctuary without requiring individual configuration updates across the codebase.

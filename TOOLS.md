@@ -8,6 +8,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | :--- | :---: | :---: |
 | **Web Search** | ✅ | ✅ |
 | **Web Scrape** | ✅ | ✅ |
+| **Write PDF** | ✅ | ✅ |
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
@@ -19,11 +20,14 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 ### 🌐 Web & Research
 - **`web_search`**: Uses DuckDuckGo to find up-to-date information on the internet. Crucial for answering questions about recent events or unlearned documentation.
 - **`web_scrape`**: Extracts the detailed text content from a specific URL, allowing the agent to read documentation or articles.
+- **`write_pdf`**: Generates high-fidelity, branded PDF documents from HTML/CSS. Features automatic watermarking and page-aware layout management.
 
 ### 📁 File System Operations
 - **`list_files`**: Lists the contents of a directory to help the agent understand the project structure.
 - **`read_folder`**: Provides detailed statistics and metadata about a directory's contents.
-- **`view_file`**: Reads the content of a file. Supports reading specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
+- **`view_file`**: Reads the content of a file.
+  - **Native Multimodality**: Supports analyzing images (JPG, PNG, WEBP) and PDF documents. The tool automatically detects binary formats and encodes them for AI analysis.
+  - **Text Reading**: Supports specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
 
 ### ✍️ Code Editing
 - **`write_file`**: Creates a new file or completely overwrites an existing one with new content.
