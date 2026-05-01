@@ -44,42 +44,73 @@ export const web_scrape = async (args) => {
             // 5. Deep Hydration Delay: Wait an additional 5s flat before reading data
             await new Promise(r => setTimeout(r, 5000));
 
-            // 6. Extract Rendered Text with Link Preservation
-            let text = await page.evaluate(() => {
-                // Remove non-content elements
-                const junk = document.querySelectorAll('script, style, nav, footer, header, noscript');
+            // 6. Deep Semantic Extraction: High-signal HTML
+            let htmlContent = await page.evaluate(() => {
+                // 1. Remove absolute junk (Keeping buttons for CTAs, but removing images as they are token-heavy)
+                const junk = document.querySelectorAll('script, style, nav, footer, header, noscript, svg, canvas, iframe, ad, .ads, link, meta, img');
                 junk.forEach(el => el.remove());
 
-                // Transform links into readable markdown-like format
-                const links = document.querySelectorAll('a');
-                links.forEach(a => {
-                    const href = a.href;
-                    const content = a.innerText.trim();
-                    // Only transform meaningful, absolute links
-                    if (href && content && !href.startsWith('javascript:') && !href.startsWith('#')) {
-                        a.innerText = ` [${content}](${href}) `;
+                // 2. Strip comments
+                const iterator = document.createNodeIterator(document.body, NodeFilter.SHOW_COMMENT);
+                let currentNode;
+                while (currentNode = iterator.nextNode()) {
+                    currentNode.remove();
+                }
+
+                // 3. Process all elements
+                const allElements = document.querySelectorAll('*');
+                allElements.forEach(el => {
+                    // Strip all attributes except 'href' and 'src'
+                    const attributes = el.attributes;
+                    for (let i = attributes.length - 1; i >= 0; i--) {
+                        const attrName = attributes[i].name;
+                        if (attrName !== 'href' && attrName !== 'src') {
+                            el.removeAttribute(attrName);
+                        }
+                    }
+
+                    // Flatten spans and other non-semantic wrappers that now have no attributes
+                    if ((el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'SECTION') && el.attributes.length === 0) {
+                        // If it's a small wrapper, we can often flatten it
+                        if (el.tagName === 'SPAN' || (el.tagName === 'DIV' && el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE)) {
+                             el.replaceWith(...el.childNodes);
+                        }
                     }
                 });
 
-                return document.body.innerText;
+                // 4. Prune empty elements (except br)
+                const pruneEmpty = () => {
+                    let found = false;
+                    document.querySelectorAll('*:not(br)').forEach(el => {
+                        if (el.childNodes.length === 0 && !el.innerText.trim()) {
+                            el.remove();
+                            found = true;
+                        }
+                    });
+                    if (found) pruneEmpty(); // Recursive prune
+                };
+                pruneEmpty();
+
+                return document.body.innerHTML;
             });
 
-            if (!text) throw new Error("EMPTY_RENDER_RESULT");
+            if (!htmlContent) throw new Error("EMPTY_RENDER_RESULT");
 
-            // 6. Clean and Truncate
-            const cleanedText = text
-                .replace(/\s+/g, ' ')
+            // 7. Clean and Truncate HTML
+            const cleanedHtml = htmlContent
+                .replace(/\s+/g, ' ')      // Collapse whitespace
+                .replace(/>\s+</g, '><')   // Remove space between tags
                 .trim()
-                .substring(0, 25000); // Increased limit due to higher fidelity
+                .substring(0, 30000);     // Increased limit for rich HTML context
 
             // Log for audit
             const toolLogDir = path.join(LOGS_DIR, 'tools');
             if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedText.length}.\n Content:\n${cleanedText}\n\n--------------------------------------------------------\n\n\n`);
+            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}\n\n--------------------------------------------------------\n\n\n`);
 
             await browser.close();
-            // fs.writeFileSync('scraped.txt', cleanedText);
-            return `CONTENT FROM [${url}]:\n\n${cleanedText}${text.length > 25000 ? '\n\n[TRUNCATED AT 25K CHARS]' : ''}`;
+            // fs.writeFileSync('scraped.html', cleanedHtml);
+            return `CLEANED HTML FROM [${url}]:\n\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}`;
 
         } catch (err) {
             lastError = err;

@@ -64,7 +64,7 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 - Use GFM tables for structured data to keep the terminal view organized. KEEP SENTENCES IN TABLE **SHORT & CONCISE**. AND MAX 3 COLUMNS. DO NOT OVERUSE TABLES.
 - **CRITICAL**: NEVER USE LaTeX IN TERMINAL RESPONSES (exception: file content).
 - Keep Poems & Literature in Code Block.
-- Use emojis & Kaomojis.
+- Use emojis & Kaomojis. Prefer Kaomojis more.
 -- END FORMATTING RULES --
 
 -- START REPONSE FINISH PROTOCOL --
@@ -95,7 +95,7 @@ export const getJanitorInstruction = (originalText, agentRaws, userMemories = ''
 AGENT RAWS (responses from this turn):
 ${agentRes}
 ${userMemories ? `
-    
+
 -- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}
 
 --- START SYSTEM INSTRUCTION (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY) ---

@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.5.1", "1.5.2"]
+        const stableVersions = ["1.5.3", "1.5.2"]
         const changelogData = {
+            "1.5.3": {
+                "note": "Improved web scraping tool to understand pages.",
+                "added": [],
+                "changed": [
+                    "`web_scrape` now preserves more context depth."
+                ],
+                "fixes": []
+            },
             "1.5.2": {
                 "note": "New and Advanced Web tools.",
                 "added": [],

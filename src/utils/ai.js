@@ -308,7 +308,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     } catch (e) {
 
                     }
-                    label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                    const pathLower = targetPath.toLowerCase();
+                    const isPdf = pathLower.endsWith('.pdf');
+                    const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                    
+                    if (isPdf) {
+                        label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
+                    } else if (isImage) {
+                        label = `🖼️ ANALYZING IMAGE: ${targetPath}`.toUpperCase();
+                    } else {
+                        label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                    }
                 } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                     const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
                     label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
