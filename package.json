@@ -34,7 +34,7 @@
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:duck-duck-scrape --external:nanoid --external:puppeteer --external:typescript"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:typescript"
 	},
 	"dependencies": {
 		"@google/genai": "^1.50.1",
