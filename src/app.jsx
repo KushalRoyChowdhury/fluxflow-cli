@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.5.3';
+const versionFluxflow = '1.5.4';
 const updatedOn = '2026-05-02';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -769,6 +769,7 @@ export default function App() {
                 try {                    const cleanHistoryForAI = [...messages, userMessage]
                         .filter(m =>
                             m.role !== 'think' &&
+                            !m.isVisualFeedback &&
                             !String(m.id).startsWith('welcome')
                         )
                         .map(m => ({
@@ -906,6 +907,15 @@ OUTPUT: ${execOutputRef.current}`;
                                 }
                                 return newMsgs;
                             });
+                            continue;
+                        }
+                        if (packet.type === 'visual_feedback') {
+                            setMessages(prev => [...prev, {
+                                id: 'feedback-' + Date.now(),
+                                role: 'system',
+                                text: packet.content,
+                                isVisualFeedback: true
+                            }]);
                             continue;
                         }
                         if (packet.type === 'exec_start') {
@@ -1046,7 +1056,7 @@ OUTPUT: ${execOutputRef.current}`;
                     }
 
                     setMessages(prev => {
-                        const historyToSave = prev.filter(m => !String(m.id).startsWith('welcome'));
+                        const historyToSave = prev.filter(m => !String(m.id).startsWith('welcome') && !m.isVisualFeedback);
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);
                         setCompletedIndex(prev.length);

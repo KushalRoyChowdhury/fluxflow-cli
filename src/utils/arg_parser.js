@@ -35,6 +35,17 @@ export const parseArgs = (argsString) => {
         else if (value === 'false') value = false;
         else if (typeof value === 'string' && !isNaN(value) && value.trim() !== '') value = Number(value);
         
+        // [PATH-SENTRY] Path Sanitization (Security & Fidelity)
+        // Convert accidental control characters back to literal representations for path-like keys
+        if (typeof value === 'string' && (key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase()))) {
+            value = value
+                .replace(/\x0C/g, '\\f')
+                .replace(/\x0D/g, '\\r')
+                .replace(/\x0B/g, '\\v')
+                .replace(/\x08/g, '\\b');
+            // Note: \n (\x0A) and \t (\x09) are intentionally left alone
+        }
+
         args[key] = value;
     }
     

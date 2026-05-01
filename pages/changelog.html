@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.5.3", "1.5.2"]
+        const stableVersions = ["1.5.3", "1.5.4"]
         const changelogData = {
+            "1.5.4": {
+                "note": "General Improvements.",
+                "added": [],
+                "changed": [
+                    "Generated PDFs will now include invisible 'AI Generated' watermark."
+                ],
+                "fixes": [
+                    "Fixed file path handling glitch in Windows."
+                ]
+            },
             "1.5.3": {
                 "note": "Improved web scraping tool to understand pages.",
                 "added": [],

@@ -338,7 +338,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                     const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
                     const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                    yield { type: 'text', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
+                    yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
                 }
                 // END VISUAL FEEDBACK FOR TOOLS
 

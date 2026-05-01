@@ -410,6 +410,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     const isDiffResult = msg.role === 'system' && msg.text?.includes('[DIFF_START]');
     const isTerminalRecord = msg.isTerminalRecord;
 
+    if (msg.isVisualFeedback) {
+        return (
+            <Box marginBottom={1} paddingX={1} width="100%">
+                <Text color="white">{msg.text}</Text>
+            </Box>
+        );
+    }
+
     if (msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord) return null;
 
     if (msg.isAskRecord) {
