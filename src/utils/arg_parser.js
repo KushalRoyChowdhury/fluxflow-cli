@@ -81,6 +81,51 @@ export const parseArgs = (argsString) => {
                     .replace(/\\`/g, '`')
                     .replace(/\\\\/g, '\\');
             }
+        } else if (i < argsString.length && argsString[i] === '[') {
+            // ARRAY LITERAL DETECTION
+            let balance = 0;
+            let inString = null;
+            let start = i;
+            let end = -1;
+
+            for (let j = i; j < argsString.length; j++) {
+                const char = argsString[j];
+                if (!inString && (char === '"' || char === "'" || char === '`')) {
+                    inString = char;
+                } else if (inString && char === inString && argsString[j - 1] !== '\\') {
+                    inString = null;
+                }
+
+                if (!inString) {
+                    if (char === '[') balance++;
+                    else if (char === ']') balance--;
+
+                    if (balance === 0) {
+                        end = j;
+                        break;
+                    }
+                }
+            }
+
+            if (end !== -1) {
+                value = argsString.substring(start, end + 1);
+                i = end + 1;
+
+                // Attempt to parse the array string into a real array
+                try {
+                    // Normalize for JSON: replace single quotes with double quotes
+                    // This is a heuristic fix for AI-generated "messy" JSON
+                    let normalized = value.trim();
+                    if (normalized.startsWith("'") || normalized.includes("'")) {
+                         // Simple replacement is risky, but for slide content it's often better than failing
+                         // Better: try to use a more lenient parser later
+                    }
+                    // For now, leave it as string and let the tool's "Hiccup Handler" parse it
+                } catch (e) {}
+            } else {
+                value = argsString.substring(start);
+                i = argsString.length;
+            }
         } else {
             // Unquoted value
             let endMatch = argsString.substring(i).match(/([^,\s\)]+)/);

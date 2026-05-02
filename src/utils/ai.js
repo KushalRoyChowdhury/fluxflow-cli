@@ -341,6 +341,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                 } else if (toolCall.toolName === 'write_pdf') {
                     label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                } else if (toolCall.toolName === 'write_docx') {
+                    label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                } else if (toolCall.toolName === 'write_pptx') {
+                    label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                 } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
                     label = ''; // handled by high-fidelity components
                 } else {

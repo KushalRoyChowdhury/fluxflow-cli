@@ -92,7 +92,7 @@ export const write_pdf = async (args) => {
         const pdfDoc = await PDFDocument.load(pdfBytes);
 
         const fileName = path.basename(targetPath);
-        pdfDoc.setTitle(`FluxFlow ${fileName}`);
+        pdfDoc.setTitle(`FluxFlow_${fileName}`);
         pdfDoc.setAuthor('FluxFlow CLI');
         pdfDoc.setSubject('Generated with Agentic AI System');
         pdfDoc.setKeywords(['FluxFlow', 'AI', 'Agentic', 'Automated']);

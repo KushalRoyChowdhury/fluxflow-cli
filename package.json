@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.6.7",
+	"version": "1.7.0",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -34,13 +34,15 @@
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:typescript"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:html-to-docx --external:pptxgenjs --external:html2pptxgenjs --external:typescript"
 	},
 	"dependencies": {
 		"@google/genai": "^1.50.1",
 		"chalk": "^5.6.2",
 		"fs-extra": "^11.3.4",
 		"gradient-string": "^3.0.0",
+		"html-to-docx": "^1.8.0",
+		"html2pptxgenjs": "^0.0.3",
 		"ink": "^7.0.1",
 		"ink-multiline-input": "^0.1.0",
 		"ink-select-input": "^6.2.0",
@@ -48,6 +50,7 @@
 		"ink-text-input": "^6.0.0",
 		"nanoid": "^5.1.9",
 		"pdf-lib": "^1.17.1",
+		"pptxgenjs": "^4.0.1",
 		"puppeteer": "^24.42.0",
 		"react": "^19.2.5",
 		"zod": "^4.3.6"

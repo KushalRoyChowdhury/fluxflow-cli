@@ -10,6 +10,8 @@ import { exec_command } from '../tools/exec_command.js';
 import { read_folder } from '../tools/read_folder.js';
 import { ask_user } from '../tools/ask_user.js';
 import { write_pdf } from '../tools/write_pdf.js';
+import { write_docx } from '../tools/write_docx.js';
+import { write_pptx } from '../tools/write_pptx.js';
 
 const TOOL_MAP = {
     web_search,
@@ -23,6 +25,8 @@ const TOOL_MAP = {
     exec_command,
     read_folder,
     write_pdf,
+    write_docx,
+    write_pptx,
     ask: ask_user
 };
 
