@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.6.0", "1.5.4"]
+        const stableVersions = ["1.6.0", "1.6.6"]
         const changelogData = {
+            "1.6.6": {
+                "note": "Bug fixes.",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Occational quote escaping issues fixed."
+                ]
+            },
             "1.6.0": {
                 "note": "Improved experience & reliability.",
                 "added": [

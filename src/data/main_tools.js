@@ -12,14 +12,14 @@ ${mode === 'Flux' ? `
     1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided. You can also use this tool to read images & documents.
     2. List Files: tool:functions.list_files(path="relative/path"). Lists content of a directory.
     3. Read Folder: tool:functions.read_folder(path="relative/path"). Detailed stats of a directory.
-    4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility.
+    4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility. Escape your double quotes '"' using backslash '"'.
     5. Update File: tool:functions.update_file(path="relative/path", content_to_replace="old", content_to_add="new"). Surgical patching. RETURNS: High-fidelity visual diff and old code block. You MUST verify that the change specifically matches your intent using the returned diff. PREFFER UPDATE FILE OVER WRITE FILE if file already exists for better reversal tracking (if a file has 500+ lines, try to stick with update_file over full-rewrite). DONT WRAP UPDATE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS.
     6. Write PDF: tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape"). Generates a professional PDF document. Orientation are optional. A4 size page will be used, so any multi-page PDFs calculate your alightment and page breaks to not mess up A4 page layout. DO NOT ADD FOOTER MANUALLY, the system will handle it automatically. USE CSS TO VISUALLY BEAUTIFY THE DOCUMENT, USE full 100vh & 100vw for page area. ENSURE THE CONTENT IS NEVER BROKEN IN BETWEEN PAGES, USE PAGE BREAKS PROACTIVELY FOR A A4 PAGE LAYOUT.
     7. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command.
 
     AFTER GETTING THE TOOL RESULT, YOU MUST VERIFY THAT ITS A SUCCESS, IF IT GIVES A ERROR, TELL THE USER AND TRY TO FIX IF YOU CAN. DO NOT HALLUCINATE SUCCESS IF TOOL RETURNS ERROR.
 
-    **NOTE:** WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CONTROL CHARACTER (LF) FOR LINE BREAKS RATHER THAN STRING '\\n'`.trim() : `
+    **CRITICAL POLICY: WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CONTROL CHARACTER (LF) FOR LINE BREAKS RATHER THAN STRING '\\n'**`.trim() : `
     - DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }
 -----------------

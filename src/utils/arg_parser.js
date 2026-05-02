@@ -1,34 +1,92 @@
 /**
- * Smart Argument Parser for Tool Signals
- * Handles key="val", key='val', key=123, key=true
+ * Smart Argument Parser for Tool Signals (Fidelity v2.0)
+ * Handles unescaped quotes by using heuristic end-of-string detection.
  */
 export const parseArgs = (argsString) => {
     const args = {};
-    
-    // Pattern to match key=value pairs
-    // Group 1: key
-    // Group 2: value (unquoted or starting with quote)
-    // We use a more comprehensive regex to catch various types including backticks
-    const regex = /(\w+)\s*=\s*(?:(["'`])((?:\\.|(?!\2)[\s\S])*)\2|([^,\s\)]+))/g;
-    
-    let match;
-    while ((match = regex.exec(argsString)) !== null) {
-        const key = match[1];
-        let value = match[3] !== undefined ? match[3] : match[4];
-        
-        // Unescape strings using JSON.parse logic for high-fidelity
-        if (match[3] !== undefined) {
+    if (!argsString) return args;
+
+    let i = 0;
+    while (i < argsString.length) {
+        // Skip whitespace and commas
+        while (i < argsString.length && (/[\s,]/.test(argsString[i]))) i++;
+        if (i >= argsString.length) break;
+
+        // 1. Capture Key
+        let keyMatch = argsString.substring(i).match(/^(\w+)\s*=\s*/);
+        if (!keyMatch) {
+            i++; // Skip noise
+            continue;
+        }
+        const key = keyMatch[1];
+        i += keyMatch[0].length;
+
+        // 2. Capture Value
+        let value = '';
+        if (i < argsString.length && (argsString[i] === '"' || argsString[i] === "'" || argsString[i] === '`')) {
+            const quote = argsString[i];
+            i++; // Start after quote
+            let start = i;
+            let end = -1;
+
+            // HEURISTIC SEARCH: Find the REAL closing quote
+            // We look for the quote followed by [, \s] \w+ = or \s* \) or end of string
+            let searchIndex = i;
+            while (searchIndex < argsString.length) {
+                let qIdx = argsString.indexOf(quote, searchIndex);
+                if (qIdx === -1) break;
+
+                // Check if this quote is escaped
+                if (argsString[qIdx - 1] === '\\' && argsString[qIdx - 2] !== '\\') {
+                    searchIndex = qIdx + 1;
+                    continue;
+                }
+
+                // CHECK BOUNDARY: Is this quote likely the END of the argument?
+                const after = argsString.substring(qIdx + 1).trim();
+                const isLogicalEnd = 
+                    after === '' ||                    // End of entire string
+                    after.startsWith(')') ||           // End of tool call
+                    after.startsWith(',') ||           // Next argument separator
+                    /^(\w+)\s*=/.test(after);          // Next argument key=
+
+                if (isLogicalEnd) {
+                    end = qIdx;
+                    break;
+                }
+                
+                // Not a logical end, skip this quote and keep searching
+                searchIndex = qIdx + 1;
+            }
+
+            if (end !== -1) {
+                value = argsString.substring(start, end);
+                i = end + 1;
+            } else {
+                // Fallback: capture till end
+                value = argsString.substring(start);
+                i = argsString.length;
+            }
+
+            // High-fidelity unescaping
             try {
-                // Wrap in quotes and parse to handle all escapes (\n, \t, \", etc) correctly
-                // Replace literal newlines with \\n, and literal carriage returns with \\r
-                value = JSON.parse(`"${value.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+                // Only use JSON.parse if it looks like it might have escapes
+                if (value.includes('\\')) {
+                    value = JSON.parse(`"${value.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+                }
             } catch (e) {
-                // Fallback for messy inputs
                 value = value
                     .replace(/\\"/g, '"')
                     .replace(/\\'/g, "'")
                     .replace(/\\`/g, '`')
                     .replace(/\\\\/g, '\\');
+            }
+        } else {
+            // Unquoted value
+            let endMatch = argsString.substring(i).match(/([^,\s\)]+)/);
+            if (endMatch) {
+                value = endMatch[1];
+                i += value.length;
             }
         }
 
@@ -37,19 +95,13 @@ export const parseArgs = (argsString) => {
         else if (value === 'false') value = false;
         else if (typeof value === 'string' && !isNaN(value) && value.trim() !== '') value = Number(value);
         
-        // [PATH-SENTRY] Path Sanitization (Security & Fidelity)
-        // Convert accidental control characters back to literal representations for path-like keys
+        // [PATH-SENTRY] Path Sanitization
         if (typeof value === 'string' && (key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase()))) {
-            value = value
-                .replace(/\x0C/g, '\\f')
-                .replace(/\x0D/g, '\\r')
-                .replace(/\x0B/g, '\\v')
-                .replace(/\x08/g, '\\b');
-            // Note: \n (\x0A) and \t (\x09) are intentionally left alone
+            value = value.replace(/\x0C/g, '\\f').replace(/\x0D/g, '\\r').replace(/\x0B/g, '\\v').replace(/\x08/g, '\\b');
         }
 
         args[key] = value;
     }
-    
+
     return args;
 };

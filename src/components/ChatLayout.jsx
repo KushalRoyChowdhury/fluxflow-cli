@@ -378,7 +378,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line }) => {
+const DiffLine = React.memo(({ line, columns = 80 }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
     const isRemoval = cleanLine.startsWith('-');
@@ -399,7 +399,7 @@ const DiffLine = React.memo(({ line }) => {
                 <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
             </Box>
             <Box flexGrow={1} marginLeft={1}>
-                <Text color={textColor} wrap="anywhere">{content}</Text>
+                <Text color={textColor}>{wrapText(content, columns - 10)}</Text>
             </Box>
         </Box>
     );
@@ -417,7 +417,7 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
             {beforeDiff && <MarkdownText text={beforeDiff} columns={columns} />}
             <Box flexDirection="column" marginTop={1} backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} />
+                    <DiffLine key={i} line={line} columns={columns} />
                 ))}
             </Box>
             {afterDiff && <MarkdownText text={afterDiff} columns={columns} />}
