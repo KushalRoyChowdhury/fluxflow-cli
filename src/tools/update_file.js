@@ -42,7 +42,7 @@ export const update_file = async (args) => {
         if (!currentContent.includes(content_to_replace)) {
             const diskLen = currentContent.length;
             const matchLen = content_to_replace.length;
-            return `ERROR: Could not find exact match for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace/line breaks. Try re-reading the file for latest changes.`;
+            return `ERROR: Could not find exact match for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace. Try re-reading the file for latest changes.`;
         }
 
         const startPos = currentContent.indexOf(content_to_replace);

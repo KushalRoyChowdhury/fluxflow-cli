@@ -31,8 +31,8 @@ export const web_scrape = async (args) => {
             const page = await browser.newPage();
 
             // 2. Set Realistic Identity
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
-            await page.setViewport({ width: 1280, height: 1600 });
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36');
+            await page.setViewport({ width: 1366, height: 768 });
 
             // 3. Jitter Delay
             const jitter = attempt === 1 ? Math.random() * 1000 + 500 : Math.random() * 2000 + 1000;
@@ -106,7 +106,7 @@ export const web_scrape = async (args) => {
             // Log for audit
             const toolLogDir = path.join(LOGS_DIR, 'tools');
             if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}\n\n--------------------------------------------------------\n\n\n`);
+            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
 
             await browser.close();
             // fs.writeFileSync('scraped.html', cleanedHtml);

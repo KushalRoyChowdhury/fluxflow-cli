@@ -247,11 +247,12 @@ const wrapText = (text, width) => {
 const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     if (buffer.length < 2) return null;
 
-    const rows = buffer.map(line =>
-        line.split('|')
-            .filter((_, i, arr) => i > 0 && i < arr.length - 1)
-            .map(cell => cell.trim())
-    );
+    const rows = buffer.map(line => {
+        const parts = line.split('|');
+        if (parts[0] !== undefined && parts[0].trim() === '') parts.shift();
+        if (parts.length > 0 && parts[parts.length - 1].trim() === '') parts.pop();
+        return parts.map(cell => cell.trim());
+    });
 
     const header = rows[0];
     const data = rows.slice(2);
@@ -313,7 +314,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
 
     lines.forEach((line, i) => {
         const trimmed = line.trim();
-        const isTableRow = trimmed.startsWith('|') && trimmed.endsWith('|');
+        const isTableRow = trimmed.startsWith('|');
         const isQuote = trimmed.startsWith('>');
 
         if (isTableRow) {
@@ -450,7 +451,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                     <Text backgroundColor="#333" color="white"> {lang.toUpperCase()} </Text>
                                 </Box>
                                 <Box paddingY={1} width="100%">
-                                    <Text color="cyan" wrap="anywhere">{code.trim()}</Text>
+                                    <Text color="cyan">{wrapText(code.trim(), columns - 6)}</Text>
                                 </Box>
                             </Box>
                         );

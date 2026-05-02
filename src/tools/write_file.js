@@ -54,17 +54,17 @@ export const write_file = async (args) => {
 
         // Prepare a snippet for the UI/History (Top 15 / Bottom 15)
         let snippet = '';
-        if (verifiedLineCount <= 30) {
+        if (verifiedLineCount <= 200) {
             snippet = verifiedLines.join('\n');
         } else {
-            const head = verifiedLines.slice(0, 15).join('\n');
-            const tail = verifiedLines.slice(-15).join('\n');
-            snippet = `${head}\n\n... [${verifiedLineCount - 30} lines truncated for history stability] ...\n\n${tail}`;
+            const head = verifiedLines.slice(0, 100).join('\n');
+            const tail = verifiedLines.slice(-100).join('\n');
+            snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated for history stability] ...\n\n${tail}`;
         }
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] verified and persisted.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}`;
+        return `SUCCESS: File [${targetPath}] verified and persisted.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
     } catch (err) {
         return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
     }

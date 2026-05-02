@@ -13,7 +13,7 @@ export const write_pdf = async (args) => {
         path: targetPath,
         content,
         orientation = 'portrait',
-        margin = '10px'
+        margin = '0px'
     } = parseArgs(args);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
@@ -94,7 +94,7 @@ export const write_pdf = async (args) => {
         const fileName = path.basename(targetPath);
         pdfDoc.setTitle(`FluxFlow ${fileName}`);
         pdfDoc.setAuthor('FluxFlow CLI');
-        pdfDoc.setSubject('Generated with AI');
+        pdfDoc.setSubject('Generated with Agentic AI System');
         pdfDoc.setKeywords(['FluxFlow', 'AI', 'Agentic', 'Automated']);
         pdfDoc.setCreator('FluxFlow PDF Engine');
         pdfDoc.setProducer('FluxFlow (Generative AI)');
