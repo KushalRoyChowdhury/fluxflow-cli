@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.6.0';
+const versionFluxflow = '1.6.1';
 const updatedOn = '2026-05-02';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -106,7 +106,7 @@ export default function App() {
                         newMsgs.splice(manual ? newMsgs.length : 1, 0, {
                             id: 'update-' + Date.now(),
                             role: 'system',
-                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`/update\` to upgrade immediately.\nCheck what's new using \`/changelog\` command.`,
+                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`/update latest\` to upgrade immediately.\nCheck what's new using \`/changelog\` command.`,
                             isUpdateNotification: true,
                             isMeta: true
                         });
@@ -468,7 +468,7 @@ export default function App() {
         { cmd: '/changelog', desc: 'View latest updates' },
         { cmd: '/update', desc: 'Check/Install updates', subs: [
             { cmd: 'check', desc: 'Check for new version' },
-            { cmd: 'force', desc: 'Force reinstall latest' }
+            { cmd: 'latest', desc: 'Install Latest Version' }
         ]}
     ];
 
@@ -739,7 +739,7 @@ export default function App() {
                         performVersionCheck(true);
                         break;
                     }
-                    const isForce = parts.includes('--force');
+                    const isForce = parts.includes('--latest');
                     setActiveView('update');
                     break;
                 }

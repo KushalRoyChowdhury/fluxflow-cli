@@ -6,7 +6,7 @@ const TypewriterText = ({ text, isStreaming, onComplete, columns = 80, color = '
     const [displayedText, setDisplayedText] = useState('');
     const fullTextRef = useRef(text);
     const displayedTextRef = useRef('');
-    
+
     useEffect(() => {
         fullTextRef.current = text;
     }, [text]);
@@ -22,7 +22,7 @@ const TypewriterText = ({ text, isStreaming, onComplete, columns = 80, color = '
                 if (match) {
                     const chunk = match[0];
                     const gap = currentFull.length - currentDisp.length;
-                    
+
                     let revealedChunk = chunk;
                     if (gap > 100) {
                         const extraMatch = remaining.slice(chunk.length).match(/^(\S+\s*|\s+){0,2}/);
@@ -179,7 +179,8 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     // Basic math symbol translation
                     const mathContent = content
                         .replace(/\\multiply/g, '×')
-                        .replace(/\\divide/g, '÷');
+                        .replace(/\\mul/g, '×')
+                        .replace(/\\div/g, '÷');
 
                     return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
                 }
@@ -617,9 +618,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     <Text bold color="white">Thinking...</Text>
                     <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} flexDirection="column" width="100%">
                         {!animationDone ? (
-                            <TypewriterText 
-                                text={finalContent} 
-                                isStreaming={msg.isStreaming} 
+                            <TypewriterText
+                                text={finalContent}
+                                isStreaming={msg.isStreaming}
                                 onComplete={() => setAnimationDone(true)}
                                 speed={25}
                                 render={(t) => formatThinkText(t, columns)}
