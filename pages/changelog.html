@@ -225,8 +225,23 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.6.7", "1.7.0"]
+        const stableVersions = ["1.7.0", "1.7.1"]
         const changelogData = {
+            "1.7.1": {
+                "note": "The Telemetry Engine.",
+                "added": [
+                    "Integrated High-Fidelity Performance Telemetry (Wall Time vs Agent Active Time).",
+                    "Precision Tool Tracking (Detailed Success/Failure rates with millisecond-accurate timing).",
+                    "Redesigned 'Instant-Exit' Dashboard with comprehensive session summaries."
+                ],
+                "changed": [
+                    "Swapped /quit confirmation for a data-driven shutdown dashboard.",
+                    "Unified telemetry aesthetics across `/stats` and `/quit` screens."
+                ],
+                "fixes": [
+                    "Improved terminal signal handling for Ctrl+C."
+                ]
+            },
             "1.7.0": {
                 "note": "The Office Suite.",
                 "added": [

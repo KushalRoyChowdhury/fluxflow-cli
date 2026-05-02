@@ -20,7 +20,7 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } 
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
-import { getDailyUsage } from './utils/usage.js';
+import { getDailyUsage, incrementUsage, addToUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.0';
+const versionFluxflow = '1.7.1';
 const updatedOn = '2026-05-03';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -165,6 +165,10 @@ export default function App() {
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
+    const [sessionToolSuccess, setSessionToolSuccess] = useState(0);
+    const [sessionToolFailure, setSessionToolFailure] = useState(0);
+    const [sessionApiTime, setSessionApiTime] = useState(0);
+    const [sessionToolTime, setSessionToolTime] = useState(0);
     const [dailyUsage, setDailyUsage] = useState(null);
     const [chatId, setChatId] = useState(generateChatId());
     const [activeCommand, setActiveCommand] = useState(null);
@@ -201,6 +205,11 @@ export default function App() {
         parts.push(`${s}s`);
 
         return parts.join(' ');
+    };
+
+    const formatMsDuration = (ms) => {
+        if (ms < 1000) return `${ms}ms`;
+        return formatDuration(Math.floor(ms / 1000));
     };
     const [statusText, setStatusText] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -432,6 +441,26 @@ export default function App() {
             setTempKey('');
         }
     };
+    
+    // Auto-Exit Trigger
+    useEffect(() => {
+        if (activeView === 'exit') {
+            const timer = setTimeout(() => {
+                process.exit(0);
+            }, 100); // Tiny tick to ensure final render is flushed
+            return () => clearTimeout(timer);
+        }
+    }, [activeView]);
+
+    // Duration Watcher (Telemetry)
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            if (!isInitializing) {
+                await addToUsage('duration', 5); // Add 5 seconds to today's stats
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [isInitializing]);
 
     const COMMANDS = [
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
@@ -440,24 +469,30 @@ export default function App() {
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/chats', desc: 'List all chat sessions' },
-        { cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
-            { cmd: 'flux', desc: 'Enable Dev toolset' },
-            { cmd: 'flow', desc: 'Enable Chat mode' }
-        ]},
-        { cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-            { cmd: 'low', desc: 'Fastest reasoning' },
-            { cmd: 'medium', desc: 'Balanced depth' },
-            { cmd: 'high', desc: 'Complex coding' },
-            { cmd: 'max', desc: 'Architectural depth' },
-            { cmd: 'show', desc: 'Show full thoughts' },
-            { cmd: 'hide', desc: 'Show concise thoughts' }
-        ]},
-        { cmd: '/model', desc: 'Switch AI model', subs: [
-            { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
-            { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
-            { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
-            { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
-        ]},
+        {
+            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+                { cmd: 'flux', desc: 'Enable Dev toolset' },
+                { cmd: 'flow', desc: 'Enable Chat mode' }
+            ]
+        },
+        {
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
+                { cmd: 'low', desc: 'Fastest reasoning' },
+                { cmd: 'medium', desc: 'Balanced depth' },
+                { cmd: 'high', desc: 'Complex coding' },
+                { cmd: 'max', desc: 'Architectural depth' },
+                { cmd: 'show', desc: 'Show full thoughts' },
+                { cmd: 'hide', desc: 'Show concise thoughts' }
+            ]
+        },
+        {
+            cmd: '/model', desc: 'Switch AI model', subs: [
+                { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
+                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
+                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
+                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+            ]
+        },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
         { cmd: '/profile', desc: 'Edit developer persona' },
@@ -466,10 +501,12 @@ export default function App() {
         { cmd: '/reset', desc: 'Wipe all project data' },
         { cmd: '/about', desc: 'Project info & credits' },
         { cmd: '/changelog', desc: 'View latest updates' },
-        { cmd: '/update', desc: 'Check/Install updates', subs: [
-            { cmd: 'check', desc: 'Check for new version' },
-            { cmd: 'latest', desc: 'Install latest release' }
-        ]}
+        {
+            cmd: '/update', desc: 'Check/Install updates', subs: [
+                { cmd: 'check', desc: 'Check for new version' },
+                { cmd: 'latest', desc: 'Install latest release' }
+            ]
+        }
     ];
 
     const handleSubmit = (value) => {
@@ -693,7 +730,7 @@ export default function App() {
                             try {
                                 const items = fs.readdirSync(FLUXFLOW_DIR);
                                 if (items.length === 0) fs.removeSync(FLUXFLOW_DIR);
-                            } catch (e) {}
+                            } catch (e) { }
 
                             setTimeout(() => {
                                 setActiveView('exit');
@@ -715,8 +752,8 @@ export default function App() {
                         : 'Checking for updates...';
                     const s = emojiSpace(2);
                     const aboutText = `ℹ️${s}**FluxFlow Version:** v${versionFluxflow}\n` +
-                                     `🔄 **Status:** ${updateStatus}\n` +
-                                     `📅 **Updated on:** ${updatedOn}`;
+                        `🔄 **Status:** ${updateStatus}\n` +
+                        `📅 **Updated on:** ${updatedOn}`;
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', text: aboutText, isMeta: true }];
@@ -766,7 +803,9 @@ export default function App() {
             const streamChat = async () => {
                 setIsProcessing(true);
                 setIsExpanded(false);
-                try {                    const cleanHistoryForAI = [...messages, userMessage]
+                const apiStart = Date.now();
+                try {
+                    const cleanHistoryForAI = [...messages, userMessage]
                         .filter(m =>
                             m.role !== 'think' &&
                             !m.isVisualFeedback &&
@@ -804,6 +843,10 @@ OUTPUT: ${execOutputRef.current}`;
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
                                 setExecOutput('');
+                            },
+                            onToolResult: (status) => {
+                                if (status === 'success') setSessionToolSuccess(prev => prev + 1);
+                                else setSessionToolFailure(prev => prev + 1);
                             },
                             onToolApproval: async (tool, args) => {
                                 const isAuto = autoAcceptWrites || systemSettings.autoExec;
@@ -948,6 +991,10 @@ OUTPUT: ${execOutputRef.current}`;
                             setSessionBackgroundCalls(prev => prev + 1);
                             continue;
                         }
+                        if (packet.type === 'tool_time') {
+                            setSessionToolTime(prev => prev + packet.content);
+                            continue;
+                        }
                         if (packet.type === 'tool_result') {
                             setMessages(prev => [...prev, {
                                 id: 'tool-' + Date.now(),
@@ -976,7 +1023,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 const char = chunkText[j];
                                 if (!inToolCallString && (char === "'" || char === '"' || char === '`')) {
                                     inToolCallString = char;
-                                } else if (inToolCallString && char === inToolCallString && chunkText[j-1] !== '\\') {
+                                } else if (inToolCallString && char === inToolCallString && chunkText[j - 1] !== '\\') {
                                     inToolCallString = null;
                                 }
 
@@ -1070,6 +1117,8 @@ OUTPUT: ${execOutputRef.current}`;
                             }
                         }
                     }
+                    const apiEnd = Date.now();
+                    setSessionApiTime(prev => prev + (apiEnd - apiStart));
                 } catch (err) {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
@@ -1282,9 +1331,8 @@ OUTPUT: ${execOutputRef.current}`;
                     <CommandMenu
                         title={`API Tier: ${apiTier}`}
                         items={[
-                            { label: 'Free Tier (1,500/day)', value: 'Free' },
-                            { label: `Paid Tier (Budget: ${quotas.agentLimit})`, value: 'Paid' },
-                            { label: `Custom Model (Endpoint: ${quotas.customModelId || 'None'})`, value: 'Custom' },
+                            { label: 'Free Tier (Gemini API Free Tier - Optimized for Gemma 4 Model)', value: 'Free' },
+                            { label: `Custom    (for using Paid API)`, value: 'Custom' },
                             { label: 'Back', value: 'settings' }
                         ]}
                         onSelect={(item) => {
@@ -1296,43 +1344,12 @@ OUTPUT: ${execOutputRef.current}`;
                             const newTier = item.value;
                             setApiTier(newTier);
 
-                            if (newTier === 'Paid') {
+                            if (newTier === 'Custom') {
                                 setInputConfig({
-                                    label: "Daily Agent Limit for default model (Gemma 4 31B):",
-                                    note: "NOTE: If you have your own Gemini API supported model, use Custom mode.",
+                                    label: "Enter Agent daily limit (requests made):",
                                     key: 'quotas',
                                     subKey: 'agentLimit',
                                     value: String(quotas.agentLimit),
-                                    next: (q) => ({
-                                        label: "Daily default background model limit (Gemma 4 26B A4B):",
-                                        key: 'quotas',
-                                        subKey: 'backgroundLimit',
-                                        value: String(q.backgroundLimit)
-                                    })
-                                });
-                                setActiveView('input');
-                            } else if (newTier === 'Custom') {
-                                setInputConfig({
-                                    label: "Enter Agent Model ID:",
-                                    key: 'activeModel',
-                                    value: activeModel,
-                                    next: (val) => ({
-                                        label: "Enter Background Model ID:",
-                                        key: 'janitorModel',
-                                        value: janitorModel,
-                                        next: (val2) => ({
-                                            label: "Enter Agent daily limit (calls):",
-                                            key: 'quotas',
-                                            subKey: 'agentLimit',
-                                            value: String(quotas.agentLimit),
-                                            next: (q) => ({
-                                                label: "Enter Background daily limit (calls):",
-                                                key: 'quotas',
-                                                subKey: 'backgroundLimit',
-                                                value: String(quotas.backgroundLimit)
-                                            })
-                                        })
-                                    })
                                 });
                                 setActiveView('input');
                             } else {
@@ -1397,13 +1414,75 @@ OUTPUT: ${execOutputRef.current}`;
                 );
             case 'stats':
                 return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={2} paddingY={1}>
-                        <Text color="cyan" bold>📊 DAILY USAGE TRACKER</Text>
-                        <Box flexDirection="column" marginTop={1}>
-                            <Text>• Agent Model Calls:    <Text color="green">{dailyUsage?.agent || 0}</Text></Text>
-                            <Text>• Memory Tasks:         <Text color="blue">{dailyUsage?.background || 0}</Text></Text>
+                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} width={100}>
+                        <Box marginBottom={1}>
+                            <Text color="white" bold underline>SESSION TELEMETRY</Text>
                         </Box>
-                        <Text dimColor marginTop={1}>(Press ESC to return to chat)</Text>
+                        
+                        <Box flexDirection="column">
+                            <Box>
+                                <Box width={25}><Text color="blue">Session Duration:</Text></Box>
+                                <Text color="white">{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                <Text color="white">{sessionAgentCalls}</Text>
+                            </Box>
+                            <Box marginLeft={2}>
+                                <Box width={23}><Text color="blue" dimColor>» API Time:</Text></Box>
+                                <Text color="white">{formatMsDuration(sessionApiTime)}</Text>
+                            </Box>
+                            <Box marginLeft={2}>
+                                <Box width={23}><Text color="blue" dimColor>» Tool Time:</Text></Box>
+                                <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                <Text color="white">{sessionBackgroundCalls}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
+                                <Text color="white">{(sessionTotalTokens / 1000).toFixed(2)}k</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
+                                <Text color="white">{sessionToolSuccess + sessionToolFailure} ( </Text>
+                                <Text color="green">√ {sessionToolSuccess}</Text>
+                                <Text color="white"> </Text>
+                                <Text color="red">x {sessionToolFailure}</Text>
+                                <Text color="white"> )</Text>
+                            </Box>
+                        </Box>
+
+                        <Box flexDirection="column" marginTop={1}>
+                            <Text color="white" bold underline>DAILY USAGE TRACKER</Text>
+                            <Box marginTop={1}>
+                                <Box width={25}><Text color="blue">Wall Time Today:</Text></Box>
+                                <Text color="white">{formatDuration(dailyUsage?.duration || 0)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                <Text color="white">{dailyUsage?.agent || 0}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                <Text color="white">{dailyUsage?.background || 0}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
+                                <Text color="white">{((dailyUsage?.tokens || 0) / 1000).toFixed(2)}k</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
+                                <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0)} ( </Text>
+                                <Text color="green">√ {dailyUsage?.toolSuccess || 0}</Text>
+                                <Text color="white"> </Text>
+                                <Text color="red">x {dailyUsage?.toolFailure || 0}</Text>
+                                <Text color="white"> )</Text>
+                            </Box>
+                        </Box>
+
+                        <Text dimColor marginTop={1} italic>(Press ESC to return to chat)</Text>
                     </Box>
                 );
             case 'autoExecDanger':
@@ -1532,35 +1611,60 @@ OUTPUT: ${execOutputRef.current}`;
                         </Box>
                     </Box>
                 );
-            case 'exit':
+            case 'exit': {
+                const wallTimeMs = Date.now() - SESSION_START_TIME;
+                const totalTools = sessionToolSuccess + sessionToolFailure;
+                const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
+                
+                const agentActiveMs = sessionApiTime + sessionToolTime;
+                const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+                const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+
                 return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red">
-                        <Text color="red" bold>🏁 SESSION DASHBOARD</Text>
+                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={100}>
+                        <Box marginBottom={1}>
+                            <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
+                        </Box>
+                        
+                        <Box flexDirection="column">
+                            <Text color="white" bold underline>Interaction Summary</Text>
+                            <Box marginTop={1}>
+                                <Box width={20}><Text color="blue">Session ID:</Text></Box>
+                                <Text color="white">{chatId}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
+                                <Text color="white">{totalTools} ( <Text color="green">√ {sessionToolSuccess}</Text> <Text color="red">x {sessionToolFailure}</Text> )</Text>
+                            </Box>
+                            <Box>
+                                <Box width={20}><Text color="blue">Success Rate:</Text></Box>
+                                <Text color="white">{successRate}%</Text>
+                            </Box>
+                        </Box>
+
                         <Box flexDirection="column" marginTop={1}>
-                            <Text>• Agent Active For:      <Text color="yellow">{formatDuration(Math.floor((Date.now() - SESSION_START_TIME) / 1000))}</Text></Text>
-                            <Text>• Total Model Queries:   <Text color="green">{sessionAgentCalls}</Text></Text>
-                            <Text>• Memory Tasks:          <Text color="blue">{sessionBackgroundCalls}</Text></Text>
-                            <Text>• Total Tokens Consumed: <Text color="magenta">{(sessionTotalTokens / 1000).toFixed(2)}k</Text></Text>
+                            <Text color="white" bold underline>Performance</Text>
+                            <Box marginTop={1}>
+                                <Box width={20}><Text color="blue">Wall Time:</Text></Box>
+                                <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={20}><Text color="blue">Agent Active:</Text></Box>
+                                <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
+                            </Box>
+                            <Box marginLeft={2}>
+                                <Box width={18}><Text color="blue" dimColor>» API Time:</Text></Box>
+                                <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
+                            </Box>
+                            <Box marginLeft={2}>
+                                <Box width={18}><Text color="blue" dimColor>» Tool Time:</Text></Box>
+                                <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
+                            </Box>
                         </Box>
-                        <Text marginTop={1}>Are you sure you want to exit?</Text>
-                        <Box marginTop={1}>
-                            <CommandMenu
-                                title="Exit Confirmation"
-                                items={[
-                                    { label: "Yes, Shutdown Flux", value: 'yes' },
-                                    { label: "No, Back to terminal", value: 'no' }
-                                ]}
-                                onSelect={(item) => {
-                                    if (item.value === 'yes') {
-                                        process.exit(0);
-                                    } else {
-                                        setActiveView('chat');
-                                    }
-                                }}
-                            />
-                        </Box>
+
                     </Box>
                 );
+            }
             case 'ask':
                 return (
                     <Box width="100%">
@@ -1839,7 +1943,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : (
-                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." :  !isProcessing ? `  Type /cmd or message... (${terminalEnv.shortcut} for newline)` : "  You can send a prompt to steer the agent."}</Text>
+                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Type /cmd or message... (${terminalEnv.shortcut} for newline)` : "  You can send a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}

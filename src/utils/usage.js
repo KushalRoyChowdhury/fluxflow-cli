@@ -12,7 +12,18 @@ export const getDailyUsage = async () => {
         if (await fs.exists(USAGE_FILE)) {
             const data = await fs.readJson(USAGE_FILE);
             if (data.date === today) {
-                return data.stats;
+                // Ensure all keys exist (migration)
+                const s = data.stats;
+                const normalized = {
+                    agent: s.agent || 0,
+                    background: s.background || 0,
+                    search: s.search || 0,
+                    toolSuccess: s.toolSuccess || 0,
+                    toolFailure: s.toolFailure || 0,
+                    duration: s.duration || 0,
+                    tokens: s.tokens || 0
+                };
+                return normalized;
             }
         }
     } catch (err) {
@@ -20,7 +31,15 @@ export const getDailyUsage = async () => {
     }
 
     // Reset for new day
-    const defaultStats = { agent: 0, background: 0, search: 0 };
+    const defaultStats = { 
+        agent: 0, 
+        background: 0, 
+        search: 0, 
+        toolSuccess: 0, 
+        toolFailure: 0, 
+        duration: 0, 
+        tokens: 0 
+    };
     await fs.ensureDir(path.dirname(USAGE_FILE));
     await fs.writeJson(USAGE_FILE, { date: today, stats: defaultStats }, { spaces: 2 });
     return defaultStats;
@@ -31,15 +50,26 @@ export const getDailyUsage = async () => {
  */
 export const incrementUsage = async (key) => {
     const today = new Date().toISOString().split('T')[0];
-    const data = await fs.readJson(USAGE_FILE).catch(() => ({ date: today, stats: { agent: 0, background: 0, search: 0 } }));
+    const stats = await getDailyUsage();
+    const data = { date: today, stats };
     
-    if (data.date !== today) {
-        data.date = today;
-        data.stats = { agent: 0, background: 0, search: 0 };
-    }
-
     if (data.stats[key] !== undefined) {
         data.stats[key]++;
+        await fs.ensureDir(path.dirname(USAGE_FILE));
+        await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
+    }
+};
+
+/**
+ * Adds a specific amount to a usage key
+ */
+export const addToUsage = async (key, amount) => {
+    const today = new Date().toISOString().split('T')[0];
+    const stats = await getDailyUsage();
+    const data = { date: today, stats };
+    
+    if (data.stats[key] !== undefined) {
+        data.stats[key] += Math.floor(amount);
         await fs.ensureDir(path.dirname(USAGE_FILE));
         await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
     }
