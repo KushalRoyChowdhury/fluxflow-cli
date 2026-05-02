@@ -65,7 +65,7 @@ const migrateToExternal = async (newPath) => {
         try {
             if (await fs.exists(src)) {
                 await fs.ensureDir(dest);
-                await fs.copy(src, dest, { overwrite: false });
+                await fs.copy(src, dest, { overwrite: true });
             }
         } catch (err) {
             console.error(`Migration failed for ${folder}:`, err);

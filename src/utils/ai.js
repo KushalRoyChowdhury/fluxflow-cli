@@ -223,6 +223,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 success = true;
                 // Success - Reset model name display for final chunks
                 yield { type: 'model_update', content: null };
+                yield { type: 'status', content: 'Working...' };
             } catch (err) {
                 const errMsg = err.status || (err.error && err.error.message) || String(err);
                 // Log error in /logs/agent/error.log
@@ -265,7 +266,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             lastUsage = chunk.usageMetadata;
             if (lastUsage) {
                 yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
-                yield { type: 'status', content: 'Working...' };
             }
         }
 

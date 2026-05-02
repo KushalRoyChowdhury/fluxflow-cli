@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.6.1';
+const versionFluxflow = '1.6.3';
 const updatedOn = '2026-05-02';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -468,7 +468,7 @@ export default function App() {
         { cmd: '/changelog', desc: 'View latest updates' },
         { cmd: '/update', desc: 'Check/Install updates', subs: [
             { cmd: 'check', desc: 'Check for new version' },
-            { cmd: 'latest', desc: 'Install Latest Version' }
+            { cmd: 'latest', desc: 'Install latest release' }
         ]}
     ];
 
@@ -1051,27 +1051,22 @@ OUTPUT: ${execOutputRef.current}`;
                                 }
                                 return newMsgs;
                             });
-                        } else if (!inThinkMode && !toolCallEncounteredInTurn) {
-                            // [SIGNAL BLOCKADE] Sniff for tool calls and cut the append
-                            let cleanedText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<\/?(think|thought)>/gi, '').replace(signalRegex, '');
-
-                            const toolIdx = cleanedText.toLowerCase().indexOf('tool:functions.');
-                            if (toolIdx !== -1) {
-                                cleanedText = cleanedText.substring(0, toolIdx);
+                        } else if (!inThinkMode) {
+                            // [SIGNAL MONITOR] Mark turn state if tool call encountered
+                            const chunkLower = chunkText.toLowerCase();
+                            if (!toolCallEncounteredInTurn && chunkLower.includes('tool:functions.')) {
                                 toolCallEncounteredInTurn = true;
                             }
 
-                            if (cleanedText) {
-                                if (!currentAgentId) {
-                                    currentAgentId = 'agent-' + Date.now();
-                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText, isStreaming: true }]);
-                                } else {
-                                    setMessages(prev => prev.map(m =>
-                                        m.id === currentAgentId
-                                            ? { ...m, text: m.text + cleanedText, isStreaming: true }
-                                            : m
-                                    ));
-                                }
+                            if (!currentAgentId) {
+                                currentAgentId = 'agent-' + Date.now();
+                                setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: chunkText, isStreaming: true }]);
+                            } else {
+                                setMessages(prev => prev.map(m =>
+                                    m.id === currentAgentId
+                                        ? { ...m, text: m.text + chunkText, isStreaming: true }
+                                        : m
+                                ));
                             }
                         }
                     }
@@ -1106,7 +1101,7 @@ OUTPUT: ${execOutputRef.current}`;
 
                     setMessages(prev => {
                         const newMsgs = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isVisualFeedback);
+                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isMeta);
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);
                         setCompletedIndex(newMsgs.length);
