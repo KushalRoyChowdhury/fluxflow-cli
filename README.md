@@ -12,7 +12,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 ## ✨ Features
 
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
-- **Autonomous PDF Engine**: Generate professional, branded PDF documents on the fly using the `write_pdf` tool, complete with custom CSS styling and automatic watermarking.
+- **Document Engineering Suite**: Generate professional, branded PDF, DOCX, and PPTX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
 - **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
 - **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
 - **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
@@ -20,7 +20,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops (up to 45 iterations) to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
-- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and PDF generation.
+- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX/PPTX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Minimal to Max).
 - **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.
@@ -78,6 +78,7 @@ Flux Flow runs entirely locally on your machine.
 - **[@google/genai](https://www.npmjs.com/package/@google/genai)**: The core AI SDK powering the agent's intelligence.
 - **[chalk](https://www.npmjs.com/package/chalk) & [gradient-string](https://www.npmjs.com/package/gradient-string)**: For terminal styling and aesthetics.
 - **[fs-extra](https://www.npmjs.com/package/fs-extra)**: For robust file system operations.
+- **[pptxgenjs](https://www.npmjs.com/package/pptxgenjs) & [html-to-docx](https://www.npmjs.com/package/html-to-docx)**: For native Office document generation.
 
 ---
 *Created as a demonstration of highly capable AI tooling.*

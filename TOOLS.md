@@ -9,6 +9,8 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | **Web Search** | ✅ | ✅ |
 | **Web Scrape** | ✅ | ✅ |
 | **Write PDF** | ✅ | ✅ |
+| **Write DOCX** | ✅ | ✅ |
+| **Write PPTX** | ✅ | ✅ |
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
@@ -20,7 +22,14 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 ### 🌐 Web & Research
 - **`web_search`**: Uses DuckDuckGo to find up-to-date information on the internet. Crucial for answering questions about recent events or unlearned documentation.
 - **`web_scrape`**: Extracts the detailed text content from a specific URL, allowing the agent to read documentation or articles.
+
+### 📄 Document Engineering (The Office Suite)
 - **`write_pdf`**: Generates high-fidelity, branded PDF documents from HTML/CSS. Features automatic watermarking and page-aware layout management.
+- **`write_docx`**: Generates professional Word documents (.docx) from HTML. Supports multi-page layouts, automatic page numbering, and native styling.
+- **`write_pptx`**: Generates high-fidelity, native PowerPoint presentations (.pptx) from HTML.
+  - **Native Translation**: Uses `html2pptxgenjs` to translate HTML tags (`<h1>`, `<ul>`, `<b>`) directly into selectable PowerPoint text objects.
+  - **Rich Styling**: Supports CSS-like properties (color, font-size, text-align) for professional slide design.
+  - **Flat Protocol**: Optimized for AI stability using a flat HTML string interface.
 
 ### 📁 File System Operations
 - **`list_files`**: Lists the contents of a directory to help the agent understand the project structure.
