@@ -881,6 +881,12 @@ OUTPUT: ${execOutputRef.current}`;
                     let inThinkMode = false;
                     let currentThinkId = null;
                     let currentAgentId = null;
+                    let inCodeBlock = false;
+                    let inToolCall = false;
+                    let thinkConsumedInTurn = false;
+                    let toolCallEncounteredInTurn = false;
+                    let toolCallBalance = 0;
+                    let inToolCallString = null;
                     // const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
                     const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
@@ -897,6 +903,10 @@ OUTPUT: ${execOutputRef.current}`;
                             currentThinkId = null;
                             currentAgentId = null;
                             inThinkMode = false;
+                            inCodeBlock = false;
+                            inToolCall = false;
+                            toolCallEncounteredInTurn = false;
+                            // thinkConsumedInTurn = false; // Keep persistent across sub-loops if desired, or reset
                             continue;
                         }
                         if (packet.type === 'memory_updated') {
@@ -950,23 +960,55 @@ OUTPUT: ${execOutputRef.current}`;
                         }
 
                         let chunkText = packet.content;
+                        const chunkLower = chunkText.toLowerCase();
+
+                        // [CONTEXT TRACKING] Update state based on chunk content
+                        if (chunkText.includes('```')) inCodeBlock = !inCodeBlock;
+                        
+                        if (chunkLower.includes('tool:functions.')) {
+                            inToolCall = true;
+                            toolCallBalance = 0;
+                            inToolCallString = null;
+                        }
+
+                        if (inToolCall) {
+                            for (let j = 0; j < chunkText.length; j++) {
+                                const char = chunkText[j];
+                                if (!inToolCallString && (char === "'" || char === '"' || char === '`')) {
+                                    inToolCallString = char;
+                                } else if (inToolCallString && char === inToolCallString && chunkText[j-1] !== '\\') {
+                                    inToolCallString = null;
+                                }
+
+                                if (!inToolCallString) {
+                                    if (char === '(') toolCallBalance++;
+                                    else if (char === ')') toolCallBalance--;
+                                }
+                            }
+                            if (toolCallBalance <= 0 && !inToolCallString) {
+                                inToolCall = false;
+                            }
+                        }
 
                         // 1. Detect transition to THINK mode (Handles <think> or <thought>)
-                        if ((chunkText.toLowerCase().includes('<think') || chunkText.toLowerCase().includes('<thought')) && !inThinkMode) {
+                        const hasThinkTag = chunkLower.includes('<think') || chunkLower.includes('<thought');
+                        const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
+
+                        if (hasThinkTag && canThink) {
                             inThinkMode = true;
+                            thinkConsumedInTurn = true;
                             // Clean up any partial tags from the visible text
-                            chunkText = chunkText.replace(/<(think|thought)>/gi, '');
+                            chunkText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
                             setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '' }]);
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
-                        if (chunkText.toLowerCase().includes('</think>') || chunkText.toLowerCase().includes('</thought>')) {
+                        if (chunkLower.includes('</think>') || chunkLower.includes('</thought>')) {
                             const parts = chunkText.split(/<\/(think|thought)>/gi);
                             const thinkPart = parts[0] || '';
-                            // The split with regex group (thought|think) will include the captured group in parts
-                            // So we join the rest carefully.
-                            const agentPart = parts.slice(2).join('') || '';
+                            // Parts indices: 0: text before </think>, 1: 'think' or 'thought', 2+: rest
+                            const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
                             setMessages(prev => {
                                 const newMsgs = prev.map(m =>
@@ -977,16 +1019,13 @@ OUTPUT: ${execOutputRef.current}`;
 
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
-                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart.replace(/<\/?(think|thought)>/gi, '') }];
+                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart }];
                             });
                             continue;
                         }
 
                         // 3. Append to target role with Leak Protection
                         if (inThinkMode && currentThinkId) {
-                            // Even if the tag was split across chunks (e.g. </th then ink>),
-                            // we catch the 'ink>' part here by checking if the resulting thought block
-                            // now contains the full tag.
                             setMessages(prev => {
                                 let transitioning = false;
                                 let transitionContent = '';
@@ -1008,21 +1047,31 @@ OUTPUT: ${execOutputRef.current}`;
                                 if (transitioning) {
                                     inThinkMode = false;
                                     currentAgentId = 'agent-' + Date.now();
-                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?think>/gi, '') }];
+                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, '') }];
                                 }
                                 return newMsgs;
                             });
-                        } else if (!inThinkMode) {
-                            const cleanedText = chunkText.replace(/<\/?(think|thought)>/gi, '').replace(signalRegex, '');
-                            if (!currentAgentId) {
-                                currentAgentId = 'agent-' + Date.now();
-                                setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
-                            } else {
-                                setMessages(prev => prev.map(m =>
-                                    m.id === currentAgentId
-                                        ? { ...m, text: m.text + cleanedText }
-                                        : m
-                                ));
+                        } else if (!inThinkMode && !toolCallEncounteredInTurn) {
+                            // [SIGNAL BLOCKADE] Sniff for tool calls and cut the append
+                            let cleanedText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<\/?(think|thought)>/gi, '').replace(signalRegex, '');
+                            
+                            const toolIdx = cleanedText.toLowerCase().indexOf('tool:functions.');
+                            if (toolIdx !== -1) {
+                                cleanedText = cleanedText.substring(0, toolIdx);
+                                toolCallEncounteredInTurn = true;
+                            }
+
+                            if (cleanedText) {
+                                if (!currentAgentId) {
+                                    currentAgentId = 'agent-' + Date.now();
+                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
+                                } else {
+                                    setMessages(prev => prev.map(m =>
+                                        m.id === currentAgentId
+                                            ? { ...m, text: m.text + cleanedText }
+                                            : m
+                                    ));
+                                }
                             }
                         }
                     }

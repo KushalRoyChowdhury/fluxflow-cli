@@ -5,35 +5,50 @@ import { TerminalBox } from './TerminalBox.jsx';
 const cleanSignals = (text) => {
     if (!text) return text;
 
-    const parts = [];
-    let i = 0;
-    while (i < text.length) {
-        const trigger = 'tool:functions.';
-        if (text.substring(i, i + trigger.length).toLowerCase() === trigger) {
-             let balance = 0;
-             let foundStart = false;
-             let j = i;
+    let result = text;
+    const trigger = 'tool:functions.';
+    
+    // Greedy loop to strip all tool calls
+    while (true) {
+        const lowerResult = result.toLowerCase();
+        const startIdx = lowerResult.indexOf(trigger);
+        if (startIdx === -1) break;
 
-             // Seek forward to balance original brackets
-             while (j < text.length) {
-                 if (text[j] === '(') {
-                     balance++;
-                     foundStart = true;
-                 } else if (text[j] === ')') {
-                     balance--;
-                 }
-                 j++;
-                 if (foundStart && balance === 0) break;
-             }
-             i = j; // Skip the tool call
-        } else {
-             parts.push(text[i]);
-             i++;
+        let balance = 0;
+        let foundStart = false;
+        let inString = null;
+        let j = startIdx;
+
+        while (j < result.length) {
+            const char = result[j];
+            
+            // String immunity
+            if (!inString && (char === "'" || char === '"' || char === '`')) {
+                inString = char;
+            } else if (inString && char === inString && result[j-1] !== '\\') {
+                inString = null;
+            }
+
+            if (!inString) {
+                if (char === '(') {
+                    balance++;
+                    foundStart = true;
+                } else if (char === ')') {
+                    balance--;
+                }
+            }
+
+            j++;
+            // Exit condition: we've balanced the parentheses of the tool call
+            if (foundStart && balance === 0 && !inString) break;
         }
+
+        // Slice out the tool call
+        result = result.substring(0, startIdx) + result.substring(j);
     }
 
-    // Secondary cleanup for protocol signals
-    return parts.join('')
+    // Secondary cleanup for protocol signals and success/error markers
+    return result
         .replace(/^\[TOOL_RESULT\]:\s*/gi, '')
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))

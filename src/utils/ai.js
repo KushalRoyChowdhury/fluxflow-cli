@@ -269,8 +269,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         fullAgentResponseChunks.push(turnText);
 
-        // [SAFETY] Strictly ignore any tools or signals trapped inside <think> tags
-        const textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/g, '');
+        // [SAFETY] Surgical extraction of top-level thinking blocks only.
+        // We avoid global stripping to protect documentation or code that might mention <think> tags.
+        let textToProcess = turnText;
+        const thinkMatch = turnText.match(/<think>([\s\S]*?)<\/think>/i);
+        if (thinkMatch) {
+            // Only strip if it's at the very beginning or followed by significant output
+            textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/i, '');
+        }
 
         const turnTextLower = textToProcess.toLowerCase();
         const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(turnTextLower);
