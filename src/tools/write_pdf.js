@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs-extra';
+import { PDFDocument } from 'pdf-lib';
 import { parseArgs } from '../utils/arg_parser.js';
 
 /**
@@ -8,7 +9,12 @@ import { parseArgs } from '../utils/arg_parser.js';
  * Uses bundled Chromium for 100% consistent rendering across all platforms.
  */
 export const write_pdf = async (args) => {
-    const { path: targetPath, content, orientation = 'portrait', margin = '10px' } = parseArgs(args);
+    const {
+        path: targetPath,
+        content,
+        orientation = 'portrait',
+        margin = '10px'
+    } = parseArgs(args);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
     if (!content) return 'ERROR: Missing "content" (HTML/CSS) for write_pdf.';
@@ -54,7 +60,7 @@ export const write_pdf = async (args) => {
                     font-weight: bold;
                     color: rgba(0, 0, 0, 0.005);
                     pointer-events: none;
-                    z-index: 1000;
+                    z-index: -1000;
                     text-align: center;
                     width: 150%;
                     white-space: nowrap;
@@ -69,9 +75,8 @@ export const write_pdf = async (args) => {
         // Set HTML content
         await page.setContent(styledContent, { waitUntil: 'networkidle0' });
 
-        // Generate PDF
-        await page.pdf({
-            path: absolutePath,
+        // Generate PDF Buffer
+        const pdfBytes = await page.pdf({
             format: 'A4',
             landscape: orientation.toLowerCase() === 'landscape',
             margin: {
@@ -82,6 +87,20 @@ export const write_pdf = async (args) => {
             },
             printBackground: true
         });
+
+        // --- PDF-LIB METADATA INJECTION (Hardcoded Branded Metadata) ---
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+
+        const fileName = path.basename(targetPath);
+        pdfDoc.setTitle(`FluxFlow ${fileName}`);
+        pdfDoc.setAuthor('FluxFlow CLI');
+        pdfDoc.setSubject('Generated with AI');
+        pdfDoc.setKeywords(['FluxFlow', 'AI', 'Agentic', 'Automated']);
+        pdfDoc.setCreator('FluxFlow PDF Engine');
+        pdfDoc.setProducer('FluxFlow (Generative AI)');
+
+        const finalPdfBytes = await pdfDoc.save();
+        await fs.writeFile(absolutePath, finalPdfBytes);
 
         const stats = await fs.stat(absolutePath);
         return `SUCCESS: PDF generated successfully at [${targetPath}] (${(stats.size / 1024).toFixed(2)} KB).`;

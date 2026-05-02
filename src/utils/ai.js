@@ -22,49 +22,56 @@ export const signalTermination = () => {
 
 const detectToolCalls = (text) => {
     const results = [];
-    // More flexible regex to catch variations in spacing and formatting
-    // Matches: tool:functions.name(...), [tool:functions.name(...)], etc.
-    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(([\s\S]*?)\)(?:\s*\]?)/gi;
+    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
 
     let match;
     while ((match = toolRegex.exec(text)) !== null) {
-        const fullMatch = match[0];
         const toolName = match[1];
-        const args = match[2];
+        const startIdx = match.index + match[0].length - 1; // Index of '('
 
-        // Basic balanced parenthesis check for complex nested JSON
-        let openCount = (args.match(/\(/g) || []).length;
-        let closeCount = (args.match(/\)/g) || []).length;
+        let balance = 0;
+        let inString = null;
+        let isEscaped = false;
+        let endIdx = -1;
 
-        let finalArgs = args;
-        let finalFullMatch = fullMatch;
+        for (let i = startIdx; i < text.length; i++) {
+            const char = text[i];
 
-        // If we clipped a nested structure, try to recover it from the original text
-        if (openCount > closeCount) {
-            const startIdx = match.index + fullMatch.indexOf('(');
-            let balance = 0;
-            let endIdx = -1;
-            for (let i = startIdx; i < text.length; i++) {
-                if (text[i] === '(') balance++;
-                if (text[i] === ')') balance--;
+            if (!inString && (char === '"' || char === "'" || char === '`')) {
+                inString = char;
+                isEscaped = false;
+            } else if (inString && char === inString && !isEscaped) {
+                inString = null;
+            }
+
+            if (!inString) {
+                if (char === '(') balance++;
+                else if (char === ')') balance--;
+
                 if (balance === 0) {
                     endIdx = i;
                     break;
                 }
             }
-            if (endIdx !== -1) {
-                finalArgs = text.substring(startIdx + 1, endIdx);
-                finalFullMatch = text.substring(match.index, endIdx + 1);
-                // Advance regex index
-                toolRegex.lastIndex = endIdx + 1;
+
+            // Toggle escape state
+            if (char === '\\') {
+                isEscaped = !isEscaped;
+            } else {
+                isEscaped = false;
             }
         }
 
-        results.push({
-            fullMatch: finalFullMatch,
-            toolName: toolName.trim(),
-            args: finalArgs.trim()
-        });
+        if (endIdx !== -1) {
+            const finalArgs = text.substring(startIdx + 1, endIdx);
+            const finalFullMatch = text.substring(match.index, endIdx + 1);
+            results.push({
+                fullMatch: finalFullMatch,
+                toolName: toolName.trim(),
+                args: finalArgs.trim()
+            });
+            toolRegex.lastIndex = endIdx + 1;
+        }
     }
 
     return results;
@@ -128,7 +135,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     let lastUsage = null;
     const MAX_LOOPS = mode === 'Flux' ? 50 : 7;
     const MAX_RETRIES = 7;
-    yield { type: 'status', content: 'Working...' };
+    yield { type: 'status', content: 'Connecting...' };
 
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
@@ -258,6 +265,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             lastUsage = chunk.usageMetadata;
             if (lastUsage) {
                 yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
+                yield { type: 'status', content: 'Working...' };
             }
         }
 
@@ -317,7 +325,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const pathLower = targetPath.toLowerCase();
                     const isPdf = pathLower.endsWith('.pdf');
                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
-                    
+
                     if (isPdf) {
                         label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
                     } else if (isImage) {

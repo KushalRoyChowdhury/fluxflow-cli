@@ -8,8 +8,8 @@ export const parseArgs = (argsString) => {
     // Pattern to match key=value pairs
     // Group 1: key
     // Group 2: value (unquoted or starting with quote)
-    // We use a more comprehensive regex to catch various types
-    const regex = /(\w+)\s*=\s*(?:(["'])((?:\\.|(?!\2)[\s\S])*)\2|([^,\s\)]+))/g;
+    // We use a more comprehensive regex to catch various types including backticks
+    const regex = /(\w+)\s*=\s*(?:(["'`])((?:\\.|(?!\2)[\s\S])*)\2|([^,\s\)]+))/g;
     
     let match;
     while ((match = regex.exec(argsString)) !== null) {
@@ -20,12 +20,14 @@ export const parseArgs = (argsString) => {
         if (match[3] !== undefined) {
             try {
                 // Wrap in quotes and parse to handle all escapes (\n, \t, \", etc) correctly
-                value = JSON.parse(`"${value.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`);
+                // Replace literal newlines with \\n, and literal carriage returns with \\r
+                value = JSON.parse(`"${value.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
             } catch (e) {
                 // Fallback for messy inputs
                 value = value
                     .replace(/\\"/g, '"')
                     .replace(/\\'/g, "'")
+                    .replace(/\\`/g, '`')
                     .replace(/\\\\/g, '\\');
             }
         }

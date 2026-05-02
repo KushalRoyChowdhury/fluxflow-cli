@@ -13,8 +13,8 @@ export const update_file = async (args) => {
     if (content_to_replace === undefined) return 'ERROR: Missing "content_to_replace" argument.';
     if (content_to_add === undefined) return 'ERROR: Missing "content_to_add" argument.';
 
-    // Sanitization: Strip unintended markdown code blocks
-    const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').trim();
+    // Sanitization: Strip unintended markdown code blocks and normalize to LF
+    const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     content_to_replace = strip(content_to_replace);
     content_to_add = strip(content_to_add);
 
@@ -25,10 +25,24 @@ export const update_file = async (args) => {
             return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
         }
 
-        const currentContent = fs.readFileSync(absolutePath, 'utf8');
+        // --- LF NORMALIZATION ARMISTICE ---
+        let diskContent = fs.readFileSync(absolutePath, 'utf8');
+        // Strip BOM if present
+        if (diskContent.startsWith('\uFEFF')) {
+            diskContent = diskContent.slice(1);
+        }
+
+        const normalizedDisk = diskContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (diskContent !== normalizedDisk) {
+            fs.writeFileSync(absolutePath, normalizedDisk, 'utf8');
+            diskContent = normalizedDisk;
+        }
+        const currentContent = diskContent;
 
         if (!currentContent.includes(content_to_replace)) {
-            return `ERROR: Could not find exact match for the specified "content_to_replace" in [${targetPath}]. Check indentation/whitespace/line breaks(LF or CRLF)/string. Try re-reading the file for latest changes.`;
+            const diskLen = currentContent.length;
+            const matchLen = content_to_replace.length;
+            return `ERROR: Could not find exact match for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace/line breaks. Try re-reading the file for latest changes.`;
         }
 
         const startPos = currentContent.indexOf(content_to_replace);

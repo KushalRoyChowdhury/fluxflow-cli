@@ -51,7 +51,12 @@ export const view_file = async (args) => {
         }
         // ----------------------------
 
-        const content = fs.readFileSync(absolutePath, 'utf8');
+        let content = fs.readFileSync(absolutePath, 'utf8');
+        // Strip BOM if present
+        if (content.startsWith('\uFEFF')) {
+            content = content.slice(1);
+        }
+        content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         const lines = content.split('\n');
         const totalLines = lines.length;
 

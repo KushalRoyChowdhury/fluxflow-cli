@@ -17,7 +17,7 @@ ${mode === 'Flux' ? `
     6. Write PDF: tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape"). Generates a professional PDF document. Orientation are optional. A4 size page will be used, so any multi-page PDFs calculate your alightment and page breaks to not mess up A4 page layout . DO NOT ADD FOOTER MANUALLY, the system will handle it automatically. USE CSS TO VISUALLY BEAUTIFY THE DOCUMENT.
     7. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command.
 
-    **NOTE:** WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CHARACTER FOR LINE BREAKS RATHER THAN STRING '\\n'`.trim() : `
+    **NOTE:** WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CONTROL CHARACTER (LF) FOR LINE BREAKS RATHER THAN STRING '\\n'`.trim() : `
     - DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }
 -----------------

@@ -1,13 +1,57 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
+
+const TypewriterText = ({ text, isStreaming, onComplete, columns = 80, color = 'white', speed = 50, render }) => {
+    const [displayedText, setDisplayedText] = useState('');
+    const fullTextRef = useRef(text);
+    const displayedTextRef = useRef('');
+    
+    useEffect(() => {
+        fullTextRef.current = text;
+    }, [text]);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const currentFull = fullTextRef.current;
+            const currentDisp = displayedTextRef.current;
+
+            if (currentDisp.length < currentFull.length) {
+                const remaining = currentFull.slice(currentDisp.length);
+                const match = remaining.match(/^(\S+\s*|\s+)/);
+                if (match) {
+                    const chunk = match[0];
+                    const gap = currentFull.length - currentDisp.length;
+                    
+                    let revealedChunk = chunk;
+                    if (gap > 100) {
+                        const extraMatch = remaining.slice(chunk.length).match(/^(\S+\s*|\s+){0,2}/);
+                        if (extraMatch) revealedChunk += extraMatch[0];
+                    }
+
+                    const nextText = currentDisp + revealedChunk;
+                    setDisplayedText(nextText);
+                    displayedTextRef.current = nextText;
+                }
+            } else if (!isStreaming) {
+                if (onComplete) onComplete();
+                clearInterval(timer);
+            }
+        }, speed);
+
+        return () => clearInterval(timer);
+    }, [isStreaming, speed]);
+
+    if (render) return render(displayedText);
+    return <CodeRenderer text={displayedText} columns={columns} />;
+};
 
 const cleanSignals = (text) => {
     if (!text) return text;
 
     let result = text;
     const trigger = 'tool:functions.';
-    
+
     // Greedy loop to strip all tool calls
     while (true) {
         const lowerResult = result.toLowerCase();
@@ -21,7 +65,7 @@ const cleanSignals = (text) => {
 
         while (j < result.length) {
             const char = result[j];
-            
+
             // String immunity
             if (!inString && (char === "'" || char === '"' || char === '`')) {
                 inString = char;
@@ -124,7 +168,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 if (part.startsWith('`') && part.endsWith('`')) {
                     return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
                 }
-                
+
                 // 📐 Math & LaTeX-like support
                 if (part.startsWith('$') && part.endsWith('$')) {
                     let content = part.slice(1, -1);
@@ -136,7 +180,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     const mathContent = content
                         .replace(/\\multiply/g, '×')
                         .replace(/\\divide/g, '÷');
-                        
+
                     return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
                 }
 
@@ -512,7 +556,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         );
     }
 
+    const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
     const content = React.useMemo(() => cleanSignals(msg.text), [msg.text]);
+
+    // Reset animation state if message ID changes (rare but possible)
+    React.useEffect(() => {
+        if (msg.isStreaming) setAnimationDone(false);
+    }, [msg.id]);
 
     // Handle Thinking Visibility
     const finalContent = React.useMemo(() => {
@@ -566,12 +616,31 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                 <Box flexDirection="column" marginTop={1} paddingX={1} width="100%">
                     <Text bold color="white">Thinking...</Text>
                     <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} flexDirection="column" width="100%">
-                        {formatThinkText(finalContent, columns)}
+                        {!animationDone ? (
+                            <TypewriterText 
+                                text={finalContent} 
+                                isStreaming={msg.isStreaming} 
+                                onComplete={() => setAnimationDone(true)}
+                                speed={25}
+                                render={(t) => formatThinkText(t, columns)}
+                            />
+                        ) : (
+                            formatThinkText(finalContent, columns)
+                        )}
                     </Box>
                 </Box>
             ) : (
                 <Box flexDirection="column" paddingX={1} marginTop={1} width="100%">
-                    <CodeRenderer text={finalContent} columns={columns} />
+                    {!animationDone ? (
+                        <TypewriterText
+                            text={finalContent}
+                            isStreaming={msg.isStreaming}
+                            onComplete={() => setAnimationDone(true)}
+                            columns={columns}
+                        />
+                    ) : (
+                        <CodeRenderer text={finalContent} columns={columns} />
+                    )}
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
                             <Text color="yellow" italic>✨ [Memory Updated]</Text>

@@ -225,8 +225,21 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.5.3", "1.5.4"]
+        const stableVersions = ["1.6.0", "1.5.4"]
         const changelogData = {
+            "1.6.0": {
+                "note": "Improved experience & reliability.",
+                "added": [
+                    "Added client side streaming for more predictictable response generation speed."
+                ],
+                "changed": [
+                    "Files written/updated via FluxFlow will be normalized to LF line endings."
+                ],
+                "fixes": [
+                    "Fixed a bug where occationally `write_file` tool gets confused by certain keywords resulting in half corrupted file writes.",
+                    "More reliable file operations with CRLF or LF. Resulting in less update failures."
+                ]
+            },
             "1.5.4": {
                 "note": "General Improvements.",
                 "added": [],

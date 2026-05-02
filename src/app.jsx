@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.5.4';
+const versionFluxflow = '1.6.0';
 const updatedOn = '2026-05-02';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -964,7 +964,7 @@ OUTPUT: ${execOutputRef.current}`;
 
                         // [CONTEXT TRACKING] Update state based on chunk content
                         if (chunkText.includes('```')) inCodeBlock = !inCodeBlock;
-                        
+
                         if (chunkLower.includes('tool:functions.')) {
                             inToolCall = true;
                             toolCallBalance = 0;
@@ -1000,7 +1000,7 @@ OUTPUT: ${execOutputRef.current}`;
                             // Clean up any partial tags from the visible text
                             chunkText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '' }]);
+                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '', isStreaming: true }]);
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
@@ -1013,13 +1013,13 @@ OUTPUT: ${execOutputRef.current}`;
                             setMessages(prev => {
                                 const newMsgs = prev.map(m =>
                                     m.id === currentThinkId
-                                        ? { ...m, text: m.text + thinkPart }
+                                        ? { ...m, text: m.text + thinkPart, isStreaming: true }
                                         : m
                                 );
 
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
-                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart }];
+                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart, isStreaming: true }];
                             });
                             continue;
                         }
@@ -1039,7 +1039,7 @@ OUTPUT: ${execOutputRef.current}`;
                                             transitionContent = parts.slice(1).join('</think>') || '';
                                             return { ...m, text: parts[0] };
                                         }
-                                        return { ...m, text: newText };
+                                        return { ...m, text: newText, isStreaming: true };
                                     }
                                     return m;
                                 });
@@ -1047,14 +1047,14 @@ OUTPUT: ${execOutputRef.current}`;
                                 if (transitioning) {
                                     inThinkMode = false;
                                     currentAgentId = 'agent-' + Date.now();
-                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, '') }];
+                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true }];
                                 }
                                 return newMsgs;
                             });
                         } else if (!inThinkMode && !toolCallEncounteredInTurn) {
                             // [SIGNAL BLOCKADE] Sniff for tool calls and cut the append
                             let cleanedText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<\/?(think|thought)>/gi, '').replace(signalRegex, '');
-                            
+
                             const toolIdx = cleanedText.toLowerCase().indexOf('tool:functions.');
                             if (toolIdx !== -1) {
                                 cleanedText = cleanedText.substring(0, toolIdx);
@@ -1064,11 +1064,11 @@ OUTPUT: ${execOutputRef.current}`;
                             if (cleanedText) {
                                 if (!currentAgentId) {
                                     currentAgentId = 'agent-' + Date.now();
-                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText }]);
+                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: cleanedText, isStreaming: true }]);
                                 } else {
                                     setMessages(prev => prev.map(m =>
                                         m.id === currentAgentId
-                                            ? { ...m, text: m.text + cleanedText }
+                                            ? { ...m, text: m.text + cleanedText, isStreaming: true }
                                             : m
                                     ));
                                 }
@@ -1105,11 +1105,12 @@ OUTPUT: ${execOutputRef.current}`;
                     }
 
                     setMessages(prev => {
-                        const historyToSave = prev.filter(m => !String(m.id).startsWith('welcome') && !m.isVisualFeedback);
+                        const newMsgs = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isVisualFeedback);
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);
-                        setCompletedIndex(prev.length);
-                        return prev;
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
                     });
                 }
             };
