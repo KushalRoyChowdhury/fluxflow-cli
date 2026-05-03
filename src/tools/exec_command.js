@@ -84,7 +84,7 @@ export const exec_command = async (args, options = {}) => {
             const finalOutput = result.join('\n\n') || 'Command executed with no output.';
             
             if (code !== 0) {
-                resolve(`FAILURE: Command [${command}] failed.\n\n${finalOutput}`);
+                resolve(`ERROR: Command [${command}] failed with exit code [${code}].\n\n${finalOutput}`);
             } else {
                 resolve(`SUCCESS: Command [${command}] completed.\n\n${finalOutput}`);
             }

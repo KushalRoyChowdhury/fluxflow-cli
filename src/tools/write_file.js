@@ -38,6 +38,9 @@ export const write_file = async (args) => {
 
         // --- CONTEXT-AWARE NEURAL UNESCAPE ---
         // Programmatically unescape \n only if it's NOT within a string literal
+        const ext = path.extname(targetPath).toLowerCase();
+        const isProse = ['.md', '.txt', '.log', '.html', '.css'].includes(ext);
+
         let processedContent = "";
         let inString = null; // Track if we are inside ", ', or `
         for (let i = 0; i < content.length; i++) {
@@ -46,7 +49,8 @@ export const write_file = async (args) => {
 
             if (!inString) {
                 // Not in a string: Look for string starts or unescape targets
-                if (char === '"' || char === "'" || char === '`') {
+                // Prose check: Don't track strings in natural language files (apostrophes are common)
+                if (!isProse && (char === '"' || char === "'" || char === '`')) {
                     inString = char;
                     processedContent += char;
                 } else if (next2 === '\\\\n') {
@@ -60,7 +64,6 @@ export const write_file = async (args) => {
                 }
             } else {
                 // Inside a string: Preserve everything exactly as the AI sent it
-                // Handle escaped quotes within the string (e.g. \" or \')
                 if (char === inString && content[i - 1] !== '\\') {
                     inString = null;
                 }
@@ -81,7 +84,7 @@ export const write_file = async (args) => {
         // Explicit check for silent failures
         if (verifiedSize === 0 && originalSize > 0) {
             verifiedContent = null; // Flush
-            return `CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
+            return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
         }
 
         // Prepare a snippet for the UI/History (Top 15 / Bottom 15)

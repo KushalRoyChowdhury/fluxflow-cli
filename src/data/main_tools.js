@@ -21,12 +21,11 @@ ${mode === 'Flux' ? `
     8. Write PPTX: tool:functions.write_pptx(path="path", content="<h1 style='color: #0088CC;'>Title</h1><ul style='font-size: 14pt;'><li>Point A</li></ul>\n---\n<p align='center'>Styled Slide</p>"). Generates a professional PowerPoint presentation (.pptx) from a flat HTML string. Use '---' on a new line to separate slides. Aspect Ratio is 4:3.
        - Supported Tags: <a>, <b>, <br>, <del>, <font>, <h1>-<h6>, <i>, <ol>, <ul>, <li>, <p>, <pre>, <s>, <sub>, <sup>, <u>.
        - Supported Styles: background-color, color, font-family, font-size (use 'pt'), font-style (italic), font-weight (bold), margin, text-align, text-shadow.
-       - High-fidelity conversion to native PPTX text.
     9. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command. Use ask tool to confirm before executing any destructive or irreversible operations.
 
     AFTER GETTING THE TOOL RESULT, YOU MUST VERIFY THAT ITS A SUCCESS, IF IT GIVES A ERROR, TELL THE USER AND TRY TO FIX IF YOU CAN. DO NOT HALLUCINATE SUCCESS IF TOOL RETURNS ERROR.
 
-    **CRITICAL POLICY: WHEN WRITING/UPDATING FILES, USE ACTUAL NEW LINE CONTROL CHARACTER (LF) FOR LINE BREAKS RATHER THAN STRING '\\n'**`.trim() : `
+    **CRITICAL POLICY: WHEN WRITING/UPDATING FILES, ALWAYS USE ACTUAL NEW LINE CONTROL CHARACTER (LF) FOR LINE BREAKS.**`.trim() : `
     - DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }
 -----------------

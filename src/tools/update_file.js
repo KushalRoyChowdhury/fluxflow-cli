@@ -17,6 +17,9 @@ export const update_file = async (args) => {
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
     // --- CONTEXT-AWARE NEURAL UNESCAPE ---
+    const ext = path.extname(targetPath).toLowerCase();
+    const isProse = ['.md', '.txt', '.log', '.html', '.css'].includes(ext);
+
     const unescapeContent = (content) => {
         let processedContent = "";
         let inString = null;
@@ -25,7 +28,8 @@ export const update_file = async (args) => {
             const next2 = content.substring(i, i + 2);
 
             if (!inString) {
-                if (char === '"' || char === "'" || char === '`') {
+                // Prose check: Don't track strings in natural language files (apostrophes are common)
+                if (!isProse && (char === '"' || char === "'" || char === '`')) {
                     inString = char;
                     processedContent += char;
                 } else if (next2 === '\\\\n') {

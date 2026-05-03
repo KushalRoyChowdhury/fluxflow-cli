@@ -496,6 +496,8 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START]
     const isDiffResult = msg.role === 'system' && msg.text?.includes('[DIFF_START]');
+    const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]: ERROR:') &&
+                        (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
 
     if (msg.isVisualFeedback) {
@@ -506,7 +508,20 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         );
     }
 
-    if (msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord) return null;
+    if (isPatchError) {
+        return (
+            <Box marginBottom={1}>
+                <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1} paddingY={0}>
+                    <Text color="red" bold underline>❌ PATCH FAILED</Text>
+                    <Box marginTop={1}>
+                        <Text color="red">Patch failed: <Text color="white" bold>Model generated malformed edit.</Text></Text>
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
 
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);

@@ -152,6 +152,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     });
 
     for (let loop = 0; loop < MAX_LOOPS; loop++) {
+        if (loop > 0) {
+            yield { type: 'status', content: 'Processed. Reconnecting...' };
+        }
         if (TERMINATION_SIGNAL) {
             yield { type: 'status', content: 'Termination Signal Received.' };
             break;
@@ -245,6 +248,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let turnText = '';
         let lastToolSniffed = null;
+        let lastToolEventTime = null;
 
         for await (const chunk of stream) {
             if (TERMINATION_SIGNAL) break;
@@ -252,8 +256,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 turnText += chunk.text;
                 yield { type: 'text', content: chunk.text };
 
-                // [LIVE TOOL SNIFFING] - Zero latency feedback
+                // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
                 if (turnText.includes('tool:functions.')) {
+                    if (!lastToolEventTime) lastToolEventTime = Date.now();
+
                     const parts = turnText.split('tool:functions.');
                     const potentialTool = parts[parts.length - 1].split('(')[0].trim();
                     // Regex validation to ensure it's a valid-looking tool name and not stray text
@@ -261,6 +267,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         lastToolSniffed = potentialTool;
                         yield { type: 'status', content: `Working (${potentialTool})...` };
                     }
+                }
+
+                // [LOOP DETECTION] - Catch runaway repetitive reasoning (Only inside <think> blocks)
+                const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
+                const thinkContent = thinkBlocks.join('');
+                const headingsCount = (thinkContent.match(/\*\*.*?\*\*/g) || []).length;
+                if (headingsCount > 5) {
+                    yield { type: 'status', content: 'Loop Detected. Restarting internal loop.' };
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    break; // Force close this turn's stream and proceed to next loop
                 }
             }
             lastUsage = chunk.usageMetadata;
@@ -296,7 +312,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const shouldContinue = toolCalls.length > 0;
 
         if (toolCalls.length > 0) {
+            let toolIdx = 0;
             for (const toolCall of toolCalls) {
+                if (toolIdx > 0) {
+                    yield { type: 'status', content: `Preparing next tool (${toolCall.toolName})...` };
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // Synthetic Pacing Delay
+                }
+                toolIdx++;
+
                 yield { type: 'turn_reset', content: true };
                 yield { type: 'status', content: `Working (${toolCall.toolName})...` };
 
@@ -434,15 +457,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                const toolStart = Date.now();
+                // [TELEMETRY] Intent-based tool timing
+                // If this is the first tool, we use the intent start time.
+                // Subsequent tools start from the end of the previous one to capture the full 'tooling phase'.
+                const effectiveStart = lastToolEventTime || Date.now();
+
                 let result = await dispatchTool(toolCall.toolName, toolCall.args, {
                     chatId,
                     history,
                     onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null,
                     onAskUser: settings.onAskUser
                 });
+
                 const toolEnd = Date.now();
-                yield { type: 'tool_time', content: toolEnd - toolStart };
+                yield { type: 'tool_time', content: toolEnd - effectiveStart };
+                lastToolEventTime = toolEnd; // Update for sequential tracking
 
                 let binaryPart = null;
                 if (typeof result === 'object' && result.binaryPart) {
@@ -500,7 +529,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     type: 'tool_result',
                     content: uiContent,
                     aiContent: aiContent,
-                    binaryPart: binaryPart // Multi-modal stage (v1.5.0)
+                    binaryPart: binaryPart, // Multi-modal stage (v1.5.0)
+                    toolName: toolCall.toolName
                 };
 
                 if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) {
@@ -638,7 +668,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: '[turn: continue]' });
+            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: Loop detected by internal system. If you are finished use [turn: finish] else continue.' });
         }
     }
     yield { type: 'status', content: null };

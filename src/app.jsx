@@ -31,8 +31,8 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.6';
-const updatedOn = '2026-05-03';
+const versionFluxflow = '1.7.10';
+const updatedOn = '2026-05-04';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -570,6 +570,15 @@ export default function App() {
         if (isProcessing) {
             // STEERING HINT ENGINE
             const hintText = absoluteClean.trim();
+            if (hintText.startsWith('/')) {
+                setMessages(prev => {
+                    setCompletedIndex(prev.length + 1);
+                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '❌ [RESTRICTED] Steering Hints cannot start with /', isMeta: true }];
+                });
+                setInput('');
+                return;
+            }
+
             setQueuedPrompt(hintText);
             queuedPromptRef.current = hintText;
             setMessages(prev => {
@@ -1022,7 +1031,8 @@ OUTPUT: ${execOutputRef.current}`;
                                 role: 'system',
                                 text: packet.content,
                                 fullText: packet.aiContent, // Preserve raw data for next turn
-                                binaryPart: packet.binaryPart // v1.5.0 Multimodal Support
+                                binaryPart: packet.binaryPart, // v1.5.0 Multimodal Support
+                                toolName: packet.toolName
                             }]);
                             continue;
                         }
