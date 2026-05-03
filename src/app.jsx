@@ -20,7 +20,7 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } 
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
-import { getDailyUsage, incrementUsage, addToUsage } from './utils/usage.js';
+import { getDailyUsage, addToUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -31,8 +31,8 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.5';
-const updatedOn = '2026-05-03';``
+const versionFluxflow = '1.7.6';
+const updatedOn = '2026-05-03';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -463,7 +463,7 @@ export default function App() {
 
             const timer = setTimeout(() => {
                 process.exit(0);
-            }, 100); // Tiny tick to ensure final render is flushed
+            }, 1700); // Give user 1.7s to see the final stats dashboard
             return () => clearTimeout(timer);
         }
     }, [activeView]);
@@ -479,7 +479,7 @@ export default function App() {
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
             }
-        }, 3000); // 3s "vibe" interval - save disk life
+        }, 1500); // 1.5s "vibe" interval
         return () => clearInterval(interval);
     }, [isInitializing]);
 

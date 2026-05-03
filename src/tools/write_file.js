@@ -36,9 +36,41 @@ export const write_file = async (args) => {
             fs.mkdirSync(parentDir, { recursive: true });
         }
 
-        const lineCount = content.split(/\r?\n/).length;
-        const originalSize = Buffer.byteLength(content, 'utf8');
-        fs.writeFileSync(absolutePath, content, 'utf8');
+        // --- CONTEXT-AWARE NEURAL UNESCAPE ---
+        // Programmatically unescape \n only if it's NOT within a string literal
+        let processedContent = "";
+        let inString = null; // Track if we are inside ", ', or `
+        for (let i = 0; i < content.length; i++) {
+            const char = content[i];
+            const next2 = content.substring(i, i + 2);
+
+            if (!inString) {
+                // Not in a string: Look for string starts or unescape targets
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                    processedContent += char;
+                } else if (next2 === '\\\\n') {
+                    processedContent += '\\n';
+                    i++; // skip next char
+                } else if (next2 === '\\n') {
+                    processedContent += '\n';
+                    i++; // skip next char
+                } else {
+                    processedContent += char;
+                }
+            } else {
+                // Inside a string: Preserve everything exactly as the AI sent it
+                // Handle escaped quotes within the string (e.g. \" or \')
+                if (char === inString && content[i - 1] !== '\\') {
+                    inString = null;
+                }
+                processedContent += char;
+            }
+        }
+
+        const lineCount = processedContent.split(/\r?\n/).length;
+        const originalSize = Buffer.byteLength(processedContent, 'utf8');
+        fs.writeFileSync(absolutePath, processedContent, 'utf8');
 
         // --- HIGH-FIDELITY VERIFICATION ---
         let verifiedContent = fs.readFileSync(absolutePath, 'utf8');
@@ -64,7 +96,7 @@ export const write_file = async (args) => {
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] verified and persisted.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
+        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
     } catch (err) {
         return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
     }

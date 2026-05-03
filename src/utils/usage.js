@@ -11,7 +11,7 @@ export const getDailyUsage = async () => {
     try {
         if (await fs.exists(USAGE_FILE)) {
             const data = await fs.readJson(USAGE_FILE);
-            if (data.date === today) {
+            if (data && data.date === today && data.stats) {
                 // Ensure all keys exist (migration)
                 const s = data.stats;
                 const normalized = {
@@ -24,13 +24,19 @@ export const getDailyUsage = async () => {
                     tokens: s.tokens || 0
                 };
                 return normalized;
+            } else if (data && data.date !== today) {
+                // It's actually a new day, fall through to reset
+            } else {
+                // File exists but is malformed - don't reset immediately if we can avoid it
+                // But if we're here, it's likely corrupted.
             }
         }
     } catch (err) {
-        console.error('Failed to read usage:', err);
+        // Only log, don't return default yet - let the missing file logic handle it
+        // unless it's truly unreadable
     }
 
-    // Reset for new day
+    // Reset for new day or recovery
     const defaultStats = { 
         agent: 0, 
         background: 0, 
@@ -40,8 +46,20 @@ export const getDailyUsage = async () => {
         duration: 0, 
         tokens: 0 
     };
-    await fs.ensureDir(path.dirname(USAGE_FILE));
-    await fs.writeJson(USAGE_FILE, { date: today, stats: defaultStats }, { spaces: 2 });
+    
+    try {
+        await fs.ensureDir(path.dirname(USAGE_FILE));
+        const tempFile = USAGE_FILE + '.tmp';
+        await fs.writeJson(tempFile, { date: today, stats: defaultStats }, { spaces: 2 });
+        
+        // Ensure data is physically on disk before swap (Durability)
+        const fd = await fs.open(tempFile, 'r+');
+        await fs.fsync(fd);
+        await fs.close(fd);
+        
+        await fs.rename(tempFile, USAGE_FILE);
+    } catch (e) {}
+    
     return defaultStats;
 };
 
@@ -55,8 +73,18 @@ export const incrementUsage = async (key) => {
     
     if (data.stats[key] !== undefined) {
         data.stats[key]++;
-        await fs.ensureDir(path.dirname(USAGE_FILE));
-        await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
+        try {
+            await fs.ensureDir(path.dirname(USAGE_FILE));
+            const tempFile = USAGE_FILE + '.tmp';
+            await fs.writeJson(tempFile, data, { spaces: 2 });
+            
+            // Physical Flush
+            const fd = await fs.open(tempFile, 'r+');
+            await fs.fsync(fd);
+            await fs.close(fd);
+            
+            await fs.rename(tempFile, USAGE_FILE);
+        } catch (e) {}
     }
 };
 
@@ -70,8 +98,18 @@ export const addToUsage = async (key, amount) => {
     
     if (data.stats[key] !== undefined) {
         data.stats[key] += Math.floor(amount);
-        await fs.ensureDir(path.dirname(USAGE_FILE));
-        await fs.writeJson(USAGE_FILE, data, { spaces: 2 });
+        try {
+            await fs.ensureDir(path.dirname(USAGE_FILE));
+            const tempFile = USAGE_FILE + '.tmp';
+            await fs.writeJson(tempFile, data, { spaces: 2 });
+            
+            // Physical Flush
+            const fd = await fs.open(tempFile, 'r+');
+            await fs.fsync(fd);
+            await fs.close(fd);
+            
+            await fs.rename(tempFile, USAGE_FILE);
+        } catch (e) {}
     }
 };
 

@@ -15,8 +15,40 @@ export const update_file = async (args) => {
 
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    content_to_replace = strip(content_to_replace);
-    content_to_add = strip(content_to_add);
+    
+    // --- CONTEXT-AWARE NEURAL UNESCAPE ---
+    const unescapeContent = (content) => {
+        let processedContent = "";
+        let inString = null;
+        for (let i = 0; i < content.length; i++) {
+            const char = content[i];
+            const next2 = content.substring(i, i + 2);
+
+            if (!inString) {
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                    processedContent += char;
+                } else if (next2 === '\\\\n') {
+                    processedContent += '\\n';
+                    i++;
+                } else if (next2 === '\\n') {
+                    processedContent += '\n';
+                    i++;
+                } else {
+                    processedContent += char;
+                }
+            } else {
+                if (char === inString && content[i - 1] !== '\\') {
+                    inString = null;
+                }
+                processedContent += char;
+            }
+        }
+        return processedContent;
+    };
+
+    content_to_replace = unescapeContent(strip(content_to_replace));
+    content_to_add = unescapeContent(strip(content_to_add));
 
     const absolutePath = path.resolve(process.cwd(), targetPath);
 

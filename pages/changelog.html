@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.7.5", "1.7.1"]
+        const stableVersions = ["1.7.5", "1.7.6"]
         const changelogData = {
+            "1.7.6": {
+                "note": "Write Tool Improvements",
+                "added": [],
+                "changed": [
+                    "More frequent & atomic saves of daily telemetry."
+                ],
+                "fixes": [
+                    "Fixed the `write_file` tool to handle newlines correctly.",
+                ]
+            },
             "1.7.5": {
                 "note": "Math Improvements",
                 "added": [],
