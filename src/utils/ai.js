@@ -249,6 +249,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let turnText = '';
         let lastToolSniffed = null;
         let lastToolEventTime = null;
+        let toolResults = [];
+        let toolCallPointer = 0;
 
         for await (const chunk of stream) {
             if (TERMINATION_SIGNAL) break;
@@ -278,6 +280,170 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     break; // Force close this turn's stream and proceed to next loop
                 }
+
+                // [REAL-TIME TOOL EXECUTION]
+                const allToolsFound = detectToolCalls(turnText);
+                while (allToolsFound.length > toolCallPointer) {
+                    const toolCall = allToolsFound[toolCallPointer];
+                    
+                    // Status Update
+                    yield { type: 'status', content: `Working (${toolCall.toolName})...` };
+
+                    // START VISUAL FEEDBACK FOR TOOLS
+                    let label = '';
+                    if (toolCall.toolName === 'web_search') {
+                        const { query, limit = 10 } = parseArgs(toolCall.args);
+                        label = `🔍 SEARCHING: "${query}" (${limit})`.toUpperCase();
+                    } else if (toolCall.toolName === 'web_scrape') {
+                        const url = parseArgs(toolCall.args).url || '...';
+                        label = `📖 READING SITE: ${url}`.toUpperCase();
+                    } else if (toolCall.toolName === 'view_file') {
+                        const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(toolCall.args);
+                        let totalLines = '...';
+                        let actualEndLine = end_line;
+                        try {
+                            const absPath = path.resolve(process.cwd(), targetPath);
+                            if (fs.existsSync(absPath)) {
+                                const content = fs.readFileSync(absPath, 'utf8');
+                                const lines = content.split('\n').length;
+                                totalLines = lines;
+                                actualEndLine = Math.min(end_line, lines);
+                            }
+                        } catch (e) {}
+                        const pathLower = targetPath.toLowerCase();
+                        const isPdf = pathLower.endsWith('.pdf');
+                        const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                        if (isPdf) {
+                            label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
+                        } else if (isImage) {
+                            label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
+                        } else {
+                            label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                        }
+                    } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
+                        const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
+                        label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
+                        const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
+                        label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'write_pdf') {
+                        label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'write_docx') {
+                        label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'write_pptx') {
+                        label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
+                        label = ''; 
+                    } else {
+                        label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
+                    }
+
+                    if (label) {
+                        const boxWidth = Math.min(label.length + 4, 115);
+                        const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                        const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                        const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                        yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
+                    }
+                    // END VISUAL FEEDBACK
+
+                    // EXECUTION LOGIC
+                    if (toolCall.toolName === 'exec_command') {
+                        const { command } = parseArgs(toolCall.args);
+                        if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
+                            const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
+                            const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                            const isViolating = riskyPatterns.some(pattern => {
+                                if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
+                                    const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
+                                    return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+                                }
+                                return pattern.test(command);
+                            });
+                            if (isViolating) {
+                                const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
+                                toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                toolCallPointer++;
+                                continue;
+                            }
+                        }
+                        if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
+                        yield { type: 'exec_start' };
+                    }
+
+                    const parsedArgs = parseArgs(toolCall.args);
+                    const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
+                    if (targetPath) {
+                        const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
+                        const absoluteTarget = path.resolve(targetPath);
+                        const absoluteCwd = path.resolve(process.cwd());
+                        if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
+                            const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
+                            toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                            yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                            toolCallPointer++;
+                            continue;
+                        }
+                    }
+
+                    if (settings.onToolApproval) {
+                        let shouldPrompt = (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'exec_command');
+                        if (shouldPrompt) {
+                            const approval = await settings.onToolApproval(toolCall.toolName, toolCall.args);
+                            if (approval === 'deny') {
+                                if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
+                                const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
+                                toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                toolCallPointer++;
+                                continue;
+                            }
+                        }
+                    }
+
+                    const effectiveStart = lastToolEventTime || Date.now();
+                    let result = await dispatchTool(toolCall.toolName, toolCall.args, {
+                        chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
+                    });
+
+                    const toolEnd = Date.now();
+                    yield { type: 'tool_time', content: toolEnd - effectiveStart };
+                    lastToolEventTime = toolEnd;
+
+                    let binaryPart = null;
+                    if (typeof result === 'object' && result.binaryPart) {
+                        binaryPart = result.binaryPart;
+                        result = result.text;
+                    }
+
+                    if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
+                        await new Promise(resolve => setTimeout(resolve, 800));
+                        settings.onExecEnd();
+                    }
+
+                    const isSuccess = result && !result.startsWith('ERROR:');
+                    if (isSuccess) {
+                        await incrementUsage('toolSuccess');
+                        if (settings.onToolResult) settings.onToolResult('success');
+                    } else {
+                        await incrementUsage('toolFailure');
+                        if (settings.onToolResult) settings.onToolResult('failure');
+                    }
+
+                    const aiContent = `[TOOL_RESULT]: ${result.split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
+                    toolResults.push({ role: 'user', text: aiContent, binaryPart });
+
+                    let uiContent = `[TOOL_RESULT]: ${result}`;
+                    if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
+                        uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
+                    }
+
+                    yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: toolCall.toolName };
+                    if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
+
+                    toolCallPointer++;
+                }
             }
             lastUsage = chunk.usageMetadata;
             if (lastUsage) {
@@ -303,242 +469,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/i, '');
         }
 
-        const turnTextLower = textToProcess.toLowerCase();
-        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(turnTextLower);
-        const toolCalls = detectToolCalls(textToProcess);
-        let toolResults = [];
+        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(turnText.toLowerCase());
+        const shouldContinue = toolCallPointer > 0;
 
-        // Safety: If tool calls are present, we must continue regardless of finish signals
-        const shouldContinue = toolCalls.length > 0;
-
-        if (toolCalls.length > 0) {
-            let toolIdx = 0;
-            for (const toolCall of toolCalls) {
-                if (toolIdx > 0) {
-                    yield { type: 'status', content: `Preparing next tool (${toolCall.toolName})...` };
-                    await new Promise(resolve => setTimeout(resolve, 5000)); // Synthetic Pacing Delay
-                }
-                toolIdx++;
-
-                yield { type: 'turn_reset', content: true };
-                yield { type: 'status', content: `Working (${toolCall.toolName})...` };
-
-                // START VISUAL FEEDBACK FOR TOOLS
-                let label = '';
-                if (toolCall.toolName === 'web_search') {
-                    const { query, limit = 10 } = parseArgs(toolCall.args);
-                    label = `🔍 SEARCHING: "${query}" (${limit})`.toUpperCase();
-                } else if (toolCall.toolName === 'web_scrape') {
-                    const url = parseArgs(toolCall.args).url || '...';
-                    label = `📖 READING SITE: ${url}`.toUpperCase();
-                } else if (toolCall.toolName === 'view_file') {
-                    const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(toolCall.args);
-                    let totalLines = '...';
-                    let actualEndLine = end_line;
-                    try {
-                        const absPath = path.resolve(process.cwd(), targetPath);
-                        if (fs.existsSync(absPath)) {
-                            const content = fs.readFileSync(absPath, 'utf8');
-                            const lines = content.split('\n').length;
-                            totalLines = lines;
-                            actualEndLine = Math.min(end_line, lines);
-                        }
-                    } catch (e) {
-
-                    }
-                    const pathLower = targetPath.toLowerCase();
-                    const isPdf = pathLower.endsWith('.pdf');
-                    const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
-
-                    if (isPdf) {
-                        label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
-                    } else if (isImage) {
-                        label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
-                    } else {
-                        label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
-                    }
-                } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
-                    const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
-                    label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
-                } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
-                    const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
-                    label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                } else if (toolCall.toolName === 'write_pdf') {
-                    label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                } else if (toolCall.toolName === 'write_docx') {
-                    label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                } else if (toolCall.toolName === 'write_pptx') {
-                    label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
-                    label = ''; // handled by high-fidelity components
-                } else {
-                    label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
-                }
-
-                if (label) {
-                    const boxWidth = Math.min(label.length + 4, 115);
-                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                    const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                    yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
-                }
-                // END VISUAL FEEDBACK FOR TOOLS
-
-
-                // REAL-TIME TERMINAL STREAMING SYNC
-                if (toolCall.toolName === 'exec_command') {
-                    const { command } = parseArgs(toolCall.args);
-
-                    // SYSTEM DRIVE & EXTERNAL PATH SHIELD (Security Governance)
-                    if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
-                        const riskyPatterns = [
-                            /[a-zA-Z]:[\\\/]/i, // Any drive letter path (C:\, D:/, etc)
-                            /^\//,               // Root path on Unix
-                            /\.\.[\\\/]/,       // Parent directory traversal
-                            /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\// // Sensitive Linux paths
-                        ];
-
-                        const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase(); // e.g. "d:\"
-                        const isViolating = riskyPatterns.some(pattern => {
-                            if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
-                                // Specialized check for Windows: allow current drive, block others
-                                const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
-                                return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
-                            }
-                            return pattern.test(command);
-                        });
-
-                        if (isViolating) {
-                            const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
-                            toolResults.push(`[TOOL_RESULT]: ERROR: ${denyMsg}`);
-                            yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                            continue; // Block execution
-                        }
-                    }
-
-                    if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
-                    yield { type: 'exec_start' }; // Force UI flush
-                }
-
-                // TOOL APPROVAL GATE (Security Governance)
-                const parsedArgs = parseArgs(toolCall.args);
-                const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
-
-                if (targetPath) {
-                    const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                    const absoluteTarget = path.resolve(targetPath);
-                    const absoluteCwd = path.resolve(process.cwd());
-
-                    if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
-                        const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                        toolResults.push(`[TOOL_RESULT]: ERROR: ${denyMsg}`);
-                        yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                        continue; // Block execution
-                    }
-                }
-
-                if (settings.onToolApproval) {
-                    let shouldPrompt = false;
-                    if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
-                        shouldPrompt = true;
-                    } else if (toolCall.toolName === 'exec_command') {
-                        shouldPrompt = true; // Handled internally by app.jsx whitelist
-                    }
-
-                    if (shouldPrompt) {
-                        const approval = await settings.onToolApproval(toolCall.toolName, toolCall.args);
-                        if (approval === 'deny') {
-                            if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
-                            const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                            toolResults.push(`[TOOL_RESULT]: ERROR: ${denyMsg}`);
-                            yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                            continue; // Skip execution
-                        }
-                    }
-                }
-
-                // [TELEMETRY] Intent-based tool timing
-                // If this is the first tool, we use the intent start time.
-                // Subsequent tools start from the end of the previous one to capture the full 'tooling phase'.
-                const effectiveStart = lastToolEventTime || Date.now();
-
-                let result = await dispatchTool(toolCall.toolName, toolCall.args, {
-                    chatId,
-                    history,
-                    onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null,
-                    onAskUser: settings.onAskUser
-                });
-
-                const toolEnd = Date.now();
-                yield { type: 'tool_time', content: toolEnd - effectiveStart };
-                lastToolEventTime = toolEnd; // Update for sequential tracking
-
-                let binaryPart = null;
-                if (typeof result === 'object' && result.binaryPart) {
-                    binaryPart = result.binaryPart;
-                    result = result.text;
-                }
-
-                if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
-                    await new Promise(resolve => setTimeout(resolve, 800)); // Artificial pause for visual persistence
-                    settings.onExecEnd();
-                }
-
-                // Track tool results for stats
-                const isSuccess = result && !result.startsWith('ERROR:');
-                if (isSuccess) {
-                    await incrementUsage('toolSuccess');
-                    if (settings.onToolResult) settings.onToolResult('success');
-                } else {
-                    await incrementUsage('toolFailure');
-                    if (settings.onToolResult) settings.onToolResult('failure');
-                }
-
-                // TOOL HISTORY LOGGING
-                try {
-                    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
-                    const isErr = result.startsWith('ERROR:');
-                    const logStatus = isErr ? result.trim() : 'SUCCESS';
-
-                    const toolHistDir = path.join(LOGS_DIR, 'tools');
-                    if (!fs.existsSync(toolHistDir)) {
-                        fs.mkdirSync(toolHistDir, { recursive: true });
-                    }
-                    fs.appendFileSync(path.join(toolHistDir, 'history.log'), `HISTORY [${timestamp}]: ${toolCall.toolName} [${logStatus}]\n`);
-                } catch (logErr) {
-                    // Fail silently to keep the agent running
-                }
-
-                const cleanResultForAI = result
-                    .split(/\r?\n/)
-                    .filter(line => !line.includes('[UI_CONTEXT]'))
-                    .join('\n');
-
-                const aiContent = `[TOOL_RESULT]: ${cleanResultForAI}`;
-                toolResults.push({ role: 'user', text: aiContent, binaryPart });
-
-                // Yield result for UI preservation (WITH context for the user)
-                // Resilience: For large files (view_file), we hide the raw content in the UI thread to prevent pollution
-                let uiContent = `[TOOL_RESULT]: ${result}`;
-                if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
-                    uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
-                }
-
-                // CRITICAL FIX: Send dual payload to ensure UI stays clean but AI stays smart in next turn
-                yield {
-                    type: 'tool_result',
-                    content: uiContent,
-                    aiContent: aiContent,
-                    binaryPart: binaryPart, // Multi-modal stage (v1.5.0)
-                    toolName: toolCall.toolName
-                };
-
-                if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) {
-                    yield { type: 'memory_updated' };
-                }
-            }
-            yield { type: 'status', content: 'Working...' };
-        }
+        yield { type: 'status', content: 'Working...' };
 
         const cleanedTurnText = turnText
             .replace(/<think>[\s\S]*?<\/think>/g, '')
