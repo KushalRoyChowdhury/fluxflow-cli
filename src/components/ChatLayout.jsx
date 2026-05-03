@@ -180,9 +180,36 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     const mathContent = content
                         .replace(/\\multiply/g, '×')
                         .replace(/\\mul/g, '×')
-                        .replace(/\\div/g, '÷');
+                        .replace(/\\times /g, '×')
+                        .replace(/\\div /g, '÷')
+                        .replace(/\\cdot  /g, '⋅')
+                        .replace(/\\infty/g, '∞')
+                        .replace(/\\pm/g, '±')
+                        .replace(/\\leq/g, '≤')
+                        .replace(/\\geq/g, '≥')
+                        .replace(/\\neq/g, '≠')
+                        .replace(/\\left/g, '<')
+                        .replace(/\\right/g, '>')
+                        .replace(/\\left\(/g, '(')
+                        .replace(/\\right\)/g, ')')
+                        .replace(/\\sqrt/g, '√')
+                        .replace(/\\sqrt\[3\]/g, '∛')
+                        .replace(/\\alpha/g, 'α')
+                        .replace(/\\beta/g, 'β')
+                        .replace(/\\theta/g, 'θ')
+                        .replace(/\\phi/g, 'φ')
+                        .replace(/\\delta/g, 'δ')
+                        .replace(/\\gamma/g, 'γ')
+                        .replace(/\\sigma/g, 'σ')
+                        .replace(/\\pi/g, 'π')
+                        .replace(/\\sum/g, 'Σ')
+                        .replace(/\\lim/g, 'lim')
+                        .replace(/\\integral/g, '∫')
+                        .replace(/\\diff/g, 'd')
+                        .replace(/\\partial/g, '∂')
+                        .replace(/\\frac/g, '/');
 
-                    return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
+                        return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
                 }
 
                 // 🌐 Harmonized Link System

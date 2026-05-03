@@ -31,8 +31,8 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.1';
-const updatedOn = '2026-05-03';
+const versionFluxflow = '1.7.5';
+const updatedOn = '2026-05-03';``
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -441,10 +441,26 @@ export default function App() {
             setTempKey('');
         }
     };
-    
+
+    const lastSavedTimeRef = useRef(SESSION_START_TIME);
+
     // Auto-Exit Trigger
     useEffect(() => {
         if (activeView === 'exit') {
+            // Final Telemetry Flush
+            const flush = async () => {
+                const now = Date.now();
+                const deltaSecs = Math.floor((now - lastSavedTimeRef.current) / 1000);
+                if (deltaSecs >= 1) {
+                    await addToUsage('duration', deltaSecs);
+                    lastSavedTimeRef.current += deltaSecs * 1000;
+                }
+
+                // Optional: Force save chat state to history
+                // saveChat(chatId, `Auto-Saved ${new Date().toLocaleTimeString()}`, messages);
+            };
+            flush();
+
             const timer = setTimeout(() => {
                 process.exit(0);
             }, 100); // Tiny tick to ensure final render is flushed
@@ -456,9 +472,14 @@ export default function App() {
     useEffect(() => {
         const interval = setInterval(async () => {
             if (!isInitializing) {
-                await addToUsage('duration', 5); // Add 5 seconds to today's stats
+                const now = Date.now();
+                const deltaSecs = Math.floor((now - lastSavedTimeRef.current) / 1000);
+                if (deltaSecs >= 1) {
+                    await addToUsage('duration', deltaSecs);
+                    lastSavedTimeRef.current += deltaSecs * 1000;
+                }
             }
-        }, 5000);
+        }, 3000); // 3s "vibe" interval - save disk life
         return () => clearInterval(interval);
     }, [isInitializing]);
 
@@ -1418,7 +1439,7 @@ OUTPUT: ${execOutputRef.current}`;
                         <Box marginBottom={1}>
                             <Text color="white" bold underline>SESSION TELEMETRY</Text>
                         </Box>
-                        
+
                         <Box flexDirection="column">
                             <Box>
                                 <Box width={25}><Text color="blue">Session Duration:</Text></Box>
@@ -1447,7 +1468,7 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
                                 <Text color="white">{sessionToolSuccess + sessionToolFailure} ( </Text>
-                                <Text color="green">√ {sessionToolSuccess}</Text>
+                                <Text color="green">✓ {sessionToolSuccess}</Text>
                                 <Text color="white"> </Text>
                                 <Text color="red">x {sessionToolFailure}</Text>
                                 <Text color="white"> )</Text>
@@ -1475,7 +1496,7 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
                                 <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0)} ( </Text>
-                                <Text color="green">√ {dailyUsage?.toolSuccess || 0}</Text>
+                                <Text color="green">✓ {dailyUsage?.toolSuccess || 0}</Text>
                                 <Text color="white"> </Text>
                                 <Text color="red">x {dailyUsage?.toolFailure || 0}</Text>
                                 <Text color="white"> )</Text>
@@ -1611,60 +1632,8 @@ OUTPUT: ${execOutputRef.current}`;
                         </Box>
                     </Box>
                 );
-            case 'exit': {
-                const wallTimeMs = Date.now() - SESSION_START_TIME;
-                const totalTools = sessionToolSuccess + sessionToolFailure;
-                const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
-                
-                const agentActiveMs = sessionApiTime + sessionToolTime;
-                const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
-                const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
-
-                return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={100}>
-                        <Box marginBottom={1}>
-                            <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
-                        </Box>
-                        
-                        <Box flexDirection="column">
-                            <Text color="white" bold underline>Interaction Summary</Text>
-                            <Box marginTop={1}>
-                                <Box width={20}><Text color="blue">Session ID:</Text></Box>
-                                <Text color="white">{chatId}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                <Text color="white">{totalTools} ( <Text color="green">√ {sessionToolSuccess}</Text> <Text color="red">x {sessionToolFailure}</Text> )</Text>
-                            </Box>
-                            <Box>
-                                <Box width={20}><Text color="blue">Success Rate:</Text></Box>
-                                <Text color="white">{successRate}%</Text>
-                            </Box>
-                        </Box>
-
-                        <Box flexDirection="column" marginTop={1}>
-                            <Text color="white" bold underline>Performance</Text>
-                            <Box marginTop={1}>
-                                <Box width={20}><Text color="blue">Wall Time:</Text></Box>
-                                <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={20}><Text color="blue">Agent Active:</Text></Box>
-                                <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
-                            </Box>
-                            <Box marginLeft={2}>
-                                <Box width={18}><Text color="blue" dimColor>» API Time:</Text></Box>
-                                <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
-                            </Box>
-                            <Box marginLeft={2}>
-                                <Box width={18}><Text color="blue" dimColor>» Tool Time:</Text></Box>
-                                <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
-                            </Box>
-                        </Box>
-
-                    </Box>
-                );
-            }
+            case 'exit':
+                return null;
             case 'ask':
                 return (
                     <Box width="100%">
@@ -2037,6 +2006,64 @@ OUTPUT: ${execOutputRef.current}`;
                         isMemoryEnabled={systemSettings.memory}
                     />
                 </Box>
+
+                {activeView === 'exit' && (() => {
+                    const wallTimeMs = Date.now() - SESSION_START_TIME;
+                    const totalTools = sessionToolSuccess + sessionToolFailure;
+                    const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
+
+                    const agentActiveMs = sessionApiTime + sessionToolTime;
+                    const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+                    const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+
+                    return (
+                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={100} marginTop={1}>
+                            <Box marginBottom={1}>
+                                <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
+                            </Box>
+
+                            <Box flexDirection="column">
+                                <Text color="white" bold underline>Interaction Summary</Text>
+                                <Box marginTop={1}>
+                                    <Box width={20}><Text color="blue">Session ID:</Text></Box>
+                                    <Text color="white">{chatId}</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
+                                    <Text color="white">{totalTools} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="red">x {sessionToolFailure}</Text> )</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Success Rate:</Text></Box>
+                                    <Text color="white">{successRate}%</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
+                                    <Text color="white">{(sessionTotalTokens / 1000).toFixed(2)}k</Text>
+                                </Box>
+                            </Box>
+
+                            <Box flexDirection="column" marginTop={1}>
+                                <Text color="white" bold underline>Performance</Text>
+                                <Box marginTop={1}>
+                                    <Box width={20}><Text color="blue">Wall Time:</Text></Box>
+                                    <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Agent Active:</Text></Box>
+                                    <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
+                                </Box>
+                                <Box marginLeft={2}>
+                                    <Box width={18}><Text color="blue" dimColor>» API Time:</Text></Box>
+                                    <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
+                                </Box>
+                                <Box marginLeft={2}>
+                                    <Box width={18}><Text color="blue" dimColor>» Tool Time:</Text></Box>
+                                    <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
+                                </Box>
+                            </Box>
+                        </Box>
+                    );
+                })()}
 
                 {/* 💡 Suggestion "Bottom Shelf" - Clean, isolated, and perfectly stable below the status bar */}
                 {suggestions.length > 0 && (() => {

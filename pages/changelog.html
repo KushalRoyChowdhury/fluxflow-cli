@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.7.0", "1.7.1"]
+        const stableVersions = ["1.7.5", "1.7.1"]
         const changelogData = {
+            "1.7.5": {
+                "note": "Math Improvements",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Improved Math Rendering with more LaTeX support."
+                ]
+            },
             "1.7.1": {
                 "note": "The Telemetry Engine.",
                 "added": [
@@ -401,11 +409,11 @@
             },
             "1.3.0": {
                 "added":
-                [
-                    "Added `Auto Updater` with user prefered package manager.",
-                    "Added `/update` & `/update check` commands.",
-                    "Added built-in app updater."
-                ],
+                    [
+                        "Added `Auto Updater` with user prefered package manager.",
+                        "Added `/update` & `/update check` commands.",
+                        "Added built-in app updater."
+                    ],
                 "changed": [
                     "Real-time context counter window update.",
                     "Improved Session Dashboard."
