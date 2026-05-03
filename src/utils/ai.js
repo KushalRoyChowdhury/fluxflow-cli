@@ -273,7 +273,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
                 const thinkContent = thinkBlocks.join('');
                 const headingsCount = (thinkContent.match(/\*\*.*?\*\*/g) || []).length;
-                if (headingsCount > 5) {
+                if (headingsCount > 20) {
                     yield { type: 'status', content: 'Loop Detected. Restarting internal loop.' };
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     break; // Force close this turn's stream and proceed to next loop
@@ -316,7 +316,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             for (const toolCall of toolCalls) {
                 if (toolIdx > 0) {
                     yield { type: 'status', content: `Preparing next tool (${toolCall.toolName})...` };
-                    await new Promise(resolve => setTimeout(resolve, 3000)); // Synthetic Pacing Delay
+                    await new Promise(resolve => setTimeout(resolve, 5000)); // Synthetic Pacing Delay
                 }
                 toolIdx++;
 
