@@ -214,7 +214,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
-                    model: targetModel,
+                    model: targetModel || "gemma-4-31b-it",
                     contents,
                     config: {
                         thinkingConfig: {
@@ -668,7 +668,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: Loop detected by internal system. If you are finished use [turn: finish] else continue.' });
+            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. If you have finished your task use [turn: finish] else continue.' });
         }
     }
     yield { type: 'status', content: null };
