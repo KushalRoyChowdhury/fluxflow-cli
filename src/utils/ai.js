@@ -275,7 +275,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
                 const thinkContent = thinkBlocks.join('');
                 const headingsCount = (thinkContent.match(/\*\*.*?\*\*/g) || []).length;
-                if (headingsCount > 20) {
+                if (headingsCount > 35) {
                     yield { type: 'status', content: 'Loop Detected. Restarting internal loop.' };
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     break; // Force close this turn's stream and proceed to next loop
@@ -285,7 +285,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const allToolsFound = detectToolCalls(turnText);
                 while (allToolsFound.length > toolCallPointer) {
                     const toolCall = allToolsFound[toolCallPointer];
-                    
+
                     // Status Update
                     yield { type: 'status', content: `Working (${toolCall.toolName})...` };
 
@@ -333,7 +333,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     } else if (toolCall.toolName === 'write_pptx') {
                         label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                     } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
-                        label = ''; 
+                        label = '';
                     } else {
                         label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
                     }

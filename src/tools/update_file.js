@@ -102,20 +102,36 @@ export const update_file = async (args) => {
         // 1. Context Before (up to 15 lines)
         const contextStart = Math.max(0, startLine - 16);
         for (let i = contextStart; i < startLine - 1; i++) {
-            diffText += `[UI_CONTEXT]  ${i + 1}| ${allOriginalLines[i]}\n`;
+            diffText += `[UI_CONTEXT]  ${i + 1}|${allOriginalLines[i]}\n`;
         }
 
-        // 2. The Change (Red then Green)
-        oldLines.forEach((line, i) => {
-            diffText += `-${startLine + i}| ${line}\n`;
+        // 2. The Change (Full Line Diff for better UI indentation)
+        // Find the boundaries of the lines affected by the change
+        const lineStartPos = currentContent.lastIndexOf('\n', startPos) + 1;
+        const affectedEndPos = startPos + content_to_replace.length;
+        const lineEndPos = currentContent.indexOf('\n', affectedEndPos);
+        const actualEndPos = lineEndPos === -1 ? currentContent.length : lineEndPos;
+
+        // Original lines (fully indented)
+        const fullOldLines = currentContent.substring(lineStartPos, actualEndPos).split('\n');
+        
+        // Updated lines (fully indented)
+        // Calculate the corresponding range in the new content
+        const newAffectedEndPos = startPos + content_to_add.length;
+        const newLineEndPos = newFileContent.indexOf('\n', newAffectedEndPos);
+        const actualNewEndPos = newLineEndPos === -1 ? newFileContent.length : newLineEndPos;
+        const fullNewLines = newFileContent.substring(lineStartPos, actualNewEndPos).split('\n');
+
+        fullOldLines.forEach((line, i) => {
+            diffText += `-${startLine + i}|${line}\n`;
         });
-        newLines.forEach((line, i) => {
-            diffText += `+${startLine + i}| ${line}\n`;
+        fullNewLines.forEach((line, i) => {
+            diffText += `+${startLine + i}|${line}\n`;
         });
 
         // 3. Context After (up to 15 lines)
         for (let i = endLine; i < Math.min(allOriginalLines.length, endLine + 15); i++) {
-            diffText += `[UI_CONTEXT]  ${i + 1}| ${allOriginalLines[i]}\n`;
+            diffText += `[UI_CONTEXT]  ${i + 1}|${allOriginalLines[i]}\n`;
         }
 
         diffText += `[DIFF_END]`;

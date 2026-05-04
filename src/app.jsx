@@ -31,7 +31,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.11';
+const versionFluxflow = '1.7.13';
 const updatedOn = '2026-05-04';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (

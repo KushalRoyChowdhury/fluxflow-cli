@@ -244,28 +244,38 @@ const InlineMarkdown = React.memo(({ text, color }) => {
 // Helper: Wrap text to a specific width without breaking words
 const wrapText = (text, width) => {
     if (!text) return '';
-    // Handle manual line breaks first
     const sourceLines = text.split(/\r?\n/);
     let finalLines = [];
 
     sourceLines.forEach(sLine => {
-        const words = sLine.split(' ');
-        let currentLine = '';
+        if (sLine.length <= width) {
+            finalLines.push(sLine);
+            return;
+        }
 
+        let currentLine = '';
+        const words = sLine.split(/(\s+)/); // Capture whitespace as tokens to preserve indentation
+        
         words.forEach(word => {
             if ((currentLine + word).length > width) {
-                if (currentLine) finalLines.push(currentLine.trim());
-                currentLine = word + ' ';
-                // Handle ultra-long words that exceed column width
-                while (currentLine.length > width) {
-                    finalLines.push(currentLine.substring(0, width));
-                    currentLine = currentLine.substring(width) + ' ';
+                if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
+                
+                // If it's just whitespace that exceeded the width, don't start the new line with it
+                if (word.trim().length === 0) {
+                    currentLine = '';
+                } else {
+                    currentLine = word;
+                    // Handle ultra-long words
+                    while (currentLine.length > width) {
+                        finalLines.push(currentLine.substring(0, width));
+                        currentLine = currentLine.substring(width);
+                    }
                 }
             } else {
-                currentLine += word + ' ';
+                currentLine += word;
             }
         });
-        if (currentLine) finalLines.push(currentLine.trim());
+        if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
     });
 
     return finalLines.join('\n');
