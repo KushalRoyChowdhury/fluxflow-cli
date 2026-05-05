@@ -274,9 +274,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // [LOOP DETECTION] - Catch runaway repetitive reasoning (Only inside <think> blocks)
                 const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
                 const thinkContent = thinkBlocks.join('');
-                const headingsCount = (thinkContent.match(/\*\*.*?\*\*/g) || []).length;
-                if (headingsCount > 35) {
-                    yield { type: 'status', content: 'Loop Detected. Restarting internal loop.' };
+
+                // 1. Headings Count Check (Repetitive structure)
+                const headingsCount = (thinkContent.match(/^\s*\*\*.*?\*\*\s*$/gm) || []).length;
+
+                // 2. Verbosity Check (Rambling detection)
+                const headingSections = thinkContent.split(/^\s*\*\*.*?\*\*\s*$/gm);
+                const isOverVerbose = headingSections.some(section => {
+                    const wordCount = section.trim().split(/\s+/).filter(w => w.length > 0).length;
+                    return wordCount > 450;
+                });
+
+                if (headingsCount > 25 || isOverVerbose) {
+                    const reason = headingsCount > 25 ? 'Loop Detected' : 'Noise Detected';
+                    yield { type: 'status', content: `${reason}. Auto-adjusting...` };
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     break; // Force close this turn's stream and proceed to next loop
                 }

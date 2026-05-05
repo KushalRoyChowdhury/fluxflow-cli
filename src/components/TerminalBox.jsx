@@ -1,11 +1,14 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { wrapText } from '../utils/text.js';
 
-export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false }) => {
+export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80 }) => {
     // Clean output of \r and excessive trailing newlines
     const cleanOutput = (output || '')
         .replace(/\r/g, '')
         .trim();
+
+    const wrappedOutput = cleanOutput ? wrapText(cleanOutput, columns - 6) : '';
 
     return (
         <Box flexDirection="column" borderStyle={isFocused ? 'double' : 'round'} borderColor={completed ? "#334155" : (isFocused ? "yellow" : "cyan")} paddingX={2} paddingY={completed ? 0 : 1} width="100%">
@@ -14,9 +17,9 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
                 <Text color={completed ? "gray" : "white"}>{command}</Text>
             </Box>
             
-            {cleanOutput ? (
+            {wrappedOutput ? (
                 <Box marginTop={completed ? 0 : 1} backgroundColor="#0a0a0a" paddingX={1}>
-                    <Text color={completed ? "gray" : "green"} wrap="anywhere">{cleanOutput}</Text>
+                    <Text color={completed ? "gray" : "green"}>{wrappedOutput}</Text>
                 </Box>
             ) : !completed && (
                 <Box marginTop={1} backgroundColor="#0a0a0a" paddingX={1}>

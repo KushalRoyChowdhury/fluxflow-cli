@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
+import { wrapText } from '../utils/text.js';
 
 const TypewriterText = ({ text, isStreaming, onComplete, columns = 80, color = 'white', speed = 50, render }) => {
     const [displayedText, setDisplayedText] = useState('');
@@ -144,6 +145,35 @@ const formatThinkText = (cleaned, columns = 80) => {
     });
 };
 
+const parseMathSymbols = (content) => {
+    return content
+        .replace(/\\multiply|\\mul|\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\cdot/g, '⋅')
+        .replace(/\\infty/g, '∞')
+        .replace(/\\pm/g, '±')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\sqrt\{?(.*?)\}?/g, (_, p1) => `√(${p1})`)
+        .replace(/\\alpha/g, 'α')
+        .replace(/\\beta/g, 'β')
+        .replace(/\\theta/g, 'θ')
+        .replace(/\\pi/g, 'π')
+        .replace(/\\approx/g, '≈')
+        .replace(/\\Delta/g, 'Δ')
+        .replace(/\\sigma/g, 'σ')
+        .replace(/\\sum/g, 'Σ')
+        .replace(/\\prod/g, 'Π')
+        .replace(/\\rightarrow|\\to/g, '→')
+        .replace(/\\leftarrow/g, '←')
+        .replace(/\\leftrightarrow/g, '↔')
+        .replace(/\\left\(|\\right\)/g, match => match.includes('left') ? '(' : ')')
+        .replace(/\\left\[|\\right\]/g, match => match.includes('left') ? '[' : ']')
+        .replace(/\\\{|\\\}/g, match => match.includes('{') ? '{' : '}')
+        .replace(/\\text\{?(.*?)\}?/g, '$1');
+};
+
 const InlineMarkdown = React.memo(({ text, color }) => {
     if (!text) return null;
 
@@ -155,12 +185,12 @@ const InlineMarkdown = React.memo(({ text, color }) => {
             {parts.map((part, j) => {
                 if (!part) return null;
 
-                // 🏷️ Recursive Bold: Scan inside for more styles
+                // 🏷️ Recursive Bold
                 if (part.startsWith('**') && part.endsWith('**')) {
                     return <Text key={j} bold color="white"><InlineMarkdown text={part.slice(2, -2)} color="white" /></Text>;
                 }
 
-                // 🏷️ Recursive Italic: Scan inside for more styles
+                // 🏷️ Recursive Italic
                 if (part.startsWith('*') && part.endsWith('*')) {
                     return <Text key={j} italic color="gray"><InlineMarkdown text={part.slice(1, -1)} color="gray" /></Text>;
                 }
@@ -169,47 +199,37 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
                 }
 
-                // 📐 Math & LaTeX-like support
+                // 📐 Advanced LaTeX support
                 if (part.startsWith('$') && part.endsWith('$')) {
-                    let content = part.slice(1, -1);
-                    // Extract content if it was inside $\text{...}$
-                    if (content.startsWith('\\text{') && content.endsWith('}')) {
-                        content = content.slice(6, -1);
-                    }
-                    // Basic math symbol translation
-                    const mathContent = content
-                        .replace(/\\multiply/g, '×')
-                        .replace(/\\mul/g, '×')
-                        .replace(/\\times /g, '×')
-                        .replace(/\\div /g, '÷')
-                        .replace(/\\cdot  /g, '⋅')
-                        .replace(/\\infty/g, '∞')
-                        .replace(/\\pm/g, '±')
-                        .replace(/\\leq/g, '≤')
-                        .replace(/\\geq/g, '≥')
-                        .replace(/\\neq/g, '≠')
-                        .replace(/\\left/g, '<')
-                        .replace(/\\right/g, '>')
-                        .replace(/\\left\(/g, '(')
-                        .replace(/\\right\)/g, ')')
-                        .replace(/\\sqrt/g, '√')
-                        .replace(/\\sqrt\[3\]/g, '∛')
-                        .replace(/\\alpha/g, 'α')
-                        .replace(/\\beta/g, 'β')
-                        .replace(/\\theta/g, 'θ')
-                        .replace(/\\phi/g, 'φ')
-                        .replace(/\\delta/g, 'δ')
-                        .replace(/\\gamma/g, 'γ')
-                        .replace(/\\sigma/g, 'σ')
-                        .replace(/\\pi/g, 'π')
-                        .replace(/\\sum/g, 'Σ')
-                        .replace(/\\lim/g, 'lim')
-                        .replace(/\\integral/g, '∫')
-                        .replace(/\\diff/g, 'd')
-                        .replace(/\\partial/g, '∂')
-                        .replace(/\\frac/g, '/');
-
-                        return <Text key={j} color="white" backgroundColor="#4c0099" bold italic> {mathContent} </Text>;
+                    const content = part.slice(1, -1);
+                    const latexParts = content.split(/(\\(?:mathbf|textbf|textit|underline|text|mathrm|textsf|texttt)\{.*?\})/g);
+                    
+                    return (
+                        <Text key={j} color="yellow">
+                            {latexParts.map((lp, lpi) => {
+                                if (lp.startsWith('\\')) {
+                                    const match = lp.match(/\\(\w+)\{(.*?)\}/);
+                                    if (match) {
+                                        const cmd = match[1];
+                                        const inner = match[2];
+                                        const isBold = cmd === 'mathbf' || cmd === 'textbf';
+                                        const isItalic = cmd === 'textit';
+                                        const isUnderline = cmd === 'underline';
+                                        const isMono = cmd === 'texttt';
+                                        
+                                        return (
+                                            <Text key={lpi} bold={isBold} italic={isItalic} underline={isUnderline} color={isMono ? 'cyan' : undefined}>
+                                                {parseMathSymbols(inner)}
+                                            </Text>
+                                        );
+                                    }
+                                }
+                                return (
+                                    <Text key={lpi}>{parseMathSymbols(lp)}</Text>
+                                );
+                            })}
+                        </Text>
+                    );
                 }
 
                 // 🌐 Harmonized Link System
@@ -242,44 +262,6 @@ const InlineMarkdown = React.memo(({ text, color }) => {
 });
 
 // Helper: Wrap text to a specific width without breaking words
-const wrapText = (text, width) => {
-    if (!text) return '';
-    const sourceLines = text.split(/\r?\n/);
-    let finalLines = [];
-
-    sourceLines.forEach(sLine => {
-        if (sLine.length <= width) {
-            finalLines.push(sLine);
-            return;
-        }
-
-        let currentLine = '';
-        const words = sLine.split(/(\s+)/); // Capture whitespace as tokens to preserve indentation
-        
-        words.forEach(word => {
-            if ((currentLine + word).length > width) {
-                if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
-                
-                // If it's just whitespace that exceeded the width, don't start the new line with it
-                if (word.trim().length === 0) {
-                    currentLine = '';
-                } else {
-                    currentLine = word;
-                    // Handle ultra-long words
-                    while (currentLine.length > width) {
-                        finalLines.push(currentLine.substring(0, width));
-                        currentLine = currentLine.substring(width);
-                    }
-                }
-            } else {
-                currentLine += word;
-            }
-        });
-        if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
-    });
-
-    return finalLines.join('\n');
-};
 
 const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     if (buffer.length < 2) return null;
@@ -605,7 +587,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <TerminalBox command={cmd} output={outputList} completed={true} />
+                <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} />
             </Box>
         );
     }

@@ -10,7 +10,7 @@ Your tool syntax is: 'tool:functions.function_name(args...)'
 You have access to the following memory functions to persist important information:
 
 1. Temporary context (MUST OUTPUT THIS TOOL CALL EVERY TIME):
-   tool:functions.memory(action='temp', content='<summary of the user prompt & model responses ONLY FROM LATEST PROMPT. [Talked on: <date> <hour>]')
+   tool:functions.memory(action='temp', content='<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]')
 
 ${isMemoryEnabled ? `2. User-specific long-term memory (USE BASED ON CONVERSATION CONTEXT):
     - Add: tool:functions.memory(action='user', method='add', content='<string to add>. [Saved on: <date ONLY>]')

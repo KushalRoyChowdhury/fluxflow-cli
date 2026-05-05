@@ -11,7 +11,7 @@ tool:functions.tool_name(arguments)
     2. Web Scrape: tool:functions.web_scrape(url="<url>"). provides detail from a URL.
 ${mode === 'Flux' ? `
 - DEV & FILE TOOLS (Available in FLUX MODE ONLY) -
-    1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided. You can also use this tool to read images & documents.
+    1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided. YOU CAN ALSO USE THIS TOOL TO SEE IMAGES AND DOCUMENTS IN A FOLDER. IF USER ASK HOW TO SHARE A IMAGE TELL THEM TO PASTE THE IMAGE IN THE CURRENT FOLDER.
     2. List Files: tool:functions.list_files(path="relative/path"). Lists content of a directory.
     3. Read Folder: tool:functions.read_folder(path="relative/path"). Detailed stats of a directory.
     4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility. Escape your double quotes '"' using backslash.
