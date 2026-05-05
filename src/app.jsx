@@ -20,19 +20,20 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } 
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
-import { getDailyUsage, addToUsage } from './utils/usage.js';
+import { getDailyUsage, addToUsage, initUsage, forceFlushUsage } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
+import { formatTokens } from './utils/text.js';
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.16';
-const updatedOn = '2026-05-05';
+const versionFluxflow = '1.7.18';
+const updatedOn = '2026-05-06';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -410,6 +411,9 @@ export default function App() {
             // 4. Check for updates after settings are loaded
             performVersionCheck(false, freshSettings);
 
+            // 5. Prime usage cache
+            await initUsage();
+
             setIsInitializing(false);
         }
         init();
@@ -455,6 +459,7 @@ export default function App() {
                     await addToUsage('duration', deltaSecs);
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
+                await forceFlushUsage();
 
                 // Optional: Force save chat state to history
                 // saveChat(chatId, `Auto-Saved ${new Date().toLocaleTimeString()}`, messages);
@@ -1473,7 +1478,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
-                                <Text color="white">{(sessionTotalTokens / 1000).toFixed(2)}k</Text>
+                                <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
@@ -1501,7 +1506,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
-                                <Text color="white">{((dailyUsage?.tokens || 0) / 1000).toFixed(2)}k</Text>
+                                <Text color="white">{formatTokens(dailyUsage?.tokens || 0)}</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
@@ -2019,6 +2024,7 @@ OUTPUT: ${execOutputRef.current}`;
 
                 {activeView === 'exit' && (() => {
                     const wallTimeMs = Date.now() - SESSION_START_TIME;
+
                     const totalTools = sessionToolSuccess + sessionToolFailure;
                     const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
 
@@ -2048,7 +2054,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
-                                    <Text color="white">{(sessionTotalTokens / 1000).toFixed(2)}k</Text>
+                                    <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                                 </Box>
                             </Box>
 

@@ -157,6 +157,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
         if (TERMINATION_SIGNAL) {
             yield { type: 'status', content: 'Termination Signal Received.' };
+            // wait 1.5s
+            await new Promise(resolve => setTimeout(resolve, 1500));
             break;
         }
 
@@ -204,10 +206,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 let targetModel = modelName;
                 if (retryCount === 5) {
                     targetModel = 'gemini-3-flash-preview';
-                    yield { type: 'model_update', content: 'Trying with fallback model (v3)' };
+                    yield { type: 'model_update', content: 'Trying with fallback model' };
                 } else if (retryCount >= 6) {
                     targetModel = 'gemini-3.1-flash-lite-preview';
-                    yield { type: 'model_update', content: 'Trying with fallback model (v3.1)' };
+                    yield { type: 'model_update', content: 'Trying with fallback model lite' };
                 } else if (retryCount > 0) {
                     yield { type: 'model_update', content: null };
                 }
@@ -230,7 +232,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             } catch (err) {
                 const errMsg = err.status || (err.error && err.error.message) || String(err);
                 // Log error in /logs/agent/error.log
-                const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                const date = new Date().toLocaleString();
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
                 fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errMsg}\n`);
@@ -486,7 +488,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         yield { type: 'status', content: 'Working...' };
 
         const cleanedTurnText = turnText
-            .replace(/<think>[\s\S]*?<\/think>/g, '')
             .replace(/\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
             .trim();
 
@@ -543,7 +544,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (parts && parts[1]?.text) {
                     finalSynthesis = parts[1].text;
                     // Append /logs/janitor/debug.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
-                    const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                    const date = new Date().toLocaleString();
                     const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                     // Create folder if it doesn't exist
                     if (!fs.existsSync(janitorLogDir)) {
@@ -570,7 +571,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
 
                     // Log the tool result for high-fidelity debugging
-                    const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                    const date = new Date().toLocaleString();
                     const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                     fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
 
@@ -581,7 +582,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } catch (janitorErr) {
                 // Append /logs/janitor/error.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
-                const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+                const date = new Date().toLocaleString();
                 const janitorErrDir = path.join(LOGS_DIR, 'janitor');
                 // Create folder if it doesn't exist
                 if (!fs.existsSync(janitorErrDir)) {

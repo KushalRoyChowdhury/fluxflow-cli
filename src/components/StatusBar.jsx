@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { formatTokens } from '../utils/text.js';
 
 const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
@@ -32,7 +33,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color="gray">MEM: </Text>
                 <Text color={memStatus === 'ON' ? 'green' : 'red'}>{memStatus}</Text>
                 <Text color="gray"> │ </Text>
-                <Text color="blue">{tokensTotal > 1000 ? `${(tokensTotal / 1000).toFixed(1)}k` : tokensTotal} ({Math.round((tokens / 254000) * 100)}%)</Text>
+                <Text color="blue">{formatTokens(tokensTotal)} ({Math.round((tokens / 254000) * 100)}%)</Text>
                 <Text color="gray"> │ </Text>
                 <Text color="dim">{chatId} </Text>
             </Box>

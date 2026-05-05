@@ -106,7 +106,7 @@ export const web_scrape = async (args) => {
             // Log for audit
             const toolLogDir = path.join(LOGS_DIR, 'tools');
             if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toISOString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
+            fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toLocaleString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
 
             await browser.close();
             // fs.writeFileSync('scraped.html', cleanedHtml);

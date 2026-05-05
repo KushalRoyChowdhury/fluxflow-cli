@@ -75,7 +75,7 @@ export const web_search = async (argsString) => {
             // Log for audit
             const toolLogDir = path.join(LOGS_DIR, 'tools');
             if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-results.log'), `SEARCH ${new Date().toISOString()} - Query: [${query}]. Count: ${results.length}.\nContent:\n${finalResults}\n\n--------------------------------------------------------\n\n\n`);
+            fs.appendFileSync(path.join(toolLogDir, 'search-results.log'), `SEARCH ${new Date().toLocaleString()} - Query: [${query}]. Count: ${results.length}.\nContent:\n${finalResults}\n\n--------------------------------------------------------\n\n\n`);
 
             // fs.writeFileSync('search.txt', finalResults);
             await browser.close();

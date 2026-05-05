@@ -40,3 +40,18 @@ export const wrapText = (text, width) => {
 
     return finalLines.join('\n');
 };
+
+/**
+ * Formats token counts into human-readable strings (e.g., 1.5k, 2.1m)
+ */
+export const formatTokens = (tokens) => {
+    if (!tokens && tokens !== 0) return '0.0k';
+    const num = typeof tokens === 'string' ? parseFloat(tokens) : tokens;
+    
+    if (num >= 1000000) {
+        return `${(num / 1000000).toFixed(2)}m`;
+    } else if (num >= 1000) {
+        return `${(num / 1000).toFixed(2)}k`;
+    }
+    return num.toString();
+};
