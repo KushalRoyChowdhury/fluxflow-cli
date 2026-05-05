@@ -203,7 +203,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 if (part.startsWith('$') && part.endsWith('$')) {
                     const content = part.slice(1, -1);
                     const latexParts = content.split(/(\\(?:mathbf|textbf|textit|underline|text|mathrm|textsf|texttt)\{.*?\})/g);
-                    
+
                     return (
                         <Text key={j} color="yellow">
                             {latexParts.map((lp, lpi) => {
@@ -216,7 +216,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                                         const isItalic = cmd === 'textit';
                                         const isUnderline = cmd === 'underline';
                                         const isMono = cmd === 'texttt';
-                                        
+
                                         return (
                                             <Text key={lpi} bold={isBold} italic={isItalic} underline={isUnderline} color={isMono ? 'cyan' : undefined}>
                                                 {parseMathSymbols(inner)}
@@ -546,18 +546,50 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     if (msg.isHelpRecord) {
         const commandList = [
-            { cmd: '/mode', desc: 'Switch dev/chat mode' },
-            { cmd: '/thinking', desc: 'Set reasoning level' },
-            { cmd: '/model', desc: 'Change AI model' },
-            { cmd: '/settings', desc: 'Open system settings' },
-            { cmd: '/stats', desc: 'View usage statistics' },
-            { cmd: '/profile', desc: 'Manage your persona' },
-            { cmd: '/update', desc: 'Check/apply updates' },
-            { cmd: '/memory', desc: 'Manage agent memories' },
-            { cmd: '/save', desc: 'Save current session' },
-            { cmd: '/chats', desc: 'List saved sessions' },
-            { cmd: '/reset', desc: 'Purge all app data' },
-            { cmd: '/exit', desc: 'Close Flux Flow' }
+            { cmd: '/quit', desc: 'Exit and shutdown Flux' },
+        { cmd: '/help', desc: 'Show all available commands' },
+        { cmd: '/clear', desc: 'Clear terminal screen' },
+        { cmd: '/resume', desc: 'Load previous session' },
+        { cmd: '/save', desc: 'Force save current chat' },
+        { cmd: '/chats', desc: 'List all chat sessions' },
+        {
+            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+                { cmd: 'flux', desc: 'Enable Dev toolset' },
+                { cmd: 'flow', desc: 'Enable Chat mode' }
+            ]
+        },
+        {
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
+                { cmd: 'low', desc: 'Fastest reasoning' },
+                { cmd: 'medium', desc: 'Balanced depth' },
+                { cmd: 'high', desc: 'Complex coding' },
+                { cmd: 'max', desc: 'Architectural depth' },
+                { cmd: 'show', desc: 'Show full thoughts' },
+                { cmd: 'hide', desc: 'Show concise thoughts' }
+            ]
+        },
+        {
+            cmd: '/model', desc: 'Switch AI model', subs: [
+                { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
+                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
+                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
+                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+            ]
+        },
+        { cmd: '/settings', desc: 'Configure system prefs' },
+        { cmd: '/key', desc: 'Manage API keys' },
+        { cmd: '/profile', desc: 'Edit developer persona' },
+        { cmd: '/memory', desc: 'Manage agent memory' },
+        { cmd: '/stats', desc: 'Show session usage' },
+        { cmd: '/reset', desc: 'Wipe all project data' },
+        { cmd: '/about', desc: 'Project info & credits' },
+        { cmd: '/changelog', desc: 'View latest updates' },
+        {
+            cmd: '/update', desc: 'Check/Install updates', subs: [
+                { cmd: 'check', desc: 'Check for new version' },
+                { cmd: 'latest', desc: 'Install latest release' }
+            ]
+        }
         ];
 
         return (
