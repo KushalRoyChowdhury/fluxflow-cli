@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.24';
+const versionFluxflow = '1.7.25';
 const updatedOn = '2026-05-07';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1299,6 +1299,7 @@ OUTPUT: ${execOutputRef.current}`;
                             { label: `Toggle Auto-Exec                        [ ${systemSettings.autoExec ? 'ON' : 'OFF'} ]`, value: 'autoExec' },
                             { label: `External Workspace Access               [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
                             { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
+                            { label: `Auto-Delete History                     [ ${systemSettings.autoDeleteHistory || '30d'} ]`, value: 'autoDelete' },
                             { label: `Auto-Update                             [ ${systemSettings.autoUpdate ? 'ON' : 'OFF'} ]`, value: 'autoUpdate' },
                             { label: `Preferred Updater                       [ ${(systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase()} ]`, value: 'updateManager' },
                             { label: `Save AppData Externally                 [ ${systemSettings.useExternalData ? 'ON' : 'OFF'} ]`, value: 'externalData' },
