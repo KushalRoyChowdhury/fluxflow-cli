@@ -284,7 +284,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const headingSections = thinkContent.split(/^\s*\*\*.*?\*\*\s*$/gm);
                 const isOverVerbose = headingSections.some(section => {
                     const wordCount = section.trim().split(/\s+/).filter(w => w.length > 0).length;
-                    return wordCount > 450;
+                    return wordCount > 500;
                 });
 
                 if (headingsCount > 25 || isOverVerbose) {
@@ -533,6 +533,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: janitorModel || 'gemma-4-26b-a4b-it',
                     contents: janitorContents,
                     config: {
+                        maxOutputTokens: 512,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
@@ -614,7 +615,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. If you have finished your task use [turn: finish] else continue.' });
+            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. Your thinking process seems to be repeating and excreeding allocated budget for single turn. If you have finished your task use [turn: finish] else continue.' });
         }
     }
     yield { type: 'status', content: null };

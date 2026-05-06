@@ -32,8 +32,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.19';
-const updatedOn = '2026-05-06';
+const versionFluxflow = '1.7.20';
+const updatedOn = '2026-05-07';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">

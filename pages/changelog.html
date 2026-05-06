@@ -225,8 +225,17 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.7.11", "1.7.6"]
+        const stableVersions = ["1.7.20"]
         const changelogData = {
+            "1.7.20": {
+                "note": "Improved Tools for less failures.",
+                "added": [],
+                "changed": [
+                    "Improved `update_file` tool focued on reduce patch failures due to indentation mismatches.",
+                    "Improved Loop detection algorithm."
+                ],
+                "fixes": []
+            },
             "1.7.11": {
                 "note": "Improved UX",
                 "added": [],

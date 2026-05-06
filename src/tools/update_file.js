@@ -75,18 +75,77 @@ export const update_file = async (args) => {
         }
         const currentContent = diskContent;
 
-        if (!currentContent.includes(content_to_replace)) {
-            const diskLen = currentContent.length;
-            const matchLen = content_to_replace.length;
-            return `ERROR: Could not find exact match for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace. Try re-reading the file for latest changes.`;
+        // --- INDENTATION PRESERVATION ENGINE (v2: Min-Indent Delta) ---
+        const adjustIndentation = (newText, originalMatch) => {
+            if (!newText || !originalMatch) return newText;
+            
+            const getMinIndent = (text) => {
+                const lines = text.split('\n').filter(l => l.trim() !== '');
+                if (lines.length === 0) return '';
+                let min = lines[0].match(/^\s*/)[0];
+                for (const line of lines) {
+                    const indent = line.match(/^\s*/)[0];
+                    if (indent.length < min.length) min = indent;
+                }
+                return min;
+            };
+
+            const originalMinIndent = getMinIndent(originalMatch);
+            const newMinIndent = getMinIndent(newText);
+
+            const newLines = newText.split('\n');
+            return newLines.map(line => {
+                if (line.trim() === '') return '';
+                if (line.startsWith(newMinIndent)) {
+                    return originalMinIndent + line.substring(newMinIndent.length);
+                }
+                return originalMinIndent + line.trimStart();
+            }).join('\n');
+        };
+
+        let matchRegex = null;
+        let instances = 0;
+        let startPos = -1;
+
+        if (currentContent.includes(content_to_replace)) {
+            instances = currentContent.split(content_to_replace).length - 1;
+            startPos = currentContent.indexOf(content_to_replace);
+        } else {
+            // --- GENEROUS WHITESPACE MATCHING (Fuzzy Fallback) ---
+            const escaped = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Replace any whitespace sequence in the pattern with \s+ (relaxed matching)
+            const fuzzyPattern = escaped.trim().replace(/\s+/g, '\\s+');
+            try {
+                const fuzzyRegex = new RegExp(fuzzyPattern, 'g');
+                const matches = [...currentContent.matchAll(fuzzyRegex)];
+
+                if (matches.length > 0) {
+                    matchRegex = fuzzyRegex;
+                    instances = matches.length;
+                    startPos = matches[0].index;
+                    // Use the first match's actual content for line counting and diff display
+                    content_to_replace = matches[0][0]; 
+                }
+            } catch (e) {
+                // Regex error (unlikely due to escaping, but safe fallback)
+            }
         }
 
-        const startPos = currentContent.indexOf(content_to_replace);
+        if (instances === 0) {
+            const diskLen = currentContent.length;
+            const matchLen = content_to_replace.length;
+            return `ERROR: Could not find match (even fuzzy) for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace. Try re-reading the file for latest changes.`;
+        }
+
         // Count lines before the replacement to get the start line number
         const startLine = currentContent.substring(0, startPos).split(/\r?\n/).length;
 
-        const instances = currentContent.split(content_to_replace).length - 1;
-        const newFileContent = currentContent.split(content_to_replace).join(content_to_add);
+        const newFileContent = matchRegex 
+            ? currentContent.replace(matchRegex, (match) => adjustIndentation(content_to_add, match))
+            : currentContent.split(content_to_replace).join(adjustIndentation(content_to_add, content_to_replace));
+
+        // Sync content_to_add for the diff generation based on the first match
+        content_to_add = adjustIndentation(content_to_add, content_to_replace);
 
         fs.writeFileSync(absolutePath, newFileContent, 'utf8');
 
