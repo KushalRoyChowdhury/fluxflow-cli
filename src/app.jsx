@@ -227,7 +227,7 @@ export default function App() {
     const [completedIndex, setCompletedIndex] = useState(1);
 
     const windowedHistory = useMemo(() => {
-        const MAX_LINES = 1000;
+        const MAX_LINES = 2000;
         const width = stdout?.columns || 80;
         let totalLines = 0;
         let startIdx = 0;
@@ -1960,13 +1960,6 @@ OUTPUT: ${execOutputRef.current}`;
     return (
         <Box flexDirection="column" width="100%">
 
-            {windowedHistory.isTruncated && (
-                <Box borderStyle="single" borderColor="gray" paddingX={1} marginBottom={1} width="100%" justifyContent="center">
-                    <Text color="gray" dimColor italic>
-                        [ ↑ History truncated for performance (showing last ~1000 lines) ]
-                    </Text>
-                </Box>
-            )}
             <Box flexDirection="column" width="100%" flexGrow={1}>
                 {windowedHistory.items.map((msg, idx) => (
                     <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} columns={stdout?.columns || 80} />
