@@ -75,9 +75,9 @@ export const update_file = async (args) => {
         }
         const currentContent = diskContent;
 
-        // --- INDENTATION PRESERVATION ENGINE (v2: Min-Indent Delta) ---
-        const adjustIndentation = (newText, originalMatch) => {
-            if (!newText || !originalMatch) return newText;
+        // --- INDENTATION PRESERVATION ENGINE (v3: Context-Aware Delta) ---
+        const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
+            if (!newText || originalMatch === undefined) return newText;
             
             const getMinIndent = (text) => {
                 const lines = text.split('\n').filter(l => l.trim() !== '');
@@ -90,46 +90,61 @@ export const update_file = async (args) => {
                 return min;
             };
 
-            const originalMinIndent = getMinIndent(originalMatch);
+            // Anchor the original indent using the leading context from the file
+            const originalMinIndent = getMinIndent(leadingContext + originalMatch);
             const newMinIndent = getMinIndent(newText);
 
             const newLines = newText.split('\n');
-            return newLines.map(line => {
-                if (line.trim() === '') return '';
-                if (line.startsWith(newMinIndent)) {
-                    return originalMinIndent + line.substring(newMinIndent.length);
+            return newLines.map((line, i) => {
+                if (line.trim() === '' && i !== 0) return '';
+                
+                // For the first line, we subtract the leading context already present in the file
+                const currentOriginalIndent = (i === 0) 
+                    ? originalMinIndent.substring(Math.min(originalMinIndent.length, leadingContext.length)) 
+                    : originalMinIndent;
+
+                const lineIndent = line.match(/^\s*/)[0];
+                
+                // Case 1: Standard indentation (starts with the block's minimum)
+                if (lineIndent.startsWith(newMinIndent)) {
+                    return currentOriginalIndent + line.substring(newMinIndent.length);
                 }
-                return originalMinIndent + line.trimStart();
+                
+                // Case 2: Outdent (e.g., a closing brace '}' that is indented less than the block's min)
+                if (newMinIndent.startsWith(lineIndent)) {
+                    const diff = newMinIndent.length - lineIndent.length;
+                    const adjustedIndent = currentOriginalIndent.substring(0, Math.max(0, currentOriginalIndent.length - diff));
+                    return adjustedIndent + line.trimStart();
+                }
+
+                // Fallback: Just preserve the line as is but prepended with the base indent
+                return currentOriginalIndent + line.trimStart();
             }).join('\n');
         };
 
-        let matchRegex = null;
         let instances = 0;
         let startPos = -1;
+        let matchRegex = null;
 
-        if (currentContent.includes(content_to_replace)) {
-            instances = currentContent.split(content_to_replace).length - 1;
-            startPos = currentContent.indexOf(content_to_replace);
+        // --- UNIFIED MATCHER ---
+        // We prioritize an exact match (including any indentation the agent provided).
+        // If that fails, we fall back to a fuzzy match that ignores indentation differences.
+        const escaped = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (content_to_replace !== '' && currentContent.includes(content_to_replace)) {
+            matchRegex = new RegExp(escaped, 'g');
         } else {
-            // --- GENEROUS WHITESPACE MATCHING (Fuzzy Fallback) ---
-            const escaped = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // Replace any whitespace sequence in the pattern with \s+ (relaxed matching)
-            const fuzzyPattern = escaped.trim().replace(/\s+/g, '\\s+');
+            // Fuzzy Fallback: Trim the agent's input and allow any whitespace sequence (including zero spaces)
+            // This allows the agent to be "lazy" with indentation in its search string.
+            const fuzzyPattern = escaped.trim().replace(/\s+/g, '\\s*');
             try {
-                const fuzzyRegex = new RegExp(fuzzyPattern, 'g');
-                const matches = [...currentContent.matchAll(fuzzyRegex)];
-
-                if (matches.length > 0) {
-                    matchRegex = fuzzyRegex;
-                    instances = matches.length;
-                    startPos = matches[0].index;
-                    // Use the first match's actual content for line counting and diff display
-                    content_to_replace = matches[0][0]; 
-                }
+                matchRegex = new RegExp(fuzzyPattern, 'g');
             } catch (e) {
-                // Regex error (unlikely due to escaping, but safe fallback)
+                // Safe fallback for complex strings
             }
         }
+
+        const matches = matchRegex ? [...currentContent.matchAll(matchRegex)] : [];
+        instances = matches.length;
 
         if (instances === 0) {
             const diskLen = currentContent.length;
@@ -137,22 +152,34 @@ export const update_file = async (args) => {
             return `ERROR: Could not find match (even fuzzy) for the specified "content_to_replace" in [${targetPath}].\n- Disk Content Length (Normalized): ${diskLen}\n- Match String Length (Normalized): ${matchLen}\n- Check indentation/whitespace. Try re-reading the file for latest changes.`;
         }
 
-        // Count lines before the replacement to get the start line number
-        const startLine = currentContent.substring(0, startPos).split(/\r?\n/).length;
+        if (instances > 1) {
+            return `ERROR: Unable to find unique match. [${instances}] instances of the specified "content_to_replace" were found in [${targetPath}]. Try providing more context (surrounding lines) to make the match unique.`;
+        }
 
-        const newFileContent = matchRegex 
-            ? currentContent.replace(matchRegex, (match) => adjustIndentation(content_to_add, match))
-            : currentContent.split(content_to_replace).join(adjustIndentation(content_to_add, content_to_replace));
+        // Use the first match as the anchor for positioning and diff display
+        startPos = matches[0].index;
+        const firstMatchContent = matches[0][0];
 
-        // Sync content_to_add for the diff generation based on the first match
-        content_to_add = adjustIndentation(content_to_add, content_to_replace);
+        // --- PERFORM REPLACEMENT ---
+        const newFileContent = currentContent.replace(matchRegex, (match, offset) => {
+            const lineStart = currentContent.lastIndexOf('\n', offset) + 1;
+            const leadingContext = currentContent.substring(lineStart, offset);
+            return adjustIndentation(content_to_add, match, leadingContext);
+        });
+
+        // Sync for the diff generation based on the first match
+        const firstLineStart = currentContent.lastIndexOf('\n', startPos) + 1;
+        const firstLeadingContext = currentContent.substring(firstLineStart, startPos);
+        
+        const finalContentToAdd = adjustIndentation(content_to_add, firstMatchContent, firstLeadingContext);
+        const finalContentToReplace = firstMatchContent;
 
         fs.writeFileSync(absolutePath, newFileContent, 'utf8');
 
         // Structured response for UI diffing
         const allOriginalLines = currentContent.split(/\r?\n/);
+        const startLine = currentContent.substring(0, startPos).split(/\r?\n/).length;
         const oldLines = content_to_replace.split(/\r?\n/);
-        const newLines = content_to_add.split(/\r?\n/);
         const endLine = startLine + oldLines.length - 1;
 
         let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\n\n`;
