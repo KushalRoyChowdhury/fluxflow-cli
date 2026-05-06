@@ -16,39 +16,13 @@ export const update_file = async (args) => {
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // --- CONTEXT-AWARE NEURAL UNESCAPE ---
-    const ext = path.extname(targetPath).toLowerCase();
-    const isProse = ['.md', '.txt', '.log', '.html', '.css'].includes(ext);
-
     const unescapeContent = (content) => {
-        let processedContent = "";
-        let inString = null;
-        for (let i = 0; i < content.length; i++) {
-            const char = content[i];
-            const next2 = content.substring(i, i + 2);
-
-            if (!inString) {
-                // Prose check: Don't track strings in natural language files (apostrophes are common)
-                if (!isProse && (char === '"' || char === "'" || char === '`')) {
-                    inString = char;
-                    processedContent += char;
-                } else if (next2 === '\\\\n') {
-                    processedContent += '\\n';
-                    i++;
-                } else if (next2 === '\\n') {
-                    processedContent += '\n';
-                    i++;
-                } else {
-                    processedContent += char;
-                }
-            } else {
-                if (char === inString && content[i - 1] !== '\\') {
-                    inString = null;
-                }
-                processedContent += char;
-            }
-        }
-        return processedContent;
+        // \n (backslash + n) becomes a real newline (LF)
+        // \\n (two backslashes + n) becomes a literal \n
+        return content.replace(/\\\\n|\\n/g, (match) => {
+            if (match === '\\\\n') return '\\n';
+            return '\n';
+        });
     };
 
     content_to_replace = unescapeContent(strip(content_to_replace));
