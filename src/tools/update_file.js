@@ -94,16 +94,30 @@ export const update_file = async (args) => {
         let startPos = -1;
         let matchRegex = null;
 
-        // --- UNIFIED MATCHER ---
-        const escaped = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // --- UNIFIED MATCHER (v6: High-Fidelity Fuzzy Logic) ---
+        const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
         if (content_to_replace !== '' && currentContent.includes(content_to_replace)) {
-            matchRegex = new RegExp(escaped, 'g');
+            matchRegex = new RegExp(exactPattern, 'g');
         } else {
-            const fuzzyPattern = escaped.trim().replace(/\s+/g, '\\s*');
-            try {
-                matchRegex = new RegExp(fuzzyPattern, 'g');
-            } catch (e) {
-                matchRegex = new RegExp(escaped, 'g');
+            // High-Res Fuzzy: Match each line's core content while ignoring indentation/whitespace drift
+            const fuzzyLines = content_to_replace
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0) // Skip empty lines for matching
+                .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
+            
+            if (fuzzyLines.length > 0) {
+                // Construct a pattern that allows flexible indentation and whitespace between lines
+                // We use \s* to ensure we stay within the intended block
+                const fuzzyPattern = fuzzyLines.join('\\s*');
+                try {
+                    matchRegex = new RegExp(fuzzyPattern, 'g');
+                } catch (e) {
+                    matchRegex = new RegExp(exactPattern, 'g');
+                }
+            } else {
+                matchRegex = new RegExp(exactPattern, 'g');
             }
         }
 
