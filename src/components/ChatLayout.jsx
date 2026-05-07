@@ -69,37 +69,16 @@ const cleanSignals = (text) => {
 
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
-    const lines = cleaned.split('\n'); // Preserve line breaks for vertical rhythm
     const availableWidth = columns - 10;
+    const wrapped = wrapText(cleaned.trim(), availableWidth);
 
-    return lines.map((line, i) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <Box key={i} height={1} />;
-
-        // Headings (Bold white with subtle prefix)
-        if ((trimmed.startsWith('**') && trimmed.endsWith('**')) || trimmed.startsWith('#')) {
-            const hText = trimmed.replace(/\*|#/g, '').trim();
-            return (
-                <Box key={i} marginTop={i === 0 ? 0 : 1} marginBottom={0} width="100%">
-                    <Text bold color="white">▸ {wrapText(hText, availableWidth - 2)}</Text>
-                </Box>
-            );
-        }
-
-        // Content (Steps or Monologue Paragraphs)
-        const isBullet = trimmed.startsWith('*');
-        const bulletPrefix = isBullet ? '• ' : '';
-        const cleanText = trimmed.replace(/^\*|\s\*/g, '').trim();
-        const wrapped = wrapText(cleanText, availableWidth - (isBullet ? 2 : 0));
-
-        return (
-            <Box key={i} marginLeft={isBullet ? 2 : 0} width="100%">
-                <Text italic color="gray">
-                    {bulletPrefix}{wrapped.split('\n').join('\n' + ' '.repeat(bulletPrefix.length))}
-                </Text>
-            </Box>
-        );
-    });
+    return (
+        <Box width="100%">
+            <Text italic color="gray">
+                {wrapped}
+            </Text>
+        </Box>
+    );
 };
 
 const parseMathSymbols = (content) => {
@@ -589,19 +568,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         if (msg.isStreaming) setAnimationDone(false);
     }, [msg.id]);
 
-    // Handle Thinking Visibility
     const finalContent = React.useMemo(() => {
         if (msg.role === 'think' && !showFullThinking) {
-            const lines = content.split('\n')
-                .filter(line => {
-                    const trimmed = line.trim();
-                    const isHeading = trimmed.startsWith('# ');
-                    const isActionStep = trimmed.startsWith('**') && trimmed.endsWith('**');
-                    return isHeading || isActionStep;
-                });
-
-            if (lines.length === 0) return '*Reasoning...*';
-            return lines.join('\n');
+            return 'Thinking...';
         }
         return content;
     }, [content, msg.role, showFullThinking]);
