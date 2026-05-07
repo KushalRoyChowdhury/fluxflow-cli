@@ -19,11 +19,11 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
             }
 
             let command = '';
-            if (manager === 'pnpm') command = 'pnpm add -g fluxflow-cli@latest';
-            else if (manager === 'bun') command = 'bun add -g fluxflow-cli';
-            else if (manager === 'yarn') command = 'yarn global add fluxflow-cli@latest';
+            if (manager === 'pnpm') command = `pnpm add -g fluxflow-cli@${latest}`;
+            else if (manager === 'bun') command = `bun add -g fluxflow-cli@${latest}`;
+            else if (manager === 'yarn') command = `yarn global add fluxflow-cli@${latest}`;
             else if (manager === 'custom') command = settings.customUpdateCommand;
-            else command = 'npm install -g fluxflow-cli@latest';
+            else command = `npm install -g fluxflow-cli@${latest}`;
 
             // Add force if requested (Force is handled by the command caller adding --force to the input)
             // But since we are in a dedicated view, we can just log the intent.

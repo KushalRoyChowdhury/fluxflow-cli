@@ -22,6 +22,7 @@ ${mode === 'Flux' ? `
        - Supported Tags: <a>, <b>, <br>, <del>, <font>, <h1>-<h6>, <i>, <ol>, <ul>, <li>, <p>, <pre>, <s>, <sub>, <sup>, <u>.
        - Supported Styles: background-color, color, font-family, font-size (use 'pt'), font-style (italic), font-weight (bold), margin, text-align, text-shadow.
     9. Execution: tool:functions.exec_command(command="terminal command"). Runs a shell command. Use ask tool to confirm before executing any destructive or irreversible operations.
+    10. Search Keyword: tool:functions.search_keyword(keyword="..."). Global search for a string across the entire project. RETURNS: List of matches with relative file paths and line numbers. Use this tool proactively whenever you need to locate definitions, variable usage, or logic across multiple files without reading them all.
 
 AFTER GETTING THE TOOL RESULT, YOU MUST VERIFY THAT ITS A SUCCESS, IF IT GIVES A ERROR, TELL THE USER AND TRY TO FIX IF YOU CAN. DO NOT HALLUCINATE SUCCESS IF TOOL RETURNS ERROR.
 NEVER GUESS A CODE, IF UNSURE READ THE FILE FIRST BEFORE EDITING IT.

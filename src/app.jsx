@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.7.26';
+const versionFluxflow = '1.8.0';
 const updatedOn = '2026-05-07';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -227,33 +227,32 @@ export default function App() {
     const [completedIndex, setCompletedIndex] = useState(1);
 
     const windowedHistory = useMemo(() => {
-        const MAX_LINES = 2000;
-        const width = stdout?.columns || 80;
+        // [SCROLLBACK-SAFE SNAP-TO-BOTTOM]
+        // We keep 2000 lines of history in the render tree so the user can scroll up.
+        const MAX_HISTORY_LINES = 2000;
+        const width = terminalSize.columns || 80;
+
         let totalLines = 0;
         let startIdx = 0;
 
-        // Iterate backwards to find how many messages fit in the window
-        for (let i = completedIndex - 1; i >= 0; i--) {
+        // Step 1: Find the total line count of all messages (backwards)
+        // We go back until we hit the 2000 line scrollback limit.
+        for (let i = messages.length - 1; i >= 0; i--) {
             const msg = messages[i];
             if (!msg) continue;
 
-            // Estimate lines for this message
             const text = msg.text || '';
             let lines = text.split(/\r?\n/).length;
             text.split(/\r?\n/).forEach(l => {
                 lines += Math.floor(l.length / width);
             });
 
-            // Adjust for UI-only records
             if (msg.isHelpRecord) lines = 15;
             if (msg.isUpdateNotification) lines = 8;
             if (msg.isTerminalRecord) lines = 10;
+            lines += msg.role === 'think' ? 3 : 2;
 
-            lines += msg.role === 'think' ? 3 : 2; // Padding/overhead
-
-            // If adding this message exceeds the limit, stop here
-            // (But always show at least the 2 most recent completed messages to avoid an empty-looking screen)
-            if (totalLines + lines > MAX_LINES && (completedIndex - i) > 2) {
+            if (totalLines + lines > MAX_HISTORY_LINES) {
                 startIdx = i + 1;
                 break;
             }
@@ -264,7 +263,7 @@ export default function App() {
             items: messages.slice(startIdx, completedIndex),
             isTruncated: startIdx > 0
         };
-    }, [messages, completedIndex, stdout?.columns]);
+    }, [messages, terminalSize.columns, terminalSize.rows]);
 
     // Calculate visual line count for the input buffer (used for Paste UI)
     const terminalWidth = stdout?.columns || 80;
@@ -506,9 +505,7 @@ export default function App() {
                 { cmd: 'low', desc: 'Fastest reasoning' },
                 { cmd: 'medium', desc: 'Balanced depth' },
                 { cmd: 'high', desc: 'Complex coding' },
-                { cmd: 'max', desc: 'Architectural depth' },
-                { cmd: 'show', desc: 'Show full thoughts' },
-                { cmd: 'hide', desc: 'Show concise thoughts' }
+                { cmd: 'max', desc: 'Architectural depth' }
             ]
         },
         {
@@ -2106,7 +2103,7 @@ OUTPUT: ${execOutputRef.current}`;
                             {/* ⚓ Height Anchor: Reserve space for the 'more' line if our list is long */}
                             {suggestions.length > 5 && (
                                 <Box height={1}>
-                                    {remaining > 0 && <Text color="gray" dimColor>  ... ({remaining} more)</Text>}
+                                    {remaining > 0 && <Text color="gray" dimColor>  ...({remaining}more)</Text>}
                                 </Box>
                             )}
                         </Box>

@@ -12,6 +12,7 @@ import { ask_user } from '../tools/ask_user.js';
 import { write_pdf } from '../tools/write_pdf.js';
 import { write_docx } from '../tools/write_docx.js';
 import { write_pptx } from '../tools/write_pptx.js';
+import { search_keyword } from '../tools/search_keyword.js';
 
 const TOOL_MAP = {
     web_search,
@@ -27,6 +28,7 @@ const TOOL_MAP = {
     write_pdf,
     write_docx,
     write_pptx,
+    search_keyword,
     ask: ask_user
 };
 

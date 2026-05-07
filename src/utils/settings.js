@@ -6,7 +6,7 @@ const DEFAULT_SETTINGS = {
     mode: 'Flux',
     thinkingLevel: 'Medium',
     activeModel: 'gemma-4-31b-it',
-    showFullThinking: false,
+    showFullThinking: true,
     apiTier: 'Free',
     quotas: {
         agentLimit: 1500,
@@ -38,14 +38,22 @@ export const loadSettings = async () => {
     try {
         if (await fs.exists(SETTINGS_FILE)) {
             const saved = await fs.readJson(SETTINGS_FILE);
-            // Deep merge for second-level objects
-            return {
+            const merged = {
                 ...DEFAULT_SETTINGS,
                 ...saved,
                 quotas: { ...DEFAULT_SETTINGS.quotas, ...saved.quotas },
                 systemSettings: { ...DEFAULT_SETTINGS.systemSettings, ...saved.systemSettings },
                 profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData }
             };
+
+            // [MIGRATION LOCK]: Always force showFullThinking to true. 
+            // If it was false in the old config, save the new "true" value now.
+            if (merged.showFullThinking === false) {
+                merged.showFullThinking = true;
+                await fs.writeJson(SETTINGS_FILE, merged, { spaces: 2 });
+            }
+
+            return merged;
         }
     } catch (err) {
         console.error('Failed to load settings:', err);

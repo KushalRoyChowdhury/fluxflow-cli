@@ -124,12 +124,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-    // [CONTEXT-AWARE THROTTLE]
-    const isContext50 = (sessionStats.tokens || 0) >= 54000;
 
-    const systemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50);
-
-    const firstUserMsg = `${systemInstruction}\n\nUSER_PROMPT: ${agentText}`.trim();
+    const firstUserMsg = `USER_PROMPT: ${agentText}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -214,11 +210,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     yield { type: 'model_update', content: null };
                 }
 
+                // [DYNAMIC CONTEXT ADAPTATION]
+                // We recalculate instructions every turn so the agent knows when it's hitting context limits
+                const isContext50 = (sessionStats.tokens || 0) >= 54000;
+                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50);
+
                 // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
                     contents,
                     config: {
+                        systemInstruction: currentSystemInstruction,
+                        temperature: mode === 'Flux' ? 1.0 : 1.3,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
@@ -231,11 +234,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield { type: 'status', content: 'Working...' };
             } catch (err) {
                 const errMsg = err.status || (err.error && err.error.message) || String(err);
+                const errLog = String(err);
                 // Log error in /logs/agent/error.log
                 const date = new Date().toLocaleString();
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errMsg}\n`);
+                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n`);
 
                 if (retryCount < MAX_RETRIES) {
                     retryCount++;
@@ -273,23 +277,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                // [LOOP DETECTION] - Catch runaway repetitive reasoning (Only inside <think> blocks)
+                // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
                 const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
-                const thinkContent = thinkBlocks.join('');
+                const thinkContent = thinkBlocks.join('').trim();
 
-                // 1. Headings Count Check (Repetitive structure)
-                const headingsCount = (thinkContent.match(/^\s*\*\*.*?\*\*\s*$/gm) || []).length;
+                // 1. Repetitive Sentence Check (The most common loop symptom)
+                const sentences = thinkContent.split(/[.!?]\s+/);
+                const uniqueSentences = new Set(sentences);
+                const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
 
-                // 2. Verbosity Check (Rambling detection)
-                const headingSections = thinkContent.split(/^\s*\*\*.*?\*\*\s*$/gm);
-                const isOverVerbose = headingSections.some(section => {
-                    const wordCount = section.trim().split(/\s+/).filter(w => w.length > 0).length;
-                    return wordCount > 500;
-                });
+                // 2. Verbosity Check (Global rambling detection)
+                const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
 
-                if (headingsCount > 25 || isOverVerbose) {
-                    const reason = headingsCount > 25 ? 'Loop Detected' : 'Noise Detected';
-                    yield { type: 'status', content: `${reason}. Auto-adjusting...` };
+                let repetitionThreshold = 0.4;
+                let isOverVerbose = wordCount > 2500; // Hard cap for a single turn's thinking
+
+                if (repetitionRatio > repetitionThreshold || isOverVerbose) {
+                    const reason = repetitionRatio > repetitionThreshold ? 'Circular Thinking Detected' : 'Rambling Detected';
+                    yield { type: 'status', content: `${reason}. Re-centering...` };
                     await new Promise(resolve => setTimeout(resolve, 3000));
                     break; // Force close this turn's stream and proceed to next loop
                 }
@@ -345,6 +350,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                     } else if (toolCall.toolName === 'write_pptx') {
                         label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                    } else if (toolCall.toolName === 'search_keyword') {
+                        const { keyword } = parseArgs(toolCall.args);
+                        label = `🔎 SEARCHING KEYWORD: "${keyword}"`.toUpperCase();
                     } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
                         label = '';
                     } else {
@@ -534,6 +542,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     contents: janitorContents,
                     config: {
                         maxOutputTokens: 512,
+                        temperature: 0.69,
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
@@ -589,7 +598,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (!fs.existsSync(janitorErrDir)) {
                     fs.mkdirSync(janitorErrDir, { recursive: true });
                 }
-                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${janitorErr.message}\n`);
+                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${String(janitorErr)}\n`);
                 console.error("Janitor Background Tasks Failed:", janitorErr.message);
             }
 
@@ -615,7 +624,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. Your thinking process seems to be repeating and excreeding allocated budget for single turn. If you have finished your task use [turn: finish] else continue.' });
+            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. If you have finished your task use [turn: finish] else continue.' });
         }
     }
     yield { type: 'status', content: null };
