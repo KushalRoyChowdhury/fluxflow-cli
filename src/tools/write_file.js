@@ -36,13 +36,15 @@ export const write_file = async (args) => {
             fs.mkdirSync(parentDir, { recursive: true });
         }
 
-        // --- SIMPLE UNESCAPE ---
-        // \n (backslash + n) becomes a real newline (LF)
-        // \\n (two backslashes + n) becomes a literal \n
-        const processedContent = content.replace(/\\\\n|\\n/g, (match) => {
-            if (match === '\\\\n') return '\\n';
-            return '\n';
-        });
+        // Sanitization: Strip unintended markdown code blocks and normalize to LF
+        const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        // --- THE FINAL HARMONY ---
+        // 1. \n (2 chars) becomes a real newline (LF)
+        // 2. [/n] becomes a literal \n in the file
+        const processedContent = strip(content)
+            .replace(/\\n/g, '\n')
+            .replace(/\[\/n\]/g, '\\n');
 
         const lineCount = processedContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(processedContent, 'utf8');
