@@ -7,7 +7,14 @@ import { parseArgs } from '../utils/arg_parser.js';
  * Reads a file, optionally within a specific line range.
  */
 export const view_file = async (args) => {
-    const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(args);
+    let { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(args);
+
+    // Normalize argument names and apply dynamic 800-line paging logic
+    const sLine = parseInt(StartLine || start_line);
+    const eLine = parseInt(EndLine || end_line);
+
+    const finalStart = sLine || 1;
+    const finalEnd = eLine || (sLine ? (sLine + 800) : 800);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
     const absolutePath = path.resolve(process.cwd(), targetPath);
@@ -66,8 +73,8 @@ export const view_file = async (args) => {
         const totalLines = lines.length;
 
         // Slice lines (adjusting for 1-based indexing)
-        const start = Math.max(0, start_line - 1);
-        const end = Math.min(totalLines, end_line);
+        const start = Math.max(0, finalStart - 1);
+        const end = Math.min(totalLines, finalEnd);
         const resultLines = lines.slice(start, end);
 
         const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines})`;

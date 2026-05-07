@@ -37,17 +37,36 @@ const loadUsageFromFile = async () => {
 };
 
 /**
- * Persists in-memory usage to disk
+ * Persists in-memory usage to disk with Read-Merge-Write safety
  */
 const flushUsage = async () => {
     if (!isDirty || !cachedUsage) return;
 
     try {
         await fs.ensureDir(path.dirname(USAGE_FILE));
+        
+        // --- READ-MERGE-WRITE SAFETY (v1.8.5 Protection) ---
+        // Before we overwrite the file, check if disk has data we lost in memory
+        let diskData = null;
+        try {
+            if (await fs.exists(USAGE_FILE)) {
+                diskData = await fs.readJson(USAGE_FILE);
+            }
+        } catch (e) {}
+
+        if (diskData && diskData.date === cachedUsage.date && diskData.stats) {
+            // Merge: Take the maximum of memory vs disk to prevent "Zero-Reset"
+            for (const key in cachedUsage.stats) {
+                if (diskData.stats[key] !== undefined) {
+                    cachedUsage.stats[key] = Math.max(cachedUsage.stats[key], diskData.stats[key]);
+                }
+            }
+        }
+
         const tempFile = USAGE_FILE + '.tmp';
         await fs.writeJson(tempFile, cachedUsage, { spaces: 2 });
         
-        // Physical Flush
+        // Physical Flush to ensure durability
         const fd = await fs.open(tempFile, 'r+');
         await fs.fsync(fd);
         await fs.close(fd);
@@ -72,6 +91,7 @@ const queueFlush = () => {
         await flushUsage();
         writeTimeout = null;
     }, delay);
+    if (writeTimeout.unref) writeTimeout.unref();
 };
 
 /**

@@ -222,6 +222,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     config: {
                         systemInstruction: currentSystemInstruction,
                         temperature: mode === 'Flux' ? 1.0 : 1.3,
+                        maxOutputTokens: 32768,
+                        mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+                        safetySettings: [
+                            {
+                              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                          ],
+
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL
@@ -316,9 +337,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const url = parseArgs(toolCall.args).url || '...';
                         label = `📖 READING SITE: ${url}`.toUpperCase();
                     } else if (toolCall.toolName === 'view_file') {
-                        const { path: targetPath, start_line = 1, end_line = 500 } = parseArgs(toolCall.args);
+                        const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
+                        const sLine = parseInt(StartLine || start_line) || 1;
+                        const eLine = parseInt(EndLine || end_line) || ((StartLine || start_line) ? (sLine + 800) : 800);
                         let totalLines = '...';
-                        let actualEndLine = end_line;
+                        let actualEndLine = eLine;
                         try {
                             const absPath = path.resolve(process.cwd(), targetPath);
                             if (fs.existsSync(absPath)) {
@@ -336,7 +359,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         } else if (isImage) {
                             label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
                         } else {
-                            label = `📄 READING FILE: ${targetPath}. LINES ${start_line} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                            label = `📄 READING FILE: ${targetPath}. LINES ${sLine} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
                         }
                     } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                         const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
@@ -543,6 +566,25 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     config: {
                         maxOutputTokens: 512,
                         temperature: 0.69,
+                        safetySettings: [
+                            {
+                              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                            {
+                              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                            },
+                          ],
+
                         thinkingConfig: {
                             includeThoughts: false,
                             thinkingLevel: ThinkingLevel.MINIMAL

@@ -225,8 +225,24 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.8.0", "1.7.20"]
+        const stableVersions = []
         const changelogData = {
+            "1.8.6": {
+                "note": "Vision & Stability Patch.",
+                "added": [
+                    "Implemented **Dynamic 800-line Viewport** for `view_file` with intelligent relative paging.",
+                    "Added **Read-Merge-Write** persistence safety to protect daily telemetry from zombie process resets."
+                ],
+                "changed": [
+                    "Modernized **Thought Rendering** UI — Shifted to a clean, fluid monologue style for better readability.",
+                    "Upgraded **Fuzzy Matcher v6** for `update_file` with significantly improved whitespace elasticity.",
+                    "Synced terminal status labels with the new 800-line viewing standard."
+                ],
+                "fixes": [
+                    "Fixed a background memory leak in the `UpdateProcessor`.",
+                    "Resolved a bug where telemetry stats would reset to zero during in-app updates."
+                ]
+            },
             "1.8.0": {
                 "note": "The Reasoning Revolution.",
                 "added": [

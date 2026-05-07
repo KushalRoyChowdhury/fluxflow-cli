@@ -9,6 +9,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
     const [error, setError] = useState(null);
 
     useEffect(() => {
+        let child;
         const runUpdate = async () => {
             const manager = settings.updateManager || 'npm';
 
@@ -25,12 +26,10 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
             else if (manager === 'custom') command = settings.customUpdateCommand;
             else command = `npm install -g fluxflow-cli@${latest}`;
 
-            // Add force if requested (Force is handled by the command caller adding --force to the input)
-            // But since we are in a dedicated view, we can just log the intent.
             setStatus('downloading');
             setLog(`Running: ${command}...`);
 
-            const child = exec(command, (err, stdout, stderr) => {
+            child = exec(command, (err, stdout, stderr) => {
                 if (err) {
                     setError(stderr || err.message);
                     setStatus('error');
@@ -47,6 +46,14 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
         };
 
         runUpdate();
+
+        return () => {
+            if (child) {
+                try {
+                    child.kill();
+                } catch (e) {}
+            }
+        };
     }, []);
 
     if (status === 'initializing' || status === 'downloading') {
