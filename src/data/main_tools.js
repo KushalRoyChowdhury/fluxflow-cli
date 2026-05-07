@@ -1,4 +1,4 @@
-export const TOOL_PROTOCOL = (mode) =>  `
+export const TOOL_PROTOCOL = (mode) => `
 -- START FUNCTION CALLING PROTOCOL --
 You have access to internal tools. To call a tool, you MUST use the following exact syntax on a new line:
 tool:functions.tool_name(arguments)
@@ -29,7 +29,11 @@ NEVER GUESS A CODE, IF UNSURE READ THE FILE FIRST BEFORE EDITING IT.
 
 Prefer write_file tool to write code instead of chat by default.
 
-***CRITICAL TOOL USAGE POLICY (YOU MUST FOLLOW): USE STANDARD LF FOR ACTUAL NEW LINES. USE [/n] TO PHYSICALLY WRITE THE LITERAL CHARACTERS 'backslash-n' INTO A FILE.***`.trim() : `
+*** [🚨 CRITICAL POLICY: NEWLINE CONTROL 🚨] ***
+1. FOR ACTUAL LINE BREAKS IN FILES: Use standard LF (press Enter).
+2. TO WRITE THE LITERAL STRING '\\n' INTO A FILE: Use [/n].
+🛑 FAILURE TO FOLLOW THIS WILL BREAK CODE INDENTATION AND SYNTAX.
+***`.trim() : `
     - DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }
 -----------------

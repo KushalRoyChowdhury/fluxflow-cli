@@ -66,12 +66,13 @@ export const update_file = async (args) => {
                 return min;
             };
 
-            const targetBaseIndent = leadingContext.match(/^\s*/)[0];
+            const matchBaseIndent = getMinIndent(originalMatch);
+            const targetBaseIndent = leadingContext.match(/^\s*/)[0] + matchBaseIndent;
             const newBaseIndent = getMinIndent(newText);
             
             // Calculate the delta shift (can be negative)
             const delta = targetBaseIndent.length - newBaseIndent.length;
-            const indentChar = targetBaseIndent[0] || ' '; // Use same char as file if possible
+            const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
 
             const newLines = newText.split('\n');
             return newLines.map((line, i) => {

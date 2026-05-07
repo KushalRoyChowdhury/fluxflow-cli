@@ -57,6 +57,11 @@ export const view_file = async (args) => {
             content = content.slice(1);
         }
         content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        // --- DSL TRANSLATION ---
+        // Convert literal \n to [/n] so the model recognizes them as literal characters
+        content = content.replace(/\\n/g, '[/n]');
+        
         const lines = content.split('\n');
         const totalLines = lines.length;
 
