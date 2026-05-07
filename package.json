@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.8.3",
+	"version": "1.8.4",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -21,7 +21,7 @@
 	},
 	"files": [
 		"dist",
-		"README-npm.md",
+		"README.md",
 		"package.json",
 		"ARCHITECTURE.md",
 		"TOOLS.md",
