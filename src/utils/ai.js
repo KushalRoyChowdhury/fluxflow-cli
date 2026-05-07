@@ -147,7 +147,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
     });
 
-    for (let loop = 0; loop < MAX_LOOPS; loop++) {
+    // 1 extra loop for grace period
+    for (let loop = 0; loop <= MAX_LOOPS; loop++) {
         if (loop > 0) {
             yield { type: 'status', content: 'Processed. Reconnecting...' };
         }
@@ -213,7 +214,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // [DYNAMIC CONTEXT ADAPTATION]
                 // We recalculate instructions every turn so the agent knows when it's hitting context limits
                 const isContext50 = (sessionStats.tokens || 0) >= 54000;
-                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50);
+                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50, MAX_LOOPS, loop + 1);
 
                 // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
@@ -338,8 +339,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         label = `📖 READING SITE: ${url}`.toUpperCase();
                     } else if (toolCall.toolName === 'view_file') {
                         const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
-                        const sLine = parseInt(StartLine || start_line) || 1;
-                        const eLine = parseInt(EndLine || end_line) || ((StartLine || start_line) ? (sLine + 800) : 800);
+
+                        const rawStart = StartLine || start_line;
+                        const rawEnd = EndLine || end_line;
+
+                        const sLine = parseInt(rawStart) || 1;
+                        const eLine = parseInt(rawEnd) || (rawStart ? (sLine + 800) : 800);
+
                         let totalLines = '...';
                         let actualEndLine = eLine;
                         try {
@@ -348,7 +354,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const content = fs.readFileSync(absPath, 'utf8');
                                 const lines = content.split('\n').length;
                                 totalLines = lines;
-                                actualEndLine = Math.min(end_line, lines);
+                                actualEndLine = Math.min(eLine, lines);
                             }
                         } catch (e) {}
                         const pathLower = targetPath.toLowerCase();
