@@ -1,4 +1,4 @@
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction } from './prompts.js';
 import { getTruncatedHistory } from './history.js';
 import { checkQuota, incrementUsage, addToUsage } from './usage.js';
@@ -564,7 +564,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     model: janitorModel || 'gemma-4-26b-a4b-it',
                     contents: janitorContents,
                     config: {
-                        maxOutputTokens: 512,
+                        maxOutputTokens: 384,
                         temperature: 0.69,
                         safetySettings: [
                             {
