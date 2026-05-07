@@ -63,7 +63,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replace(/\[\/n\]/g, '\\n')
+        .replace(/\[\/n\]/g, '\\\\n')
         .trim();
 };
 
