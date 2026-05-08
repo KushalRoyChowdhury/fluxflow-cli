@@ -14,6 +14,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
+| **Search Keyword** | ✅ | ❌ |
 
 ---
 
@@ -37,6 +38,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 - **`view_file`**: Reads the content of a file.
   - **Native Multimodality**: Supports analyzing images (JPG, PNG, WEBP) and PDF documents. The tool automatically detects binary formats and encodes them for AI analysis.
   - **Text Reading**: Supports specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
+- **`search_keyword`**: Performs a global project search for a specific string or keyword. Returns file paths and line numbers where matches are found, making it essential for navigation and impact analysis.
 
 ### ✍️ Code Editing
 - **`write_file`**: Creates a new file or completely overwrites an existing one with new content.

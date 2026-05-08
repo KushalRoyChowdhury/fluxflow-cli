@@ -38,7 +38,7 @@ Prefer write_file tool to write code instead of chat by default.
     }
 -----------------
 
-Results will be provided in the next loop as: [TOOL_RESULT]: [content]
+Results will be provided in the next loop as: [TOOL_RESULT]: [content] under <user> tag. Treat them as SYSTEM MESSAGES. True user messages will be prefixed as 'USER_PROMPT' by the system.
 WHEN CALLING TOOLS, YOU **MUST** end your response with '[turn: continue]'. NEVER use '[turn: finish]' in the same turn as a tool call. After receiving the [TOOL_RESULT], acknowledge the output and verify if the goal is met; only then may you use '[turn: finish]', otherwise use '[turn: continue]'.
 Do NOT over-use tools. Use them only when strictly necessary for the user's objective. You can stack multiple tool calls 1-by-1.
 Distinguish clearly between tool discussion and execution. Use the 'tool:' prefix ONLY when calling a function. When discussing tools with the user, refer to them by name as nouns (e.g., 'write_file', 'list_files') to avoid accidental triggers and context bloat. Even in your <think> ... </think> tags, do not use the 'tool:' prefix when planning to select a tool.

@@ -227,6 +227,20 @@
         // ==========================================
         const stableVersions = []
         const changelogData = {
+            "1.8.10": {
+                "note": "Hardened Reliability & Seamless Recovery.",
+                "added": [
+                    "Implemented **Seamless Recovery Engine** for mid-response API failures (500/503 errors).",
+                    "Introduced **Cognitive Filtering** to prevent system keyword 'leakage' from reasoning process."
+                ],
+                "changed": [
+                    "Optimized **Instruction Hierarchy**.",
+                    "Improved **Termination Sync** across nested retry loops for zero-zombie shutdowns.",
+                ],
+                "fixes": [
+                    "Fixed 'Reasoning Leakage' where thought processes could accidentally trigger system commands."
+                ]
+            },
             "1.8.7": {
                 "note": "Vision & Stability Patch.",
                 "added": [

@@ -173,27 +173,41 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
-        yield { type: 'turn_reset', content: true };
-        // Convert current history to GenAI format
-        const contents = modifiedHistory
-            .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
-            .map(msg => {
-                const parts = [{ text: msg.text }];
-                if (msg.binaryPart) {
-                    parts.push(msg.binaryPart);
-                }
-                return {
-                    role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
-                    parts
-                };
-            });
 
         let stream;
         let success = false;
         let retryCount = 0;
 
-        while (retryCount <= MAX_RETRIES && !success) {
+        let turnText = '';
+        let lastToolSniffed = null;
+        let lastToolEventTime = null;
+        let toolResults = [];
+        let toolCallPointer = 0;
+        let isThinkingLoop = false;
+        let isInitialAttempt = true;
+        let accumulatedContext = '';
+
+        while (retryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
             try {
+                if (isInitialAttempt) {
+                    yield { type: 'turn_reset', content: true };
+                    isInitialAttempt = false;
+                    accumulatedContext = '';
+                }
+
+                // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
+                const contents = modifiedHistory
+                    .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
+                    .map(msg => {
+                        const parts = [{ text: msg.text }];
+                        if (msg.binaryPart) {
+                            parts.push(msg.binaryPart);
+                        }
+                        return {
+                            role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
+                            parts
+                        };
+                    });
                 // Quota Check
                 if (!(await checkQuota('agent', settings))) {
                     throw new Error("Error: Daily Quota Exausted for Agent");
@@ -227,22 +241,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                         safetySettings: [
                             {
-                              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
-                          ],
+                        ],
 
                         thinkingConfig: {
                             includeThoughts: false,
@@ -250,10 +264,274 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         },
                     },
                 });
-                success = true;
+                // Reset turn state for this specific retry attempt
+                turnText = '';
+                lastToolSniffed = null;
+                lastToolEventTime = null;
+                toolResults = [];
+                toolCallPointer = 0;
+
                 // Success - Reset model name display for final chunks
                 yield { type: 'model_update', content: null };
                 yield { type: 'status', content: 'Working...' };
+
+                let dedupeBuffer = '';
+                let isDedupeActive = accumulatedContext.length > 0;
+
+                for await (const chunk of stream) {
+                    if (TERMINATION_SIGNAL) {
+                        yield { type: 'status', content: 'Termination Signal Received.' };
+                        // wait 1.5s
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        break;
+                    }
+                    if (chunk.text) {
+                        if (isDedupeActive) {
+                            dedupeBuffer += chunk.text;
+                            if (dedupeBuffer.length >= accumulatedContext.length) {
+                                if (dedupeBuffer.startsWith(accumulatedContext)) {
+                                    // Strip the duplicated prefix
+                                    const newText = dedupeBuffer.substring(accumulatedContext.length);
+                                    if (newText) {
+                                        turnText += newText;
+                                        yield { type: 'text', content: newText };
+                                    }
+                                    isDedupeActive = false;
+                                } else {
+                                    // Not a match, flush buffer and stop deduping
+                                    turnText += dedupeBuffer;
+                                    yield { type: 'text', content: dedupeBuffer };
+                                    isDedupeActive = false;
+                                }
+                            }
+                        } else {
+                            turnText += chunk.text;
+                            yield { type: 'text', content: chunk.text };
+                        }
+
+                        // [SYSTEM SIGNAL FILTER] - Ignore anything inside <think> tags for tool/signal detection
+                        const actionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+
+                        // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
+                        if (actionableText.includes('tool:functions.')) {
+                            if (!lastToolEventTime) lastToolEventTime = Date.now();
+
+                            const parts = actionableText.split('tool:functions.');
+                            const potentialTool = parts[parts.length - 1].split('(')[0].trim();
+                            // Regex validation to ensure it's a valid-looking tool name and not stray text
+                            if (potentialTool && /^[a-z_]+$/.test(potentialTool) && potentialTool !== lastToolSniffed) {
+                                lastToolSniffed = potentialTool;
+                                yield { type: 'status', content: `Working (${potentialTool})...` };
+                            }
+                        }
+
+                        // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
+                        const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
+                        const thinkContent = thinkBlocks.join('').trim();
+
+                        // 1. Repetitive Sentence Check (The most common loop symptom)
+                        const sentences = thinkContent.split(/[.!?]\s+/);
+                        const uniqueSentences = new Set(sentences);
+                        const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
+
+                        // 2. Verbosity Check (Global rambling detection)
+                        const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
+
+                        let repetitionThreshold = 0.4;
+                        let isOverVerbose = wordCount > 2500; // Hard cap for a single turn's thinking
+
+                        if (repetitionRatio > repetitionThreshold || isOverVerbose) {
+                            const reason = repetitionRatio > repetitionThreshold ? 'Thinking Loop Detected' : 'Rambling Detected';
+                            yield { type: 'status', content: `${reason}. Re-centering...` };
+                            isThinkingLoop = true;
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            break; // Force close this turn's stream and proceed to next loop
+                        }
+
+                        // [REAL-TIME TOOL EXECUTION]
+                        const allToolsFound = detectToolCalls(actionableText);
+                        while (allToolsFound.length > toolCallPointer) {
+                            const toolCall = allToolsFound[toolCallPointer];
+
+                            // Status Update
+                            yield { type: 'status', content: `Working (${toolCall.toolName})...` };
+
+                            // START VISUAL FEEDBACK FOR TOOLS
+                            let label = '';
+                            if (toolCall.toolName === 'web_search') {
+                                const { query, limit = 10 } = parseArgs(toolCall.args);
+                                label = `🔍 SEARCHING: "${query}" (${limit})`.toUpperCase();
+                            } else if (toolCall.toolName === 'web_scrape') {
+                                const url = parseArgs(toolCall.args).url || '...';
+                                label = `📖 READING SITE: ${url}`.toUpperCase();
+                            } else if (toolCall.toolName === 'view_file') {
+                                const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
+
+                                const rawStart = StartLine || start_line;
+                                const rawEnd = EndLine || end_line;
+
+                                const sLine = parseInt(rawStart) || 1;
+                                const eLine = parseInt(rawEnd) || (rawStart ? (sLine + 800) : 800);
+
+                                let totalLines = '...';
+                                let actualEndLine = eLine;
+                                try {
+                                    const absPath = path.resolve(process.cwd(), targetPath);
+                                    if (fs.existsSync(absPath)) {
+                                        const content = fs.readFileSync(absPath, 'utf8');
+                                        const lines = content.split('\n').length;
+                                        totalLines = lines;
+                                        actualEndLine = Math.min(eLine, lines);
+                                    }
+                                } catch (e) { }
+                                const pathLower = targetPath.toLowerCase();
+                                const isPdf = pathLower.endsWith('.pdf');
+                                const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                                if (isPdf) {
+                                    label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
+                                } else if (isImage) {
+                                    label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
+                                } else {
+                                    label = `📄 READING FILE: ${targetPath}. LINES ${sLine} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                                }
+                            } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
+                                const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
+                                label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
+                            } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
+                                const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
+                                label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                            } else if (toolCall.toolName === 'write_pdf') {
+                                label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                            } else if (toolCall.toolName === 'write_docx') {
+                                label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                            } else if (toolCall.toolName === 'write_pptx') {
+                                label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                            } else if (toolCall.toolName === 'search_keyword') {
+                                const { keyword } = parseArgs(toolCall.args);
+                                label = `🔎 SEARCHING KEYWORD: "${keyword}"`.toUpperCase();
+                            } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
+                                label = '';
+                            } else {
+                                label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
+                            }
+
+                            if (label) {
+                                const boxWidth = Math.min(label.length + 4, 115);
+                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
+                            }
+                            // END VISUAL FEEDBACK
+
+                            // EXECUTION LOGIC
+                            if (toolCall.toolName === 'exec_command') {
+                                const { command } = parseArgs(toolCall.args);
+                                if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
+                                    const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
+                                    const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                                    const isViolating = riskyPatterns.some(pattern => {
+                                        if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
+                                            const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
+                                            return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+                                        }
+                                        return pattern.test(command);
+                                    });
+                                    if (isViolating) {
+                                        const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
+                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                        toolCallPointer++;
+                                        continue;
+                                    }
+                                }
+                                if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
+                                yield { type: 'exec_start' };
+                            }
+
+                            const parsedArgs = parseArgs(toolCall.args);
+                            const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
+                            if (targetPath) {
+                                const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
+                                const absoluteTarget = path.resolve(targetPath);
+                                const absoluteCwd = path.resolve(process.cwd());
+                                if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
+                                    const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
+                                    toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                    yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                    toolCallPointer++;
+                                    continue;
+                                }
+                            }
+
+                            if (settings.onToolApproval) {
+                                let shouldPrompt = (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'exec_command');
+                                if (shouldPrompt) {
+                                    const approval = await settings.onToolApproval(toolCall.toolName, toolCall.args);
+                                    if (approval === 'deny') {
+                                        if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
+                                        const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
+                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                        toolCallPointer++;
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            const effectiveStart = lastToolEventTime || Date.now();
+                            let result = await dispatchTool(toolCall.toolName, toolCall.args, {
+                                chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
+                            });
+
+                            const toolEnd = Date.now();
+                            yield { type: 'tool_time', content: toolEnd - effectiveStart };
+                            lastToolEventTime = toolEnd;
+
+                            let binaryPart = null;
+                            if (typeof result === 'object' && result.binaryPart) {
+                                binaryPart = result.binaryPart;
+                                result = result.text;
+                            }
+
+                            if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
+                                await new Promise(resolve => setTimeout(resolve, 800));
+                                settings.onExecEnd();
+                            }
+
+                            const isSuccess = result && !result.startsWith('ERROR:');
+                            if (isSuccess) {
+                                await incrementUsage('toolSuccess');
+                                if (settings.onToolResult) settings.onToolResult('success');
+                            } else {
+                                await incrementUsage('toolFailure');
+                                if (settings.onToolResult) settings.onToolResult('failure');
+                            }
+
+                            const aiContent = `[TOOL_RESULT]: ${result.split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
+                            toolResults.push({ role: 'user', text: aiContent, binaryPart });
+
+                            let uiContent = `[TOOL_RESULT]: ${result}`;
+                            if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
+                                uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
+                            }
+
+                            yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: toolCall.toolName };
+                            if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
+
+                            toolCallPointer++;
+                        }
+                    }
+                    lastUsage = chunk.usageMetadata;
+                    if (lastUsage) {
+                        yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
+                    }
+                }
+
+                if (TERMINATION_SIGNAL) break;
+                success = true;
+                // Count the successful call
+                await incrementUsage('agent');
             } catch (err) {
                 const errMsg = err.status || (err.error && err.error.message) || String(err);
                 const errLog = String(err);
@@ -266,7 +544,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (retryCount < MAX_RETRIES) {
                     retryCount++;
                     const waitTime = Math.floor(Math.random() * (2000 - 800 + 1)) + 800;
-                    yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES + 1})...` };
+
+                    if (turnText.trim().length > 0) {
+                        // RECOVERY MODE: Continue from where we left off
+                        modifiedHistory.push({ role: 'agent', text: turnText });
+                        if (toolResults.length > 0) {
+                            toolResults.forEach(tr => modifiedHistory.push(tr));
+                        }
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly and DON'T repeat what you already said!" });
+                        accumulatedContext += turnText;
+                        yield { type: 'status', content: `Recovering & Continuing (${retryCount}/${MAX_RETRIES + 1})...` };
+                    } else {
+                        // HARD RESET MODE: Restart the turn because nothing was produced
+                        isInitialAttempt = true;
+                        yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES + 1})...` };
+                    }
+
                     await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else {
                     throw new Error(`Model cannot be reached: ${errMsg}. (Failed ${MAX_RETRIES + 1} times)`);
@@ -274,235 +567,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
-        let turnText = '';
-        let lastToolSniffed = null;
-        let lastToolEventTime = null;
-        let toolResults = [];
-        let toolCallPointer = 0;
-
-        for await (const chunk of stream) {
-            if (TERMINATION_SIGNAL) break;
-            if (chunk.text) {
-                turnText += chunk.text;
-                yield { type: 'text', content: chunk.text };
-
-                // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
-                if (turnText.includes('tool:functions.')) {
-                    if (!lastToolEventTime) lastToolEventTime = Date.now();
-
-                    const parts = turnText.split('tool:functions.');
-                    const potentialTool = parts[parts.length - 1].split('(')[0].trim();
-                    // Regex validation to ensure it's a valid-looking tool name and not stray text
-                    if (potentialTool && /^[a-z_]+$/.test(potentialTool) && potentialTool !== lastToolSniffed) {
-                        lastToolSniffed = potentialTool;
-                        yield { type: 'status', content: `Working (${potentialTool})...` };
-                    }
-                }
-
-                // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
-                const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
-                const thinkContent = thinkBlocks.join('').trim();
-
-                // 1. Repetitive Sentence Check (The most common loop symptom)
-                const sentences = thinkContent.split(/[.!?]\s+/);
-                const uniqueSentences = new Set(sentences);
-                const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
-
-                // 2. Verbosity Check (Global rambling detection)
-                const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
-
-                let repetitionThreshold = 0.4;
-                let isOverVerbose = wordCount > 2500; // Hard cap for a single turn's thinking
-
-                if (repetitionRatio > repetitionThreshold || isOverVerbose) {
-                    const reason = repetitionRatio > repetitionThreshold ? 'Circular Thinking Detected' : 'Rambling Detected';
-                    yield { type: 'status', content: `${reason}. Re-centering...` };
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    break; // Force close this turn's stream and proceed to next loop
-                }
-
-                // [REAL-TIME TOOL EXECUTION]
-                const allToolsFound = detectToolCalls(turnText);
-                while (allToolsFound.length > toolCallPointer) {
-                    const toolCall = allToolsFound[toolCallPointer];
-
-                    // Status Update
-                    yield { type: 'status', content: `Working (${toolCall.toolName})...` };
-
-                    // START VISUAL FEEDBACK FOR TOOLS
-                    let label = '';
-                    if (toolCall.toolName === 'web_search') {
-                        const { query, limit = 10 } = parseArgs(toolCall.args);
-                        label = `🔍 SEARCHING: "${query}" (${limit})`.toUpperCase();
-                    } else if (toolCall.toolName === 'web_scrape') {
-                        const url = parseArgs(toolCall.args).url || '...';
-                        label = `📖 READING SITE: ${url}`.toUpperCase();
-                    } else if (toolCall.toolName === 'view_file') {
-                        const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
-
-                        const rawStart = StartLine || start_line;
-                        const rawEnd = EndLine || end_line;
-
-                        const sLine = parseInt(rawStart) || 1;
-                        const eLine = parseInt(rawEnd) || (rawStart ? (sLine + 800) : 800);
-
-                        let totalLines = '...';
-                        let actualEndLine = eLine;
-                        try {
-                            const absPath = path.resolve(process.cwd(), targetPath);
-                            if (fs.existsSync(absPath)) {
-                                const content = fs.readFileSync(absPath, 'utf8');
-                                const lines = content.split('\n').length;
-                                totalLines = lines;
-                                actualEndLine = Math.min(eLine, lines);
-                            }
-                        } catch (e) {}
-                        const pathLower = targetPath.toLowerCase();
-                        const isPdf = pathLower.endsWith('.pdf');
-                        const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
-                        if (isPdf) {
-                            label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
-                        } else if (isImage) {
-                            label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
-                        } else {
-                            label = `📄 READING FILE: ${targetPath}. LINES ${sLine} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
-                        }
-                    } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
-                        const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
-                        label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
-                    } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
-                        const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
-                        label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                    } else if (toolCall.toolName === 'write_pdf') {
-                        label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                    } else if (toolCall.toolName === 'write_docx') {
-                        label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                    } else if (toolCall.toolName === 'write_pptx') {
-                        label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                    } else if (toolCall.toolName === 'search_keyword') {
-                        const { keyword } = parseArgs(toolCall.args);
-                        label = `🔎 SEARCHING KEYWORD: "${keyword}"`.toUpperCase();
-                    } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
-                        label = '';
-                    } else {
-                        label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
-                    }
-
-                    if (label) {
-                        const boxWidth = Math.min(label.length + 4, 115);
-                        const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                        const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                        const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                        yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
-                    }
-                    // END VISUAL FEEDBACK
-
-                    // EXECUTION LOGIC
-                    if (toolCall.toolName === 'exec_command') {
-                        const { command } = parseArgs(toolCall.args);
-                        if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
-                            const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
-                            const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase();
-                            const isViolating = riskyPatterns.some(pattern => {
-                                if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
-                                    const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
-                                    return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
-                                }
-                                return pattern.test(command);
-                            });
-                            if (isViolating) {
-                                const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
-                                toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
-                                yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                                toolCallPointer++;
-                                continue;
-                            }
-                        }
-                        if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
-                        yield { type: 'exec_start' };
-                    }
-
-                    const parsedArgs = parseArgs(toolCall.args);
-                    const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
-                    if (targetPath) {
-                        const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                        const absoluteTarget = path.resolve(targetPath);
-                        const absoluteCwd = path.resolve(process.cwd());
-                        if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
-                            const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                            toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
-                            yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                            toolCallPointer++;
-                            continue;
-                        }
-                    }
-
-                    if (settings.onToolApproval) {
-                        let shouldPrompt = (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'exec_command');
-                        if (shouldPrompt) {
-                            const approval = await settings.onToolApproval(toolCall.toolName, toolCall.args);
-                            if (approval === 'deny') {
-                                if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
-                                const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
-                                yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
-                                toolCallPointer++;
-                                continue;
-                            }
-                        }
-                    }
-
-                    const effectiveStart = lastToolEventTime || Date.now();
-                    let result = await dispatchTool(toolCall.toolName, toolCall.args, {
-                        chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
-                    });
-
-                    const toolEnd = Date.now();
-                    yield { type: 'tool_time', content: toolEnd - effectiveStart };
-                    lastToolEventTime = toolEnd;
-
-                    let binaryPart = null;
-                    if (typeof result === 'object' && result.binaryPart) {
-                        binaryPart = result.binaryPart;
-                        result = result.text;
-                    }
-
-                    if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
-                        await new Promise(resolve => setTimeout(resolve, 800));
-                        settings.onExecEnd();
-                    }
-
-                    const isSuccess = result && !result.startsWith('ERROR:');
-                    if (isSuccess) {
-                        await incrementUsage('toolSuccess');
-                        if (settings.onToolResult) settings.onToolResult('success');
-                    } else {
-                        await incrementUsage('toolFailure');
-                        if (settings.onToolResult) settings.onToolResult('failure');
-                    }
-
-                    const aiContent = `[TOOL_RESULT]: ${result.split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
-                    toolResults.push({ role: 'user', text: aiContent, binaryPart });
-
-                    let uiContent = `[TOOL_RESULT]: ${result}`;
-                    if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
-                        uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
-                    }
-
-                    yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: toolCall.toolName };
-                    if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
-
-                    toolCallPointer++;
-                }
-            }
-            lastUsage = chunk.usageMetadata;
-            if (lastUsage) {
-                yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
-            }
-        }
-
-        // Count the successful call
-        await incrementUsage('agent');
         if (lastUsage) {
             await addToUsage('tokens', lastUsage.totalTokenCount || 0);
             yield { type: 'usage', content: lastUsage };
@@ -519,7 +583,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/i, '');
         }
 
-        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(turnText.toLowerCase());
+        const finalActionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(finalActionableText.toLowerCase());
         const shouldContinue = toolCallPointer > 0;
 
         yield { type: 'status', content: 'Working...' };
@@ -574,22 +639,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         temperature: 0.69,
                         safetySettings: [
                             {
-                              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
                             {
-                              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                              threshold: HarmBlockThreshold.BLOCK_NONE,
+                                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                                threshold: HarmBlockThreshold.BLOCK_NONE,
                             },
-                          ],
+                        ],
 
                         thinkingConfig: {
                             includeThoughts: false,
@@ -672,7 +737,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: '[SYSTEM]: LOOP DETECTED by Internal System. If you have finished your task use [turn: finish] else continue.' });
+            modifiedHistory.push({ role: 'user', text: `[SYSTEM]: ${isThinkingLoop ? 'OVER-THINKING ' : ''}LOOP DETECTED by Internal System. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}` });
+            isThinkingLoop = false;
         }
     }
     yield { type: 'status', content: null };
