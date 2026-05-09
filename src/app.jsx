@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.14';
+const versionFluxflow = '1.8.15';
 const updatedOn = '2026-05-09';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -175,6 +175,22 @@ export default function App() {
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
+
+    // [TIER AWARENESS] Auto-switch from Gemma if moving to Paid tier
+    useEffect(() => {
+        if (apiTier !== 'Free' && activeModel === 'gemma-4-31b-it') {
+            setActiveModel('gemini-3-flash-preview');
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'tier-switch-' + Date.now(),
+                    role: 'system',
+                    text: `⚠️ **[TIER LIMIT]** Gemma is only available on Free API tier. Automatically switched to Gemini 3 Flash Preview.`,
+                    isMeta: true
+                }];
+            });
+        }
+    }, [apiTier, activeModel]);
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
@@ -511,7 +527,7 @@ export default function App() {
         },
         {
             cmd: '/model', desc: 'Switch AI model', subs: [
-                { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
+                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default (Free, Recommended)' : 'Standard Default (Free, Recommended) - Cannot use Gemma with paid API' },
                 { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
                 { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
                 { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
@@ -697,8 +713,21 @@ export default function App() {
                 case '/model': {
                     if (parts[1]) {
                         const mod = parts.slice(1).join(' ');
-                        setActiveModel(mod);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
+                        if (mod === 'gemma-4-31b-it' && apiTier !== 'Free') {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `❌ **[ACCESS DENIED]** Gemma is restricted to the Free API tier. Automatically switching you to **Gemini 3 Flash Preview** for optimal performance.`,
+                                    isMeta: true
+                                }];
+                            });
+                            setActiveModel('gemini-3-flash-preview');
+                        } else {
+                            setActiveModel(mod);
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
+                        }
                     } else {
                         setActiveView('model');
                     }
@@ -2095,12 +2124,19 @@ OUTPUT: ${execOutputRef.current}`;
                             {visible.map((s, i) => {
                                 const actualIdx = startIdx + i;
                                 const isActive = actualIdx === selectedIndex;
+                                const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';
                                 const cmdText = s.cmd.padEnd(32); // Ensure description starts at col 32
 
                                 return (
                                     <Box key={s.cmd} flexDirection="row">
                                         <Text color={isActive ? 'cyan' : 'gray'}>{isActive ? '❯ ' : '  '}</Text>
-                                        <Text color={isActive ? 'yellow' : 'gray'} bold={isActive}>{cmdText}</Text>
+                                        <Text 
+                                            color={isGemmaDisabled ? 'gray' : (isActive ? 'yellow' : 'gray')} 
+                                            bold={isActive}
+                                            dimColor={isGemmaDisabled}
+                                        >
+                                            {cmdText}
+                                        </Text>
                                         <Text color="gray" dimColor italic>{s.desc}</Text>
                                     </Box>
                                 );
