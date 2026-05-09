@@ -437,23 +437,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (chunk.text) {
                         if (isDedupeActive) {
                             dedupeBuffer += chunk.text;
-                            if (dedupeBuffer.length >= accumulatedContext.length) {
-                                if (dedupeBuffer.startsWith(accumulatedContext)) {
-                                    // Strip the duplicated prefix
-                                    const newText = dedupeBuffer.substring(accumulatedContext.length);
-                                    if (newText) {
-                                        turnText += newText;
-                                        yield { type: 'text', content: newText };
+                            // Wait for a small window to find a reliable overlap
+                            if (dedupeBuffer.length >= 100) {
+                                let overlapLen = 0;
+                                const maxPossibleOverlap = Math.min(accumulatedContext.length, dedupeBuffer.length);
+
+                                // Find the longest overlap between end of context and start of new buffer
+                                for (let len = maxPossibleOverlap; len > 0; len--) {
+                                    if (accumulatedContext.endsWith(dedupeBuffer.substring(0, len))) {
+                                        overlapLen = len;
+                                        break;
                                     }
-                                    isDedupeActive = false;
-                                } else {
-                                    // Not a match, flush buffer and stop deduping
-                                    turnText += dedupeBuffer;
-                                    yield { type: 'text', content: dedupeBuffer };
-                                    isDedupeActive = false;
                                 }
+
+                                const cleanText = dedupeBuffer.substring(overlapLen);
+                                if (cleanText) {
+                                    turnText += cleanText;
+                                    yield { type: 'text', content: cleanText };
+                                }
+                                isDedupeActive = false;
+                                dedupeBuffer = '';
                             }
-                        } else {
+                            continue;
+                        }
+                        else {
                             turnText += chunk.text;
                             yield { type: 'text', content: chunk.text };
                         }
@@ -714,6 +721,25 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (lastUsage) {
                         yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
                     }
+                }
+
+                // [DEDUPE FLUSH] - Handle cases where stream ends before buffer hits threshold
+                if (isDedupeActive && dedupeBuffer.length > 0) {
+                    let overlapLen = 0;
+                    const maxPossibleOverlap = Math.min(accumulatedContext.length, dedupeBuffer.length);
+                    for (let len = maxPossibleOverlap; len > 0; len--) {
+                        if (accumulatedContext.endsWith(dedupeBuffer.substring(0, len))) {
+                            overlapLen = len;
+                            break;
+                        }
+                    }
+                    const cleanText = dedupeBuffer.substring(overlapLen);
+                    if (cleanText) {
+                        turnText += cleanText;
+                        yield { type: 'text', content: cleanText };
+                    }
+                    isDedupeActive = false;
+                    dedupeBuffer = '';
                 }
 
                 if (TERMINATION_SIGNAL) break;
