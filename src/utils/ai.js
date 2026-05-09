@@ -20,6 +20,154 @@ export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
 
+const getActiveToolContext = (text) => {
+    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    let match;
+    while ((match = toolRegex.exec(text)) !== null) {
+        const startIdx = match.index + match[0].length - 1; // Index of '('
+        let balance = 0;
+        let inString = null;
+        let isEscaped = false;
+        let closed = false;
+
+        for (let i = startIdx; i < text.length; i++) {
+            const char = text[i];
+            if (!inString && (char === '"' || char === "'" || char === '`')) {
+                inString = char;
+                isEscaped = false;
+            } else if (inString && char === inString && !isEscaped) {
+                inString = null;
+            }
+            if (!inString) {
+                if (char === '(') balance++;
+                else if (char === ')') balance--;
+                if (balance === 0) {
+                    closed = true;
+                    toolRegex.lastIndex = i + 1;
+                    break;
+                }
+            }
+            if (char === '\\') isEscaped = !isEscaped;
+            else isEscaped = false;
+        }
+
+        if (!closed) {
+            return { inside: true, toolName: match[1], startIndex: match.index };
+        }
+    }
+    return { inside: false };
+};
+
+const getContextSafeText = (text, stripThoughts = true) => {
+    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    let result = '';
+    let lastIdx = 0;
+    let match;
+
+    while ((match = toolRegex.exec(text)) !== null) {
+        const before = text.substring(lastIdx, match.index);
+        result += stripThoughts ? before.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '') : before;
+
+        const startIdx = match.index + match[0].length - 1;
+        let balance = 0;
+        let inString = null;
+        let isEscaped = false;
+        let endIdx = -1;
+
+        for (let i = startIdx; i < text.length; i++) {
+            const char = text[i];
+            if (!inString && (char === '"' || char === "'" || char === '`')) {
+                inString = char;
+                isEscaped = false;
+            } else if (inString && char === inString && !isEscaped) {
+                inString = null;
+            }
+            if (!inString) {
+                if (char === '(') balance++;
+                else if (char === ')') balance--;
+                if (balance === 0) {
+                    endIdx = i;
+                    break;
+                }
+            }
+            if (char === '\\') isEscaped = !isEscaped;
+            else isEscaped = false;
+        }
+
+        if (endIdx !== -1) {
+            result += 'tool:functions.' + match[1] + '()';
+            lastIdx = endIdx + 1;
+            toolRegex.lastIndex = lastIdx;
+        } else {
+            result += 'tool:functions.' + match[1] + '(';
+            lastIdx = text.length;
+            break;
+        }
+    }
+
+    if (lastIdx < text.length) {
+        result += stripThoughts ? text.substring(lastIdx).replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '') : text.substring(lastIdx);
+    }
+    return result;
+};
+
+const contextSafeReplace = (text, regex, replacement) => {
+    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    let result = '';
+    let lastIdx = 0;
+    let match;
+
+    while ((match = toolRegex.exec(text)) !== null) {
+        const before = text.substring(lastIdx, match.index);
+        result += before.replace(regex, replacement);
+
+        const startIdx = match.index + match[0].length - 1;
+        let balance = 0;
+        let inString = null;
+        let isEscaped = false;
+        let endIdx = -1;
+
+        for (let i = startIdx; i < text.length; i++) {
+            const char = text[i];
+            if (!inString && (char === '"' || char === "'" || char === '`')) {
+                inString = char;
+                isEscaped = false;
+            } else if (inString && char === inString && !isEscaped) {
+                inString = null;
+            }
+            if (!inString) {
+                if (char === '(') balance++;
+                else if (char === ')') balance--;
+                if (balance === 0) {
+                    endIdx = i;
+                    break;
+                }
+            }
+            if (char === '\\') isEscaped = !isEscaped;
+            else isEscaped = false;
+        }
+
+        if (endIdx !== -1) {
+            result += text.substring(match.index, endIdx + 1);
+            lastIdx = endIdx + 1;
+            toolRegex.lastIndex = lastIdx;
+        } else {
+            result += text.substring(match.index);
+            lastIdx = text.length;
+            break;
+        }
+    }
+
+    if (lastIdx < text.length) {
+        result += text.substring(lastIdx).replace(regex, replacement);
+    }
+    return result;
+};
+
+const getSanitizedText = (text) => {
+    return getContextSafeText(text, true);
+};
+
 const detectToolCalls = (text) => {
     const results = [];
     const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
@@ -309,15 +457,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             yield { type: 'text', content: chunk.text };
                         }
 
-                        // [SYSTEM SIGNAL FILTER] - Ignore anything inside <think> tags for tool/signal detection
-                        const actionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+                        // [SYSTEM SIGNAL FILTER] - Ignore thoughts and unclosed tools for signal detection
+                        const signalSafeText = getSanitizedText(turnText);
 
                         // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
-                        if (actionableText.includes('tool:functions.')) {
+                        const toolContext = getActiveToolContext(turnText);
+                        if (toolContext.inside) {
                             if (!lastToolEventTime) lastToolEventTime = Date.now();
-
-                            const parts = actionableText.split('tool:functions.');
-                            const potentialTool = parts[parts.length - 1].split('(')[0].trim();
+                            const potentialTool = toolContext.toolName;
                             // Regex validation to ensure it's a valid-looking tool name and not stray text
                             if (potentialTool && /^[a-z_]+$/.test(potentialTool) && potentialTool !== lastToolSniffed) {
                                 lastToolSniffed = potentialTool;
@@ -326,7 +473,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
-                        const thinkBlocks = turnText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
+                        // Shield loop detection from text inside tool calls (closed or unclosed)
+                        const contextSafeText = getContextSafeText(turnText, false);
+                        const thinkBlocks = contextSafeText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
                         const thinkContent = thinkBlocks.join('').trim();
 
                         // 1. Repetitive Sentence Check (The most common loop symptom)
@@ -349,7 +498,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         // [REAL-TIME TOOL EXECUTION]
-                        const allToolsFound = detectToolCalls(actionableText);
+                        // We use a version that only strips thoughts but preserves full tool arguments
+                        const toolActionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+                        const allToolsFound = detectToolCalls(toolActionableText);
                         while (allToolsFound.length > toolCallPointer) {
                             const toolCall = allToolsFound[toolCallPointer];
 
@@ -583,14 +734,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/i, '');
         }
 
-        const finalActionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
-        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(finalActionableText.toLowerCase());
+        const signalSafeText = getSanitizedText(turnText);
+        const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
         const shouldContinue = toolCallPointer > 0;
 
         yield { type: 'status', content: 'Working...' };
 
-        const cleanedTurnText = turnText
-            .replace(/\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
+        const cleanedTurnText = contextSafeReplace(turnText, /\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
             .trim();
 
         // [STRICT PROTOCOL ENFORCEMENT]

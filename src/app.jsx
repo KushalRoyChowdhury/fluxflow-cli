@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.10';
+const versionFluxflow = '1.8.11';
 const updatedOn = '2026-05-09';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1735,7 +1735,7 @@ OUTPUT: ${execOutputRef.current}`;
             case 'approval':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} width="100%">
-                        <Text color="yellow" bold underline>🛡️ SECURITY GATE: FILE WRITE PERMISSION</Text>
+                        <Text color="yellow" bold underline>🔐 SECURITY GATE: FILE WRITE PERMISSION</Text>
                         <Text marginTop={1}>The agent is attempting to modify: <Text color="cyan">{parseArgs(pendingApproval?.args || '{}').path || 'Unknown File'}</Text></Text>
 
                         <Box marginTop={1} borderStyle="single" borderColor="#333" paddingX={1} flexDirection="column">
@@ -1762,7 +1762,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 title="Action Required"
                                 items={[
                                     { label: '✅ Accept this time', value: 'allow' },
-                                    { label: '🛡️ Accept for this session', value: 'always' },
+                                    { label: '🔐 Accept for this session', value: 'always' },
                                     { label: '❌ Don\'t accept', value: 'deny' }
                                 ]}
                                 onSelect={(item) => {
@@ -1841,7 +1841,7 @@ OUTPUT: ${execOutputRef.current}`;
             case 'terminalApproval':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1} width="100%">
-                        <Text color="red" bold underline>🛡️ SECURITY GATE: TERMINAL COMMAND OVERSIGHT</Text>
+                        <Text color="red" bold underline>🔐 SECURITY GATE: TERMINAL COMMAND OVERSIGHT</Text>
                         <Box marginTop={1}>
                             <Text>Agent requested to run: <Text color="yellow" bold>{parseArgs(pendingApproval?.args || '{}').command || 'Unknown Command'}</Text></Text>
                         </Box>
