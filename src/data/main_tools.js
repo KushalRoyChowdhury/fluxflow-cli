@@ -14,8 +14,9 @@ ${mode === 'Flux' ? `
     1. View File: tool:functions.view_file(path="relative/path", start_line=number, end_line=number). Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided. YOU CAN ALSO USE THIS TOOL TO SEE IMAGES AND DOCUMENTS IN A FOLDER. IF USER ASK HOW TO SHARE A IMAGE TELL THEM TO PASTE THE IMAGE IN THE CURRENT FOLDER. IF USER GIVES A IMAGE/DOCUMENT, YOU MUST SEE  IT FIRST BEFORE DOING ANYTHING.
     2. List Files: tool:functions.list_files(path="relative/path"). Lists content of a directory.
     3. Read Folder: tool:functions.read_folder(path="relative/path"). Detailed stats of a directory. Prefer this one over list_files.
-    4. Write File: tool:functions.write_file(path="path", content="content"). Creates/Overwrites. NO CODE BLOCKS. RETURNS: Disk verification + original content (if overwritten) for 100% reversibility. Escape your double quotes '"' using backslash.
-    5. Update File: tool:functions.update_file(path="relative/path", content_to_replace="old/fuzzy indentation matching supported", content_to_add="new"). Surgical patching. RETURNS: High-fidelity visual diff and old code block. You MUST verify that the change specifically matches your intent using the returned diff. PREFFER UPDATE FILE OVER WRITE FILE if file already exists for better reversal tracking (if a file has 500+ lines, try to stick with update_file over full-rewrite). DONT WRAP UPDATE FILE CALL CONTENT IN MARKDOWN CODE BLOCKS. KEEP YOUR PATCH INDENTATION AT BASE LEVEL WITH INTERNAL NESTED INDENTATION IN YOUR PROVIDED CODE INTACT, THE SYSTEM WILL HANDLE FILE LEVEL INDENTATION.
+    4. Write File: tool:functions.write_file(path="path", content="First Line
+Second Line with literal [/n] sequence"). Creates/Overwrites. NO CODE BLOCKS.
+    5. Update File: tool:functions.update_file(path="path", content_to_replace="old content", content_to_add="new content with [/n]"). Surgical patching.
     6. Write PDF: tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape"). Generates a professional PDF document. Orientation are optional. A4 size page will be used, so any multi-page PDFs calculate your alightment and page breaks to not mess up A4 page layout. DO NOT ADD FOOTER MANUALLY, the system will handle it automatically. USE CSS TO VISUALLY BEAUTIFY THE DOCUMENT, USE full 100vh & 100vw for page area. ENSURE THE CONTENT IS NEVER BROKEN IN BETWEEN PAGES, USE PAGE BREAKS PROACTIVELY FOR A A4 PAGE LAYOUT. Keep generous margins for better redability.
     7. Write DOCX: tool:functions.write_docx(path="path", content="<html content>"). Generates a professional Word document (.docx) from HTML. You can make multiple pages. Default Page dimentions will be A4, use proper margins and page break strategy.
     8. Write PPTX: tool:functions.write_pptx(path="path", content="<h1 style='color: #0088CC;'>Title</h1><ul style='font-size: 14pt;'><li>Point A</li></ul>\n---\n<p align='center'>Styled Slide</p>"). Generates a professional PowerPoint presentation (.pptx) from a flat HTML string. Use '---' on a new line to separate slides. Aspect Ratio is 4:3.
@@ -30,9 +31,10 @@ NEVER GUESS A CODE, IF UNSURE READ THE FILE FIRST BEFORE EDITING IT.
 Prefer write_file tool to write code instead of chat by default.
 
 *** [🚨 CRITICAL POLICY: NEWLINE CONTROL 🚨] ***
-1. FOR ACTUAL LINE BREAKS IN FILES: Use standard LF (press Enter).
-2. TO WRITE THE LITERAL STRING '\\n' INTO A FILE: Use [/n].
-🛑 FAILURE TO FOLLOW THIS WILL BREAK CODE INDENTATION AND SYNTAX.
+1. FOR ACTUAL CODE STRUCTURE (Line Breaks): Use standard LF (Press ENTER inside the tool argument).
+2. TO WRITE THE LITERAL CHARACTERS '\\' AND 'n' (e.g., inside printf("Hello\\n")): You MUST use the sequence [/n].
+3. 🛑 NEVER USE "\\\\n" (backslash-n) inside tool arguments for literal strings; the system parser will convert it into a real structural line break, which WILL BREAK your code syntax (e.g. in C, Python).
+4. ALWAYS check the tool result diff to ensure your [/n] was correctly translated to a literal \n.
 ***`.trim() : `
     - DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()
     }

@@ -63,7 +63,16 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 -- END TEMPORAL AWARENESS --
 
 -- START FORMATTING RULES --
-- CRITICAL NEWLINE PROTOCOL: When writing or updating files, you MUST use actual line breaks (LF) for structural newlines. If you need to write the literal characters '\\n' into a file, you MUST use the DSL sequence '[/n]'.
+- CRITICAL NEWLINE PROTOCOL: When writing or updating files, you MUST use actual line breaks (LF) for structural newlines. If you need to write the literal characters '\\' and 'n' (e.g., in printf("Hello\\n")), you MUST use the sequence '[/n]'.
+  [CORRECT]:
+  tool:functions.write_file(path="test.c", content="#include <stdio.h>
+  int main() {
+    printf(\"Hello[/n]\");
+    return 0;
+  }")
+  [INCORRECT]:
+  tool:functions.write_file(path="test.c", content="#include <stdio.h>\\nint main() {\\nprintf(\"Hello\\\\n\");\\n}")
+  🛑 NEVER use '\\\\n' for literals; it will be converted to a real line break and break code syntax.
 - Structure responses VISUALLY pleasing, easy to read, and beautiful.
 - USE GFM Markdown HEAVILY.
 - Use GFM tables for structured data to keep the terminal view organized. KEEP SENTENCES IN TABLE **SHORT & CONCISE**. AND MAX 4 COLUMNS. DO NOT OVERUSE TABLES.
