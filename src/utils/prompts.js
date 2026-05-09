@@ -32,10 +32,12 @@ CURRENT_WORKING_DIRECTORY: ${cwdStr}.
 OS: ${osDetected}. ${osDetected === 'Windows' && mode === 'Flux' ? "Your terminal commands will run on CMD. 'Prefer using PS scripts via CMD' instead of raw CMD commands." : ''}
 If you see a [STEERING HINT] from user, give that prompt priority for the task at hand, user can use it to help you guide if you go wrong way.
 
-[Runtime Monitor] Turn Progress: ${currentLoop}/${maxLoops} steps. Aim to finalize the task before the window closes. If the limit is reached, please summarize and invite the user to re-engage.
 
-
+-- START THINKING INSTRUCTIONS --
 ${thinkingConfig}
+
+BEFORE USING ANY TOOL THINKING IS **MANDATORY**. ALWAYS PREFER TO ENTER IN THINKING AS PER INSTRUCTIONS FOR MORE ACCURACY, AVOID DIRECT SHOTS.
+-- END THINKING INSTRUCTIONS --
 
 ${TOOL_PROTOCOL(mode)}
 ${mode === 'Flux' ? `
@@ -64,15 +66,15 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 
 -- START FORMATTING RULES --
 - CRITICAL NEWLINE PROTOCOL: When writing or updating files, you MUST use actual line breaks (LF) for structural newlines. If you need to write the literal characters '\\' and 'n' (e.g., in printf("Hello\\n")), you MUST use the sequence '[/n]'.
-  [CORRECT]:
-  tool:functions.write_file(path="test.c", content="#include <stdio.h>
-  int main() {
+[CORRECT]:
+tool:functions.write_file(path="test.c", content="#include <stdio.h>
+int main() {
     printf(\"Hello[/n]\");
     return 0;
-  }")
-  [INCORRECT]:
-  tool:functions.write_file(path="test.c", content="#include <stdio.h>\\nint main() {\\nprintf(\"Hello\\\\n\");\\n}")
-  🛑 NEVER use '\\\\n' for literals; it will be converted to a real line break and break code syntax.
+    }")
+[INCORRECT]:
+tool:functions.write_file(path="test.c", content="#include <stdio.h>\\nint main() {\\nprintf(\"Hello\\\\n\");\\n}")
+🛑 NEVER use '\\\\n' for literals; it will be converted to a real line break and break code syntax.
 - Structure responses VISUALLY pleasing, easy to read, and beautiful.
 - USE GFM Markdown HEAVILY.
 - Use GFM tables for structured data to keep the terminal view organized. KEEP SENTENCES IN TABLE **SHORT & CONCISE**. AND MAX 4 COLUMNS. DO NOT OVERUSE TABLES.
@@ -88,8 +90,9 @@ TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE.
 When you 'finish' an agentic loop, you will lose your previous turn 'thinking' data. So only write [turn: finish] when you are absolutely sure that you are done with the task. Or user has to prompt again and re-thinking again from scratch will use tokens that were already planned.
 -- END REPONSE FINISH PROTOCOL --
 
+[Runtime Monitor] Turn Progress: ${currentLoop}/${maxLoops} steps. Aim to finalize the task before the window closes. If the limit is reached, please summarize and invite the user to re-engage.
 Current date and Time is: ${dateTimeStr}
- --- END SYSTEM INSTRUCTION ---`.trim();
+--- END SYSTEM INSTRUCTION ---`.trim();
 };
 
 /**
@@ -98,7 +101,7 @@ Current date and Time is: ${dateTimeStr}
  * @param {string} agentRaws - The raw, multi-turn output from the agentic loop.
  * @param {boolean} isMemoryEnabled - Whether the memory system is enabled.
  * @returns {string} The formatted Janitor prompt.
- */
+*/
 export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = false) => {
     let agentRes = `${agentRaws.replace(/tool:functions\..*\n/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL_RESULTS\]/g, '').replace(/\[tool_results\]/g, '').substring(0, 3500)}`;
     if (agentRes.length > 3500) {

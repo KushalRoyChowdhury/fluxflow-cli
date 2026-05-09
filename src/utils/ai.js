@@ -430,8 +430,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 for await (const chunk of stream) {
                     if (TERMINATION_SIGNAL) {
                         yield { type: 'status', content: 'Termination Signal Received.' };
-                        // wait 1.5s
-                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        // wait 3s
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                         break;
                     }
                     if (chunk.text) {
