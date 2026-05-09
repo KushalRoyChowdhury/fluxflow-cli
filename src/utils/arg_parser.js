@@ -46,9 +46,9 @@ export const parseArgs = (argsString) => {
                 const after = argsString.substring(qIdx + 1).trim();
                 const isLogicalEnd = 
                     after === '' ||                    // End of entire string
-                    after.startsWith(')') ||           // End of tool call
                     after.startsWith(',') ||           // Next argument separator
-                    /^(\w+)\s*=/.test(after);          // Next argument key=
+                    /^(\w+)\s*=/.test(after) ||        // Next argument key=
+                    (after.startsWith(')') && (after.length === 1 || /^\)\s*([,\]\s]|tool:)/i.test(after))); // Robust Tool End
 
                 if (isLogicalEnd) {
                     end = qIdx;
@@ -72,14 +72,17 @@ export const parseArgs = (argsString) => {
             try {
                 // Only use JSON.parse if it looks like it might have escapes
                 if (value.includes('\\')) {
-                    value = JSON.parse(`"${value.replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+                    // Surgical escape: Only escape quotes that are NOT already escaped
+                    const surgicalValue = value.replace(/(^|[^\\])"/g, '$1\\"');
+                    value = JSON.parse(`"${surgicalValue.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
                 }
             } catch (e) {
                 value = value
                     .replace(/\\"/g, '"')
                     .replace(/\\'/g, "'")
                     .replace(/\\`/g, '`')
-                    .replace(/\\\\/g, '\\');
+                    .replace(/\\\\/g, '\\')
+                    .replace(/\\n/g, '\n');
             }
         } else if (i < argsString.length && argsString[i] === '[') {
             // ARRAY LITERAL DETECTION
