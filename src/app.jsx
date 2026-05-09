@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.11';
+const versionFluxflow = '1.8.12';
 const updatedOn = '2026-05-09';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -213,6 +213,7 @@ export default function App() {
         return formatDuration(Math.floor(ms / 1000));
     };
     const [statusText, setStatusText] = useState(null);
+    const [isSpinnerActive, setIsSpinnerActive] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [escPressed, setEscPressed] = useState(false);
     const [escTimer, setEscTimer] = useState(null);
@@ -968,6 +969,10 @@ OUTPUT: ${execOutputRef.current}`;
                     for await (const packet of stream) {
                         if (packet.type === 'status') {
                             setStatusText(packet.content);
+                            continue;
+                        }
+                        if (packet.type === 'spinner') {
+                            setIsSpinnerActive(packet.content);
                             continue;
                         }
                         if (packet.type === 'model_update') {
@@ -1869,8 +1874,8 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 {statusText && (
                                     <Box>
-                                        <Text color="magenta"><Spinner type="dots" /></Text>
-                                        <Text color="magenta" italic> {statusText}</Text>
+                                        {isSpinnerActive && <Text color="magenta"><Spinner type="dots" /></Text>}
+                                        <Text color="magenta" italic>{isSpinnerActive ? ' ' : ''}{statusText}</Text>
                                     </Box>
                                 )}
                             </Box>

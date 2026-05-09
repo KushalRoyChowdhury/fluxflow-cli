@@ -41,7 +41,7 @@ export const web_search = async (argsString) => {
 
             // 4. Navigate to DDG
             const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-            await page.goto(searchUrl, { waitUntil: 'networkidle2' });
+            await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 180000 });
 
             // 5. Extract Results using DOM Selection
             const results = await page.$$eval('.result', (elements, maxLimit) => {

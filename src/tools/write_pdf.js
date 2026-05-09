@@ -73,7 +73,7 @@ export const write_pdf = async (args) => {
         `;
 
         // Set HTML content
-        await page.setContent(styledContent, { waitUntil: 'networkidle0' });
+        await page.setContent(styledContent, { waitUntil: 'networkidle0', timeout: 180000 });
 
         // Generate PDF Buffer
         const pdfBytes = await page.pdf({

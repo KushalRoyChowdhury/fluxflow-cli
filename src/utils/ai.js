@@ -339,6 +339,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             try {
                 if (isInitialAttempt) {
                     yield { type: 'turn_reset', content: true };
+                    yield { type: 'spinner', content: true };
                     isInitialAttempt = false;
                     accumulatedContext = '';
                 }
@@ -486,15 +487,49 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         // 2. Verbosity Check (Global rambling detection)
                         const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
 
-                        let repetitionThreshold = 0.4;
-                        let isOverVerbose = wordCount > 2500; // Hard cap for a single turn's thinking
+                        let repetitionThresholdThinking = 0.4;
+                        let repetitionThresholdResponse = 0.6;
+                        let isOverVerboseThinking = wordCount > 2500; // Hard cap for a single turn's thinking
 
-                        if (repetitionRatio > repetitionThreshold || isOverVerbose) {
-                            const reason = repetitionRatio > repetitionThreshold ? 'Thinking Loop Detected' : 'Rambling Detected';
+                        if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
+                            const reason = repetitionRatio > repetitionThresholdThinking ? 'Thinking Loop Detected' : 'Rambling Detected';
                             yield { type: 'status', content: `${reason}. Re-centering...` };
                             isThinkingLoop = true;
                             await new Promise(resolve => setTimeout(resolve, 3000));
                             break; // Force close this turn's stream and proceed to next loop
+                        }
+
+                        // 3. Response Repetition Check
+                        const responseContent = signalSafeText.trim();
+                        const respSentences = responseContent.split(/[.!?]\s+/);
+                        const uniqueRespSentences = new Set(respSentences);
+                        const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
+
+                        if (respRepetitionRatio > repetitionThresholdResponse) {
+                            yield { type: 'status', content: `Response Loop Detected. Re-centering...` };
+                            isThinkingLoop = false;
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            break;
+                        }
+
+                        // 4. Stutter / Word Loop Check (Global)
+                        const allWords = contextSafeText.split(/\s+/).filter(w => w.length > 0);
+                        if (allWords.length > 12) {
+                            let stutterDetected = false;
+                            for (let i = 0; i < allWords.length - 10; i++) {
+                                const sub = allWords.slice(i, i + 5).join(' ');
+                                const next = allWords.slice(i + 5, i + 10).join(' ');
+                                if (sub === next) {
+                                    stutterDetected = true;
+                                    break;
+                                }
+                            }
+                            if (stutterDetected) {
+                                yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
+                                isThinkingLoop = false;
+                                await new Promise(resolve => setTimeout(resolve, 3000));
+                                break;
+                            }
                         }
 
                         // [REAL-TIME TOOL EXECUTION]
@@ -631,9 +666,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             const effectiveStart = lastToolEventTime || Date.now();
+                            yield { type: 'spinner', content: false };
                             let result = await dispatchTool(toolCall.toolName, toolCall.args, {
                                 chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
                             });
+                            yield { type: 'spinner', content: true };
 
                             const toolEnd = Date.now();
                             yield { type: 'tool_time', content: toolEnd - effectiveStart };

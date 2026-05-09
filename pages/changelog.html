@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = []
+        const stableVersions = ["1.8.12"]
         const changelogData = {
+            "1.8.12": {
+                "note": "Performance Optimization & Cognitive Resilience.",
+                "added": [
+                    "Implemented **Word-Level Stutter Detection** to catch and recover from character/word repetition loops.",
+                    "Added **Dynamic Component Unmounting** during tool execution to reduce CPU overhead.",
+                    "Extended tool timeouts to **3 minutes** for `web_search`, `web_scrape`, and `write_pdf`."
+                ],
+                "changed": [
+                    "Upgraded **Loop Detection** with a new 0.6 threshold for main response body analysis."
+                ],
+                "fixes": []
+            },
             "1.8.10": {
                 "note": "Hardened Reliability & Seamless Recovery.",
                 "added": [

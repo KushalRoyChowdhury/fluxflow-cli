@@ -39,7 +39,7 @@ export const web_scrape = async (args) => {
             await new Promise(r => setTimeout(r, jitter));
 
             // 4. Navigate and Wait for Hydration
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+            await page.goto(url, { waitUntil: 'networkidle2', timeout: 180000 });
 
             // 5. Deep Hydration Delay: Wait an additional 5s flat before reading data
             await new Promise(r => setTimeout(r, 5000));
