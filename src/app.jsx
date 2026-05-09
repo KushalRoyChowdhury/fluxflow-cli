@@ -32,8 +32,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.15';
-const updatedOn = '2026-05-09';
+const versionFluxflow = '1.8.16';
+const updatedOn = '2026-05-10';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -644,7 +644,7 @@ export default function App() {
                                 }
 
                                 setMessages(resumedMsgs);
-                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${targetId}]` }]);
+                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${targetId}]`, isMeta: true }]);
                                 setCompletedIndex(0);
                             } else {
                                 setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `❌ ERROR: Session [${targetId}] not found.` }]);
@@ -2130,8 +2130,8 @@ OUTPUT: ${execOutputRef.current}`;
                                 return (
                                     <Box key={s.cmd} flexDirection="row">
                                         <Text color={isActive ? 'cyan' : 'gray'}>{isActive ? '❯ ' : '  '}</Text>
-                                        <Text 
-                                            color={isGemmaDisabled ? 'gray' : (isActive ? 'yellow' : 'gray')} 
+                                        <Text
+                                            color={isGemmaDisabled ? 'gray' : (isActive ? 'yellow' : 'gray')}
                                             bold={isActive}
                                             dimColor={isGemmaDisabled}
                                         >

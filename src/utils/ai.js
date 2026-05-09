@@ -753,7 +753,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const date = new Date().toLocaleString();
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n`);
+                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
 
                 if (retryCount < MAX_RETRIES) {
                     retryCount++;
@@ -817,6 +817,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             yield { type: 'status', content: 'Finalizing...' };
 
 
+
             const janitorContents = history.slice(-3)
                 .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
                 .map(msg => ({
@@ -831,7 +832,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 cleanedFullResponse,
                 janitorUserMemories,
                 isMemoryEnabled,
-                needTitle
+                true
             );
             janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
 
@@ -844,57 +845,91 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     throw new Error("QUOTA_BLOCKED");
                 }
 
-                const janitorResult = await client.models.generateContent({
-                    model: janitorModel || 'gemma-4-26b-a4b-it',
-                    contents: janitorContents,
-                    config: {
-                        maxOutputTokens: 384,
-                        temperature: 0.69,
-                        safetySettings: [
-                            {
-                                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                        ],
+                yield { type: 'spinner', content: false };
 
-                        thinkingConfig: {
-                            includeThoughts: false,
-                            thinkingLevel: ThinkingLevel.MINIMAL
+                // --- REAL 10s TIMEOUT WATCHDOG ---
+                let fullContent = '';
+                let lastUsage = null;
+
+                try {
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 15000)
+                    );
+
+                    const streamPromise = (async () => {
+                        const stream = await client.models.generateContentStream({
+                            model: janitorModel || 'gemma-4-26b-a4b-it',
+                            contents: janitorContents,
+                            config: {
+                                maxOutputTokens: 384,
+                                temperature: 0.69,
+                                safetySettings: [
+                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                ],
+                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                            }
+                        });
+
+                        // [TELEMETRY & LOGGING] Triggers as soon as the headers are received
+                        await incrementUsage('background');
+
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    })();
+
+                    const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
+
+                    let { value: firstChunk, done: firstDone } = firstResult;
+
+                    if (!firstDone && firstChunk) {
+                        const parts = firstChunk.candidates?.[0]?.content?.parts;
+                        const chunkText = (parts?.[1]?.text || parts?.[0]?.text || (typeof firstChunk.text === 'function' ? firstChunk.text() : ''));
+                        if (chunkText) {
+                            fullContent += chunkText;
+                            yield { type: 'status', content: 'Finishing...' };
+                        }
+                        lastUsage = firstChunk.usageMetadata;
+
+                        // Continue with the rest of the stream normally
+                        for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
+                            const p = chunk.candidates?.[0]?.content?.parts;
+                            const t = (p?.[1]?.text || p?.[0]?.text || (typeof chunk.text === 'function' ? chunk.text() : ''));
+                            if (t) {
+                                fullContent += t;
+                            }
+                            lastUsage = chunk.usageMetadata;
                         }
                     }
-                });
+                } catch (e) {
+                    if (e.message === "JANITOR_TIMEOUT") {
+                        throw new Error("Janitor API Timeout: No tokens received within 15s.");
+                    }
+                    throw e;
+                }
 
-                const parts = janitorResult.candidates?.[0]?.content?.parts;
-                if (parts && parts[1]?.text) {
-                    finalSynthesis = parts[1].text;
-                    // Append /logs/janitor/debug.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
+                yield { type: 'spinner', content: true };
+
+                if (fullContent) {
+                    finalSynthesis = fullContent;
+
+                    // Usage Tracking
+                    if (lastUsage) {
+                        await addToUsage('tokens', lastUsage.totalTokenCount || 0);
+                    }
+
+                    // Log the synthesis for debugging
                     const date = new Date().toLocaleString();
                     const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                    // Create folder if it doesn't exist
                     if (!fs.existsSync(janitorLogDir)) {
                         fs.mkdirSync(janitorLogDir, { recursive: true });
                     }
-                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: ${finalSynthesis}\n`);
-                }
-                else if (parts && parts[0]?.text) finalSynthesis = parts[0].text;
-                else if (janitorResult.response && janitorResult.response.text) finalSynthesis = janitorResult.response.text();
-                else throw new Error("No synthesis generated by Janitor.");
-
-                await incrementUsage('background');
-                if (janitorResult.usageMetadata) {
-                    await addToUsage('tokens', janitorResult.usageMetadata.totalTokenCount || 0);
+                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: ${finalSynthesis}\n\n`);
+                } else {
+                    throw new Error("No synthesis generated by Janitor.");
                 }
                 yield { type: 'background_increment' };
 
@@ -909,7 +944,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // Log the tool result for high-fidelity debugging
                     const date = new Date().toLocaleString();
                     const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
+                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n\n----------------------------------------------------------------------\n\n\n`);
 
                     // Only signal UI if it's a permanent memory change (not temp context)
                     if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
@@ -924,7 +959,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (!fs.existsSync(janitorErrDir)) {
                     fs.mkdirSync(janitorErrDir, { recursive: true });
                 }
-                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${String(janitorErr)}\n`);
+                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${String(janitorErr)}\n\n----------------------------------------------------------------------\n\n\n`);
                 console.error("Janitor Background Tasks Failed:", janitorErr.message);
             }
 
