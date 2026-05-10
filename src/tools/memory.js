@@ -30,8 +30,8 @@ export const memory = async (rawArgs, context = {}) => {
         const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
         if (!tempStorage[chatId]) tempStorage[chatId] = [];
 
-        // LIMIT CHECK: Combined length should not exceed 2500 * 4 = 10000 chars
-        const MAX_CHARS = 2500 * 4;
+        // LIMIT CHECK: Combined length should not exceed 2000 * 4 = 8000 chars
+        const MAX_CHARS = 2000 * 4;
         let currentTotalLength = tempStorage[chatId].reduce((acc, m) => acc + m.length, 0);
 
         // Prune oldest until there is room for the new content

@@ -278,7 +278,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     let lastUsage = null;
     const MAX_LOOPS = mode === 'Flux' ? 50 : 7;
-    const MAX_RETRIES = 7;
+    const MAX_RETRIES = 8;
     yield { type: 'status', content: 'Connecting...' };
 
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
@@ -324,7 +324,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let stream;
         let success = false;
-        let retryCount = 0;
+        let retryCount = 1;
+        let inStreamRetryCount = 1;
 
         let turnText = '';
         let lastToolSniffed = null;
@@ -332,10 +333,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let toolResults = [];
         let toolCallPointer = 0;
         let isThinkingLoop = false;
+        let isStutteringLoop = false;
         let isInitialAttempt = true;
         let accumulatedContext = '';
 
-        while (retryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
+        while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
             try {
                 if (isInitialAttempt) {
                     yield { type: 'turn_reset', content: true };
@@ -343,7 +345,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     isInitialAttempt = false;
                     accumulatedContext = '';
                 }
-
                 // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                 const contents = modifiedHistory
                     .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
@@ -364,10 +365,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [HIGH RELIABILITY FALLBACK SPECTRUM]
                 let targetModel = modelName;
-                if (retryCount === 5) {
+                if (retryCount === 6) {
                     targetModel = 'gemini-3-flash-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model' };
-                } else if (retryCount >= 6) {
+                } else if (retryCount >= 7) {
                     targetModel = 'gemini-3.1-flash-lite-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model lite' };
                 } else if (retryCount > 0) {
@@ -376,8 +377,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [DYNAMIC CONTEXT ADAPTATION]
                 // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                const isContext50 = (sessionStats.tokens || 0) >= 54000;
-                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext50, MAX_LOOPS, loop + 1);
+                const isContext8 = (sessionStats.tokens || 0) >= 8000;
+                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext8, MAX_LOOPS, loop + 1);
 
                 // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
@@ -385,34 +386,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     contents,
                     config: {
                         systemInstruction: currentSystemInstruction,
-                        temperature: mode === 'Flux' ? 1.0 : 1.3,
+                        temperature: mode === 'Flux' ? 0.99 : 1.4,
                         maxOutputTokens: 32768,
                         mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                         safetySettings: [
-                            {
-                                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
-                            {
-                                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                                threshold: HarmBlockThreshold.BLOCK_NONE,
-                            },
+                            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
+                            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
+                            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                         ],
-
-                        thinkingConfig: {
-                            includeThoughts: false,
-                            thinkingLevel: ThinkingLevel.MINIMAL // Gemma's API Reasoning is bad. Keep it Minimal.
-                        },
+                        thinkingConfig: { includeThoughts: false, thinkingLevel: targetModel.includes('pro') ? ThinkingLevel.HIGH : ThinkingLevel.MINIMAL },
                     },
                 });
+
                 // Reset turn state for this specific retry attempt
                 turnText = '';
                 lastToolSniffed = null;
@@ -496,10 +482,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                         let repetitionThresholdThinking = 0.4;
                         let repetitionThresholdResponse = 0.6;
-                        let isOverVerboseThinking = wordCount > 2500; // Hard cap for a single turn's thinking
+
+                        // Dynamic Thinking Cap based on tier
+                        const thinkingCaps = {
+                            'low': 200,
+                            'medium': 500,
+                            'high': 2000,
+                            'max': 3500
+                        };
+                        const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
+                        let isOverVerboseThinking = wordCount > cap;
 
                         if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
-                            const reason = repetitionRatio > repetitionThresholdThinking ? 'Thinking Loop Detected' : 'Rambling Detected';
+                            const reason = repetitionRatio > repetitionThresholdThinking ? 'Thinking Loop Detected' : 'Thinking Budget Exceeded';
                             yield { type: 'status', content: `${reason}. Re-centering...` };
                             isThinkingLoop = true;
                             await new Promise(resolve => setTimeout(resolve, 3000));
@@ -534,6 +529,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (stutterDetected) {
                                 yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
                                 isThinkingLoop = false;
+                                isStutteringLoop = true;
                                 await new Promise(resolve => setTimeout(resolve, 3000));
                                 break;
                             }
@@ -755,28 +751,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
                 fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
 
-                if (retryCount < MAX_RETRIES) {
-                    retryCount++;
-                    const waitTime = Math.floor(Math.random() * (2000 - 800 + 1)) + 800;
-
-                    if (turnText.trim().length > 0) {
-                        // RECOVERY MODE: Continue from where we left off
+                if (turnText.trim().length > 0) {
+                    // IN-STREAM RECOVERY
+                    if (inStreamRetryCount <= MAX_RETRIES) {
+                        inStreamRetryCount++;
+                        const waitTime = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
                         modifiedHistory.push({ role: 'agent', text: turnText });
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
                         modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly and DON'T repeat what you already said!" });
                         accumulatedContext += turnText;
-                        yield { type: 'status', content: `Recovering & Continuing (${retryCount}/${MAX_RETRIES + 1})...` };
+                        yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES})...` };
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
                     } else {
-                        // HARD RESET MODE: Restart the turn because nothing was produced
-                        isInitialAttempt = true;
-                        yield { type: 'status', content: `Retrying (${retryCount}/${MAX_RETRIES + 1})...` };
+                        throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
                     }
-
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
                 } else {
-                    throw new Error(`Model cannot be reached: ${errMsg}. (Failed ${MAX_RETRIES + 1} times)`);
+                    // CONNECTION RETRY
+                    if (retryCount <= MAX_RETRIES) {
+                        retryCount++;
+                        const waitTime = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
+                        isInitialAttempt = true;
+                        yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES})...` };
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    } else {
+                        throw new Error(`Model cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
+                    }
                 }
             }
         }
@@ -984,8 +985,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: `[SYSTEM]: ${isThinkingLoop ? 'OVER-THINKING ' : ''}LOOP DETECTED by Internal System. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}` });
+            modifiedHistory.push({ role: 'user', text: `[SYSTEM]: ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? 'OVER-THINKING ' : ''}LOOP DETECTED by Internal System${isThinkingLoop && ' for current EFFORT_LEVEL'}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
+            isStutteringLoop = false;
         }
     }
     yield { type: 'status', content: null };

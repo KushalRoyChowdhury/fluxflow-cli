@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.18';
+const versionFluxflow = '1.8.19';
 const updatedOn = '2026-05-10';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -527,10 +527,10 @@ export default function App() {
         },
         {
             cmd: '/model', desc: 'Switch AI model', subs: [
-                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default (Free, Recommended)' : 'Standard Default (Free, Recommended) - Cannot use Gemma with paid API' },
+                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default (Free, Recommended)' : 'Standard Default (Free, Recommended) - Use Free API Key to use this model ' },
                 { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
-                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
-                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Limited Free quota)' },
+                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Decent Free quota)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -1756,7 +1756,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 // Defer execution to ensure state has settled and modal is unmounted
                                 setTimeout(() => {
                                     handleSubmit(val);
-                                }, 50);
+                                }, 200);
                             }}
                             onEdit={(val) => {
                                 setResolutionData(null);

@@ -8,7 +8,7 @@ import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' 
  * @param {string} thinkingLevel - The thinking level to use.
  * @returns {string} The complete system instruction string.
  */
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext50 = false, maxLoops, currentLoop) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext8 = false, maxLoops, currentLoop) => {
     let levelKey = thinkingLevel;
     if (thinkingLevel === 'Low') levelKey = 'Minimal';
     if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
@@ -22,7 +22,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const dateTimeStr = new Date().toLocaleString();
     const cwdStr = process.cwd();
 
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext50 ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS --\n${tempMemories}\n------------------------------------------\n` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext8 ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS --\n${tempMemories}\n------------------------------------------\n` : '';
     const userMemoriesStr = userMemories?.length > 0 ? `\n--- PERSISTENT USER MEMORIES ---\n${userMemories}\n--------------------------------\n` : '';
 
     return `${isMemoryEnabled ? `${userMemoriesStr}\n\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n\n` : ''}${nameStr}${nicknameStr}${userInstrStr}
@@ -36,7 +36,7 @@ If you see a [STEERING HINT] from user, give that prompt priority for the task a
 -- START THINKING INSTRUCTIONS --
 ${thinkingConfig}
 
-BEFORE USING ANY TOOL THINKING IS **MANDATORY**. ALWAYS PREFER TO ENTER IN THINKING AS PER INSTRUCTIONS FOR MORE ACCURACY, AVOID DIRECT SHOTS.
+BEFORE USING ANY TOOL THINKING IS **MANDATORY** WITH TOOL RULES. ALWAYS PRIORITIZE THINKING FIRST BEFORE RESPONDING. YOU ARE **FORBIDDEN** TO JUMP TO RESPONSES FIRST.
 -- END THINKING INSTRUCTIONS --
 
 ${TOOL_PROTOCOL(mode)}
