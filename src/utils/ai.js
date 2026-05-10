@@ -755,7 +755,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // IN-STREAM RECOVERY
                     if (inStreamRetryCount <= MAX_RETRIES) {
                         inStreamRetryCount++;
-                        const waitTime = Math.min(1000 * Math.pow(2, inStreamRetryCount - 1), 12000);
+                        const waitTime = Math.min(1000 * Math.pow(2, inStreamRetryCount - 1), 16000);
                         modifiedHistory.push({ role: 'agent', text: turnText });
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
@@ -764,20 +764,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         accumulatedContext += turnText;
                         yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
                         await new Promise(resolve => setTimeout(resolve, waitTime));
-                    } else {
                         yield { type: 'status', content: `Error Occured. Recovering Stream...` };
+                    } else {
                         throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
                     }
                 } else {
                     // CONNECTION RETRY
                     if (retryCount <= MAX_RETRIES) {
                         retryCount++;
-                        const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 12000);
+                        const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 16000);
                         isInitialAttempt = true;
                         yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
                         await new Promise(resolve => setTimeout(resolve, waitTime));
-                    } else {
                         yield { type: 'status', content: `Retrying Connection...` };
+                    } else {
                         throw new Error(`Model cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
                     }
                 }
