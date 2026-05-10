@@ -187,13 +187,21 @@ export const update_file = async (args) => {
         fullOldLines.forEach((line, i) => {
             diffText += `-${startLine + i}|${line}\n`;
         });
-        fullNewLines.forEach((line, i) => {
-            diffText += `+${startLine + i}|${line}\n`;
+        
+        let currentNewLine = startLine;
+        fullNewLines.forEach((line) => {
+            diffText += `+${currentNewLine}|${line}\n`;
+            currentNewLine++;
         });
 
         // 3. Context After (up to 15 lines)
-        for (let i = endLine; i < Math.min(allOriginalLines.length, endLine + 15); i++) {
-            diffText += `[UI_CONTEXT]  ${i + 1}|${allOriginalLines[i]}\n`;
+        // Ensure we start context AFTER the full lines we replaced in the original content
+        const linesAffected = fullOldLines.length;
+        const originalContextIdx = startLine + linesAffected - 1;
+        
+        for (let i = originalContextIdx; i < Math.min(allOriginalLines.length, originalContextIdx + 15); i++) {
+            diffText += `[UI_CONTEXT]  ${currentNewLine}|${allOriginalLines[i]}\n`;
+            currentNewLine++;
         }
 
         diffText += `[DIFF_END]`;
