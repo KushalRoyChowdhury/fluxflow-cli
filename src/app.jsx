@@ -14,7 +14,7 @@ import ProfileForm from './components/ProfileForm.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey } from './utils/secrets.js';
-import { initAI, getAIStream, signalTermination } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, runJanitorTask } from './utils/ai.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
@@ -32,8 +32,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.22';
-const updatedOn = '2026-05-10';
+const versionFluxflow = '1.8.23';
+const updatedOn = '2026-05-11';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -992,8 +992,8 @@ OUTPUT: ${execOutputRef.current}`;
                     let toolCallEncounteredInTurn = false;
                     let toolCallBalance = 0;
                     let inToolCallString = null;
-                    // const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
-                    const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
+                    const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
+                    // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
                     for await (const packet of stream) {
                         if (packet.type === 'status') {
@@ -1018,14 +1018,23 @@ OUTPUT: ${execOutputRef.current}`;
                             thinkConsumedInTurn = false;
                             continue;
                         }
-                        if (packet.type === 'memory_updated') {
-                            setMessages(prev => {
-                                const newMsgs = [...prev];
-                                if (newMsgs.length > 0) {
-                                    newMsgs[newMsgs.length - 1].memoryUpdated = true;
+                        if (packet.type === 'interactive_turn_finished') {
+                            setIsProcessing(false);
+                            runJanitorTask(
+                                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats },
+                                packet.data.agentText,
+                                packet.data.fullAgentTextRaw,
+                                packet.data.history,
+                                packet.data.needTitle,
+                                {
+                                    onMemoryUpdated: () => setMessages(prev => {
+                                        const newMsgs = [...prev];
+                                        if (newMsgs.length > 0) newMsgs[newMsgs.length - 1].memoryUpdated = true;
+                                        return newMsgs;
+                                    }),
+                                    onBackgroundIncrement: () => setSessionBackgroundCalls(prev => prev + 1)
                                 }
-                                return newMsgs;
-                            });
+                            );
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
@@ -1049,12 +1058,6 @@ OUTPUT: ${execOutputRef.current}`;
                             setSessionStats({ tokens: total });
                             setSessionTotalTokens(prev => prev + total);
                             setSessionAgentCalls(prev => prev + 1);
-                            continue;
-                        }
-
-
-                        if (packet.type === 'background_increment') {
-                            setSessionBackgroundCalls(prev => prev + 1);
                             continue;
                         }
                         if (packet.type === 'tool_time') {

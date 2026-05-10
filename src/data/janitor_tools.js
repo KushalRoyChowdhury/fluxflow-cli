@@ -1,7 +1,7 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = false) => `
 ${needTitle ? `-- START CHAT MANAGEMENT TOOLS --
 1. YOU MUST UPDATE CHAT TITLE (URGENT PRIORITY):
-   tool:functions.chat(title='<short summary of conversation context in 3-5 words>')
+   tool:functions.chat(title='<short summary of conversation FULL context (MINIMUM 7 TURNS) in 3-5 words>')
 -- END CHAT MANAGEMENT TOOLS --
 
 ` : ''}

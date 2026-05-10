@@ -20,6 +20,148 @@ export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
 
+export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, needTitle, callbacks = {}) => {
+    const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
+    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
+    const isMemoryEnabled = systemSettings?.memory !== false;
+
+    // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
+    const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
+    const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
+
+    const janitorContents = history.slice(-6)
+        .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
+        .map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
+        }));
+
+    const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    let thisRngHas40pChanceToBehave = Math.random() < 0.41;
+    let generateTitle = needTitle || thisRngHas40pChanceToBehave;
+    const janitorPrompt = getJanitorInstruction(
+        agentText,
+        cleanedFullResponse,
+        janitorUserMemories,
+        isMemoryEnabled,
+        generateTitle
+    );
+    janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
+
+    let finalSynthesis = '';
+    let attempts = 0;
+    const MAX_JANITOR_RETRIES = 2;
+
+    while (attempts <= MAX_JANITOR_RETRIES) {
+        try {
+            if (!(await checkQuota('background', settings))) {
+                console.warn("Quota Exhausted for Background Model. Skipping refinement.");
+                return;
+            }
+
+            let fullContent = '';
+            let lastUsage = null;
+
+            try {
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), attempts === 1 ? 25000 : attempts === 2 ? 20000 : 30000)
+                );
+
+                const streamPromise = (async () => {
+                    const stream = await client.models.generateContentStream({
+                        model: janitorModel || 'gemma-4-26b-a4b-it',
+                        contents: janitorContents,
+                        config: {
+                            maxOutputTokens: 384,
+                            temperature: 0.69,
+                            safetySettings: [
+                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            ],
+                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                        }
+                    });
+                    await incrementUsage('background');
+                    const iterator = stream[Symbol.asyncIterator]();
+                    const firstResult = await iterator.next();
+                    return { iterator, firstResult };
+                })();
+
+                const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
+                let { value: firstChunk, done: firstDone } = firstResult;
+
+                if (!firstDone && firstChunk) {
+                    const parts = firstChunk.candidates?.[0]?.content?.parts;
+                    const chunkText = (parts?.[1]?.text || parts?.[0]?.text || (typeof firstChunk.text === 'function' ? firstChunk.text() : ''));
+                    if (chunkText) {
+                        fullContent += chunkText;
+                    }
+                    lastUsage = firstChunk.usageMetadata;
+
+                    for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
+                        const p = chunk.candidates?.[0]?.content?.parts;
+                        const t = (p?.[1]?.text || p?.[0]?.text || (typeof chunk.text === 'function' ? chunk.text() : ''));
+                        if (t) fullContent += t;
+                        lastUsage = chunk.usageMetadata;
+                    }
+                }
+            } catch (e) {
+                if (e.message === "JANITOR_TIMEOUT") {
+                    console.error("Janitor API Timeout: No tokens received within 30s.");
+                }
+                throw e;
+            }
+
+            if (fullContent) {
+                finalSynthesis = fullContent;
+                if (lastUsage) await addToUsage('tokens', lastUsage.totalTokenCount || 0);
+
+                const date = new Date().toLocaleString();
+                const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+                if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
+                fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
+            } else {
+                throw new Error("No synthesis generated by Janitor.");
+            }
+
+            if (onBackgroundIncrement) onBackgroundIncrement();
+
+            const janitorToolCalls = detectToolCalls(finalSynthesis);
+            for (const janitorToolCall of janitorToolCalls) {
+                const toolContext = { chatId: chatId, sessionId: chatId, history };
+                const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
+
+                const date = new Date().toLocaleString();
+                const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+                fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
+
+                if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
+                    if (onMemoryUpdated) onMemoryUpdated();
+                }
+            }
+
+            break; // Success! Break retry loop.
+        } catch (janitorErr) {
+            attempts++;
+            const date = new Date().toLocaleString();
+            const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+            if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
+            fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${String(janitorErr)}\n\n`);
+
+            if (attempts > MAX_JANITOR_RETRIES) break;
+
+            const backoff = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
+            await new Promise(resolve => setTimeout(resolve, backoff));
+        }
+    }
+    if (attempts >= MAX_JANITOR_RETRIES) {
+        const janitorErrDir = path.join(LOGS_DIR, 'janitor');
+        fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n\n`)
+    }
+};
+
 const getActiveToolContext = (text) => {
     const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
     let match;
@@ -365,10 +507,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [HIGH RELIABILITY FALLBACK SPECTRUM]
                 let targetModel = modelName;
-                if (retryCount === 6) {
+                if (retryCount === 7) {
                     targetModel = 'gemini-3-flash-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model' };
-                } else if (retryCount >= 7) {
+                } else if (retryCount >= 8) {
                     targetModel = 'gemini-3.1-flash-lite-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model lite' };
                 } else if (retryCount > 0) {
@@ -817,153 +959,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         if (isActuallyFinished) {
-            yield { type: 'status', content: 'Finalizing...' };
-
-
-
-            const janitorContents = history.slice(-3)
-                .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
-                .map(msg => ({
-                    role: msg.role === 'user' ? 'user' : 'model',
-                    parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
-                }));
-
             const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
             const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            const janitorPrompt = getJanitorInstruction(
-                agentText,
-                cleanedFullResponse,
-                janitorUserMemories,
-                isMemoryEnabled,
-                true
-            );
-            janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
 
-            let finalSynthesis = '';
-            // fs.writeFileSync('janitor-prompt.txt', janitorPrompt);
-            try {
-                // Quota Check for Background
-                if (!(await checkQuota('background', settings))) {
-                    console.warn("Quota Exhausted for Background Model. Skipping refinement.");
-                    throw new Error("QUOTA_BLOCKED");
+            yield {
+                type: 'interactive_turn_finished',
+                data: {
+                    agentText,
+                    fullAgentTextRaw,
+                    history: [...modifiedHistory],
+                    needTitle
                 }
-
-                yield { type: 'spinner', content: false };
-
-                // --- REAL 20s TIMEOUT WATCHDOG ---
-                let fullContent = '';
-                let lastUsage = null;
-
-                try {
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 20000)
-                    );
-
-                    const streamPromise = (async () => {
-                        const stream = await client.models.generateContentStream({
-                            model: janitorModel || 'gemma-4-26b-a4b-it',
-                            contents: janitorContents,
-                            config: {
-                                maxOutputTokens: 384,
-                                temperature: 0.69,
-                                safetySettings: [
-                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                ],
-                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
-                            }
-                        });
-
-                        // [TELEMETRY & LOGGING] Triggers as soon as the headers are received
-                        await incrementUsage('background');
-
-                        const iterator = stream[Symbol.asyncIterator]();
-                        const firstResult = await iterator.next();
-                        return { iterator, firstResult };
-                    })();
-
-                    const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
-
-                    let { value: firstChunk, done: firstDone } = firstResult;
-
-                    if (!firstDone && firstChunk) {
-                        const parts = firstChunk.candidates?.[0]?.content?.parts;
-                        const chunkText = (parts?.[1]?.text || parts?.[0]?.text || (typeof firstChunk.text === 'function' ? firstChunk.text() : ''));
-                        if (chunkText) {
-                            fullContent += chunkText;
-                            yield { type: 'status', content: 'Finishing...' };
-                        }
-                        lastUsage = firstChunk.usageMetadata;
-
-                        // Continue with the rest of the stream normally
-                        for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
-                            const p = chunk.candidates?.[0]?.content?.parts;
-                            const t = (p?.[1]?.text || p?.[0]?.text || (typeof chunk.text === 'function' ? chunk.text() : ''));
-                            if (t) {
-                                fullContent += t;
-                            }
-                            lastUsage = chunk.usageMetadata;
-                        }
-                    }
-                } catch (e) {
-                    if (e.message === "JANITOR_TIMEOUT") {
-                        throw new Error("Janitor API Timeout: No tokens received within 20s.");
-                    }
-                    throw e;
-                }
-
-                yield { type: 'spinner', content: true };
-
-                if (fullContent) {
-                    finalSynthesis = fullContent;
-
-                    // Usage Tracking
-                    if (lastUsage) {
-                        await addToUsage('tokens', lastUsage.totalTokenCount || 0);
-                    }
-
-                    // Log the synthesis for debugging
-                    const date = new Date().toLocaleString();
-                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                    if (!fs.existsSync(janitorLogDir)) {
-                        fs.mkdirSync(janitorLogDir, { recursive: true });
-                    }
-                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `\n\n---------------------------------------------------\n\n\nDEBUG [${date}]: ${finalSynthesis}\n\n`);
-                } else {
-                    throw new Error("No synthesis generated by Janitor.");
-                }
-                yield { type: 'background_increment' };
-
-                const janitorToolCalls = detectToolCalls(finalSynthesis);
-
-                // Execute background tools only
-                for (const janitorToolCall of janitorToolCalls) {
-                    // EXPLICIT CONTEXT SYNC: Force chatId into the tool context and arguments for absolute persistence
-                    const toolContext = { chatId: chatId, sessionId: chatId, history };
-                    const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
-
-                    // Log the tool result for high-fidelity debugging
-                    const date = new Date().toLocaleString();
-                    const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                    fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
-
-                    // Only signal UI if it's a permanent memory change (not temp context)
-                    if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
-                        yield { type: 'memory_updated' };
-                    }
-                }
-            } catch (janitorErr) {
-                // Append /logs/janitor/error.log. Get date in YYYY-MM-DD HH:MM:SS format. If file/folder doesn't exist create a new one
-                const date = new Date().toLocaleString();
-                const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-                // Create folder if it doesn't exist
-                if (!fs.existsSync(janitorErrDir)) {
-                    fs.mkdirSync(janitorErrDir, { recursive: true });
-                }
-                fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [${date}]: ${String(janitorErr)}\n\n----------------------------------------------------------------------\n\n\n`);
-            }
+            };
 
             const timestamp = `Responded on ${new Date().toLocaleString()}`;
             const finalWithTime = `${cleanedFullResponse}\n\n${timestamp}`;
