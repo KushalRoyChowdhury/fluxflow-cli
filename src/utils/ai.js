@@ -20,7 +20,7 @@ export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
 
-export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, needTitle, callbacks = {}) => {
+export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
@@ -37,14 +37,12 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         }));
 
     const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-    let thisRngHas40pChanceToBehave = Math.random() < 0.41;
-    let generateTitle = needTitle || thisRngHas40pChanceToBehave;
     const janitorPrompt = getJanitorInstruction(
         agentText,
         cleanedFullResponse,
         janitorUserMemories,
         isMemoryEnabled,
-        generateTitle
+        true
     );
     janitorContents.push({ role: 'user', parts: [{ text: janitorPrompt }] });
 
@@ -156,7 +154,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
             await new Promise(resolve => setTimeout(resolve, backoff));
         }
     }
-    if (attempts >= MAX_JANITOR_RETRIES) {
+    if (attempts) {
         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n\n`)
     }

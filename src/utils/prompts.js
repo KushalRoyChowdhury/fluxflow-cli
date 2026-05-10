@@ -102,7 +102,7 @@ Current date and Time is: ${dateTimeStr}
  * @param {boolean} isMemoryEnabled - Whether the memory system is enabled.
  * @returns {string} The formatted Janitor prompt.
 */
-export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = false) => {
+export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = true) => {
     let agentRes = `${agentRaws.replace(/tool:functions\..*\n/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL_RESULTS\]/g, '').replace(/\[tool_results\]/g, '').substring(0, 3500)}`;
     if (agentRes.length > 3500) {
         agentRes += '\n... (truncated) ...';

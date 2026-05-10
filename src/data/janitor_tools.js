@@ -1,7 +1,7 @@
-export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = false) => `
+export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
 ${needTitle ? `-- START CHAT MANAGEMENT TOOLS --
 1. YOU MUST UPDATE CHAT TITLE (URGENT PRIORITY):
-   tool:functions.chat(title='<short summary of conversation FULL context (MINIMUM 7 TURNS) in 3-5 words>')
+   tool:functions.chat(title='<short creative title of FULL conversation in 3-5 words>')
 -- END CHAT MANAGEMENT TOOLS --
 
 ` : ''}
@@ -9,7 +9,7 @@ ${needTitle ? `-- START CHAT MANAGEMENT TOOLS --
 Your tool syntax is: 'tool:functions.function_name(args...)'
 You have access to the following memory functions to persist important information:
 
-1. Temporary context (MUST OUTPUT THIS TOOL CALL EVERY TIME):
+1. Temporary context (URGENT PRIORITY):
    tool:functions.memory(action='temp', content='<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]')
 
 ${isMemoryEnabled ? `2. User-specific long-term memory (USE BASED ON CONVERSATION CONTEXT):
