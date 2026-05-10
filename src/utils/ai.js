@@ -48,12 +48,11 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     let finalSynthesis = '';
     let attempts = 0;
-    const MAX_JANITOR_RETRIES = 2;
+    const MAX_JANITOR_RETRIES = 4;
 
     while (attempts <= MAX_JANITOR_RETRIES) {
         try {
             if (!(await checkQuota('background', settings))) {
-                console.warn("Quota Exhausted for Background Model. Skipping refinement.");
                 return;
             }
 
@@ -62,7 +61,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             try {
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), attempts === 1 ? 25000 : attempts === 2 ? 20000 : 30000)
+                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 60000)
                 );
 
                 const streamPromise = (async () => {
@@ -106,9 +105,6 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     }
                 }
             } catch (e) {
-                if (e.message === "JANITOR_TIMEOUT") {
-                    console.error("Janitor API Timeout: No tokens received within 30s.");
-                }
                 throw e;
             }
 
@@ -150,7 +146,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             if (attempts > MAX_JANITOR_RETRIES) break;
 
-            const backoff = Math.min(1000 * Math.pow(2, attempts - 1), 5000);
+            const backoff = Math.min(1000 * Math.pow(2, attempts - 1), 8000);
             await new Promise(resolve => setTimeout(resolve, backoff));
         }
     }
@@ -418,7 +414,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     let lastUsage = null;
     const MAX_LOOPS = mode === 'Flux' ? 50 : 7;
-    const MAX_RETRIES = 8;
+    const MAX_RETRIES = 16;
     yield { type: 'status', content: 'Connecting...' };
 
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
@@ -505,10 +501,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [HIGH RELIABILITY FALLBACK SPECTRUM]
                 let targetModel = modelName;
-                if (retryCount === 7) {
+                if (retryCount === MAX_RETRIES - 1) {
                     targetModel = 'gemini-3-flash-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model' };
-                } else if (retryCount >= 8) {
+                } else if (retryCount === MAX_RETRIES) {
                     targetModel = 'gemini-3.1-flash-lite-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model lite' };
                 } else if (retryCount > 0) {
@@ -895,15 +891,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // IN-STREAM RECOVERY
                     if (inStreamRetryCount <= MAX_RETRIES) {
                         inStreamRetryCount++;
-                        const waitTime = Math.min(1000 * Math.pow(2, inStreamRetryCount - 1), 16000);
+                        const waitTime = Math.min(1000 * Math.pow(2, inStreamRetryCount - 1), 24000);
                         modifiedHistory.push({ role: 'agent', text: turnText });
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
                         modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly and DON'T repeat what you already said!" });
                         accumulatedContext += turnText;
-                        yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        // show live decremental countdown
+                        for (let i = waitTime / 1000; i > 0; i--) {
+                            yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [${i}s]...` };
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
                         yield { type: 'status', content: `Error Occured. Recovering Stream...` };
                     } else {
                         throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
@@ -912,10 +911,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // CONNECTION RETRY
                     if (retryCount <= MAX_RETRIES) {
                         retryCount++;
-                        const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 16000);
+                        const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
                         isInitialAttempt = true;
                         yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        // show live decremental countdown
+                        for (let i = waitTime / 1000; i > 0; i--) {
+                            yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${i}s]...` };
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        }
                         yield { type: 'status', content: `Retrying Connection...` };
                     } else {
                         throw new Error(`Model cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
