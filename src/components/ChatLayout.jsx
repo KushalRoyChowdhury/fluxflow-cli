@@ -64,7 +64,15 @@ const cleanSignals = (text) => {
                 result = result.substring(0, startIdx) + result.substring(endIdx + 1);
                 break;
             }
+            
             j++;
+
+            // [SAFETY] If we reached the end without finding a closing boundary, 
+            // it's a partial call. Strip it and break to prevent infinite loop.
+            if (j === result.length) {
+                result = result.substring(0, startIdx);
+                return result; // Immediate exit
+            }
         }
     }
 

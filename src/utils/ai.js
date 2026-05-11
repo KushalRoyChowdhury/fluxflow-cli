@@ -48,7 +48,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     let finalSynthesis = '';
     let attempts = 0;
-    const MAX_JANITOR_RETRIES = 4;
+    const MAX_JANITOR_RETRIES = 5; // Total Retries = 6
 
     while (attempts <= MAX_JANITOR_RETRIES) {
         try {
@@ -177,7 +177,7 @@ const getActiveToolContext = (text) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
-                
+
                 if (balance === 0) {
                     // Check for closing ']' after ')'
                     let j = i + 1;
@@ -227,7 +227,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
-                
+
                 if (balance === 0) {
                     let j = i + 1;
                     while (j < text.length && /\s/.test(text[j])) j++;
@@ -285,7 +285,7 @@ const contextSafeReplace = (text, regex, replacement) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
-                
+
                 if (balance === 0) {
                     let j = i + 1;
                     while (j < text.length && /\s/.test(text[j])) j++;
@@ -818,8 +818,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (approval === 'deny') {
                                         if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
                                         const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
-                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: DENIED: ${denyMsg}` });
+                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: DENIED: ${denyMsg}` };
+                                        await incrementUsage('toolDenied');
+                                        if (settings.onToolResult) settings.onToolResult('denied');
                                         toolCallPointer++;
                                         continue;
                                     }
@@ -848,19 +850,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 settings.onExecEnd();
                             }
 
-                            const isSuccess = result && !result.startsWith('ERROR:');
+                            const isDenied = result && result.startsWith('DENIED:');
+                            const isSuccess = result && !result.startsWith('ERROR:') && !isDenied;
+
                             if (isSuccess) {
                                 await incrementUsage('toolSuccess');
                                 if (settings.onToolResult) settings.onToolResult('success');
+                            } else if (isDenied) {
+                                // Already incremented above in the direct deny block, but let's be safe for other tools
+                                // actually, direct deny block handles it.
+                                // But if a tool itself returns DENIED:, we should handle it here.
+                                // Let's check if we already handled it.
                             } else {
                                 await incrementUsage('toolFailure');
                                 if (settings.onToolResult) settings.onToolResult('failure');
                             }
 
-                            const aiContent = `[TOOL_RESULT]: ${result.split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
+                            const aiContent = `[TOOL_RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
                             toolResults.push({ role: 'user', text: aiContent, binaryPart });
 
-                            let uiContent = `[TOOL_RESULT]: ${result}`;
+                            let uiContent = `[TOOL_RESULT]: ${result || ''}`;
                             if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
                                 uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
                             }

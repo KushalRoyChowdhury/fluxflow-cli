@@ -17,7 +17,11 @@ const loadUsageFromFile = async () => {
         if (await fs.exists(USAGE_FILE)) {
             const data = await fs.readJson(USAGE_FILE);
             if (data && data.date === today && data.stats) {
-                return data;
+                // [RESILIENCE] Merge with defaults to ensure new keys (like toolDenied) are present
+                return {
+                    ...data,
+                    stats: { ...defaultStats, ...data.stats }
+                };
             }
         }
     } catch (err) {}
@@ -29,6 +33,7 @@ const loadUsageFromFile = async () => {
         search: 0, 
         toolSuccess: 0, 
         toolFailure: 0, 
+        toolDenied: 0,
         duration: 0, 
         tokens: 0 
     };
@@ -126,7 +131,7 @@ export const getDailyUsage = async () => {
             date: today,
             stats: { 
                 agent: 0, background: 0, search: 0, 
-                toolSuccess: 0, toolFailure: 0, duration: 0, tokens: 0 
+                toolSuccess: 0, toolFailure: 0, toolDenied: 0, duration: 0, tokens: 0 
             }
         };
         isDirty = true;

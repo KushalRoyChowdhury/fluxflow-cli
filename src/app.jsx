@@ -32,8 +32,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.27';
-const updatedOn = '2026-05-11';
+const versionFluxflow = '1.8.28';
+const updatedOn = '2026-05-12';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
@@ -168,6 +168,7 @@ export default function App() {
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
     const [sessionToolSuccess, setSessionToolSuccess] = useState(0);
     const [sessionToolFailure, setSessionToolFailure] = useState(0);
+    const [sessionToolDenied, setSessionToolDenied] = useState(0);
     const [sessionApiTime, setSessionApiTime] = useState(0);
     const [sessionToolTime, setSessionToolTime] = useState(0);
     const [dailyUsage, setDailyUsage] = useState(null);
@@ -908,6 +909,7 @@ OUTPUT: ${execOutputRef.current}`;
                             },
                             onToolResult: (status) => {
                                 if (status === 'success') setSessionToolSuccess(prev => prev + 1);
+                                else if (status === 'denied') setSessionToolDenied(prev => prev + 1);
                                 else setSessionToolFailure(prev => prev + 1);
                             },
                             onToolApproval: async (tool, args) => {
@@ -1520,11 +1522,11 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
                                 <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
-                                <Text color="green">✔ {sessionToolSuccess}</Text>
+                                <Text color="green">✓ {sessionToolSuccess}</Text>
                                 <Text color="white"> </Text>
-                                <Text color="red">✘ {sessionToolFailure}</Text>
+                                <Text color="yellow">⊘ {sessionToolDenied}</Text>
                                 <Text color="white"> </Text>
-                                <Text color="yellow">⚠️ {sessionToolDenied}</Text>
+                                <Text color="red">✕ {sessionToolFailure}</Text>
                                 <Text color="white"> )</Text>
                             </Box>
                         </Box>
@@ -1549,10 +1551,12 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
-                                <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0)} ( </Text>
-                                <Text color="green">✔ {dailyUsage?.toolSuccess || 0}</Text>
+                                <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0) + (dailyUsage?.toolDenied || 0)} ( </Text>
+                                <Text color="green">✓ {dailyUsage?.toolSuccess || 0}</Text>
                                 <Text color="white"> </Text>
-                                <Text color="red">✘ {dailyUsage?.toolFailure || 0}</Text>
+                                <Text color="yellow">⊘ {dailyUsage?.toolDenied || 0}</Text>
+                                <Text color="white"> </Text>
+                                <Text color="red">✕ {dailyUsage?.toolFailure || 0}</Text>
                                 <Text color="white"> )</Text>
                             </Box>
                         </Box>
@@ -2011,7 +2015,7 @@ OUTPUT: ${execOutputRef.current}`;
                         <ChatLayout
                             messages={messages.slice(completedIndex)}
                             showFullThinking={showFullThinking}
-                            columns={stdout?.columns || 80}
+                            columns={Math.max(20, (stdout?.columns || 80) - 1)}
                         />
                         {activeCommand && (
                             <Box marginTop={1}>
@@ -2078,7 +2082,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                    <Text color="white">{totalTools} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="red">✘ {sessionToolFailure}</Text> <Text color="yellow">⚠️ {sessionToolDenied}</Text> )</Text>
+                                    <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✕ {sessionToolFailure}</Text> )</Text>
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Success Rate:</Text></Box>

@@ -7,6 +7,8 @@ export const wrapText = (text, width) => {
     const sourceLines = text.split(/\r?\n/);
     let finalLines = [];
 
+    if (width <= 5) return text;
+
     sourceLines.forEach(sLine => {
         if (sLine.length <= width) {
             finalLines.push(sLine);
@@ -44,8 +46,8 @@ export const wrapText = (text, width) => {
                 }
             } else {
                 // Handle markdown table pipes as column markers
-                if (token.includes('|')) {
-                    const pipeIdx = token.indexOf('|');
+                if (token.includes('|') || token.includes('│')) {
+                    const pipeIdx = token.includes('|') ? token.indexOf('|') : token.indexOf('│');
                     lastSignificantGap = originalXPos + pipeIdx + 1;
                 }
 
