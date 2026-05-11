@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.8.12"]
+        const stableVersions = ["1.8.26"]
         const changelogData = {
+            "1.8.26": {
+                "note": "Improved API Error resilience",
+                "added": [],
+                "changed": [
+                    "Improve Recovery algorithms cuz Google is dying."
+                ],
+                "fixes": []
+            },
             "1.8.12": {
                 "note": "Performance Optimization & Cognitive Resilience.",
                 "added": [
