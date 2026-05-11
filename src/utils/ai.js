@@ -409,7 +409,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
 
-    const firstUserMsg = `USER_PROMPT: ${agentText}`.trim();
+    const firstUserMsg = `USER_PROMPT: "${agentText}"`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -513,8 +513,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [DYNAMIC CONTEXT ADAPTATION]
                 // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                const isContext8 = (sessionStats.tokens || 0) >= 8000;
-                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext8, MAX_LOOPS, loop + 1);
+                const isContext32k = (sessionStats.tokens || 0) >= 32000;
+                const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext32k, MAX_LOOPS, loop + 1);
 
                 // fs.writeFileSync('contents.json', JSON.stringify(contents));
                 stream = await client.models.generateContentStream({
