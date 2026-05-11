@@ -13,28 +13,61 @@ export const wrapText = (text, width) => {
             return;
         }
 
+        const tokens = sLine.split(/(\s+)/);
         let currentLine = '';
-        const words = sLine.split(/(\s+)/); // Capture whitespace as tokens to preserve indentation
-        
-        words.forEach(word => {
-            if ((currentLine + word).length > width) {
-                if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
+        let lastColumnStart = 0;
+        let xPos = 0;
+
+        // Detect leading indentation of the line
+        const leadingSpaceMatch = sLine.match(/^(\s*)/);
+        if (leadingSpaceMatch) {
+            lastColumnStart = leadingSpaceMatch[1].length;
+        }
+
+        tokens.forEach((token, idx) => {
+            if (token.length === 0) return;
+
+            const isWhitespace = token.trim().length === 0;
+
+            if (isWhitespace) {
+                // If it's a significant gap (2+ spaces), it's likely a new column
+                if (token.length >= 2) {
+                    lastColumnStart = xPos + token.length;
+                }
                 
-                // If it's just whitespace that exceeded the width, don't start the new line with it
-                if (word.trim().length === 0) {
-                    currentLine = '';
-                } else {
-                    currentLine = word;
-                    // Handle ultra-long words
-                    while (currentLine.length > width) {
-                        finalLines.push(currentLine.substring(0, width));
-                        currentLine = currentLine.substring(width);
-                    }
+                // Keep whitespace if we're not at the start of a wrapped line
+                if (currentLine.length > 0) {
+                    currentLine += token;
                 }
             } else {
-                currentLine += word;
+                // It's a word. Check if it fits.
+                if ((currentLine + token).length > width) {
+                    if (currentLine.trim().length > 0) {
+                        finalLines.push(currentLine.replace(/\s+$/, ''));
+                        
+                        // Smart Wrap: Indent to the last detected column start
+                        const indent = ' '.repeat(lastColumnStart);
+                        currentLine = indent + token;
+                        // Reset xPos for the new line
+                        xPos = indent.length;
+                    } else {
+                        // Ultra long word, force split
+                        let word = token;
+                        while (word.length > width) {
+                            finalLines.push(word.substring(0, width));
+                            word = word.substring(width);
+                        }
+                        currentLine = word;
+                        xPos = word.length;
+                    }
+                } else {
+                    currentLine += token;
+                }
             }
+
+            xPos += token.length;
         });
+
         if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
     });
 

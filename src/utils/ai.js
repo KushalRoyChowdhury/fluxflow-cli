@@ -157,7 +157,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 };
 
 const getActiveToolContext = (text) => {
-    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let match;
     while ((match = toolRegex.exec(text)) !== null) {
         const startIdx = match.index + match[0].length - 1; // Index of '('
@@ -177,10 +177,16 @@ const getActiveToolContext = (text) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
+                
                 if (balance === 0) {
-                    closed = true;
-                    toolRegex.lastIndex = i + 1;
-                    break;
+                    // Check for closing ']' after ')'
+                    let j = i + 1;
+                    while (j < text.length && /\s/.test(text[j])) j++;
+                    if (j < text.length && text[j] === ']') {
+                        closed = true;
+                        toolRegex.lastIndex = j + 1;
+                        break;
+                    }
                 }
             }
             if (char === '\\') isEscaped = !isEscaped;
@@ -195,7 +201,7 @@ const getActiveToolContext = (text) => {
 };
 
 const getContextSafeText = (text, stripThoughts = true) => {
-    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let result = '';
     let lastIdx = 0;
     let match;
@@ -221,9 +227,14 @@ const getContextSafeText = (text, stripThoughts = true) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
+                
                 if (balance === 0) {
-                    endIdx = i;
-                    break;
+                    let j = i + 1;
+                    while (j < text.length && /\s/.test(text[j])) j++;
+                    if (j < text.length && text[j] === ']') {
+                        endIdx = j;
+                        break;
+                    }
                 }
             }
             if (char === '\\') isEscaped = !isEscaped;
@@ -231,11 +242,11 @@ const getContextSafeText = (text, stripThoughts = true) => {
         }
 
         if (endIdx !== -1) {
-            result += 'tool:functions.' + match[1] + '()';
+            result += '[tool:functions.' + match[1] + '()]';
             lastIdx = endIdx + 1;
             toolRegex.lastIndex = lastIdx;
         } else {
-            result += 'tool:functions.' + match[1] + '(';
+            result += '[tool:functions.' + match[1] + '(';
             lastIdx = text.length;
             break;
         }
@@ -248,7 +259,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
 };
 
 const contextSafeReplace = (text, regex, replacement) => {
-    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let result = '';
     let lastIdx = 0;
     let match;
@@ -274,9 +285,14 @@ const contextSafeReplace = (text, regex, replacement) => {
             if (!inString) {
                 if (char === '(') balance++;
                 else if (char === ')') balance--;
+                
                 if (balance === 0) {
-                    endIdx = i;
-                    break;
+                    let j = i + 1;
+                    while (j < text.length && /\s/.test(text[j])) j++;
+                    if (j < text.length && text[j] === ']') {
+                        endIdx = j;
+                        break;
+                    }
                 }
             }
             if (char === '\\') isEscaped = !isEscaped;
@@ -306,7 +322,7 @@ const getSanitizedText = (text) => {
 
 const detectToolCalls = (text) => {
     const results = [];
-    const toolRegex = /(?:\[?\s*tool:functions\.)([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
 
     let match;
     while ((match = toolRegex.exec(text)) !== null) {
@@ -317,6 +333,7 @@ const detectToolCalls = (text) => {
         let inString = null;
         let isEscaped = false;
         let endIdx = -1;
+        let closingParenIdx = -1;
 
         for (let i = startIdx; i < text.length; i++) {
             const char = text[i];
@@ -333,8 +350,13 @@ const detectToolCalls = (text) => {
                 else if (char === ')') balance--;
 
                 if (balance === 0) {
-                    endIdx = i;
-                    break;
+                    closingParenIdx = i;
+                    let j = i + 1;
+                    while (j < text.length && /\s/.test(text[j])) j++;
+                    if (j < text.length && text[j] === ']') {
+                        endIdx = j;
+                        break;
+                    }
                 }
             }
 
@@ -347,12 +369,12 @@ const detectToolCalls = (text) => {
         }
 
         if (endIdx !== -1) {
-            const finalArgs = text.substring(startIdx + 1, endIdx);
+            const finalArgsText = text.substring(startIdx + 1, closingParenIdx);
             const finalFullMatch = text.substring(match.index, endIdx + 1);
             results.push({
                 fullMatch: finalFullMatch,
                 toolName: toolName.trim(),
-                args: finalArgs.trim()
+                args: finalArgsText.trim()
             });
             toolRegex.lastIndex = endIdx + 1;
         }

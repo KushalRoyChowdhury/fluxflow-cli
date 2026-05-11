@@ -12,13 +12,25 @@ const cleanSignals = (text) => {
     // Greedy loop to strip all tool calls
     while (true) {
         const lowerResult = result.toLowerCase();
-        const startIdx = lowerResult.indexOf(trigger);
-        if (startIdx === -1) break;
+        let triggerIdx = lowerResult.indexOf(trigger);
+        if (triggerIdx === -1) break;
+
+        // [HARDENING] Check for outer bracket
+        let startIdx = triggerIdx;
+        let hasOuterBracket = false;
+        
+        // Look back for '[' (ignoring whitespace)
+        let k = triggerIdx - 1;
+        while (k >= 0 && /\s/.test(result[k])) k--;
+        if (k >= 0 && result[k] === '[') {
+            startIdx = k;
+            hasOuterBracket = true;
+        }
 
         let balance = 0;
         let foundStart = false;
         let inString = null;
-        let j = startIdx;
+        let j = triggerIdx;
 
         while (j < result.length) {
             const char = result[j];
@@ -39,13 +51,21 @@ const cleanSignals = (text) => {
                 }
             }
 
+            if (foundStart && balance === 0 && !inString) {
+                // If we have outer bracket, look for closing ']'
+                let endIdx = j;
+                if (hasOuterBracket) {
+                    let m = j + 1;
+                    while (m < result.length && /\s/.test(result[m])) m++;
+                    if (m < result.length && result[m] === ']') {
+                        endIdx = m;
+                    }
+                }
+                result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+                break;
+            }
             j++;
-            // Exit condition: we've balanced the parentheses of the tool call
-            if (foundStart && balance === 0 && !inString) break;
         }
-
-        // Slice out the tool call
-        result = result.substring(0, startIdx) + result.substring(j);
     }
 
     // Secondary cleanup for protocol signals and success/error markers
@@ -55,6 +75,7 @@ const cleanSignals = (text) => {
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')
         .replace(/\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
+        .replace(/\[\s*(turn\s*:)?\s*(continue|finish)?\s*$/gi, '')
         .replace(/\n\s*turn\s*:\s*(continue|finish)\s*$/gi, '')
         .replace(/\n\nResponded on .*/g, '')
         .replace(/\n\n\[Prompted on: .*\]/g, '')

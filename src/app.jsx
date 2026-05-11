@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.26';
+const versionFluxflow = '1.8.27';
 const updatedOn = '2026-05-11';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1084,8 +1084,10 @@ OUTPUT: ${execOutputRef.current}`;
 
                         if (chunkLower.includes('tool:functions.')) {
                             inToolCall = true;
+                            // [HARDENING] Reset balance and look for outer bracket in context
                             toolCallBalance = 0;
                             inToolCallString = null;
+                            if (chunkText.includes('[tool:functions.')) toolCallBalance = 0; // The '[' will be counted in the loop
                         }
 
                         if (inToolCall) {
@@ -1098,8 +1100,8 @@ OUTPUT: ${execOutputRef.current}`;
                                 }
 
                                 if (!inToolCallString) {
-                                    if (char === '(') toolCallBalance++;
-                                    else if (char === ')') toolCallBalance--;
+                                    if (char === '(' || char === '[') toolCallBalance++;
+                                    else if (char === ')' || char === ']') toolCallBalance--;
                                 }
                             }
                             if (toolCallBalance <= 0 && !inToolCallString) {
