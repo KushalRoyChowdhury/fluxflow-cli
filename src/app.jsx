@@ -1487,7 +1487,7 @@ OUTPUT: ${execOutputRef.current}`;
                 );
             case 'stats':
                 return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} width={100}>
+                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} width={Math.min(100, (stdout?.columns || 100) - 2)}>
                         <Box marginBottom={1}>
                             <Text color="white" bold underline>SESSION TELEMETRY</Text>
                         </Box>
@@ -1519,10 +1519,12 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
-                                <Text color="white">{sessionToolSuccess + sessionToolFailure} ( </Text>
-                                <Text color="green">✓ {sessionToolSuccess}</Text>
+                                <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
+                                <Text color="green">✔ {sessionToolSuccess}</Text>
                                 <Text color="white"> </Text>
-                                <Text color="red">x {sessionToolFailure}</Text>
+                                <Text color="red">✘ {sessionToolFailure}</Text>
+                                <Text color="white"> </Text>
+                                <Text color="yellow">⚠️ {sessionToolDenied}</Text>
                                 <Text color="white"> )</Text>
                             </Box>
                         </Box>
@@ -1548,9 +1550,9 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
                                 <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0)} ( </Text>
-                                <Text color="green">✓ {dailyUsage?.toolSuccess || 0}</Text>
+                                <Text color="green">✔ {dailyUsage?.toolSuccess || 0}</Text>
                                 <Text color="white"> </Text>
-                                <Text color="red">x {dailyUsage?.toolFailure || 0}</Text>
+                                <Text color="red">✘ {dailyUsage?.toolFailure || 0}</Text>
                                 <Text color="white"> )</Text>
                             </Box>
                         </Box>
@@ -2063,7 +2065,7 @@ OUTPUT: ${execOutputRef.current}`;
                     const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
 
                     return (
-                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={100} marginTop={1}>
+                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={1}>
                             <Box marginBottom={1}>
                                 <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
                             </Box>
@@ -2076,7 +2078,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                    <Text color="white">{totalTools} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="red">x {sessionToolFailure}</Text> )</Text>
+                                    <Text color="white">{totalTools} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="red">✘ {sessionToolFailure}</Text> <Text color="yellow">⚠️ {sessionToolDenied}</Text> )</Text>
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Success Rate:</Text></Box>

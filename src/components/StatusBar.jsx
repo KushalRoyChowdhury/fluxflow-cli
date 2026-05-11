@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { formatTokens } from '../utils/text.js';
+import { formatTokens, truncatePath } from '../utils/text.js';
 
 const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
@@ -26,7 +26,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             {/* CURRECT DIRECTORY TELEMETRY */}
             <Box flexGrow={1} justifyContent="center" paddingX={2}>
                 <Text color="gray" dimColor>📁 </Text>
-                <Text color="blue" dimColor italic>{process.cwd()}</Text>
+                <Text color="blue" dimColor italic>{truncatePath(process.cwd(), 40)}</Text>
             </Box>
 
             <Box>

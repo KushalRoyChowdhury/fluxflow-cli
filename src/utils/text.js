@@ -15,13 +15,17 @@ export const wrapText = (text, width) => {
 
         const tokens = sLine.split(/(\s+)/);
         let currentLine = '';
-        let lastColumnStart = 0;
-        let xPos = 0;
-
-        // Detect leading indentation of the line
+        let originalXPos = 0;
+        let lastSignificantGap = 0;
         const leadingSpaceMatch = sLine.match(/^(\s*)/);
         if (leadingSpaceMatch) {
-            lastColumnStart = leadingSpaceMatch[1].length;
+            lastSignificantGap = leadingSpaceMatch[1].length;
+        }
+
+        // Detect list markers (e.g., "- ", "* ", "1. ")
+        const listMatch = sLine.match(/^\s*([-*]|\d+\.)\s+/);
+        if (listMatch) {
+            lastSignificantGap = listMatch[0].length;
         }
 
         tokens.forEach((token, idx) => {
@@ -30,42 +34,50 @@ export const wrapText = (text, width) => {
             const isWhitespace = token.trim().length === 0;
 
             if (isWhitespace) {
-                // If it's a significant gap (2+ spaces), it's likely a new column
+                // Track significant gaps for table-like alignment
                 if (token.length >= 2) {
-                    lastColumnStart = xPos + token.length;
+                    lastSignificantGap = originalXPos + token.length;
                 }
                 
-                // Keep whitespace if we're not at the start of a wrapped line
                 if (currentLine.length > 0) {
                     currentLine += token;
                 }
             } else {
-                // It's a word. Check if it fits.
+                // Handle markdown table pipes as column markers
+                if (token.includes('|')) {
+                    const pipeIdx = token.indexOf('|');
+                    lastSignificantGap = originalXPos + pipeIdx + 1;
+                }
+
                 if ((currentLine + token).length > width) {
                     if (currentLine.trim().length > 0) {
                         finalLines.push(currentLine.replace(/\s+$/, ''));
                         
-                        // Smart Wrap: Indent to the last detected column start
-                        const indent = ' '.repeat(lastColumnStart);
+                        // Use the last significant gap or leading indent
+                        const safeIndent = Math.min(lastSignificantGap, Math.max(0, width - 12));
+                        const indent = ' '.repeat(safeIndent);
                         currentLine = indent + token;
-                        // Reset xPos for the new line
-                        xPos = indent.length;
+
+                        // Ensure we don't overflow again
+                        while (currentLine.length > width && width > 20) {
+                            finalLines.push(currentLine.substring(0, width));
+                            currentLine = indent + currentLine.substring(width);
+                        }
                     } else {
-                        // Ultra long word, force split
+                        // Ultra long word or narrow width
                         let word = token;
-                        while (word.length > width) {
+                        while (word.length > width && width > 5) {
                             finalLines.push(word.substring(0, width));
                             word = word.substring(width);
                         }
                         currentLine = word;
-                        xPos = word.length;
                     }
                 } else {
                     currentLine += token;
                 }
             }
 
-            xPos += token.length;
+            originalXPos += token.length;
         });
 
         if (currentLine) finalLines.push(currentLine.replace(/\s+$/, ''));
@@ -87,4 +99,13 @@ export const formatTokens = (tokens) => {
         return `${(num / 1000).toFixed(2)}k`;
     }
     return num.toString();
+};
+
+/**
+ * Middle-truncates a string (usually a path) to fit within a maximum length.
+ */
+export const truncatePath = (p, maxLength = 40) => {
+    if (!p || p.length <= maxLength) return p;
+    const half = Math.floor((maxLength - 3) / 2);
+    return p.substring(0, half) + '...' + p.substring(p.length - half);
 };
