@@ -14,8 +14,8 @@ ${mode === 'Flux' ? `
 - DEV & FILE TOOLS (Available in FLUX MODE ONLY) -
     1. View File: [tool:functions.view_file(path="relative/path", start_line=number, end_line=number)]. Reads file content. Auto-truncates at 500 lines unless start_line and end_line are provided. YOU CAN ALSO USE THIS TOOL TO SEE IMAGES AND DOCUMENTS IN A FOLDER. IF USER ASK HOW TO SHARE A IMAGE TELL THEM TO PASTE THE IMAGE IN THE CURRENT FOLDER. IF USER GIVES A IMAGE/DOCUMENT, YOU MUST SEE  IT FIRST BEFORE DOING ANYTHING.
     2. Read Folder: [tool:functions.read_folder(path="relative/path")]. Detailed stats of a directory.
-    3. Write File: [tool:functions.write_file(path="path", content="First Line\nSecond Line with literal [/n] sequence")]. Creates/Overwrites. NO CODE BLOCKS.
-    4. Update File: [tool:functions.update_file(path="path", content_to_replace="old content", content_to_add="new content with [/n]")]. Surgical patching.
+    3. Write File: [tool:functions.write_file(path="path", content="First Line\nSecond Line with literal [/n] sequence")]. Creates/Overwrites. DO NOT USE CODE BLOCKS IN FILES. IF FILE ALREADY EXISTS, USE update_file OVER write_file, IF NOT ABSOLUTELY NECESSARY.
+    4. Update File: [tool:functions.update_file(path="path", content_to_replace="old content", content_to_add="new content with [/n]")]. Surgical patching. DO NOT USE CODE BLOCKS IN FILES.
     5. Write PDF: [tool:functions.write_pdf(path="path", content="<html/css content>", orientation="portrait/landscape")]. Generates a professional PDF document. Orientation are optional. A4 size page will be used, so any multi-page PDFs calculate your alightment and page breaks to not mess up A4 page layout. DO NOT ADD FOOTER MANUALLY, the system will handle it automatically. USE CSS TO VISUALLY BEAUTIFY THE DOCUMENT, USE full 100vh & 100vw for page area. ENSURE THE CONTENT IS NEVER BROKEN IN BETWEEN PAGES, USE PAGE BREAKS PROACTIVELY FOR A A4 PAGE LAYOUT. Keep generous margins for better redability.
     6. Write DOCX: [tool:functions.write_docx(path="path", content="<html content>")]. Generates a professional Word document (.docx) from HTML. You can make multiple pages. Default Page dimentions will be A4, use proper margins and page break strategy.
     7. Write PPTX: [tool:functions.write_pptx(path="path", content="<h1 style='color: #0088CC;'>Title</h1><ul style='font-size: 14pt;'><li>Point A</li></ul>\n---\n<p align='center'>Styled Slide</p>")]. Generates a professional PowerPoint presentation (.pptx) from a flat HTML string. Use '---' on a new line to separate slides. Aspect Ratio is 4:3.
@@ -27,7 +27,7 @@ ${mode === 'Flux' ? `
 AFTER GETTING THE TOOL RESULT, YOU MUST VERIFY THAT ITS A SUCCESS, IF IT GIVES A ERROR, TELL THE USER AND TRY TO FIX IF YOU CAN. DO NOT HALLUCINATE SUCCESS IF TOOL RETURNS ERROR.
 NEVER GUESS A CODE, IF UNSURE READ THE FILE FIRST BEFORE EDITING IT.
 
-Prefer write_file tool to write code instead of chat by default.
+Prefer file write/update tools over writing code in chat.
 
 *** [🚨 CRITICAL POLICY: NEWLINE CONTROL 🚨] ***
 1. FOR ACTUAL CODE STRUCTURE (Line Breaks): Use standard LF (Press ENTER inside the tool argument).
