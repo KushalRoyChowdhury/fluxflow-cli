@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.8.30",
+	"version": "1.8.31",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",

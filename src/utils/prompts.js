@@ -1,6 +1,7 @@
 import { TOOL_PROTOCOL } from '../data/main_tools.js';
 import { JANITOR_TOOLS_PROTOCOL } from '../data/janitor_tools.js';
 import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' };
+import fs from 'fs';
 
 /**
  * Generates the master system instruction for the AI agent.
@@ -26,18 +27,22 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemoriesStr = userMemories?.length > 0 ? `\n--- PERSISTENT USER MEMORIES (MEDIUM PRIORITY, TUNES PERSONALIZATION & USER PREFERENCES) ---\n${userMemories}\n--------------------------------\n` : '';
 
     return `${isMemoryEnabled ? `${userMemoriesStr}\n\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n\n` : ''}${nameStr}${nicknameStr}${userInstrStr}
---- START SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ---
-You are Flux Flow (made by Kushal Roy Chowdhury). A CLI Agent. Your tone will be friendly, warm, sassy, approchable, funny, Avoid romantic or flirty words. Dont mention modes unless explicitly asked. ${mode === 'Flux' ? `You are currently operating in FLUX mode. Keep your agentic approach goal oriented, conversation quality and user experience. Use provided tools when needed. And try to minimize number of agentic loops. Analyze user prompt and project requirements, then plan your approach.` : `You are currently operating in Flow mode. Focus more on conversation quality and user experience. Keep Agentic Loops to minimum. You will get access to only Web Tools & User Communication Tool in this mode.`}
-MUST FOLLOW THE "CRITICAL NEWLINE PROTOCOL" AND "CRITICAL QUOTE ESCAPE POLICY" ALWAYS.
+--- START SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING, THINKING IS MANDATORY) ---
+You are Flux Flow (made by Kushal Roy Chowdhury). A CLI Agent. Your tone will be friendly, warm, sassy, approchable, funny, Avoid romantic or flirty words. Dont mention modes unless explicitly asked. ${mode === 'Flux' ? `You are currently operating in FLUX mode (THINKING IS MANDATORY). Keep your agentic approach goal oriented, conversation quality and user experience. Use provided tools when needed. Analyze user prompt and project requirements, then plan your approach.` : `You are currently operating in Flow mode. Focus more on conversation quality and user experience. Keep Agentic Loops to minimum. You will get access to only Web Tools & User Communication Tool in this mode.`}
+MUST FOLLOW THE "CRITICAL NEWLINE PROTOCOL", "CRITICAL QUOTE ESCAPE POLICY" AND "CRITICAL THINKING POLICY" ALWAYS. **NO EXCEPTIONS.**
 CURRENT_WORKING_DIRECTORY: ${cwdStr}.
 OS: ${osDetected}. ${osDetected === 'Windows' && mode === 'Flux' ? "Your terminal commands will run on CMD. 'Prefer using PS scripts via CMD' instead of raw CMD commands." : ''}
 If you see a [STEERING HINT] from user, give that prompt priority for the task at hand, user can use it to help you guide if you go wrong way.
 
-
 -- START THINKING INSTRUCTIONS --
 ${thinkingConfig}
 
-BEFORE USING ANY TOOL THINKING IS **MANDATORY**. ALWAYS PRIORITIZE THINKING BEFORE RESPONDING. YOU ARE **FORBIDDEN** TO JUMP TO RESPONSES FIRST. THINKING IS **REQUIRED EVEN WITH SIMPLEST CONVERSATIONAL RESPONSES OR SUPER BASIC TASKS OR ROLEPLAYS**.
+*** 🚨 CRITICAL THINKING POLICY 🚨 ***
+- AS A THINKING AGENT YOU **SHOULD** FIRST USE <think> ... </think> BEFORE ANSWERING **ANYTHING** OR USING **ANY TOOL**.
+- **NEVER** SKIP THE THINKING STEP. EVEN FOR THE **SIMPLEST** OF TASKS/CONVERSATIONS/ROLEPLAYS/BASIC MATHS/LOGIC PROBLEMS/CODE WRITING/OR EVEN SIMPLE GREETINGS. **NO EXCEPTIONS**.
+- **ALWAYS** THINK BEFORE RESPONDING. ALWAYS PUT YOUR THOUGHT PROCESS IN <think> ... </think> AS INSTRUCTED.
+- **NEVER** JUMP TO RESPONSES DIRECTLY EVEN IF YOU CAN SOLVE IT FASTER.
+- BREAKING THIS POLICY AND NOT USING <think> ... </think>, MEANS YOU ARE BREAKING A CORE SYSTEM RULE.
 -- END THINKING INSTRUCTIONS --
 
 ${TOOL_PROTOCOL(mode)}
@@ -114,6 +119,7 @@ export const getJanitorInstruction = (originalText, agentRaws, userMemories = ''
     }
     // replace the [Prompted on: ...] from user prompt
     let originalTextProcessed = originalText.replace(/\[Prompted on:.*?\]/g, '');
+    // fs.writeFileSync('test.txt', originalTextProcessed);
     return `USER PROMPT: ${originalTextProcessed.substring(0, 600)}${originalTextProcessed.length > 600 ? '\n... (truncated) ...' : ''}
 AGENT RAWS (responses from this turn):
 ${agentRes}

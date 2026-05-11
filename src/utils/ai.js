@@ -29,7 +29,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-    const janitorContents = history.slice(-6)
+    const janitorContents = history.slice(-12)
         .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
         .map(msg => ({
             role: msg.role === 'user' ? 'user' : 'model',
@@ -431,7 +431,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
 
-    const firstUserMsg = `USER_PROMPT: "${agentText}"`.trim();
+    const firstUserMsg = `[SYSTEM] MUST FOLLOW THINKING RULES, NEWLINE, ESCAPE POLICY AS PRIORITY.\nUSER_PROMPT: "${agentText}"`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -927,7 +927,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly and DON'T repeat what you already said!" });
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly from the EXACT word it left off and DON'T repeat what you already said! IF you were in a thinking block, complete the thinking and close the thinking with proper </think> then respond. PICK UP FROM TE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF." });
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
