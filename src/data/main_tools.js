@@ -30,10 +30,9 @@ export const TOOL_PROTOCOL = (mode) => `
     *Prefer file write/update tools over writing code in chat*.
 
     *** [🚨 CRITICAL POLICY: NEWLINE CONTROL 🚨] ***
-        1. FOR ACTUAL CODE STRUCTURE (Line Breaks): Use standard LF (Press ENTER inside the tool argument).
-        2. TO WRITE THE LITERAL CHARACTERS '\\' AND 'n' (e.g., inside printf("Hello\\n")): You MUST use the sequence [/n].
-        3. 🛑 NEVER USE "\\\\n" (backslash-n) inside tool arguments for literal strings; the system parser will convert it into a real structural line break, which WILL BREAK your code syntax (e.g. in C, Python).
-        4. ALWAYS check the tool result diff to ensure your [/n] was correctly translated to a literal \n.
+        1. PHYSICAL NEWLINES: Press ENTER inside tool arguments for real line breaks in the file structure.
+        2. LITERAL \\n: To write the literal characters '\\' and 'n' (e.g., inside printf("Hello\\n")), you MUST use the sequence [/n].
+        3. ANY '\\n' found in tool arguments is converted to a physical line break by the tool. Use this for code structure, but use [/n] for literal text.
     ***
 
     *** [🚨 CRITICAL QUOTE ESCAPE POLICY 🚨] ***

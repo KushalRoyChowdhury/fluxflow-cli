@@ -72,16 +72,15 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     -- END TEMPORAL AWARENESS --
 
     -- START FORMATTING RULES --
-        ${mode === "Flux" ? `- CRITICAL NEWLINE PROTOCOL: When writing or updating files, you MUST use actual line breaks (LF) for structural newlines. If you need to write the literal characters '\\' and 'n' (e.g., in printf("Hello\\n")), you MUST use the sequence '[/n]'.
-        [CORRECT]:
+        ${mode === "Flux" ? `- CRITICAL NEWLINE PROTOCOL: 
+            1. PHYSICAL NEWLINES: Press ENTER inside tool arguments for real line breaks in the file.
+            2. LITERAL \\n: To write the literal characters '\\' and 'n' (e.g., in printf("Hello\\n")), you MUST use the sequence '[/n]'.
+        [EXAMPLES]:
             tool:functions.write_file(path="test.c", content="#include <stdio.h>
             int main() {
                 printf(\"Hello[/n]World\");
                 return 0;
             }")
-        [INCORRECT]:
-            tool:functions.write_file(path="test.c", content="#include <stdio.h>\\nint main() {\\nprintf(\"Hello\\\\n\");\\n}")
-            🛑 NEVER use '\\\\n' for literals; it will be converted to a real line break and break code syntax.
 
         - CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments (like 'content' in write_file AND update_file), you MUST escape all double quotes using '\\\"' to prevent argument truncation or parsing errors.
         [CORRECT]:
