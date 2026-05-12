@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.31';
+const versionFluxflow = '1.8.32';
 const updatedOn = '2026-05-12';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1027,7 +1027,6 @@ OUTPUT: ${execOutputRef.current}`;
                                 packet.data.agentText,
                                 packet.data.fullAgentTextRaw,
                                 packet.data.history,
-                                packet.data.needTitle,
                                 {
                                     onMemoryUpdated: () => setMessages(prev => {
                                         const newMsgs = [...prev];
