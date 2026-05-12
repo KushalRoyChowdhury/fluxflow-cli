@@ -20,6 +20,30 @@ export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
 
+const TOOL_LABELS = {
+    'write_file': 'Writing File',
+    'update_file': 'Updating File',
+    'read_folder': 'Listing Directory',
+    'view_file': 'Reading File',
+    'exec_command': 'Running Command',
+    'web_search': 'Searching Web',
+    'web_scrape': 'Reading Site',
+    'memory': 'Updating Memory',
+    'search_keyword': 'Finding Files',
+    'ask': 'Asking User'
+};
+
+const getToolDetail = (toolName, argsStr) => {
+    try {
+        const pArgs = parseArgs(argsStr);
+        const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
+        // Strip quotes and backslashes that might be part of an escaped string
+        return filePath ? path.basename(filePath.replace(/[\\"]/g, '')) : null;
+    } catch (e) {
+        return null;
+    }
+};
+
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
@@ -199,7 +223,7 @@ const getActiveToolContext = (text) => {
         }
 
         if (!closed) {
-            return { inside: true, toolName: match[1], startIndex: match.index };
+            return { inside: true, toolName: match[1], startIndex: match.index, args: text.substring(match.index + match[0].length) };
         }
     }
     return { inside: false };
@@ -419,7 +443,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     // Truncation Logic (Compression 0.0)
     if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
-        modifiedHistory = getTruncatedHistory(modifiedHistory, 4);
+        modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
     }
 
     // Harvest temporary memories from different sessions only
@@ -436,7 +460,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
 
-    const firstUserMsg = `[SYSTEM] MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGH PRIORITY FOR THIS PROMPT. DO NOT FORGET.\n\nUSER_PROMPT: "${agentText}"`.trim();
+    const firstUserMsg = `[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.\n\nUSER_PROMPT: "${agentText}"`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -492,6 +516,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let turnText = '';
         let lastToolSniffed = null;
+        let lastToolDetail = null;
         let lastToolEventTime = null;
         let toolResults = [];
         let toolCallPointer = 0;
@@ -543,15 +568,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const isContext32k = (sessionStats.tokens || 0) >= 32000;
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext32k, MAX_LOOPS, loop + 1);
 
-                // fs.writeFileSync('contents.json', JSON.stringify(contents));
-                // fs.writeFileSync('instructions_agent.txt', currentSystemInstruction);
+                // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
+                const jitInstruction = `\n\n[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.`;
+                const lastUserMsg = contents[contents.length - 1];
+                let addedMarker = false;
+                if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL_RESULT]')) {
+                    lastUserMsg.parts[0].text += jitInstruction;
+                    addedMarker = true;
+                }
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
                     contents,
                     config: {
                         systemInstruction: currentSystemInstruction,
-                        temperature: mode === 'Flux' ? 1.05 : 1.4,
+                        temperature: mode === 'Flux' ? 0.98 : 1.4,
                         maxOutputTokens: 32768,
                         mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                         safetySettings: [
@@ -563,6 +594,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         thinkingConfig: { includeThoughts: false, thinkingLevel: targetModel.includes('pro') ? ThinkingLevel.HIGH : ThinkingLevel.MINIMAL },
                     },
                 });
+
+                // [JIT CLEANUP] - Remove the marker from the local contents object after sending
+                if (addedMarker && contents[contents.length - 1]?.parts?.[0]) {
+                    contents[contents.length - 1].parts[0].text = contents[contents.length - 1].parts[0].text.replace(jitInstruction, '').trim();
+                }
 
                 // Reset turn state for this specific retry attempt
                 turnText = '';
@@ -624,10 +660,28 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolContext.inside) {
                             if (!lastToolEventTime) lastToolEventTime = Date.now();
                             const potentialTool = toolContext.toolName;
-                            // Regex validation to ensure it's a valid-looking tool name and not stray text
-                            if (potentialTool && /^[a-z_]+$/.test(potentialTool) && potentialTool !== lastToolSniffed) {
+                            const partialArgs = toolContext.args || '';
+
+                            // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools Only)
+                            let detail = null;
+                             if (['write_file', 'update_file', 'view_file', 'read_folder'].includes(potentialTool)) {
+                                 const pArgs = parseArgs(partialArgs);
+                                 const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
+                                 if (filePath) {
+                                     detail = path.basename(filePath.replace(/[\\"]/g, ''));
+                                 } else {
+                                     // [FALLBACK] - Super-permissive regex for mid-stream escaped paths
+                                     const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                                     if (m) detail = path.basename(m[1].replace(/[\\"]/g, ''));
+                                 }
+                             }
+
+                            // Only update if something changed (to avoid jitter)
+                            const currentLabel = `${TOOL_LABELS[potentialTool] || potentialTool}${detail ? ` (${detail})` : ''}`;
+                            if (potentialTool !== lastToolSniffed || detail !== lastToolDetail) {
                                 lastToolSniffed = potentialTool;
-                                yield { type: 'status', content: `Working (${potentialTool})...` };
+                                lastToolDetail = detail;
+                                yield { type: 'status', content: `${currentLabel}...` };
                             }
                         }
 
@@ -708,7 +762,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const toolCall = allToolsFound[toolCallPointer];
 
                             // Status Update
-                            yield { type: 'status', content: `Working (${toolCall.toolName})...` };
+                            const displayLabel = TOOL_LABELS[toolCall.toolName] || toolCall.toolName;
+                            const detail = getToolDetail(toolCall.toolName, toolCall.args);
+                            yield { type: 'status', content: `${displayLabel}${detail ? ` (${detail})` : ''}...` };
 
                             // START VISUAL FEEDBACK FOR TOOLS
                             let label = '';
@@ -811,7 +867,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                                    toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
+                                    toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}\n\n[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.` });
                                     yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
                                     continue;
@@ -825,7 +881,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (approval === 'deny') {
                                         if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
                                         const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: DENIED: ${denyMsg}` });
+                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: DENIED: ${denyMsg}\n\n[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.` });
                                         yield { type: 'tool_result', content: `[TOOL_RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
                                         if (settings.onToolResult) settings.onToolResult('denied');
@@ -934,7 +990,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly from the EXACT word it left off and DON'T repeat what you already said! IF you were in a thinking block, complete the thinking and close the thinking with proper </think> then respond. PICK UP FROM TE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF." });
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly from the EXACT word it left off and DON'T repeat what you already said! IF you were in a thinking block, complete the thinking and close the thinking with proper </think> then respond. PICK UP FROM TE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start as the system won't pick half tool formats.\n- Visually the new pickup and continuation should look natual sentence flow." });
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
@@ -1033,7 +1089,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: `[SYSTEM]: ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? 'OVER-THINKING ' : ''}LOOP DETECTED by Internal System${isThinkingLoop && ' for current EFFORT_LEVEL'}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
+            modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop && ' for current EFFORT_LEVEL'}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
             isStutteringLoop = false;
         }

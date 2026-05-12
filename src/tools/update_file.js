@@ -22,7 +22,7 @@ export const update_file = async (args) => {
         // 2. [/n] becomes a literal \n in the file
         return content
             .replace(/\\n/g, '\n')
-            .replace(/\[\/n\]/g, '\\n');
+            .replace(/\[\/n\]?/g, '\\n');
     };
 
     content_to_replace = unescapeContent(strip(content_to_replace));

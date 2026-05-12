@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.32';
+const versionFluxflow = '1.8.33';
 const updatedOn = '2026-05-12';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -1793,11 +1793,11 @@ OUTPUT: ${execOutputRef.current}`;
                                     return (
                                         <Box flexDirection="column" marginTop={1}>
                                             <Box><Text color="red" wrap="anywhere" bold>- {oldVal}</Text></Box>
-                                            <Box marginTop={1}><Text color="green" wrap="anywhere" bold>+ {newVal.replace(/\[\/n\]/g, '\\n')}</Text></Box>
+                                            <Box marginTop={1}><Text color="green" wrap="anywhere" bold>+ {newVal.replace(/\[\/n\]?/g, '\\n')}</Text></Box>
                                         </Box>
                                     );
                                 }
-                                return <Text color="white" wrap="anywhere">{newVal.replace(/\[\/n\]/g, '\\n') || 'Updating file content...'}</Text>;
+                                return <Text color="white" wrap="anywhere">{newVal.replace(/\[\/n\]?/g, '\\n') || 'Updating file content...'}</Text>;
                             })()}
                         </Box>
 

@@ -44,7 +44,7 @@ export const write_file = async (args) => {
         // 2. [/n] becomes a literal \n in the file
         const processedContent = strip(content)
             .replace(/\\n/g, '\n')
-            .replace(/\[\/n\]/g, '\\n');
+            .replace(/\[\/n\]?/g, '\\n');
 
         const lineCount = processedContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(processedContent, 'utf8');
