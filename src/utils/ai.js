@@ -569,7 +569,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext32k, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} PROTOCOL**.`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL_RESULT]')) {
@@ -582,7 +582,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     contents,
                     config: {
                         systemInstruction: currentSystemInstruction,
-                        temperature: mode === 'Flux' ? 0.98 : 1.4,
+                        temperature: mode === 'Flux' ? 1.0 : 1.4,
                         maxOutputTokens: 32768,
                         mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                         safetySettings: [

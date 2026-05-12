@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.34';
+const versionFluxflow = '1.8.35';
 const updatedOn = '2026-05-13';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -72,6 +72,8 @@ const FLUX_LOGO = gradient(['#00ffff', '#0077ff', '#ff00ff']).multiline(
 );
 
 export default function App() {
+    const [confirmExit, setConfirmExit] = useState(false);
+    const [exitCountdown, setExitCountdown] = useState(10);
     const { stdout } = useStdout();
 
     const [input, setInput] = useState('');
@@ -329,6 +331,10 @@ export default function App() {
 
         // 1. ESC Logic
         if (key.escape) {
+            if (confirmExit) {
+                setConfirmExit(false);
+                return;
+            }
             if (isProcessing || activeCommand) {
                 if (!escPressed) {
                     setEscPressed(true);
@@ -368,7 +374,12 @@ export default function App() {
 
         // 3. CTRL+C Exit Protocol
         if (key.ctrl && inputText === 'c' && activeView !== 'exit') {
-            setActiveView('exit');
+            if (!confirmExit) {
+                setConfirmExit(true);
+            } else {
+                setActiveView('exit');
+                setConfirmExit(false);
+            }
         }
 
         // 4. Modifier + Enter (Newline Protocol - Supports Shift/Ctrl/Alt/Meta)
@@ -435,6 +446,26 @@ export default function App() {
         }
         init();
     }, []);
+
+    // [SAFE-EXIT TIMER]
+    useEffect(() => {
+        let timer;
+        if (confirmExit) {
+            setExitCountdown(10);
+            timer = setInterval(() => {
+                setExitCountdown(prev => {
+                    if (prev <= 1) {
+                        setConfirmExit(false);
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [confirmExit]);
 
     // Auto-save watcher
     useEffect(() => {
@@ -2044,6 +2075,17 @@ OUTPUT: ${execOutputRef.current}`;
                     </Box>
                 ) : (
                     renderActiveView()
+                )}
+
+                {confirmExit && (
+                    <Box borderStyle="round" borderColor="red" paddingX={2} marginY={0} width="100%">
+                        <Text color="red" bold>🔴 EXIT CONFIRMATION: </Text>
+                        <Text color="white">Press </Text>
+                        <Text color="red" bold>CTRL + C</Text>
+                        <Text color="white"> again to exit ({exitCountdown}s). Press </Text>
+                        <Text color="cyan" bold>ESC</Text>
+                        <Text color="white"> to cancel.</Text>
+                    </Box>
                 )}
 
                 <Box flexShrink={0} width="100%">

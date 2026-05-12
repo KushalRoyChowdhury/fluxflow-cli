@@ -15,7 +15,7 @@ export const update_file = async (args) => {
 
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    
+
     const unescapeContent = (content) => {
         // --- THE FINAL HARMONY ---
         // 1. \n (2 chars) becomes a real newline (LF)
@@ -52,9 +52,9 @@ export const update_file = async (args) => {
         // --- INDENTATION PRESERVATION ENGINE (v5: Precision Delta-Shift) ---
         const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
             if (!newText || originalMatch === undefined) return newText;
-            
+
             const getIndent = (line) => line.match(/^\s*/)[0];
-            
+
             const getMinIndent = (text) => {
                 const lines = text.split('\n').filter(l => l.trim() !== '');
                 if (lines.length === 0) return '';
@@ -69,7 +69,7 @@ export const update_file = async (args) => {
             const matchBaseIndent = getMinIndent(originalMatch);
             const targetBaseIndent = leadingContext.match(/^\s*/)[0] + matchBaseIndent;
             const newBaseIndent = getMinIndent(newText);
-            
+
             // Calculate the delta shift (can be negative)
             const delta = targetBaseIndent.length - newBaseIndent.length;
             const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
@@ -77,15 +77,15 @@ export const update_file = async (args) => {
             const newLines = newText.split('\n');
             return newLines.map((line, i) => {
                 if (line.trim() === '' && i !== 0) return '';
-                
+
                 const currentLineIndent = getIndent(line).length;
                 const shiftedIndentLength = Math.max(0, currentLineIndent + delta);
-                
+
                 // For the first line, we subtract the leadingContext already present in the file
-                const prependedIndentLength = (i === 0) 
+                const prependedIndentLength = (i === 0)
                     ? Math.max(0, shiftedIndentLength - leadingContext.length)
                     : shiftedIndentLength;
-                
+
                 return indentChar.repeat(prependedIndentLength) + line.trimStart();
             }).join('\n');
         };
@@ -96,7 +96,7 @@ export const update_file = async (args) => {
 
         // --- UNIFIED MATCHER (v6: High-Fidelity Fuzzy Logic) ---
         const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
+
         if (content_to_replace !== '' && currentContent.includes(content_to_replace)) {
             matchRegex = new RegExp(exactPattern, 'g');
         } else {
@@ -106,7 +106,7 @@ export const update_file = async (args) => {
                 .map(line => line.trim())
                 .filter(line => line.length > 0) // Skip empty lines for matching
                 .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
-            
+
             if (fuzzyLines.length > 0) {
                 // Construct a pattern that allows flexible indentation and whitespace between lines
                 // We use \s* to ensure we stay within the intended block
@@ -146,7 +146,7 @@ export const update_file = async (args) => {
         // Sync for the diff generation based on the first match
         const firstLineStart = currentContent.lastIndexOf('\n', startPos) + 1;
         const firstLeadingContext = currentContent.substring(firstLineStart, startPos);
-        
+
         const finalContentToAdd = adjustIndentation(content_to_add, firstMatchContent, firstLeadingContext);
         const finalContentToReplace = firstMatchContent;
 
@@ -158,7 +158,7 @@ export const update_file = async (args) => {
         const oldLines = content_to_replace.split(/\r?\n/);
         const endLine = startLine + oldLines.length - 1;
 
-        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\n\n`;
+        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\' and 'n' characters to the file at that place.\n\n`;
         diffText += `[DIFF_START]\n`;
 
         // 1. Context Before (up to 15 lines)
@@ -176,7 +176,7 @@ export const update_file = async (args) => {
 
         // Original lines (fully indented)
         const fullOldLines = currentContent.substring(lineStartPos, actualEndPos).split('\n');
-        
+
         // Updated lines (fully indented)
         // Calculate the corresponding range in the new content
         const newAffectedEndPos = startPos + content_to_add.length;
@@ -187,7 +187,7 @@ export const update_file = async (args) => {
         fullOldLines.forEach((line, i) => {
             diffText += `-${startLine + i}|${line}\n`;
         });
-        
+
         let currentNewLine = startLine;
         fullNewLines.forEach((line) => {
             diffText += `+${currentNewLine}|${line}\n`;
@@ -198,15 +198,14 @@ export const update_file = async (args) => {
         // Ensure we start context AFTER the full lines we replaced in the original content
         const linesAffected = fullOldLines.length;
         const originalContextIdx = startLine + linesAffected - 1;
-        
+
         for (let i = originalContextIdx; i < Math.min(allOriginalLines.length, originalContextIdx + 15); i++) {
             diffText += `[UI_CONTEXT]  ${currentNewLine}|${allOriginalLines[i]}\n`;
             currentNewLine++;
         }
 
         diffText += `[DIFF_END]`;
-
-        return diffText;
+        return diffText.replace(/\\n/g, '[/n]');
     } catch (err) {
         return `ERROR: Failed to update file [${targetPath}]: ${err.message}`;
     }
