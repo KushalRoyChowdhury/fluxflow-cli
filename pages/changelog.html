@@ -225,8 +225,21 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.8.32"]
+        const stableVersions = ["1.9.0", "1.8.32"]
         const changelogData = {
+            "1.9.0": {
+                "note": "High-Fidelity UI Modernization & Stability Hardening.",
+                "added": [
+                    "Premium design system.",
+                    "Centered 'Welcome Splash' with premium initialization branding."
+                ],
+                "changed": [
+                    "Modernized 'ask' tool with interactive decision cards and background highlighting.",
+                    "Hardened 'Power-Exit' safety system with instant-exit shortcuts.",
+                    "Improved Tools stability."
+                ],
+                "fixes": []
+            },
             "1.8.32": {
                 "note": "Stability & Quality Improvements.",
                 "added": [],

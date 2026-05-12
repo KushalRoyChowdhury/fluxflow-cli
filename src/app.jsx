@@ -32,20 +32,24 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.8.35';
+const versionFluxflow = '1.9.0';
 const updatedOn = '2026-05-13';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
-    <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
-        <Text color="magenta" bold underline>🟣 STEERING HINT RESOLUTION</Text>
-        <Text marginTop={1}>The agent already finished the task before your hint was consumed.</Text>
-        <Box marginTop={1} backgroundColor="#222" paddingX={1} width="100%">
+    <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+        <Box paddingX={1}>
+            <Text color="magenta" bold underline>🟣 STEERING HINT RESOLUTION</Text>
+        </Box>
+        <Box paddingX={1} marginTop={1}>
+            <Text>The agent already finished the task before your hint was consumed.</Text>
+        </Box>
+        <Box marginTop={1} backgroundColor="#222" paddingX={2} width="100%">
             <Text italic color="gray">"{data}"</Text>
         </Box>
-        <Box marginTop={1}>
+        <Box paddingX={1} marginTop={1}>
             <Text color="cyan">How would you like to proceed?</Text>
         </Box>
-        <Box marginTop={1}>
+        <Box marginTop={0}>
             <CommandMenu
                 title="Select Action"
                 items={[
@@ -109,7 +113,9 @@ export default function App() {
                         newMsgs.splice(manual ? newMsgs.length : 1, 0, {
                             id: 'update-' + Date.now(),
                             role: 'system',
-                            text: `🚀 **New version 'v${latestVersion}' is available!**\nType \`/update latest\` to upgrade immediately.\nCheck what's new using \`/changelog\` command.`,
+                            text: `A new version (v${latestVersion}) is here.\n\n` +
+                                  `  • Type \`/update latest\` to apply the update.\n` +
+                                  `  • Type \`/changelog\` to view the release notes.`,
                             isUpdateNotification: true,
                             isMeta: true
                         });
@@ -241,7 +247,7 @@ export default function App() {
     const [tempModelOverride, setTempModelOverride] = useState(null);
 
     const [messages, setMessages] = useState([
-        { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.\n', isMeta: true }
+        { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.', isMeta: true }
     ]);
     const queuedPromptRef = useRef(null);
     const [completedIndex, setCompletedIndex] = useState(1);
@@ -372,8 +378,14 @@ export default function App() {
             // Tab is now ignored for suggestions to prevent [object Object] errors
         }
 
-        // 3. CTRL+C Exit Protocol
+        // 3. CTRL+C Exit Protocol (Shift + Ctrl + C for Instant Exit)
         if (key.ctrl && inputText === 'c' && activeView !== 'exit') {
+            if (key.shift) {
+                // Instant bypass for power users
+                setActiveView('exit');
+                setConfirmExit(false);
+                return;
+            }
             if (!confirmExit) {
                 setConfirmExit(true);
             } else {
@@ -708,7 +720,8 @@ export default function App() {
                         } else if (newMode === 'Flux') {
                             setThinkingLevel('High');
                         }
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
+                        const s = emojiSpace(2);
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
                     }
@@ -718,10 +731,12 @@ export default function App() {
                     const arg = parts[1]?.toLowerCase();
                     if (arg === 'show') {
                         setShowFullThinking(true);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: VISIBLE', isMeta: true }]; });
+                        const s = emojiSpace(2);
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Full Thinking Process: VISIBLE`, isMeta: true }]; });
                     } else if (arg === 'hide') {
                         setShowFullThinking(false);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Full Thinking Process: HIDDEN (Headings only)', isMeta: true }]; });
+                        const s = emojiSpace(2);
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Full Thinking Process: HIDDEN (Headings only)`, isMeta: true }]; });
                     } else if (parts[1]) {
                         let val = parts[1].toLowerCase();
                         if (val === 'xhigh') val = 'max';
@@ -735,7 +750,8 @@ export default function App() {
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Thinking level set to ${formattedLevel}`, isMeta: true }]; });
+                            const s = emojiSpace(2);
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Thinking level set to ${formattedLevel}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('thinking');
@@ -758,7 +774,8 @@ export default function App() {
                             setActiveModel('gemini-3-flash-preview');
                         } else {
                             setActiveModel(mod);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️ [SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
+                            const s = emojiSpace(2);
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('model');
@@ -841,16 +858,13 @@ export default function App() {
                     break;
                 }
                 case '/about': {
-                    const updateStatus = latestVer
-                        ? (latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'No Update Available')
-                        : 'Checking for updates...';
                     const s = emojiSpace(2);
-                    const aboutText = `ℹ️${s}**FluxFlow Version:** v${versionFluxflow}\n` +
-                        `🔄 **Status:** ${updateStatus}\n` +
-                        `📅 **Updated on:** ${updatedOn}`;
+                    const aboutText = `🔹 FluxFlow Version: v${versionFluxflow}\n` +
+                                    `🔹 Status: ${latestVer && latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'Up to date'}\n` +
+                                    `🔹 Released on: ${updatedOn}`;
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: aboutText, isMeta: true }];
+                        return [...prev, { id: 'about-' + Date.now(), role: 'system', text: aboutText, isAboutRecord: true, isMeta: true }];
                     });
                     break;
                 }
@@ -883,7 +897,7 @@ export default function App() {
                 }
                 default:
                     const s = emojiSpace(2);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `⚙️${s}[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
@@ -1467,16 +1481,21 @@ OUTPUT: ${execOutputRef.current}`;
                 );
             case 'input':
                 return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={2} paddingY={1}>
+                    <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                        <Box paddingX={1}>
+                            <Text color="magenta" bold>🔧 DATA CONFIGURATION</Text>
+                        </Box>
+
                         {inputConfig?.note && (
-                            <Box marginBottom={1}>
-                                <Text color="yellow" dimColor>
+                            <Box paddingX={1} marginBottom={1}>
+                                <Text color="yellow" dimColor italic>
                                     {inputConfig.note}
                                 </Text>
                             </Box>
                         )}
-                        <Text color="cyan">{inputConfig?.label}</Text>
-                        <Box marginTop={1}>
+
+                        <Box paddingX={1} flexDirection="row">
+                            <Text color="cyan" bold>{inputConfig?.label} </Text>
                             <TextInput
                                 value={inputConfig?.value || ''}
                                 onChange={(val) => setInputConfig(prev => ({ ...prev, value: val }))}
@@ -1514,7 +1533,10 @@ OUTPUT: ${execOutputRef.current}`;
                                 }}
                             />
                         </Box>
-                        <Text dimColor marginTop={1}>(Press Enter to confirm)</Text>
+
+                        <Box paddingX={1} marginTop={1}>
+                            <Text color="gray" dimColor italic>(Press Enter to confirm selection)</Text>
+                        </Box>
                     </Box>
                 );
             case 'stats':
@@ -1685,7 +1707,8 @@ OUTPUT: ${execOutputRef.current}`;
                             if (item.value === 'edit') {
                                 setApiKey(null); // Re-triggers manual setup mode
                                 setActiveView('chat');
-                                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🗝️ [ACTION] Flux waiting for new API Key...' }]);
+                                const s = emojiSpace(2);
+                                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `🔑${s}[ACTION] Flux waiting for new API Key...` }]);
                             } else if (item.value === 'remove') {
                                 setActiveView('deleteKey');
                             } else {
@@ -1697,7 +1720,10 @@ OUTPUT: ${execOutputRef.current}`;
             case 'deleteKey':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
-                        <Text color="red" bold>⚠️ DANGER: PURGE API KEY</Text>
+                        {(() => {
+                            const s = emojiSpace(2);
+                            return <Text color="red" bold>⛔{s}DANGER: PURGE API KEY</Text>;
+                        })()}
                         <Text marginTop={1}>This will permanently delete the saved API key from the project vault. You will need to enter it again to use Flux.</Text>
                         <Box marginTop={1}>
                             <CommandMenu
@@ -1711,7 +1737,8 @@ OUTPUT: ${execOutputRef.current}`;
                                         await removeAPIKey();
                                         setApiKey(null);
                                         setActiveView('chat');
-                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🧼 [VAULT PURGED] API Key removed successfully.' }]);
+                                        const s = emojiSpace(2);
+                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✨${s}[VAULT PURGED] API Key removed successfully.` }]);
                                     } else {
                                         setActiveView('key');
                                     }
@@ -1752,7 +1779,7 @@ OUTPUT: ${execOutputRef.current}`;
                                     const resumedMsgs = [...h[id].messages];
                                     const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
                                     if (!hasLogo) {
-                                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...\n' });
+                                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...' });
                                     }
 
                                     setMessages(resumedMsgs);
@@ -1940,38 +1967,48 @@ OUTPUT: ${execOutputRef.current}`;
             default:
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
+                        {/* 🏗️ INPUT HEADER BAR */}
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                             <Box>
-                                {statusText && (
+                                {statusText ? (
                                     <Box>
                                         {isSpinnerActive && <Text color="magenta"><Spinner type="dots" /></Text>}
-                                        <Text color="magenta" italic>{isSpinnerActive ? ' ' : ''}{statusText}</Text>
+                                        <Text color="magenta" bold italic>{isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
                                     </Box>
+                                ) : (
+                                    <Text color="cyan" dimColor italic>READY FOR COMMAND...</Text>
                                 )}
                             </Box>
-                            <Text color="gray" dimColor>({tempModelOverride || activeModel})</Text>
+                            <Box>
+                                <Text color="gray" bold>[ </Text>
+                                <Text color="white">{tempModelOverride || activeModel}</Text>
+                                <Text color="gray" bold> ]</Text>
+                            </Box>
                         </Box>
-                        {suggestions.length > 0 && <Box paddingY={0} />}
-                        <Box backgroundColor="#333333" paddingX={1} paddingY={1} width="100%">
+
+                        {/* 🌊 MAIN COMMAND CONSOLE */}
+                        <Box
+                            borderStyle="round"
+                            borderColor={isProcessing ? "magenta" : "cyan"}
+                            paddingX={1}
+                            paddingY={0}
+                            width="100%"
+                        >
                             <Box flexDirection="column" width="100%">
                                 {maxLines > 2 && !isExpanded ? (
                                     <Box flexDirection="row" width="100%" paddingY={0} height={1} overflow="hidden">
-                                        <Box flexShrink={0} width={3}>
-                                            <Text color="yellow">❯ </Text>
+                                        <Box flexShrink={0} width={4}>
+                                            <Text color="cyan" bold>💠 </Text>
                                         </Box>
                                         <Box flexGrow={1} flexDirection="row">
-                                            {/* Atomic Paste Tag - Properly colored */}
                                             <Box flexShrink={0}>
-                                                <Text color="magenta" bold>[Pasted {maxLines} Lines]</Text>
+                                                <Text color="magenta" bold>[PASTED {maxLines} LINES]</Text>
                                             </Box>
-
-                                            {/* Input for Expansion/Submit */}
                                             <Box flexGrow={1} marginLeft={1}>
                                                 <MultilineInput
                                                     value=""
                                                     placeholder=" (Backspace to delete / Enter to expand)"
                                                     onChange={(val) => {
-                                                        // Any typing expands
                                                         if (val.length > 0) {
                                                             setIsExpanded(true);
                                                             setInput(input + val);
@@ -1988,8 +2025,8 @@ OUTPUT: ${execOutputRef.current}`;
                                     </Box>
                                 ) : (
                                     <Box flexDirection="row" width="100%" paddingY={0}>
-                                        <Box flexShrink={0} width={3}>
-                                            <Text color="yellow">❯ </Text>
+                                        <Box flexShrink={0} width={4}>
+                                            <Text color={isProcessing ? "magenta" : "cyan"} bold>{isProcessing ? "🧠 " : "💠 "}</Text>
                                         </Box>
                                         <Box flexGrow={1}>
                                             <Box flexGrow={1} position="relative">
@@ -2000,7 +2037,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : (
-                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Type /cmd or message... (${terminalEnv.shortcut} for newline)` : "  You can send a prompt to steer the agent."}</Text>
+                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}
@@ -2008,7 +2045,6 @@ OUTPUT: ${execOutputRef.current}`;
                                                     focus={!isTerminalFocused}
                                                     value={input}
                                                     onChange={(val) => {
-                                                        // Handle manual backslash escapes without stripping them prematurely
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
                                                     }}
@@ -2060,17 +2096,26 @@ OUTPUT: ${execOutputRef.current}`;
                         <Text color="magenta">🌊 Starting Flux Flow...</Text>
                     </Box>
                 ) : !apiKey ? (
-                    <Box borderStyle="bold" borderColor="yellow" padding={1} flexDirection="column" flexShrink={0}>
-                        <Text color="yellow" bold>🔑 API KEY REQUIRED</Text>
-                        <Text>Please enter your Gemini API Key to initialize the agent's brain.</Text>
-                        <Box marginTop={1}>
-                            <Text color="cyan">❯ </Text>
-                            <TextInput
-                                value={tempKey}
-                                onChange={setTempKey}
-                                onSubmit={handleSetup}
-                                mask="*"
-                            />
+                    <Box borderStyle="round" borderColor="gray" padding={0} flexDirection="column" flexShrink={0} width="100%">
+                        <Box paddingX={1} marginBottom={1}>
+                            <Text color="yellow" bold>🔑{emojiSpace(2)}API KEY REQUIRED</Text>
+                        </Box>
+
+                        <Box paddingX={1} flexDirection="column">
+                            <Text>Please enter your Gemini API Key to initialize the agent.</Text>
+                            <Box marginTop={1}>
+                                <Text color="cyan" bold>💠 </Text>
+                                <TextInput
+                                    value={tempKey}
+                                    onChange={setTempKey}
+                                    onSubmit={handleSetup}
+                                    mask="*"
+                                />
+                            </Box>
+                        </Box>
+
+                        <Box paddingX={1} marginTop={1}>
+                            <Text color="gray" dimColor italic>(Press Enter to confirm and initialize)</Text>
                         </Box>
                     </Box>
                 ) : (
@@ -2158,7 +2203,7 @@ OUTPUT: ${execOutputRef.current}`;
                     );
                 })()}
 
-                {/* 💡 Suggestion "Bottom Shelf" - Clean, isolated, and perfectly stable below the status bar */}
+                {/* 💡 Modernized Suggestion Box - Sleek, structured, and premium */}
                 {suggestions.length > 0 && (() => {
                     const windowSize = 5;
                     const startIdx = Math.max(0, Math.min(selectedIndex - 2, suggestions.length - windowSize));
@@ -2168,35 +2213,55 @@ OUTPUT: ${execOutputRef.current}`;
                     return (
                         <Box
                             flexDirection="column"
-                            backgroundColor="#222" borderStyle="round" borderColor="yellow"
-                            paddingX={1} paddingY={0}
-                            marginTop={0} width="100%"
-                            minHeight={suggestions.length >= 5 ? 7 : 0}
+                            borderStyle="round"
+                            borderColor="gray"
+                            paddingX={0}
+                            paddingY={0}
+                            width="100%"
                         >
+                            <Box paddingX={1} marginBottom={0}>
+                                <Text color="gray" bold dimColor>🔍 COMMAND SUGGESTIONS</Text>
+                            </Box>
+
                             {visible.map((s, i) => {
                                 const actualIdx = startIdx + i;
                                 const isActive = actualIdx === selectedIndex;
                                 const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';
-                                const cmdText = s.cmd.padEnd(32); // Ensure description starts at col 32
 
                                 return (
-                                    <Box key={s.cmd} flexDirection="row">
-                                        <Text color={isActive ? 'cyan' : 'gray'}>{isActive ? '❯ ' : '  '}</Text>
-                                        <Text
-                                            color={isGemmaDisabled ? 'gray' : (isActive ? 'yellow' : 'gray')}
-                                            bold={isActive}
-                                            dimColor={isGemmaDisabled}
-                                        >
-                                            {cmdText}
-                                        </Text>
-                                        <Text color="gray" dimColor italic>{s.desc}</Text>
+                                    <Box
+                                        key={s.cmd}
+                                        flexDirection="row"
+                                        backgroundColor={isActive ? "#2a2a2a" : undefined}
+                                        paddingX={1}
+                                    >
+                                        <Box width={3}>
+                                            <Text color={isActive ? "cyan" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
+                                        </Box>
+                                        <Box width={32}>
+                                            <Text
+                                                color={isGemmaDisabled ? "gray" : (isActive ? "yellow" : "white")}
+                                                bold={isActive}
+                                                dimColor={isGemmaDisabled && !isActive}
+                                            >
+                                                {s.cmd}
+                                            </Text>
+                                        </Box>
+                                        <Box flexGrow={1}>
+                                            <Text color="gray" italic dimColor={!isActive}>{s.desc}</Text>
+                                        </Box>
                                     </Box>
                                 );
                             })}
-                            {/* ⚓ Height Anchor: Reserve space for the 'more' line if our list is long */}
+
+                            {/* ⚓ Height Anchor: More indicators for long lists */}
                             {suggestions.length > 5 && (
-                                <Box height={1}>
-                                    {remaining > 0 && <Text color="gray" dimColor>  ...({remaining}more)</Text>}
+                                <Box paddingX={1} height={1}>
+                                    {remaining > 0 ? (
+                                        <Text color="gray" dimColor italic>   ... ({remaining} more commands available)</Text>
+                                    ) : (
+                                        <Text color="gray" dimColor italic>   (End of list)</Text>
+                                    )}
                                 </Box>
                             )}
                         </Box>

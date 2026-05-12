@@ -6,36 +6,53 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
 
-    const memStatus = isMemoryEnabled ? 'ON' : 'OFF';
-
     return (
         <Box
-            borderStyle="single"
+            borderStyle="round"
             borderColor="gray"
             flexDirection="row"
             justifyContent="space-between"
             paddingX={1}
             width="100%"
         >
+            {/* 🛠️ MODE & THINKING ZONE */}
             <Box>
-                <Text color={modeColor} bold>{modeIcon} {mode.toUpperCase()}</Text>
-                <Text color="gray"> │ </Text>
-                <Text color="magenta">🧠 {thinkingLevel}</Text>
+                <Box marginRight={1}>
+                    <Text color={modeColor} bold>{modeIcon} {mode.toUpperCase()}</Text>
+                </Box>
+
+                <Text color="gray" dimColor>┃ </Text>
+
+                <Box marginX={1}>
+                    <Text color="magenta">🧠 {thinkingLevel}</Text>
+                </Box>
+
+                <Text color="gray" dimColor>┃ </Text>
+
+                <Box marginX={1}>
+                    <Text color="gray">MEM: </Text>
+                    <Text color={isMemoryEnabled ? 'green' : 'red'} bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text>
+                </Box>
             </Box>
 
-            {/* CURRECT DIRECTORY TELEMETRY */}
+            {/* 📁 WORKSPACE TELEMETRY */}
             <Box flexGrow={1} justifyContent="center" paddingX={2}>
-                <Text color="gray" dimColor>📁 </Text>
-                <Text color="blue" dimColor italic>{truncatePath(process.cwd(), 40)}</Text>
+            <Text>📁</Text><Text color="gray" italic> {truncatePath(process.cwd(), 35)}</Text>
             </Box>
 
+            {/* 🔋 PERFORMANCE & ID ZONE */}
             <Box>
-                <Text color="gray">MEM: </Text>
-                <Text color={memStatus === 'ON' ? 'green' : 'red'}>{memStatus}</Text>
-                <Text color="gray"> │ </Text>
-                <Text color="blue">{formatTokens(tokensTotal)} ({Math.round((tokens / 254000) * 100)}%)</Text>
-                <Text color="gray"> │ </Text>
-                <Text color="dim">{chatId} </Text>
+                <Text color="gray" dimColor>┃ </Text>
+
+                <Box marginX={1}>
+                    <Text>✨</Text><Text color="blue"> {formatTokens(tokensTotal)} <Text dimColor>({Math.round((tokens / 254000) * 100)}%)</Text></Text>
+                </Box>
+
+                <Text color="gray" dimColor>┃ </Text>
+
+                <Box marginLeft={1}>
+                    <Text>🆔</Text><Text color="gray" dimColor italic> {chatId}</Text>
+                </Box>
             </Box>
         </Box>
     );

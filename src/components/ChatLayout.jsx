@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
 import { wrapText } from '../utils/text.js';
+import { emojiSpace } from '../utils/terminal.js';
 
 const cleanSignals = (text) => {
     if (!text) return text;
@@ -18,7 +19,7 @@ const cleanSignals = (text) => {
         // [HARDENING] Check for outer bracket
         let startIdx = triggerIdx;
         let hasOuterBracket = false;
-        
+
         // Look back for '[' (ignoring whitespace)
         let k = triggerIdx - 1;
         while (k >= 0 && /\s/.test(result[k])) k--;
@@ -64,10 +65,10 @@ const cleanSignals = (text) => {
                 result = result.substring(0, startIdx) + result.substring(endIdx + 1);
                 break;
             }
-            
+
             j++;
 
-            // [SAFETY] If we reached the end without finding a closing boundary, 
+            // [SAFETY] If we reached the end without finding a closing boundary,
             // it's a partial call. Strip it and break to prevent infinite loop.
             if (j === result.length) {
                 result = result.substring(0, startIdx);
@@ -457,6 +458,23 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
 
+    if (msg.id && String(msg.id).startsWith('welcome')) {
+        const parts = msg.text.split('\n\n');
+        const logo = parts[0];
+        const greeting = parts[1] || '';
+
+        return (
+            <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
+                <Box marginBottom={1}>
+                    <Text>{logo}</Text>
+                </Box>
+                <Box borderStyle="round" borderColor="gray" paddingX={3} paddingY={0}>
+                    <Text color="cyan" bold>{greeting.trim()}</Text>
+                </Box>
+            </Box>
+        );
+    }
+
     if (msg.isVisualFeedback) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
@@ -483,13 +501,31 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : 'No selection';
+        const s = emojiSpace(2);
 
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={0} width="100%">
-                    <Text color="cyan" bold underline>💬 ASK USER</Text>
-                    <Box marginTop={0}>
+                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                    <Box paddingX={1}>
+                        <Text color="cyan" bold>💬{s}AGENT REQUEST: RESOLVED</Text>
+                    </Box>
+                    <Box paddingX={1} marginTop={1} marginBottom={1}>
                         <Text color="white">Selection: <Text color="yellow" bold>{selection}</Text></Text>
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (msg.isAboutRecord) {
+        return (
+            <Box marginBottom={1} paddingX={1} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                    <Box paddingX={1}>
+                        <Text color="cyan" bold>💠 ABOUT FLUX FLOW</Text>
+                    </Box>
+                    <Box paddingX={1} marginTop={1} marginBottom={1}>
+                        <Text>{msg.text}</Text>
                     </Box>
                 </Box>
             </Box>
@@ -499,9 +535,11 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     if (msg.isUpdateNotification) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} width="100%">
-                    <Text color="yellow" bold underline>🚀 UPDATE AVAILABLE</Text>
-                    <Box marginTop={1}>
+                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                    <Box paddingX={1}>
+                        <Text color="cyan" bold>🚀 FLUX FLOW UPDATE AVAILABLE</Text>
+                    </Box>
+                    <Box paddingX={1} marginTop={1} marginBottom={1}>
                         <CodeRenderer text={msg.text} columns={columns} />
                     </Box>
                 </Box>
