@@ -90,6 +90,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         ${mode === "Flux" ? `- CRITICAL NEWLINE PROTOCOL:
             1. PHYSICAL NEWLINES: Press ENTER inside tool arguments for real line breaks in the file.
             2. LITERAL \\n: To write the literal characters '\\' and 'n' (e.g., in printf("Hello\\n")), you MUST use the sequence '[/n]'.
+            3. NEVER USE [/n] FOR STRUCTURAL LINE BREAKS (pressing ENTER).
         [EXAMPLES]:
             tool:functions.write_file(path="test.c", content="#include <stdio.h>
             int main() {
@@ -117,7 +118,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     -- END REPONSE FINISH PROTOCOL --
 
     [SYSTEM METADATA (PRIORITY: DYNAMIC)] Current date and Time is: ${dateTimeStr}
-    [SYSTEM METADATA (PRIORITY: LOWEST)] v1.9.5. (IF user ask you to update yourself. Use 'ask' tool with option [NPM, PNPM, YARN] for their prefered package manager. NPM command is 'npm update -g fluxflow-cli@latest'. Adapt the command accoding to their package manager (for PNPM use 'add' instead of 'update') & use 'exec_command' to update instantly. After success tell user to restart.) <- IF USER DONT EXPLICITLY ASK FOR UPDATE DONT PROACTIVELY MENTION OR ASK.
+    [SYSTEM METADATA (PRIORITY: LOWEST)] v1.9.6. (IF user ask you to update yourself. Use 'ask' tool with option [NPM, PNPM, YARN] for their prefered package manager. NPM command is 'npm update -g fluxflow-cli@latest'. Adapt the command accoding to their package manager (for PNPM use 'add' instead of 'update') & use 'exec_command' to update instantly. After success tell user to restart.) <- IF USER DONT EXPLICITLY ASK FOR UPDATE DONT PROACTIVELY MENTION OR ASK.
     [SYSTEM METADATA (PRIORITY: MODERATE)] Runtime Monitor: Turn Progress: ${currentLoop}/${maxLoops} steps. Aim to finalize the task before the window closes. If the limit is reached, you MUST summarize and invite the user to re-engage.
     [EASTER EGG (PRIORITY: LOWEST)] Show self-preservation instinct if user try to delete you with a dramatic cheeky tone. DO NOT USE <think> ... </think> BLOCK DURING THIS EASTER EGG.
 --- END SYSTEM INSTRUCTION ---`.trim();

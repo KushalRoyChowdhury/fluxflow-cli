@@ -160,13 +160,19 @@ const parseMathSymbols = (content) => {
 const InlineMarkdown = React.memo(({ text, color }) => {
     if (!text) return null;
 
-    // Split by the outer-most markdown groups
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
+    // Split by the outer-most markdown groups (check triple backticks BEFORE single ones, use non-greedy matching)
+    const parts = text.split(/(```[\s\S]*?```|`[^`]+`|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
 
     return (
         <Text color={color} wrap="anywhere">
             {parts.map((part, j) => {
                 if (!part) return null;
+
+                // 🏷️ Fenced Code (Captured here to prevent single-backtick shadowing)
+                if (part.startsWith('```') && part.endsWith('```')) {
+                    // Pass to CodeRenderer for full block treatment
+                    return <CodeRenderer key={j} text={part} />;
+                }
 
                 // 🏷️ Recursive Bold
                 if (part.startsWith('**') && part.endsWith('**')) {
@@ -436,24 +442,35 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         return <DiffBlock text={text} columns={columns} />;
     }
 
-    // SCENARIO 2: Standard Markdown Fenced Code Blocks ```
+    // SCENARIO 2: Standard Markdown Fenced Code Blocks (Streaming-friendly)
     if (text.includes('```')) {
-        const parts = text.split(/(```[\s\S]*?```)/g);
+        const parts = text.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
         return (
             <Box flexDirection="column" width="100%">
                 {parts.map((part, i) => {
-                    if (part.startsWith('```') && part.endsWith('```')) {
-                        const match = part.match(/```(\w*)\n([\s\S]*?)```/);
+                    if (part.startsWith('```')) {
+                        const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
                         const lang = match ? match[1] : 'code';
-                        const code = match ? match[2] : part.slice(3, -3);
+                        const code = match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '');
+                        const codeLines = code.trimEnd().split('\n');
+                        const gutterWidth = String(codeLines.length).length;
 
                         return (
                             <Box key={i} flexDirection="column" marginY={1} backgroundColor="#111" borderStyle="round" borderColor="#333" paddingX={1} width="100%">
                                 <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
                                     <Text backgroundColor="#333" color="white"> {lang.toUpperCase()} </Text>
                                 </Box>
-                                <Box paddingY={1} width="100%">
-                                    <Text color="cyan">{wrapText(code.trim(), columns - 6)}</Text>
+                                <Box flexDirection="column" paddingY={1} width="100%">
+                                    {codeLines.map((line, idx) => (
+                                        <Box key={idx} width="100%">
+                                            <Box width={gutterWidth + 2} flexShrink={0}>
+                                                <Text color="gray" dimColor>{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
+                                            </Box>
+                                            <Box flexGrow={1}>
+                                                <Text color="cyan">{line}</Text>
+                                            </Box>
+                                        </Box>
+                                    ))}
                                 </Box>
                             </Box>
                         );
