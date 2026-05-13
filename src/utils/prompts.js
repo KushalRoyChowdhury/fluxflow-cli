@@ -24,8 +24,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const cwdStr = process.cwd();
 
     // Inject 1 tab space before every line of tempMemoriesStr and userMemoriesStr inside the delimiters
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS (LOW PRIORITY) --\n${tempMemories.split('\n').map(line => `    ${line}`).join('\n')}\n-- END RECENT CONTEXT --\n` : '';
-    const userMemoriesStr = userMemories?.length > 0 ? `\n--- PERSISTENT USER MEMORIES (MEDIUM PRIORITY, TUNES PERSONALIZATION & USER PREFERENCES) ---\n${userMemories.split('\n').map(line => `    ${line}`).join('\n')}\n-- END USER MEMORIES --\n` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `\n-- RECENT CONTEXT FROM OTHER CHAT THREADS (PRIORITY: LOW, RECENT > OLD) --\n${tempMemories.split('\n').map(line => `    ${line}`).join('\n')}\n-- END RECENT CONTEXT --\n` : '';
+    const userMemoriesStr = userMemories?.length > 0 ? `\n--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES PERSONALIZATION & USER PREFERENCES) ---\n${userMemories.split('\n').map(line => `    ${line}`).join('\n')}\n-- END SAVED MEMORIES --\n` : '';
 
     return `${isMemoryEnabled ? `${userMemoriesStr}\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n` : ''}${nameStr}${nicknameStr}${userInstrStr}
 --- START SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ---

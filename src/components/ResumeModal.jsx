@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { loadHistory } from '../utils/history.js';
+import { emojiSpace } from '../utils/terminal.js';
 
 export default function ResumeModal({ onSelect, onDelete, onClose }) {
     const [history, setHistory] = useState({});
@@ -21,7 +22,7 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
         if (key.upArrow) setSelectedIndex(prev => Math.max(0, prev - 1));
         if (key.downArrow) setSelectedIndex(prev => Math.min(keys.length - 1, prev + 1));
         if (key.return && keys[selectedIndex]) onSelect(keys[selectedIndex]);
-        
+
         if (input === 'x' && keys[selectedIndex]) {
             const targetId = keys[selectedIndex];
             onDelete(targetId).then(newHistory => {
@@ -34,37 +35,57 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
         }
     });
 
+    const s = emojiSpace(2);
+
     return (
-        <Box flexDirection="column" borderStyle="double" borderColor="cyan" padding={1} width={80}>
-            <Box justifyContent="center" marginBottom={1}>
-                <Text bold color="cyan"> 📂 RESUME SESSION </Text>
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width={80}>
+            <Box paddingX={1} marginBottom={1}>
+                <Text color="cyan" bold>💠 CHAT HISTORY: RESUME CONVERSATION</Text>
             </Box>
-            
+
             {keys.length === 0 ? (
-                <Text italic color="gray"> No saved chats found. </Text>
+                <Box paddingX={2} paddingY={1}>
+                    <Text italic color="gray">No saved chats found.</Text>
+                </Box>
             ) : (
-                keys.map((id, index) => {
-                    const chat = history[id];
-                    const isSelected = index === selectedIndex;
-                    return (
-                        <Box key={id} paddingX={1}>
-                            <Text color={isSelected ? 'cyan' : 'white'}>
-                                {isSelected ? '❯ ' : '  '}
-                                <Text bold={isSelected}>{chat.name || id}</Text>
-                                <Text color="gray"> [{id.slice(5)}]</Text>
-                            </Text>
-                            {isSelected && (
-                                <Box marginLeft="auto">
-                                    <Text color="red"> (x to delete) </Text>
+                <Box flexDirection="column">
+                    {keys.map((id, index) => {
+                        const chat = history[id];
+                        const isSelected = index === selectedIndex;
+                        return (
+                            <Box
+                                key={id}
+                                paddingX={1}
+                                backgroundColor={isSelected ? "#2a2a2a" : undefined}
+                                width="100%"
+                            >
+                                <Box flexGrow={1}>
+                                    <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+                                        {isSelected ? '❯ ' : '  '}{chat.name || id}
+                                        <Text color="gray" dimColor={!isSelected}> [{id.slice(5)}]</Text>
+                                    </Text>
                                 </Box>
-                            )}
-                        </Box>
-                    );
-                })
+                                {isSelected && (
+                                    <Box flexShrink={0}>
+                                        <Text color="red" bold>[X] DELETE </Text>
+                                    </Box>
+                                )}
+                            </Box>
+                        );
+                    })}
+                </Box>
             )}
 
-            <Box marginTop={1} justifyContent="center" borderStyle="single" borderColor="gray">
-                <Text dimColor> ↑↓ navigate • Enter select • x delete • Esc close </Text>
+            <Box
+                marginTop={1}
+                paddingX={1}
+                borderStyle="single"
+                borderLeft={false}
+                borderRight={false}
+                borderBottom={false}
+                borderColor="gray"
+            >
+                <Text dimColor italic>↑↓ navigate • Enter select • x delete • Esc close</Text>
             </Box>
         </Box>
     );

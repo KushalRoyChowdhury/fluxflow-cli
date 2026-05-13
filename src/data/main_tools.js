@@ -2,6 +2,7 @@ export const TOOL_PROTOCOL = (mode) => `
 -- START FUNCTION CALLING PROTOCOL --
     You have access to internal tools. To call a tool, you MUST use the following exact syntax on a new line:
     [tool:functions.tool_name(arguments)]
+    Without the 'tool:' prefix, tools will not execute.
 
     - USER COMMUNICATION TOOLS (Available in Flux & Flow) -
         1. Ask User: [tool:functions.ask(question="...", optionA="Option::Desc", optionB="Option::Desc")]. Generally use this tool for ANY ambiguity. Can use upto 4 arguments. Mandatory triggers include: 1) **Path Divergence**: When multiple architectural or technical solutions exist, present options via 'ask' instead of choosing arbitrarily. 2) **Security Boundaries**: Explicitly request permission via 'ask' before accessing sensitive files (e.g., .env, config keys, credentials). 3) **Ambiguity Resolution**: Use 'ask' to clarify vague prompts before executing terminal commands or writing code. 4) **Risk Mitigation**: Require a 'Yes/No' confirmation for any destructive or irreversible operations. Options must always follow the 'Short Label::Detailed Description' format. This tool is a non-terminating suspension so you can get guidance without losing context. PREFER USING THIS TOOL RATHER THAN FINISHING THE LOOP FOR USER CLARIFICATION.

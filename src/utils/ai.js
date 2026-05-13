@@ -30,7 +30,10 @@ const TOOL_LABELS = {
     'web_scrape': 'Reading Site',
     'memory': 'Updating Memory',
     'search_keyword': 'Finding Files',
-    'ask': 'Asking User'
+    'ask': 'Asking User',
+    'write_pdf': 'Creating PDF',
+    'write_pptx': 'Creating Presentation',
+    'write_docx': 'Creating Document',
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -662,19 +665,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const potentialTool = toolContext.toolName;
                             const partialArgs = toolContext.args || '';
 
-                            // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools Only)
+                            // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                             let detail = null;
-                             if (['write_file', 'update_file', 'view_file', 'read_folder'].includes(potentialTool)) {
-                                 const pArgs = parseArgs(partialArgs);
-                                 const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-                                 if (filePath) {
-                                     detail = path.basename(filePath.replace(/[\\"]/g, ''));
-                                 } else {
-                                     // [FALLBACK] - Super-permissive regex for mid-stream escaped paths
-                                     const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory)\s*=\s*\\?["']?([^\\"' \),]+)/);
-                                     if (m) detail = path.basename(m[1].replace(/[\\"]/g, ''));
-                                 }
-                             }
+                            if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_pptx', 'write_docx', 'search_keyword'].includes(potentialTool)) {
+                                const pArgs = parseArgs(partialArgs);
+                                const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
+                                const keyword = pArgs.keyword;
+
+                                if (keyword) {
+                                    detail = keyword.replace(/[\\"]/g, '');
+                                } else if (filePath) {
+                                    detail = path.basename(filePath.replace(/[\\"]/g, ''));
+                                } else {
+                                    // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords
+                                    const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                                    if (m) {
+                                        const val = m[1].replace(/[\\"]/g, '');
+                                        detail = potentialTool === 'search_keyword' ? val : path.basename(val);
+                                    }
+                                }
+                            }
 
                             // Only update if something changed (to avoid jitter)
                             const currentLabel = `${TOOL_LABELS[potentialTool] || potentialTool}${detail ? ` (${detail})` : ''}`;
