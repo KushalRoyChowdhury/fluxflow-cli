@@ -13,7 +13,6 @@ const TOOL_LABELS = {
     'web_search': 'Web Search',
     'web_scrape': 'Read Site',
     'search_keyword': 'Find Files',
-    'ask': 'Ask User',
     'write_pdf': 'Create PDF',
     'write_pptx': 'Create Presentation',
     'write_docx': 'Create Document',
@@ -111,7 +110,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
         .replace(/\[\/n\]?/g, '\\n')
         .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
-        .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|ask|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
+        .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
 };
 
