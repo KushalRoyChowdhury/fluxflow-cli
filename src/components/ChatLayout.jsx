@@ -98,8 +98,9 @@ const cleanSignals = (text) => {
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')
-        .replace(/\[\s*(turn\s*:?)?\s*(continue|finish)?\s*$/gi, '')
-        .replace(/\n\s*(turn\s*:?)?\s*(continue|finish)?\s*$/gi, '')
+        .replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
+        .replace(/\[\s*turn\s*:?.*?$/gi, '')
+        .replace(/\n\s*turn\s*:?.*?$/gi, '')
         .replace(/\[\s*$/gi, '')
         .replace(/\n\nResponded on .*/g, '')
         .replace(/\n\n\[Prompted on: .*\]/g, '')
@@ -109,6 +110,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
         .replace(/\[\/n\]?/g, '\\n')
+        .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
         .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|ask|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
 };

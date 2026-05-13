@@ -32,7 +32,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.0';
+const versionFluxflow = '1.9.1';
 const updatedOn = '2026-05-13';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -194,7 +194,7 @@ export default function App() {
                 return [...prev, {
                     id: 'tier-switch-' + Date.now(),
                     role: 'system',
-                    text: `⚠️ **[TIER LIMIT]** Gemma is only available on Free API tier. Automatically switched to Gemini 3 Flash Preview.`,
+                    text: `⚠️ **[TIER LIMIT]** Gemma is only available on Free API tier. Auto-switched to Gemini 3 Flash Preview.`,
                     isMeta: true
                 }];
             });
@@ -702,11 +702,10 @@ export default function App() {
                 }
 
                 case '/clear': {
-                    // Perform full terminal hardware reset + clear scrollback buffer
-                    stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                    // Soft clear by resetting message state (Ink handles the visual refresh)
                     setMessages([{ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome back to Flux Flow! Context cleared.\n', isMeta: true }]);
-                    setCompletedIndex(0); // Trigger re-flush
-                    setChatId(generateChatId()); // Brand new identity for the new chat
+                    setCompletedIndex(1);
+                    setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
                     break;
@@ -1316,62 +1315,6 @@ OUTPUT: ${execOutputRef.current}`;
 
     const renderActiveView = () => {
         switch (activeView) {
-            case 'mode':
-                return (
-                    <CommandMenu
-                        title="⚡ Select Operating Mode"
-                        items={[{ label: 'Flux (Dev mode  - Extended Toolset)', value: 'Flux' }, { label: 'Flow (Chat mode - Basic Toolset)', value: 'Flow' }, { label: 'Cancel', value: 'Cancel' }]}
-                        onSelect={(item) => {
-                            if (item.value !== 'Cancel') {
-                                setMode(item.value);
-                                // Auto-clamp thinking levels based on the new mode
-                                if (item.value === 'Flow') {
-                                    setThinkingLevel('Low');
-                                } else if (item.value === 'Flux') {
-                                    setThinkingLevel('High');
-                                }
-                            }
-                            setActiveView('chat');
-                        }}
-                    />
-                );
-            case 'thinking': {
-                const options = mode === 'Flow'
-                    ? [
-                        { label: 'Low    (Fastest)', value: 'Low' },
-                        { label: 'Medium (Balanced)', value: 'Medium' }
-                    ]
-                    : [
-                        { label: 'Low    (Fastest)', value: 'Low' },
-                        { label: 'Medium (Balanced)', value: 'Medium' },
-                        { label: 'High   (Complex coding)', value: 'High' },
-                        { label: 'Max    (Architecture)', value: 'Max' }
-                    ];
-                options.push({ label: 'Cancel', value: 'Cancel' });
-
-                return (
-                    <CommandMenu
-                        title={`🧠 Select Thinking Level (${mode} Mode)`}
-                        items={options}
-                        onSelect={(item) => {
-                            if (item.value !== 'Cancel') setThinkingLevel(item.value);
-                            setActiveView('chat');
-                        }}
-                    />
-                );
-            }
-            case 'model':
-                return (
-                    <CommandMenu
-
-                        title="🤖 Select AI Model"
-                        items={[{ label: 'Gemma 4 31B            (Recomended - Default, Use Free Tier Key)', value: 'gemma-4-31b-it' }, { label: 'Gemini 3.1 Pro         (Best - Req. Paid Key)', value: 'gemini-3.1-pro-preview' }, { label: 'Gemini 3 Flash         (Paid API Key Recomended)', value: 'gemini-3-flash-preview', }, { label: 'Gemini 3.1 Flash Lite  (Fastest - For Quick Tasks ONLY, Limited Free Quota)', value: 'gemini-3.1-flash-lite-preview' }, { label: 'Cancel', value: 'Cancel' }]}
-                        onSelect={(item) => {
-                            if (item.value !== 'Cancel') setActiveModel(item.value);
-                            setActiveView('chat');
-                        }}
-                    />
-                );
             case 'settings':
                 return (
                     <CommandMenu
@@ -1445,6 +1388,7 @@ OUTPUT: ${execOutputRef.current}`;
                         }}
                     />
                 );
+
             case 'apiTier':
                 return (
                     <CommandMenu
@@ -1479,6 +1423,7 @@ OUTPUT: ${execOutputRef.current}`;
                         onClose={() => setActiveView('settings')}
                     />
                 );
+
             case 'input':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -1539,6 +1484,7 @@ OUTPUT: ${execOutputRef.current}`;
                         </Box>
                     </Box>
                 );
+
             case 'stats':
                 return (
                     <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} width={Math.min(100, (stdout?.columns || 100) - 2)}>
@@ -1784,8 +1730,11 @@ OUTPUT: ${execOutputRef.current}`;
 
                                     setMessages(resumedMsgs);
                                     setActiveView('chat');
-                                    setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${id}]` }]);
-                                    setCompletedIndex(0);
+                                    setMessages(prev => {
+                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${id}]` }];
+                                        setCompletedIndex(newMsgs.length);
+                                        return newMsgs;
+                                    });
                                 }
                             }}
                             onDelete={async (id) => {
@@ -1824,7 +1773,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 // Defer execution to ensure state has settled and modal is unmounted
                                 setTimeout(() => {
                                     handleSubmit(val);
-                                }, 200);
+                                }, 500);
                             }}
                             onEdit={(val) => {
                                 setResolutionData(null);

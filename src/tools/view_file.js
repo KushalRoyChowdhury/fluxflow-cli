@@ -64,11 +64,11 @@ export const view_file = async (args) => {
             content = content.slice(1);
         }
         content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        
+
         // --- DSL TRANSLATION ---
         // Convert literal \n to [/n] so the model recognizes them as literal characters
         content = content.replace(/\\n/g, '[/n]');
-        
+
         const lines = content.split('\n');
         const totalLines = lines.length;
 
@@ -77,7 +77,7 @@ export const view_file = async (args) => {
         const end = Math.min(totalLines, finalEnd);
         const resultLines = lines.slice(start, end);
 
-        const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines})`;
+        const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines}). \\\\n in strings are encoded as [/n].`;
         const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line}`).join('\n');
 
         return `${header}\n\n${code}`;

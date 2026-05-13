@@ -780,10 +780,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             let label = '';
                             if (toolCall.toolName === 'web_search') {
                                 const { query, limit = 10 } = parseArgs(toolCall.args);
-                                label = `🔍 SEARCHING: "${query}" (${limit})`.toUpperCase();
+                                label = `🔍 SEARCHED: "${query}" (${limit})`.toUpperCase();
                             } else if (toolCall.toolName === 'web_scrape') {
                                 const url = parseArgs(toolCall.args).url || '...';
-                                label = `📖 READING SITE: ${url}`.toUpperCase();
+                                label = `📖 READ SITE: ${url}`.toUpperCase();
                             } else if (toolCall.toolName === 'view_file') {
                                 const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
 
@@ -808,31 +808,31 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const isPdf = pathLower.endsWith('.pdf');
                                 const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                 if (isPdf) {
-                                    label = `📄 ANALYZING PDF: ${targetPath}`.toUpperCase();
+                                    label = `📄 ANALYSED PDF: ${targetPath}`.toUpperCase();
                                 } else if (isImage) {
-                                    label = `📸 ANALYZING IMAGE: ${targetPath}`.toUpperCase();
+                                    label = `📸 ANALYSED IMAGE: ${targetPath}`.toUpperCase();
                                 } else {
-                                    label = `📄 READING FILE: ${targetPath}. LINES ${sLine} - ${actualEndLine} FROM ${totalLines}`.toUpperCase();
+                                    label = `📄 READ FILE: ${targetPath} | LINES: ${sLine}-${actualEndLine} OF ${totalLines}`.toUpperCase();
                                 }
                             } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
-                                const action = toolCall.toolName === 'list_files' ? 'LISTING' : 'DISCOVERING';
-                                label = `📂 ${action} DIRECTORY: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
+                                const action = toolCall.toolName === 'list_files' ? 'LIST' : 'ANALYSED';
+                                label = `📂 ${action} FOLDER: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
                             } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
-                                const action = toolCall.toolName === 'write_file' ? 'WRITING' : 'PATCHING';
+                                const action = toolCall.toolName === 'write_file' ? 'WROTE' : 'UPDATED';
                                 label = `💾 ${action} FILE: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'write_pdf') {
-                                label = `📑 GENERATING PDF: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                label = `📑 PDF CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'write_docx') {
-                                label = `📝 GENERATING DOCX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                label = `📝 DOCX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'write_pptx') {
-                                label = `📊 GENERATING PPTX: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                label = `📊 PPTX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'search_keyword') {
                                 const { keyword } = parseArgs(toolCall.args);
-                                label = `🔎 SEARCHING KEYWORD: "${keyword}"`.toUpperCase();
+                                label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
                             } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
                                 label = '';
                             } else {
-                                label = `EXECUTING ${toolCall.toolName}`.toUpperCase();
+                                label = `EXECUTED: ${toolCall.toolName}`.toUpperCase();
                             }
 
                             if (label) {
@@ -1099,7 +1099,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop && ' for current EFFORT_LEVEL'}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
+            modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
             isStutteringLoop = false;
         }
