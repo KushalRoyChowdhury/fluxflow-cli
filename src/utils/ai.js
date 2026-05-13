@@ -812,11 +812,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const isPdf = pathLower.endsWith('.pdf');
                                 const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                 if (isPdf) {
-                                    label = `📄 ANALYSED PDF: ${targetPath}`.toUpperCase();
+                                    label = `📄 ANALYZED PDF: ${targetPath}`.toUpperCase();
                                 } else if (isImage) {
-                                    label = `📸 ANALYSED IMAGE: ${targetPath}`.toUpperCase();
+                                    label = `📸 ANALYZED IMAGE: ${targetPath}`.toUpperCase();
                                 } else {
-                                    label = `📄 READ FILE: ${targetPath} | LINES: ${sLine}-${actualEndLine} OF ${totalLines}`.toUpperCase();
+                                    label = `📄 ANALYZED FILE: ${targetPath} | LINES: ${sLine}-${actualEndLine} OF ${totalLines}`.toUpperCase();
                                 }
                             } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
                                 const action = toolCall.toolName === 'list_files' ? 'LIST' : 'ANALYSED';
@@ -844,7 +844,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                 const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
                                 const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                yield { type: 'visual_feedback', content: `\n\n${boxTop}\n${boxMid}\n${boxBottom}\n` };
+                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             }
                             // END VISUAL FEEDBACK
 

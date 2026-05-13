@@ -5,17 +5,17 @@ import { wrapText } from '../utils/text.js';
 import { emojiSpace } from '../utils/terminal.js';
 
 const TOOL_LABELS = {
-    'write_file': 'Write File',
-    'update_file': 'Update File',
-    'read_folder': 'Read Folder',
-    'view_file': 'View File',
-    'exec_command': 'Execute Command',
-    'web_search': 'Web Search',
-    'web_scrape': 'Read Site',
-    'search_keyword': 'Find Files',
-    'write_pdf': 'Create PDF',
-    'write_pptx': 'Create Presentation',
-    'write_docx': 'Create Document',
+    'write_file': 'WriteFile',
+    'update_file': 'UpdateFile',
+    'read_folder': 'ReadFolder',
+    'view_file': 'ViewFile',
+    'exec_command': 'ExecuteCommand',
+    'web_search': 'WebSearch',
+    'web_scrape': 'ReadSite',
+    'search_keyword': 'FindFiles',
+    'write_pdf': 'CreatePDF',
+    'write_pptx': 'CreatePresentation',
+    'write_docx': 'CreateDocument',
 };
 
 const cleanSignals = (text) => {
@@ -108,7 +108,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replace(/\[\/n\]?/g, '\\n')
+        .replace(/\[\/n\]?/g, '\\\\n')
         .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
         .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
@@ -442,7 +442,45 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         return <DiffBlock text={text} columns={columns} />;
     }
 
-    // SCENARIO 2: Standard Markdown Fenced Code Blocks (Streaming-friendly)
+    // SCENARIO 2: Write File Content Preview
+    if (text.includes('- Content Preview:')) {
+        const mainParts = text.split('- Content Preview:');
+        const headerText = mainParts[0];
+        const contentPart = mainParts[1] || '';
+        
+        // Split content from footer
+        const footerMarker = 'Check if Starting and Ending matches';
+        const contentAndFooter = contentPart.split(footerMarker);
+        const content = contentAndFooter[0]?.trim() || '';
+        const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
+
+        const codeLines = content.split('\n');
+        const gutterWidth = String(codeLines.length).length;
+
+        return (
+            <Box flexDirection="column" width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="#444" paddingX={1} width="100%">
+                    <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
+                        <Text backgroundColor="#444" color="white"> FILE SNAPSHOT </Text>
+                    </Box>
+                    <Box flexDirection="column" paddingY={1} width="100%">
+                        {codeLines.map((line, idx) => (
+                            <Box key={idx} width="100%">
+                                <Box width={gutterWidth + 2} flexShrink={0}>
+                                    <Text color="gray" dimColor>{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
+                                </Box>
+                                <Box flexGrow={1}>
+                                    <Text color="white">{line}</Text>
+                                </Box>
+                            </Box>
+                        ))}
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
+
+    // SCENARIO 3: Standard Markdown Fenced Code Blocks (Streaming-friendly)
     if (text.includes('```')) {
         const parts = text.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
         return (
@@ -481,13 +519,13 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         );
     }
 
-    // SCENARIO 3: Standard Markdown
+    // SCENARIO 4: Standard Markdown
     return <MarkdownText text={text} columns={columns} />;
 });
 
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
-    // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START]
-    const isDiffResult = msg.role === 'system' && msg.text?.includes('[DIFF_START]');
+    // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
+    const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
     const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]: ERROR:') &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
@@ -695,8 +733,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         if (msg.role === 'think' && !showFullThinking) {
             return 'Thinking...';
         }
-        return content;
-    }, [content, msg.role, showFullThinking]);
+        return msg.isStreaming ? content : content.trimEnd();
+    }, [content, msg.role, showFullThinking, msg.isStreaming]);
 
     return (
         <Box marginBottom={1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
@@ -737,7 +775,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     </Box>
                 </Box>
             ) : (
-                <Box flexDirection="column" paddingX={1} marginTop={1} width="100%">
+                <Box flexDirection="column" paddingX={1} marginTop={isDiffResult ? 0 : 1} width="100%">
                     <CodeRenderer text={finalContent} columns={columns} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
