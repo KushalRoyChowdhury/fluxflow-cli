@@ -158,7 +158,7 @@ export const update_file = async (args) => {
         const oldLines = content_to_replace.split(/\r?\n/);
         const endLine = startLine + oldLines.length - 1;
 
-        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\' and 'n' characters to the file at that place.\n\n`;
+        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\\' and 'n' characters to the file at that place.\n\n`;
         diffText += `[DIFF_START]\n`;
 
         // 1. Context Before (up to 15 lines)

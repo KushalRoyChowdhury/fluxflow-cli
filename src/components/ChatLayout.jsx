@@ -108,7 +108,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replace(/\[\/n\]?/g, '\\\\n')
+        .replace(/\[\/n\]?/g, '\\n')
         .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
         .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
@@ -415,21 +415,17 @@ const DiffLine = React.memo(({ line, columns = 80 }) => {
 });
 
 const DiffBlock = React.memo(({ text, columns = 80 }) => {
-    const beforeDiff = text.substring(0, text.indexOf('[DIFF_START]')).trim();
-    const afterDiff = text.substring(text.indexOf('[DIFF_END]') + 10).trim();
     const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
     return (
         <Box flexDirection="column" width="100%">
-            {beforeDiff && <MarkdownText text={beforeDiff} columns={columns} />}
-            <Box flexDirection="column" marginTop={1} backgroundColor="#1a1a1a" paddingY={0} width="100%">
+            <Box flexDirection="column" backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
                     <DiffLine key={i} line={line} columns={columns} />
                 ))}
             </Box>
-            {afterDiff && <MarkdownText text={afterDiff} columns={columns} />}
         </Box>
     );
 });
@@ -447,7 +443,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         const mainParts = text.split('- Content Preview:');
         const headerText = mainParts[0];
         const contentPart = mainParts[1] || '';
-        
+
         // Split content from footer
         const footerMarker = 'Check if Starting and Ending matches';
         const contentAndFooter = contentPart.split(footerMarker);
@@ -768,9 +764,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                 </Box>
 
             ) : msg.role === 'think' ? (
-                <Box flexDirection="column" marginTop={1} paddingX={1} width="100%">
+                <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
                     <Text bold color="white">Thinking...</Text>
-                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} flexDirection="column" width="100%">
+                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
                         {formatThinkText(finalContent, columns)}
                     </Box>
                 </Box>

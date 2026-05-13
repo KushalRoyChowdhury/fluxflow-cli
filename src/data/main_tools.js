@@ -34,6 +34,7 @@ export const TOOL_PROTOCOL = (mode) => `
         2. LITERAL \\n: To write the literal characters '\\' and 'n' (e.g., inside printf("Hello\\n")), you MUST use the sequence [/n].
         3. ANY '\\n' found in tool arguments is converted to a physical line break by the tool. Use this for code structure, but use [/n] for literal text.
         4. NEVER USE [/n] FOR STRUCTURAL LINE BREAKS (pressing ENTER).
+        5. [/n] WILL ALWAYS WRITE \\n LITERALLY IN THE FILE. [/n] SHOULD ALWAYS BE USED **INSIDE** STRINGS ONLY.
     ***
 
     *** [🚨 CRITICAL QUOTE ESCAPE POLICY 🚨] ***

@@ -463,7 +463,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
 
-    const firstUserMsg = `[SYSTEM] **MUST FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY**.\n\nUSER_PROMPT: "${agentText}"`.trim();
+    const firstUserMsg = `[SYSTEM] **STRICTLY FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING*.\n\nUSER_PROMPT: "${agentText}"`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -572,7 +572,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext32k, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} PROTOCOL**.`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**.`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL_RESULT]')) {
@@ -1007,7 +1007,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly after the EXACT word it cut off and DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start as the system won't pick half tool formats.\n- Visually the new pickup and continuation should look natual sentence flow." });
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly after the EXACT word it cut off and DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start as the system won't pick half tool formats.\n- Visually the new pickup and continuation should look natual sentence flow.\n- DON'T try to think shorter, keep length standard." });
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
