@@ -1,3 +1,4 @@
+import os from 'os';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
 import Spinner from 'ink-spinner';
@@ -32,8 +33,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.1';
-const updatedOn = '2026-05-13';
+const versionFluxflow = '1.9.2';
+const updatedOn = '2026-05-14';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -99,23 +100,28 @@ export default function App() {
             });
         }
         try {
-            const response = await fetch('https://registry.npmjs.org/fluxflow-cli/latest', { cache: 'no-store' });
+            const response = await fetch('https://registry.npmjs.org/fluxflow-cli', { cache: 'no-store' });
             const data = await response.json();
-            const latestVersion = data?.version;
+            const latestVersion = data['dist-tags']?.latest;
+            const stableVersion = data['dist-tags']?.stable;
             if (latestVersion) setLatestVer(latestVersion);
 
             if (latestVersion && latestVersion !== versionFluxflow) {
+                const versionDisplay = latestVersion === stableVersion ? `v${latestVersion}-stable` : `v${latestVersion}`;
+                
                 if (!manual && settingsToUse.autoUpdate) {
                     setActiveView('update');
                 } else {
                     setMessages(prev => {
                         const newMsgs = [...prev];
-                        newMsgs.splice(manual ? newMsgs.length : 1, 0, {
+                        // Splice after logo (0), welcome (1), and home warning (2 if exists)
+                        const spliceIdx = manual ? newMsgs.length : Math.min(newMsgs.length, 3);
+                        newMsgs.splice(spliceIdx, 0, {
                             id: 'update-' + Date.now(),
                             role: 'system',
-                            text: `A new version (v${latestVersion}) is here.\n\n` +
-                                  `  • Type \`/update latest\` to apply the update.\n` +
-                                  `  • Type \`/changelog\` to view the release notes.`,
+                            text: `A new version (${versionDisplay}) is here.\n\n` +
+                                `  • Type \`/update latest\` to apply the update.\n` +
+                                `  • Type \`/changelog\` to view the release notes.`,
                             isUpdateNotification: true,
                             isMeta: true
                         });
@@ -125,7 +131,8 @@ export default function App() {
             } else if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: '✅ [SYSTEM] Flux Flow is already up to date.', isMeta: true }];
+                    const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}-stable` : versionFluxflow;
+                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `✅ [SYSTEM] Flux Flow is already up to date (${displayVer}).`, isMeta: true }];
                 });
             }
         } catch (err) {
@@ -246,11 +253,47 @@ export default function App() {
     const [resolutionData, setResolutionData] = useState(null);
     const [tempModelOverride, setTempModelOverride] = useState(null);
 
-    const [messages, setMessages] = useState([
-        { id: 'welcome', role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome to Flux Flow! Type /help for commands.', isMeta: true }
-    ]);
+    const [messages, setMessages] = useState(() => {
+        const logoMsg = { id: 'logo-' + Date.now(), role: 'system', text: FLUX_LOGO, isLogo: true, isMeta: true };
+        const welcomeMsg = { id: 'welcome', role: 'system', text: '🌊⚡ Welcome to Flux Flow! Type /help for commands.', isMeta: true };
+        const isHomeDir = process.cwd() === os.homedir();
+        const isSystemDir = (() => {
+            const cwd = process.cwd().toLowerCase();
+            if (process.platform === 'win32') {
+                const winDir = process.env.SystemRoot?.toLowerCase() || 'c:\\windows';
+                const progFiles = process.env.ProgramFiles?.toLowerCase() || 'c:\\program files';
+                const progFilesX86 = process.env['ProgramFiles(x86)']?.toLowerCase() || 'c:\\program files (x86)';
+                return cwd.startsWith(winDir) || cwd.startsWith(progFiles) || cwd.startsWith(progFilesX86);
+            } else {
+                const sysPaths = ['/bin', '/sbin', '/etc', '/usr', '/var', '/root'];
+                return cwd === '/' || sysPaths.some(p => cwd.startsWith(p));
+            }
+        })();
+
+        const msgs = [logoMsg, welcomeMsg];
+        if (isSystemDir) {
+            msgs.push({
+                id: 'system-warning',
+                role: 'system',
+                text: `🛑 [CRITICAL SECURITY ALERT] SYSTEM DIRECTORY DETECTED`,
+                subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. PLEASE MOVE TO A PROJECT FOLDER FOR SAFETY.`,
+                isHomeWarning: true,
+                isMeta: true
+            });
+        } else if (isHomeDir) {
+            msgs.push({
+                id: 'home-warning',
+                role: 'system',
+                text: `[SECURITY ALERT] HOME DIRECTORY DETECTED`,
+                subText: `You are currently in ${os.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please move to a project folder for safety.`,
+                isHomeWarning: true,
+                isMeta: true
+            });
+        }
+        return msgs;
+    });
     const queuedPromptRef = useRef(null);
-    const [completedIndex, setCompletedIndex] = useState(1);
+    const [completedIndex, setCompletedIndex] = useState(messages.length);
 
     const windowedHistory = useMemo(() => {
         // [SCROLLBACK-SAFE SNAP-TO-BOTTOM]
@@ -586,6 +629,11 @@ export default function App() {
         { cmd: '/about', desc: 'Project info & credits' },
         { cmd: '/changelog', desc: 'View latest updates' },
         {
+            cmd: '/fluxflow', desc: 'Project management', subs: [
+                { cmd: 'init', desc: 'Create FluxFlow.md template' }
+            ]
+        },
+        {
             cmd: '/update', desc: 'Check/Install updates', subs: [
                 { cmd: 'check', desc: 'Check for new version' },
                 { cmd: 'latest', desc: 'Install latest release' }
@@ -859,8 +907,8 @@ export default function App() {
                 case '/about': {
                     const s = emojiSpace(2);
                     const aboutText = `🔹 FluxFlow Version: v${versionFluxflow}\n` +
-                                    `🔹 Status: ${latestVer && latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'Up to date'}\n` +
-                                    `🔹 Released on: ${updatedOn}`;
+                        `🔹 Status: ${latestVer && latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'Up to date'}\n` +
+                        `🔹 Released on: ${updatedOn}`;
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: 'about-' + Date.now(), role: 'system', text: aboutText, isAboutRecord: true, isMeta: true }];
@@ -875,6 +923,31 @@ export default function App() {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
                     });
+                    break;
+                }
+                case '/fluxflow': {
+                    const args = parts.slice(1);
+                    if (args[0] === 'init') {
+                        const template = `# FluxFlow Configuration\n# This file defines project-specific instructions for the Flux Flow Agent.\n\n# IDENTITY & TONE\n- Tone: Technical, precise, and highly efficient.\n\n# PROJECT CONTEXT\n- Goal: [Describe your project goal here]\n- Tech Stack: [List your technologies here]\n\n# CUSTOM RULES\n- [Add specific coding standards or rules here]\n\n# SKILLS & WORKFLOWS\n- [Define custom step-by-step recipes for this project here]\n`;
+                        const filePath = path.join(process.cwd(), 'FluxFlow.md');
+                        if (fs.pathExistsSync(filePath)) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: '❌ ERROR: FluxFlow.md already exists in this directory.', isMeta: true }];
+                            });
+                        } else {
+                            fs.writeFileSync(filePath, template);
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '✅ [SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
+                            });
+                        }
+                    } else {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: 'ff-err-' + Date.now(), role: 'system', text: '❓ Usage: /fluxflow init', isMeta: true }];
+                        });
+                    }
                     break;
                 }
                 case '/update': {

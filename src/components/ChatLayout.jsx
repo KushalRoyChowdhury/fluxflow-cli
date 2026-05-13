@@ -54,7 +54,7 @@ const cleanSignals = (text) => {
             // String immunity
             if (!inString && (char === "'" || char === '"' || char === '`')) {
                 inString = char;
-            } else if (inString && char === inString && result[j-1] !== '\\') {
+            } else if (inString && char === inString && result[j - 1] !== '\\') {
                 inString = null;
             }
 
@@ -333,7 +333,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
                 result.push(<Box key={i} height={1} />);
                 return;
             }
-          // Horizontal Rule
+            // Horizontal Rule
             if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
                 result.push(<Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor="#333" />);
                 return;
@@ -473,21 +473,38 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START]
     const isDiffResult = msg.role === 'system' && msg.text?.includes('[DIFF_START]');
     const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]: ERROR:') &&
-                        (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
+        (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
+    const isHomeWarning = msg.isHomeWarning;
 
-    if (msg.id && String(msg.id).startsWith('welcome')) {
-        const parts = msg.text.split('\n\n');
-        const logo = parts[0];
-        const greeting = parts[1] || '';
+    if (isHomeWarning) {
+        return (
+            <Box marginBottom={1} paddingX={1} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="red" padding={0} width="100%">
+                    <Box paddingX={1} backgroundColor="#3a0000">
+                        <Text color="red" bold>{msg.text}</Text>
+                    </Box>
+                    <Box paddingX={1} marginTop={1} marginBottom={1}>
+                        <Text color="white">{msg.subText}</Text>
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
 
+    if (msg.isLogo) {
         return (
             <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
-                <Box marginBottom={1}>
-                    <Text>{logo}</Text>
-                </Box>
+                <Text>{msg.text}</Text>
+            </Box>
+        );
+    }
+
+    if (msg.id && String(msg.id).startsWith('welcome')) {
+        return (
+            <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
                 <Box borderStyle="round" borderColor="gray" paddingX={3} paddingY={0}>
-                    <Text color="cyan" bold>{greeting.trim()}</Text>
+                    <Text color="cyan" bold>{msg.text.trim()}</Text>
                 </Box>
             </Box>
         );
@@ -525,7 +542,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
-                        <Text color="cyan" bold>💬{s}AGENT REQUEST: RESOLVED</Text>
+                        <Text color="cyan" bold>💬 AGENT REQUEST: RESOLVED</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
                         <Text color="white">Selection: <Text color="yellow" bold>{selection}</Text></Text>
@@ -568,49 +585,54 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     if (msg.isHelpRecord) {
         const commandList = [
             { cmd: '/quit', desc: 'Exit and shutdown Flux' },
-        { cmd: '/help', desc: 'Show all available commands' },
-        { cmd: '/clear', desc: 'Clear terminal screen' },
-        { cmd: '/resume', desc: 'Load previous session' },
-        { cmd: '/save', desc: 'Force save current chat' },
-        { cmd: '/chats', desc: 'List all chat sessions' },
-        {
-            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
-                { cmd: 'flux', desc: 'Enable Dev toolset' },
-                { cmd: 'flow', desc: 'Enable Chat mode' }
-            ]
-        },
-        {
-            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-                { cmd: 'low', desc: 'Fastest reasoning' },
-                { cmd: 'medium', desc: 'Balanced depth' },
-                { cmd: 'high', desc: 'Complex coding' },
-                { cmd: 'max', desc: 'Architectural depth' },
-                { cmd: 'show', desc: 'Show full thoughts' },
-                { cmd: 'hide', desc: 'Show concise thoughts' }
-            ]
-        },
-        {
-            cmd: '/model', desc: 'Switch AI model', subs: [
-                { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
-                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
-                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
-                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
-            ]
-        },
-        { cmd: '/settings', desc: 'Configure system prefs' },
-        { cmd: '/key', desc: 'Manage API keys' },
-        { cmd: '/profile', desc: 'Edit developer persona' },
-        { cmd: '/memory', desc: 'Manage agent memory' },
-        { cmd: '/stats', desc: 'Show session usage' },
-        { cmd: '/reset', desc: 'Wipe all project data' },
-        { cmd: '/about', desc: 'Project info & credits' },
-        { cmd: '/changelog', desc: 'View latest updates' },
-        {
-            cmd: '/update', desc: 'Check/Install updates', subs: [
-                { cmd: 'check', desc: 'Check for new version' },
-                { cmd: 'latest', desc: 'Install latest release' }
-            ]
-        }
+            { cmd: '/help', desc: 'Show all available commands' },
+            { cmd: '/clear', desc: 'Clear terminal screen' },
+            { cmd: '/resume', desc: 'Load previous session' },
+            { cmd: '/save', desc: 'Force save current chat' },
+            { cmd: '/chats', desc: 'List all chat sessions' },
+            {
+                cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+                    { cmd: 'flux', desc: 'Enable Dev toolset' },
+                    { cmd: 'flow', desc: 'Enable Chat mode' }
+                ]
+            },
+            {
+                cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
+                    { cmd: 'low', desc: 'Fastest reasoning' },
+                    { cmd: 'medium', desc: 'Balanced depth' },
+                    { cmd: 'high', desc: 'Complex coding' },
+                    { cmd: 'max', desc: 'Architectural depth' },
+                    { cmd: 'show', desc: 'Show full thoughts' },
+                    { cmd: 'hide', desc: 'Show concise thoughts' }
+                ]
+            },
+            {
+                cmd: '/model', desc: 'Switch AI model', subs: [
+                    { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
+                    { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
+                    { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
+                    { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+                ]
+            },
+            { cmd: '/settings', desc: 'Configure system prefs' },
+            { cmd: '/key', desc: 'Manage API keys' },
+            { cmd: '/profile', desc: 'Edit developer persona' },
+            { cmd: '/memory', desc: 'Manage agent memory' },
+            { cmd: '/stats', desc: 'Show session usage' },
+            { cmd: '/reset', desc: 'Wipe all project data' },
+            { cmd: '/about', desc: 'Project info & credits' },
+            { cmd: '/changelog', desc: 'View latest updates' },
+            {
+                cmd: '/fluxflow', desc: 'Project management', subs: [
+                    { cmd: 'init', desc: 'Create FluxFlow.md template' }
+                ]
+            },
+            {
+                cmd: '/update', desc: 'Check/Install updates', subs: [
+                    { cmd: 'check', desc: 'Check for new version' },
+                    { cmd: 'latest', desc: 'Install latest release' }
+                ]
+            }
         ];
 
         return (

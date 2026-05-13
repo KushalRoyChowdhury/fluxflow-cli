@@ -642,8 +642,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 const cleanText = dedupeBuffer.substring(overlapLen);
                                 if (cleanText) {
-                                    turnText += cleanText;
-                                    yield { type: 'text', content: cleanText };
+                                    // [SEAMLESS PICKUP] Strip redundant <think> tags if model restarts them during dedupe
+                                    const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                                    if (dedupeClean) {
+                                        turnText += dedupeClean;
+                                        yield { type: 'text', content: dedupeClean };
+                                    }
                                 }
                                 isDedupeActive = false;
                                 dedupeBuffer = '';
@@ -971,8 +975,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     const cleanText = dedupeBuffer.substring(overlapLen);
                     if (cleanText) {
-                        turnText += cleanText;
-                        yield { type: 'text', content: cleanText };
+                        const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                        if (dedupeClean) {
+                            turnText += dedupeClean;
+                            yield { type: 'text', content: dedupeClean };
+                        }
                     }
                     isDedupeActive = false;
                     dedupeBuffer = '';
@@ -1000,7 +1007,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly from the EXACT word it left off and DON'T repeat what you already said! IF you were in a thinking block, complete the thinking and close the thinking with proper </think> then respond. PICK UP FROM TE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start as the system won't pick half tool formats.\n- Visually the new pickup and continuation should look natual sentence flow." });
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly after the EXACT word it cut off and DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start as the system won't pick half tool formats.\n- Visually the new pickup and continuation should look natual sentence flow." });
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {

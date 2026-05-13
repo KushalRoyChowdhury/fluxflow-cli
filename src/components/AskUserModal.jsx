@@ -35,7 +35,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
         return (
             <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                 <Box paddingX={1}>
-                    <Text color="cyan" bold>💬{s}SUGGEST SOMETHING ELSE</Text>
+                    <Text color="cyan" bold>💬 SUGGEST SOMETHING ELSE</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1}>
                     <Text italic color="gray">Replying to: {question}</Text>
@@ -58,7 +58,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="cyan" bold>💬AGENT REQUEST: ACTION REQUIRED</Text>
+                <Text color="cyan" bold>💬 AGENT REQUEST: ACTION REQUIRED</Text>
             </Box>
 
             <Box paddingX={1} marginBottom={1}>
