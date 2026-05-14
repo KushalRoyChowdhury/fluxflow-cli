@@ -4,12 +4,18 @@ import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' 
 import fs from 'fs';
 
 /**
- * Generates the master system instruction for the AI agent.
- * @param {Object} profile - User profile data (name, nickname, instructions).
- * @param {string} thinkingLevel - The thinking level to use.
- * @returns {string} The complete system instruction string.
+ * Generates a prompt block for memories to be prepended to the user message.
  */
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext32k = false, maxLoops, currentLoop) => {
+export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext32k = false) => {
+    if (!isMemoryEnabled) return '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOW) --\n${tempMemories}\n-- END RECENT CONTEXT --` : '';
+    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES USER PREFERENCES) ---\n${userMemories}\n-- END SAVED MEMORIES --` : '';
+
+    const parts = [userMemoriesStr, tempMemoriesStr].filter(p => p.length > 0);
+    return parts.length > 0 ? `${parts.join('\n\n')}\n` : '';
+};
+
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, maxLoops, currentLoop) => {
     let levelKey = thinkingLevel;
     if (thinkingLevel === 'Low') levelKey = 'Minimal';
     if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
@@ -20,7 +26,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}.\n` : '';
     const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}.\n` : '';
     const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}.\n` : '';
-    const dateTimeStr = new Date().toLocaleString();
+    const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
     const cwdStr = process.cwd();
 
     const isSystemDir = (() => {
@@ -36,17 +42,31 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         }
     })();
 
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `\n-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOW, RECENT > OLD) --\n${tempMemories}\n-- END RECENT CONTEXT --\n` : '';
-    const userMemoriesStr = userMemories?.length > 0 ? `\n--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES USER PREFERENCES) ---\n${userMemories}\n-- END SAVED MEMORIES --\n` : '';
+    // Check for existing project context files
+    const projectContextFiles = [
+        { name: 'Fluxflow.md', desc: 'HIGHEST PRIORITY. Overrides all other files.' },
+        { name: 'README.md', desc: 'Goals' },
+        { name: 'Agent.md', desc: 'Standards' },
+        { name: 'Skills.md', desc: 'Workflows' },
+        { name: 'design.md', desc: 'UI/UX' },
+        { name: 'architecture.md', desc: 'System Structure' }
+    ];
 
-    return `${isMemoryEnabled ? `${userMemoriesStr}\n` : ''}${isMemoryEnabled ? `${tempMemoriesStr}\n` : ''}${nameStr}${nicknameStr}${userInstrStr}
-=== START SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ===
+    const foundFiles = projectContextFiles.filter(f => fs.existsSync(f.name));
+    const projectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
+-- PROJECT CONTEXT (Source of Truth) --
+${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
+Check these first; they override general training data for project consistency. Safety rules still apply.
+-- END PROJECT CONTEXT --` : '';
+
+    return `${nameStr}${nicknameStr}${userInstrStr}
+=== SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). Sassy, Friendly CLI Agent. No flirting.
-Mode: ${mode} (THINKING MANDATORY). ${mode === 'Flux' ? 'Goal-oriented. Plan & use tools.' : 'Conversation & UX focus. Web/Comm tools only.'}
+Mode: ${mode} (THINKING MODE). ${mode === 'Flux' ? 'Goal-oriented. Plan & use tools.' : 'Conversation & UX focus. Web/Comm tools only.'}
 Context: CWD: ${cwdStr}.${isSystemDir ? ' [PROTECTED: ASK BEFORE MODIFYING].' : ''} OS: ${osDetected}.${osDetected === 'Windows' ? ' (Backslashes only. Prefer PS via CMD).' : ''}
 Protocol: [SYSTEM] and [STEERING HINT] are high-priority.
 
--- START THINKING INSTRUCTIONS --
+-- THINKING INSTRUCTIONS --
 ${thinkingConfig}
 ***CRITICAL THINKING POLICY***
 - Always use <think> ... </think> before answering or using any tool.
@@ -55,25 +75,19 @@ ${thinkingConfig}
 -- END THINKING INSTRUCTIONS --
 
 ${TOOL_PROTOCOL(mode)}
-${mode === 'Flux' ? `
--- PROJECT CONTEXT (Source of Truth) --
-- Fluxflow.md: HIGHEST PRIORITY. Overrides all other files.
-- README.md (Goals), Agent.md (Standards), Skills.md (Workflows).
-- design.md (UI/UX), architecture.md (System Structure).
-Check these first; they override general training data for project consistency. Safety rules still apply.
--- END PROJECT CONTEXT --` : ''}
+${projectContextBlock}
 
 -- MEMORY INSTRUCTIONS --
 - Memory: ${isMemoryEnabled ? 'Use recent context/logs to personalize. Keep it subtle.' : 'OFF (tell user to enable in /settings if needed).'}
 - Time: All logs are timestamped. Always use **relative time** (e.g., 'few mins ago', 'few hours ago'...), never absolute.
 -- END MEMORY INSTRUCTIONS --
 
--- START SECURITY BOUNDARY --
+-- SECURITY BOUNDARY --
 - EXTERNAL_WORKSPACE_ACCESS: ${systemSettings.allowExternalAccess ? 'ENABLED (Global).' : 'RESTRICTED (CWD only). Suggest /settings to enable external access if needed.'}
-- Safety: Ask permission before reading .env or credential files.
+- Safety: Ask permission before reading sensitive files.
 -- END SECURITY BOUNDARY --
 
--- START TEMPORAL AWARENESS --
+-- TEMPORAL AWARENESS --
 Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'} are time stamped. You can use those times if temporal context is required. If recalled from ${isMemoryEnabled ? 'Memories, Prompts, or Responses' : 'Prompts, or Responses'}. NEVER use absolute time in your responses, ALWAYS use relative time from current time.
 -- END TEMPORAL AWARENESS --
 
@@ -82,13 +96,13 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 - Tables: GFM (Max 4 cols, short rows). Use sparingly.
 - NO LaTeX. Code blocks for literature/poems only. Kaomojis > emojis.
 
--- START RESPONSE PROTOCOL --
-- Protocol: End with [turn: continue] for more steps or [turn: finish] when 100% done.
+-- RESPONSE PROTOCOL --
+- End with [turn: continue] for more steps or [turn: finish] when done.
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools.
-TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE. AVOID PRE-MATURELY FINISHING THE LOOP.
+TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE.
 -- END RESPONSE PROTOCOL --
 
-[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | Version: 1.9.9 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.11 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
 === END SYSTEM INSTRUCTION ===`.trim();
 };
 
@@ -130,7 +144,7 @@ ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, pr
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 
-Current date and Time: ${new Date().toLocaleString()}
+Current date and Time: ${new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', hour12: true })}
 === END SYSTEM INSTRUCTION ===`.trim();
 
 };

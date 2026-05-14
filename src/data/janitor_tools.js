@@ -1,10 +1,10 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
-${needTitle ? `-- START CHAT MANAGEMENT TOOLS --
+${needTitle ? `-- CHAT MANAGEMENT TOOLS --
 1. YOU MUST UPDATE CHAT TITLE (URGENT PRIORITY):
 [tool:functions.chat(title='<short creative title of FULL conversation in 3-5 words>')]. Consider full chat context to generate title NOT just latest message.
 -- END CHAT MANAGEMENT TOOLS --
 `.trimEnd() : ''}
--- START MEMORY TOOLS (YOU SHOULD NOT OUTPUT ANYTHING OTHER THAN THESE SPECIFIC TOOLS) --
+-- MEMORY TOOLS (YOU SHOULD NOT OUTPUT ANYTHING OTHER THAN THESE SPECIFIC TOOLS) --
 Your tool syntax is: '[tool:functions.function_name(args...)]'
 You have access to the following memory functions to persist important information:
 

@@ -33,8 +33,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.9';
-const updatedOn = '2026-05-14';
+const versionFluxflow = '1.9.11';
+const updatedOn = '2026-05-15';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -297,15 +297,15 @@ export default function App() {
 
     const windowedHistory = useMemo(() => {
         // [SCROLLBACK-SAFE SNAP-TO-BOTTOM]
-        // We keep 2000 lines of history in the render tree so the user can scroll up.
-        const MAX_HISTORY_LINES = 2000;
+        // We keep 1536 lines of history in the render tree so the user can scroll up.
+        const MAX_HISTORY_LINES = 1536;
         const width = terminalSize.columns || 80;
 
         let totalLines = 0;
         let startIdx = 0;
 
         // Step 1: Find the total line count of all messages (backwards)
-        // We go back until we hit the 2000 line scrollback limit.
+        // We go back until we hit the 1536 line scrollback limit.
         for (let i = messages.length - 1; i >= 0; i--) {
             const msg = messages[i];
             if (!msg) continue;
@@ -2048,7 +2048,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 ) : (
                                     <Box flexDirection="row" width="100%" paddingY={0}>
                                         <Box flexShrink={0} width={4}>
-                                            <Text color={isProcessing ? "magenta" : "cyan"} bold>{isProcessing ? "🧠 " : "💠 "}</Text>
+                                            <Text color={isProcessing ? "magenta" : "cyan"} bold>{isProcessing ? "✦  " : "💠 "}</Text>
                                         </Box>
                                         <Box flexGrow={1}>
                                             <Box flexGrow={1} position="relative">

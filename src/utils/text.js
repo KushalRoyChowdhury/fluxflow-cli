@@ -1,3 +1,4 @@
+import os from 'os';
 /**
  * High-fidelity word wrapping that preserves indentation and whitespace.
  * Uses regex tokenization to treat whitespace as distinct tokens.
@@ -40,7 +41,7 @@ export const wrapText = (text, width) => {
                 if (token.length >= 2) {
                     lastSignificantGap = originalXPos + token.length;
                 }
-                
+
                 if (currentLine.length > 0) {
                     currentLine += token;
                 }
@@ -54,7 +55,7 @@ export const wrapText = (text, width) => {
                 if ((currentLine + token).length > width) {
                     if (currentLine.trim().length > 0) {
                         finalLines.push(currentLine.replace(/\s+$/, ''));
-                        
+
                         // Use the last significant gap or leading indent
                         const safeIndent = Math.min(lastSignificantGap, Math.max(0, width - 12));
                         const indent = ' '.repeat(safeIndent);
@@ -94,11 +95,11 @@ export const wrapText = (text, width) => {
 export const formatTokens = (tokens) => {
     if (!tokens && tokens !== 0) return '0.0k';
     const num = typeof tokens === 'string' ? parseFloat(tokens) : tokens;
-    
+
     if (num >= 1000000) {
-        return `${(num / 1000000).toFixed(2)}m`;
+        return `${(num / 1000000).toFixed(1)}m`;
     } else if (num >= 1000) {
-        return `${(num / 1000).toFixed(2)}k`;
+        return `${(num / 1000).toFixed(1)}k`;
     }
     return num.toString();
 };
@@ -107,6 +108,8 @@ export const formatTokens = (tokens) => {
  * Middle-truncates a string (usually a path) to fit within a maximum length.
  */
 export const truncatePath = (p, maxLength = 40) => {
+    // represent home dir by ~
+    p = p.replace(os.homedir(), '~');
     if (!p || p.length <= maxLength) return p;
     const half = Math.floor((maxLength - 3) / 2);
     return p.substring(0, half) + '...' + p.substring(p.length - half);

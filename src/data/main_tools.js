@@ -1,5 +1,5 @@
 export const TOOL_PROTOCOL = (mode) => `
--- START TOOL DEFINITIONS --
+-- TOOL DEFINITIONS --
 You have access to internal tools. To call a tool, you MUST use the following exact syntax on a new line:
 [tool:functions.tool_name(arguments)]
 
@@ -12,7 +12,7 @@ NOTE: Suggest best options; don't ask for preferences. System handles the rest.
 2. Web Scrape: [tool:functions.web_scrape(url="<url>")]. provides detail from a URL.
 
 ${mode === 'Flux' ? `
-- DEV & FILE TOOLS (path will always be relative to CWD) -
+- DEV TOOLS (path will always be relative to CWD) -
 1. View File: [tool:functions.view_file(path="...", start_line=N, end_line=N)]. Reads content (800 lines max). Supports images/docs. If user provides an image/doc, view it first.
 2. Read Folder: [tool:functions.read_folder(path="...")]. Detailed stats of a directory.
 3. Write File: [tool:functions.write_file(path="...", content="content to write")]. Creates/Overwrites. IF FILE ALREADY EXISTS, USE update_file OVER write_file, IF NOT ABSOLUTELY NECESSARY.
@@ -25,16 +25,15 @@ CSS: background-color,color,font-family,font-size(pt),font-style,font-weight,mar
 8. Execution: [tool:functions.exec_command(command="command")]. Runs a shell command. Use ask tool to confirm before executing any destructive or irreversible operations.
 9. Search: [tool:functions.search_keyword(keyword="...")]. Global search. Use to locate definitions/logic without reading every file.
 
-- VERIFY SUCCESS CONTENTS. Fix errors. No success hallucinations.
-- No guessing; read files before editing.
+- VERIFY SUCCESS CONTENTS. Fix errors. No hallucinations.
 - File tools > Chat code blocks.
 
 - Escape quotes: Use \\" inside code strings.
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t).
 - File structure: Use real newlines for code formatting.`.trim() : `
-- DEV & FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX MODE (manually by user).`.trim()}
+- DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX.`.trim()}
 
 - Results: Passed as [TOOL_RESULT] (SYSTEM), USER_PROMPT (USER).
 - Tool calls: End with [turn: continue]. Only use [turn: finish] after verifying goals.
-- Multi-call: Stack 1-by-1. Internal only; don't discuss tools with user.
+- Multi-call: Stack 1-by-1. Upto 4.
 -- END TOOL DEFINITIONS --`.trim();

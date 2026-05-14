@@ -46,8 +46,8 @@ fluxflow
 ### From Source (Local Development)
 1. Clone the repository and install dependencies:
    ```bash
-   git clone <repository-url>
-   cd Flux-Flow
+   git clone https://github.com/KushalRoyChowdhury/fluxflow-cli
+   cd fluxflow-cli
    npm install
    ```
 
