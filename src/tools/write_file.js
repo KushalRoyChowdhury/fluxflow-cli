@@ -15,6 +15,8 @@ export const write_file = async (args) => {
     // Strip markdown code blocks if the LLM accidentally included them and normalize to LF
     content = content.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
+    // fs.writeFileSync("got_in_write.txt", content);
+
     const absolutePath = path.resolve(process.cwd(), targetPath);
     const parentDir = path.dirname(absolutePath);
 
@@ -44,6 +46,7 @@ export const write_file = async (args) => {
         // 2. [/n] becomes a literal \n in the file
         const processedContent = strip(content)
             .replace(/\\n/g, '\n')
+            .replace(/\\\\n/g, '\\n')
             .replace(/\[\/n\]?/g, '\\n');
 
         const lineCount = processedContent.split(/\r?\n/).length;
@@ -74,7 +77,7 @@ export const write_file = async (args) => {
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet.replace(/\\n/g, '[/n]')}\n\nCheck if Starting and Ending matches your write.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\\' and 'n' characters to the file at that place.`;
+        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet.replace(/\\n/g, '[/n]')}\n\nCheck if Starting and Ending matches your write.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\\' and 'n' characters to the file at that place. CHECK IF YOU USED 'ENTER' AND [/n] PROPERLY.`;
     } catch (err) {
         return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
     }

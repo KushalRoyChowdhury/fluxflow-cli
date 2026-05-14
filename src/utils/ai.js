@@ -460,10 +460,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     // Harvest persistent user memories
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
     const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
-    const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
-
-    const firstUserMsg = `[SYSTEM] **STRICTLY FOLLOW THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING*.\n\nUSER_PROMPT: "${agentText}"`.trim();
+    const firstUserMsg = `[SYSTEM] **STRICTLY FOLLOW THINKING${mode === "Flux" ? ', NEWLINE (press ENTER for structural new lines, write [/n] for literal new lines inside STRINGS ONLY), ESCAPE STRING QUOTES IN CODE PROPERLY WITH \\"' : ""} POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING*.\n\nUSER_PROMPT: "${agentText}"`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -505,7 +503,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                     modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[STEERING HINT]: ${hint}` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] **STRICTLY FOLLOW THINKING${mode === "Flux" ? ', NEWLINE  (press ENTER for structural new lines, write [/n] for literal new lines inside STRINGS ONLY), ESCAPE STRING QUOTES IN CODE PROPERLY WITH \\"' : ""} POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING*.\n\n[STEERING HINT]: ${hint}` });
                 }
                 yield { type: 'status', content: 'Steering Hint Injected.' };
             }
@@ -572,13 +570,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, otherMemories, mainUserMemories, isMemoryEnabled, isContext32k, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING${mode === "Flux" ? ", NEWLINE, QUOTE ESCAPE" : ""} PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**.`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING${mode === "Flux" ? ', NEWLINE  (press ENTER for structural new lines, write [/n] for literal new lines inside STRINGS ONLY), ESCAPE STRING QUOTES IN CODE PROPERLY WITH \\"' : ""} PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**.`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL_RESULT]')) {
                     lastUserMsg.parts[0].text += jitInstruction;
                     addedMarker = true;
                 }
+
+                // fs.writeFileSync("contents.txt", currentSystemInstruction);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
