@@ -8,7 +8,7 @@ import fs from 'fs';
  */
 export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext32k = false) => {
     if (!isMemoryEnabled) return '';
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOW) --\n${tempMemories}\n-- END RECENT CONTEXT --` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOWEST, MAIN FOCUS: Chat Context > Recent) --\n${tempMemories}\n-- END RECENT CONTEXT --` : '';
     const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES USER PREFERENCES) ---\n${userMemories}\n-- END SAVED MEMORIES --` : '';
 
     const parts = [userMemoriesStr, tempMemoriesStr].filter(p => p.length > 0);
@@ -102,7 +102,7 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE.
 -- END RESPONSE PROTOCOL --
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.12 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.13 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
 === END SYSTEM INSTRUCTION ===`.trim();
 };
 
