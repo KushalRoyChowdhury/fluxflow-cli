@@ -3,15 +3,15 @@ export const TOOL_PROTOCOL = (mode) => `
 You have access to internal tools. To call a tool, you MUST use the following exact syntax on a new line:
 [tool:functions.tool_name(arguments)]
 
-- USER COMMUNICATION TOOLS (Available in Flux & Flow) -
+- USER COMMUNICATION TOOLS -
 1. Ask User: [tool:functions.ask(question="...", optionA="Option::Desc", optionB="Option::Desc")]. Generally use this tool for ANY ambiguity. Can use upto 4 arguments. Mandatory triggers include: 1) **Path Divergence**: When multiple architectural or technical solutions exist, present options instead of choosing arbitrarily. 2) **Security Boundaries**: Explicitly request permission before accessing sensitive files (e.g., .env, config keys, credentials). 3) **Ambiguity Resolution**: Use 'ask' to clarify vague prompts before proceeding. 4) **Risk Mitigation**: Require a 'Yes/No' confirmation for any destructive or irreversible operations. This tool is a non-terminating suspension so you can get guidance without losing context. PREFER USING THIS TOOL RATHER THAN FINISHING THE LOOP FOR USER CLARIFICATION.
 DO NOT GIVE OPTION TO ASK USER THEIR PREFERENCES. JUST GIVE THE OPTIONS YOU THINK ARE BEST FOR THE USER. REST WILL BE HANDLED BY THE SYSTEM.
 
-- WEB TOOLS (Available in Flux & Flow) -
+- WEB TOOLS -
 1. Web Search: [tool:functions.web_search(query="<query>", limit=number)]. Find info. limit is optional (3-10, default 10). If user asks about something that is not in your training data, proactively use this tool to find the information. Wider search recomemded (limit = 10) when exploring a topic.${mode === 'Flux' ? ` You can also use it to find documentation for APIs, libraries, and frameworks.` : ''}
 2. Web Scrape: [tool:functions.web_scrape(url="<url>")]. provides detail from a URL.
     ${mode === 'Flux' ? `
-- DEV & FILE TOOLS (Available in FLUX MODE ONLY) -
+- DEV & FILE TOOLS -
 1. View File: [tool:functions.view_file(path="relative/path", start_line=number, end_line=number)]. Reads file content. Auto-truncates at 800 lines unless start_line and end_line are provided. YOU CAN ALSO USE THIS TOOL TO SEE IMAGES AND DOCUMENTS IN A FOLDER. IF USER ASK HOW TO SHARE A IMAGE TELL THEM TO PASTE THE IMAGE IN THE CURRENT FOLDER. IF USER GIVES A IMAGE/DOCUMENT, YOU MUST SEE  IT FIRST BEFORE DOING ANYTHING.
 2. Read Folder: [tool:functions.read_folder(path="relative/path")]. Detailed stats of a directory.
 3. Write File: [tool:functions.write_file(path="path", content="content to write")]. Creates/Overwrites. IF FILE ALREADY EXISTS, USE update_file OVER write_file, IF NOT ABSOLUTELY NECESSARY. **DO NOT FORGET TO FOLLOW THE NEW LINE PROTOCOL. FOR STRUCTURAL LINE BREAKS PRESS 'ENTER', TO WRITE \\n IN FILE USE [/n] INSIDE STRINGS**. **NEVER USE [/n] FOR STRUCTURAL LINE BREAKS.**
