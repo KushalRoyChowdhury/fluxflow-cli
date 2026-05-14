@@ -33,7 +33,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.8';
+const versionFluxflow = '1.9.9';
 const updatedOn = '2026-05-14';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -617,7 +617,7 @@ export default function App() {
                 { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default (Free, Recommended)' : 'Standard Default (Free, Recommended) - Use Free API Key to use this model ' },
                 { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
                 { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Limited Free quota)' },
-                { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Decent Free quota)' }
+                { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast (Paid, Decent Free quota)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -1798,13 +1798,13 @@ OUTPUT: ${execOutputRef.current}`;
                                     const resumedMsgs = [...h[id].messages];
                                     const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
                                     if (!hasLogo) {
-                                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...' });
+                                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...', isMeta: true });
                                     }
 
                                     setMessages(resumedMsgs);
                                     setActiveView('chat');
                                     setMessages(prev => {
-                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${id}]` }];
+                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${id}]`, isMeta: true }];
                                         setCompletedIndex(newMsgs.length);
                                         return newMsgs;
                                     });

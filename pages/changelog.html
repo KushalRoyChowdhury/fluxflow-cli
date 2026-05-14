@@ -225,8 +225,21 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.9.0", "1.9.2"]
+        const stableVersions = ["1.9.9"]
         const changelogData = {
+            "1.9.9": {
+                "note": "Streamlining and Optimizing Flux Flow.",
+                "added": [
+                    "File Snapshot UI for quick view of file written by Agent.",
+                    "Added command `/fluxflow init` to quickly create `fluxflow.md` template for customized agent behavior."
+                ],
+                "changed": [
+                    "Reduced system prompt's token overhead by ~60%.",
+                    "Improved & more AI friendly tool architecture for reduced errors.",
+                    "Removed Alternate Screen Buffer feature."
+                ],
+                "fixes": []
+            },
             "1.9.2": {
                 "note": "",
                 "added": [],

@@ -108,7 +108,6 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replace(/\[\/n\]?/g, '\\n')
         .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
         .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_pptx|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
@@ -771,7 +770,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     </Box>
                 </Box>
             ) : (
-                <Box flexDirection="column" paddingX={1} marginTop={isDiffResult ? 0 : 1} width="100%">
+                <Box flexDirection="column" paddingX={1} marginTop={0} width="100%">
                     <CodeRenderer text={finalContent} columns={columns} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">

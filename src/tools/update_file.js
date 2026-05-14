@@ -16,17 +16,8 @@ export const update_file = async (args) => {
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    const unescapeContent = (content) => {
-        // --- THE FINAL HARMONY ---
-        // 1. \n (2 chars) becomes a real newline (LF)
-        // 2. [/n] becomes a literal \n in the file
-        return content
-            .replace(/\\n/g, '\n')
-            .replace(/\[\/n\]?/g, '\\n');
-    };
-
-    content_to_replace = unescapeContent(strip(content_to_replace));
-    content_to_add = unescapeContent(strip(content_to_add));
+    content_to_replace = strip(content_to_replace);
+    content_to_add = strip(content_to_add);
 
     const absolutePath = path.resolve(process.cwd(), targetPath);
 
@@ -158,7 +149,7 @@ export const update_file = async (args) => {
         const oldLines = content_to_replace.split(/\r?\n/);
         const endLine = startLine + oldLines.length - 1;
 
-        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\\' and 'n' characters to the file at that place. CHECK IF YOU USED 'ENTER' AND [/n] PROPERLY.\n\n`;
+        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\n\n`;
         diffText += `[DIFF_START]\n`;
 
         // 1. Context Before (up to 15 lines)
@@ -205,7 +196,7 @@ export const update_file = async (args) => {
         }
 
         diffText += `[DIFF_END]`;
-        return diffText.replace(/\\n/g, '[/n]');
+        return diffText;
     } catch (err) {
         return `ERROR: Failed to update file [${targetPath}]: ${err.message}`;
     }

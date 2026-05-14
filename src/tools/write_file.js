@@ -27,7 +27,7 @@ export const write_file = async (args) => {
             try {
                 const oldData = fs.readFileSync(absolutePath, 'utf8');
                 const lines = oldData.split(/\r?\n/);
-                ancestry = `Old File contents:\n${lines.map((l, i) => `${i + 1} | ${l.replace(/\\n/g, '[/n]')}`).join('\n')}\n\n`;
+                ancestry = `Old File contents:\n${lines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
             } catch (e) {
                 ancestry = `[Note: Could not read existing file for reversal reference]\n\n`;
             }
@@ -44,10 +44,7 @@ export const write_file = async (args) => {
         // --- THE FINAL HARMONY ---
         // 1. \n (2 chars) becomes a real newline (LF)
         // 2. [/n] becomes a literal \n in the file
-        const processedContent = strip(content)
-            .replace(/\\n/g, '\n')
-            .replace(/\\\\n/g, '\\n')
-            .replace(/\[\/n\]?/g, '\\n');
+        const processedContent = strip(content);
 
         const lineCount = processedContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(processedContent, 'utf8');
@@ -77,7 +74,7 @@ export const write_file = async (args) => {
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet.replace(/\\n/g, '[/n]')}\n\nCheck if Starting and Ending matches your write.\nIf you see [/n] in preview, it means the tool successfully wrote the literal '\\' and 'n' characters to the file at that place. CHECK IF YOU USED 'ENTER' AND [/n] PROPERLY.`;
+        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
     } catch (err) {
         return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
     }
