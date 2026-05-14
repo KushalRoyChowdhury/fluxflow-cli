@@ -102,7 +102,7 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE.
 -- END RESPONSE PROTOCOL --
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.11 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.12 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached).
 === END SYSTEM INSTRUCTION ===`.trim();
 };
 
