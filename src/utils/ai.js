@@ -463,7 +463,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     const isContext32k = (sessionStats?.tokens || 0) >= 32000;
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
-    const firstUserMsg = `${memoryPrompt}[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\nUSER_PROMPT: "${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}"`.trim();
+    const firstUserMsg = `${memoryPrompt}[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\nUSER_PROMPT: ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
