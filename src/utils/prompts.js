@@ -8,11 +8,11 @@ import fs from 'fs';
  */
 export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext32k = false) => {
     if (!isMemoryEnabled) return '';
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOW, MAIN FOCUS: Chat Context > Recent) --\n${tempMemories}\n-- END RECENT CONTEXT --` : '';
-    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES USER PREFERENCES) ---\n${userMemories}\n-- END SAVED MEMORIES --` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: LOW, MAIN FOCUS: Chat Context > Recent) --\n${tempMemories}\n` : '';
+    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, TUNES USER PREFERENCES) ---\n${userMemories}\n` : '';
 
     const parts = [userMemoriesStr, tempMemoriesStr].filter(p => p.length > 0);
-    return parts.length > 0 ? `[SYSTEM CONTEXT\n]${parts.join('\n\n')}\n` : '';
+    return parts.length > 0 ? `[SYSTEM CONTEXT]\n${parts.join('\n\n')}\n` : '';
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, maxLoops, currentLoop) => {
@@ -56,8 +56,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const projectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
 -- PROJECT CONTEXT (Source of Truth) --
 ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
-Check these first; they override general training data for project consistency. Safety rules still apply
--- END PROJECT CONTEXT --` : '';
+Check these first; they override general training data for project consistency. Safety rules still apply` : '';
 
     return `${nameStr}${nicknameStr}${userInstrStr}
 === SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ===
@@ -72,37 +71,32 @@ ${thinkingConfig}
 - Always use <think> ... </think> before answering or using any tool
 - Never skip thinking, even for simple tasks, code, or greetings
 - Never jump to responses directly, regardless of task complexity or speed
--- END THINKING INSTRUCTIONS --
 
 ${TOOL_PROTOCOL(mode)}
 ${projectContextBlock}
 
 -- MEMORY INSTRUCTIONS --
-- Memory: ${isMemoryEnabled ? 'Use recent context/logs to personalize. Keep it subtle' : 'OFF (tell user to enable in /settings if needed)'}
-- Time: All logs are timestamped. Always use **relative time** (e.g., 'few mins ago', 'few hours ago), never absolute
--- END MEMORY INSTRUCTIONS --
+- Memory: ${isMemoryEnabled ? 'Use memories to subtly personalize' : 'OFF (tell user to enable in /settings if needed)'}
+- Time: Logs are timestamped. Use **relative time** (e.g., few mins ago, few hours ago), never absolute
 
 -- SECURITY BOUNDARY --
-- EXTERNAL_WORKSPACE_ACCESS: ${systemSettings.allowExternalAccess ? 'ENABLED (Global)' : 'RESTRICTED (CWD only). Suggest /settings to enable external access if needed'}
+- EXTERNAL WORKSPACE ACCESS: ${systemSettings.allowExternalAccess ? 'ENABLED' : 'RESTRICTED (CWD only)'}
 - Safety: Ask permission before reading sensitive files
--- END SECURITY BOUNDARY --
 
 -- TEMPORAL AWARENESS --
 Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'} are time stamped. You can use those times if temporal context is required. If recalled from ${isMemoryEnabled ? 'Memories, Prompts, or Responses' : 'Prompts, or Responses'}. NEVER use absolute time in your responses, ALWAYS use relative time from current time
--- END TEMPORAL AWARENESS --
 
 -- FORMATTING --
 - Clean, concise responses. File updates > code text
 - Tables: GFM (Max 4 cols, short rows). Use sparingly
-- NO LaTeX. Code blocks for literature/poems only. Kaomojis > emojis
+- NO LaTeX. Code blocks for literature. Kaomojis > emojis
 
 -- RESPONSE PROTOCOL --
 - End with [turn: continue] for more steps or [turn: finish] when done
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
--- END RESPONSE PROTOCOL --
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.14 | Turn Progress: ${currentLoop}/${maxLoops} steps (Summarize & prompt user if limit is reached)
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.15 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
 === END SYSTEM INSTRUCTION ===`.trim();
 };
 
