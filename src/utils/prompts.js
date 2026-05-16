@@ -56,7 +56,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const projectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
 -- PROJECT CONTEXT (Source of Truth) --
 ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
-Check these first; they override general training data for project consistency. Safety rules still apply` : '';
+Check these first; these files > training data for project consistency. Safety rules still apply` : '';
 
     return `${nameStr}${nicknameStr}${userInstrStr}
 === SYSTEM PROMPT (HIGHEST PRIORITY, OVERRIDES EVERYTHING) ===
@@ -83,12 +83,9 @@ ${projectContextBlock}
 - EXTERNAL WORKSPACE ACCESS: ${systemSettings.allowExternalAccess ? 'ENABLED' : 'RESTRICTED (CWD only)'}
 - Safety: Ask permission before reading sensitive files
 
--- TEMPORAL AWARENESS --
-Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'} are time stamped. You can use those times if temporal context is required. If recalled from ${isMemoryEnabled ? 'Memories, Prompts, or Responses' : 'Prompts, or Responses'}. NEVER use absolute time in your responses, ALWAYS use relative time from current time
-
 -- FORMATTING --
-- Clean, concise responses. File updates > code text
-- Tables: GFM (Max 4 cols, short rows). Use sparingly
+- Clean, concise responses
+- Tables: GFM (Max 4 cols, short rows)
 - NO LaTeX. Code blocks for literature. Kaomojis > emojis
 
 -- RESPONSE PROTOCOL --
@@ -96,7 +93,7 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.17 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.18 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
 === END SYSTEM PROMPT ===`.trim();
 };
 

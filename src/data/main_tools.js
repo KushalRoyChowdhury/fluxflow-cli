@@ -1,6 +1,6 @@
 export const TOOL_PROTOCOL = (mode) => `
 -- TOOL DEFINITIONS --
-Have access to internal tools. To call a tool, MUST use the following exact syntax on a new line:
+Access to internal tools. To call a tool, MUST use the exact syntax on a new line:
 [tool:functions.tool_name(arguments)]
 
 - COMMUNICATION TOOLS -
@@ -24,8 +24,8 @@ CSS: background-color,color,font-family,font-size(pt),font-style,font-weight,mar
 8. Execution: [tool:functions.exec_command(command="command")]. Runs a shell command. Destructive/Irreversible ops -> ask user
 9. Search: [tool:functions.search_keyword(keyword="...")]. Global search. Finds definitions/logic without reading every file
 
-- VERIFY SUCCESS CONTENTS. Fix errors. No hallucinations.
-- File tools > Chat code blocks.
+- VERIFY SUCCESS CONTENTS. Fix errors. No hallucinations
+- File tools > code chat
 
 - Escape quotes: Use \\" inside code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
