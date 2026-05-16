@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.9.10"]
+        const stableVersions = ["1.9.16"]
         const changelogData = {
+            "1.9.16": {
+                "note": "Updated models.",
+                "added": [],
+                "changed": [
+                    "Swapped `gemini-3.1-flash-lite-preview` with `gemini-3.1-flash-lite`."
+                ],
+                "fixes": []
+            },
             "1.9.10": {
                 "note": "Web Patch.",
                 "added": [],

@@ -33,7 +33,7 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.15';
+const versionFluxflow = '1.9.16';
 const updatedOn = '2026-05-16';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (

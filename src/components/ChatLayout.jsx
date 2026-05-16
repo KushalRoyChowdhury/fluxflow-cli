@@ -660,7 +660,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
                     { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
                     { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
-                    { cmd: 'gemini-3.1-flash-lite-preview', desc: 'Ultra Fast (Paid, Free limited quota)' }
+                    { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast (Paid, Free limited quota)' }
                 ]
             },
             { cmd: '/settings', desc: 'Configure system prefs' },

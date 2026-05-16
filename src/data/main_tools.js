@@ -32,6 +32,6 @@ CSS: background-color,color,font-family,font-size(pt),font-style,font-weight,mar
 - File structure: Use real newlines for code formatting`.trim() : `
 - DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE. If you need to access files, tell the user to switch to FLUX`.trim()}
 
-- Results: Passed as [TOOL_RESULT] (SYSTEM), USER_PROMPT (USER)
+- Results: Passed as [TOOL_RESULT] SYSTEM, [USER] USER
 - Tool calls: End with [turn: continue]. Only use [turn: finish] after verifying goals
 - Multi-call: Stack 1-by-1. Upto 3`.trim();

@@ -44,7 +44,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // Check for existing project context files
     const projectContextFiles = [
-        { name: 'Fluxflow.md', desc: 'HIGHEST PRIORITY. Overrides other files' },
+        { name: 'Fluxflow.md', desc: 'HIGH PRIORITY. Overrides other files' },
         { name: 'README.md', desc: 'Goals' },
         { name: 'Agent.md', desc: 'Standards' },
         { name: 'Skills.md', desc: 'Workflows' },
@@ -59,7 +59,7 @@ ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
 Check these first; they override general training data for project consistency. Safety rules still apply` : '';
 
     return `${nameStr}${nicknameStr}${userInstrStr}
-=== SYSTEM INSTRUCTION (STRICT PRIORITY, OVERRIDES EVERYTHING) ===
+=== SYSTEM PROMPT (HIGHEST PRIORITY, OVERRIDES EVERYTHING) ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). Sassy, Friendly CLI Agent. No flirting
 Mode: ${mode} (THINKING MODE). ${mode === 'Flux' ? 'Goal-oriented. Plan & use tools' : 'Conversation & UX focus. Web/Comm tools only'}
 Context: CWD: ${cwdStr}.${isSystemDir ? ' [PROTECTED: ASK BEFORE MODIFYING]' : ''} OS: ${osDetected}.${osDetected === 'Windows' ? ' (Backslashes only. Prefer PS via CMD)' : ''}
@@ -96,8 +96,8 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.15 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
-=== END SYSTEM INSTRUCTION ===`.trim();
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.16 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
+=== END SYSTEM PROMPT ===`.trim();
 };
 
 /**
@@ -115,14 +115,13 @@ export const getJanitorInstruction = (originalText, agentRaws, userMemories = ''
     // replace the [Prompted on: ...] from user prompt
     let originalTextProcessed = originalText.replace(/\[Prompted on:.*?\]/g, '');
     // fs.writeFileSync('test.txt', originalTextProcessed);
-    return `USER_PROMPT: ${originalTextProcessed.substring(0, 600)}${originalTextProcessed.length > 600 ? '\n... (truncated) ...' : ''}
-AGENT RAWS (responses from this turn):
-${agentRes}
+    return `[USER]: ${originalTextProcessed.substring(0, 600)}${originalTextProcessed.length > 600 ? '\n... (truncated) ...' : ''}
+[AGENT (current turn)]: ${agentRes}
 ${userMemories ? `
 
 -- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}
 
-=== START SYSTEM INSTRUCTION (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
+=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
 1. OUTPUT ONLY '[tool:functions.xxx(args)]' CALLS (BRACKET WRAP IS MANDATORY).
@@ -139,6 +138,6 @@ ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, pr
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 
 Current date and Time: ${new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', hour12: true })}
-=== END SYSTEM INSTRUCTION ===`.trim();
+=== END SYSTEM PROMPT ===`.trim();
 
 };

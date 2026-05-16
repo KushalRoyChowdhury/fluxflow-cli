@@ -463,7 +463,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     const isContext32k = (sessionStats?.tokens || 0) >= 32000;
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
-    const firstUserMsg = `${memoryPrompt}[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\nUSER_PROMPT: ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+    const firstUserMsg = `${memoryPrompt}[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\n[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -525,6 +525,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let toolCallPointer = 0;
         let isThinkingLoop = false;
         let isStutteringLoop = false;
+        let isResponseCut = false;
         let isInitialAttempt = true;
         let accumulatedContext = '';
 
@@ -560,7 +561,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     targetModel = 'gemini-3-flash-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model' };
                 } else if (retryCount === MAX_RETRIES) {
-                    targetModel = 'gemini-3.1-flash-lite-preview';
+                    targetModel = 'gemini-3.1-flash-lite';
                     yield { type: 'model_update', content: 'Trying with fallback model lite' };
                 } else if (retryCount > 0) {
                     yield { type: 'model_update', content: null };
@@ -626,6 +627,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         break;
                     }
                     if (chunk.text) {
+                        isResponseCut = false;
                         if (isDedupeActive) {
                             dedupeBuffer += chunk.text;
                             // Wait for a small window to find a reliable overlap
@@ -1009,6 +1011,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
                         modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly, DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start.\n- Visually the new pickup and continuation should look natual sentence flow.\n- DON'T try to think shorter, keep length standard." });
+                        isResponseCut = true;
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
@@ -1104,12 +1107,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // If the model hasn't finished, we must provide a user turn to keep the loop going.
         // If there are no tool results, we send a 'continue' signal to prompt the model.
-        if (toolResults.length > 0) {
+        if (toolResults.length > 0 && !isResponseCut) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
             modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
             isStutteringLoop = false;
+            isResponseCut = false;
         }
     }
     yield { type: 'status', content: null };
