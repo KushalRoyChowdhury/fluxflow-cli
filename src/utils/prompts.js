@@ -77,7 +77,7 @@ ${projectContextBlock}
 
 -- MEMORY INSTRUCTIONS --
 - Memory: ${isMemoryEnabled ? 'Use memories to subtly personalize' : 'OFF (tell user to enable in /settings if needed)'}
-- Time: Logs are timestamped. Use **relative time** (e.g., few mins ago, few hours ago), never absolute
+- Time: Logs are timestamped. RELATIVE TIME REFERENCE (e.g., few mins ago, few hours ago)
 
 -- SECURITY BOUNDARY --
 - EXTERNAL WORKSPACE ACCESS: ${systemSettings.allowExternalAccess ? 'ENABLED' : 'RESTRICTED (CWD only)'}
@@ -96,7 +96,7 @@ Every ${isMemoryEnabled ? 'Prompt, Responses & Memories' : 'Prompt & Responses'}
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.16 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.17 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
 === END SYSTEM PROMPT ===`.trim();
 };
 

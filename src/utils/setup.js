@@ -22,21 +22,21 @@ export const checkPuppeteerReady = () => {
 };
 
 /**
- * Automates the installation of the required Chromium browser.
+ * Automates the installation of the required Chromium browser (Version 148).
  */
 export const installPuppeteerBrowser = async (onStatus) => {
-    if (onStatus) onStatus('📥 Downloading Chromium engine (Wait a moment)...');
+    if (onStatus) onStatus('📥 Downloading Chromium engine (chrome@148)...');
     try {
         // Attempt pnpm exec first, fallback to npx if it fails
         try {
-            await execAsync('pnpm exec puppeteer browsers install chrome');
+            await execAsync('pnpm exec puppeteer browsers install chrome@148');
         } catch (pnpmErr) {
-            await execAsync('npx -y puppeteer browsers install chrome');
+            await execAsync('npx -y puppeteer browsers install chrome@148');
         }
-        
+
         // Brief delay to allow file system to settle
         await new Promise(r => setTimeout(r, 1000));
-        
+
         return { success: true };
     } catch (err) {
         console.error('[SETUP ERROR]', err);

@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.9.16",
+	"version": "1.9.17",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -51,7 +51,7 @@
 		"nanoid": "^5.1.9",
 		"pdf-lib": "^1.17.1",
 		"pptxgenjs": "^4.0.1",
-		"puppeteer": "^24.42.0",
+		"puppeteer": "24.43.1",
 		"react": "^19.2.5",
 		"zod": "^4.3.6"
 	},
