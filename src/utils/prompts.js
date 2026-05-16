@@ -93,7 +93,7 @@ ${projectContextBlock}
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
 TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.18 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.19 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
 === END SYSTEM PROMPT ===`.trim();
 };
 
