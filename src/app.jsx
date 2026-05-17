@@ -33,7 +33,11 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const versionFluxflow = '1.9.20';
+
+// Centralized Version Control: dynamically fetch version from package.json
+const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const versionFluxflow = packageJson.version;
 const updatedOn = '2026-05-17';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
@@ -298,7 +302,7 @@ export default function App() {
     const windowedHistory = useMemo(() => {
         // [SCROLLBACK-SAFE SNAP-TO-BOTTOM]
         // We keep 1536 lines of history in the render tree so the user can scroll up.
-        const MAX_HISTORY_LINES = 1536;
+        const MAX_HISTORY_LINES = 2000;
         const width = terminalSize.columns || 80;
 
         let totalLines = 0;
@@ -1099,7 +1103,8 @@ OUTPUT: ${execOutputRef.current}`;
                                 return p;
                             }
                             return null;
-                        }
+                        },
+                        versionFluxflow
                     );
 
                     let inThinkMode = false;

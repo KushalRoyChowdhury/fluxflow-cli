@@ -39,8 +39,8 @@ const getToolDetail = (toolName, argsStr) => {
     try {
         const pArgs = parseArgs(argsStr);
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-        // Strip quotes and backslashes that might be part of an escaped string
-        return filePath ? path.basename(filePath.replace(/[\\"]/g, '')) : null;
+        // Normalize backslashes to forward slashes and strip quotes before extracting basename
+        return filePath ? path.basename(filePath.replace(/["']/g, '').replace(/\\/g, '/')) : null;
     } catch (e) {
         return null;
     }
@@ -426,7 +426,7 @@ export const initAI = (apiKey) => {
 /**
  * Executes a streaming request using the new SDK
  */
-export const getAIStream = async function* (modelName, history, settings, steeringCallback) {
+export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
     if (!client) throw new Error('AI not initialized');
 
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
@@ -462,7 +462,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     const isContext32k = (sessionStats?.tokens || 0) >= 32000;
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
-    const firstUserMsg = `${memoryPrompt}[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\n[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+    const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\n[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -579,6 +581,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     addedMarker = true;
                 }
 
+                // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 95% for Flux
+                // Keeps prompts fully cached and static for the vast majority of runs!
+                const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.95 : 0.7));
+                const currentStep = loop + 1;
+                if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
+                    lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
+                }
+
                 // fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
 
                 stream = await client.models.generateContentStream({
@@ -679,15 +689,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const keyword = pArgs.keyword;
 
                                 if (keyword) {
-                                    detail = keyword.replace(/[\\"]/g, '');
+                                    detail = keyword.replace(/["']/g, '');
                                 } else if (filePath) {
-                                    detail = path.basename(filePath.replace(/[\\"]/g, ''));
+                                    detail = path.basename(filePath.replace(/["']/g, '').replace(/\\/g, '/'));
                                 } else {
                                     // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords
                                     const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword)\s*=\s*\\?["']?([^\\"' \),]+)/);
                                     if (m) {
-                                        const val = m[1].replace(/[\\"]/g, '');
-                                        detail = potentialTool === 'search_keyword' ? val : path.basename(val);
+                                        const val = m[1].replace(/["']/g, '');
+                                        detail = potentialTool === 'search_keyword' ? val : path.basename(val.replace(/\\/g, '/'));
                                     }
                                 }
                             }

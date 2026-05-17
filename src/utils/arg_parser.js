@@ -69,20 +69,29 @@ export const parseArgs = (argsString) => {
             }
 
             // High-fidelity unescaping
-            try {
-                // Only use JSON.parse if it looks like it might have escapes
-                if (value.includes('\\')) {
-                    // Surgical escape: Only escape quotes that are NOT already escaped
-                    const surgicalValue = value.replace(/(^|[^\\])"/g, '$1\\"');
-                    value = JSON.parse(`"${surgicalValue.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
-                }
-            } catch (e) {
+            const isPathKey = key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase());
+            if (isPathKey) {
                 value = value
                     .replace(/\\"/g, '"')
                     .replace(/\\'/g, "'")
                     .replace(/\\`/g, '`')
-                    .replace(/\\\\/g, '\\')
-                    .replace(/\\n/g, '\n');
+                    .replace(/\\\\/g, '\\');
+            } else {
+                try {
+                    // Only use JSON.parse if it looks like it might have escapes
+                    if (value.includes('\\')) {
+                        // Surgical escape: Only escape quotes that are NOT already escaped
+                        const surgicalValue = value.replace(/(^|[^\\])"/g, '$1\\"');
+                        value = JSON.parse(`"${surgicalValue.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
+                    }
+                } catch (e) {
+                    value = value
+                        .replace(/\\"/g, '"')
+                        .replace(/\\'/g, "'")
+                        .replace(/\\`/g, '`')
+                        .replace(/\\\\/g, '\\')
+                        .replace(/\\n/g, '\n');
+                }
             }
         } else if (i < argsString.length && argsString[i] === '[') {
             // ARRAY LITERAL DETECTION

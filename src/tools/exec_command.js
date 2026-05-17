@@ -31,11 +31,94 @@ export const terminateActiveCommand = () => {
     }
 };
 
+/**
+ * Programmatically converts forward slashes to backslashes for path-like arguments
+ * in Windows commands to prevent shell execution errors.
+ */
+export const adjustWindowsCommand = (command) => {
+    if (process.platform !== 'win32') return command;
+
+    // Split command by space, respecting single/double quotes
+    const tokens = [];
+    let current = '';
+    let inQuote = null;
+    let isEscaped = false;
+
+    for (let i = 0; i < command.length; i++) {
+        const char = command[i];
+
+        if (isEscaped) {
+            current += char;
+            isEscaped = false;
+            continue;
+        }
+
+        if (char === '\\') {
+            current += char;
+            isEscaped = true;
+            continue;
+        }
+
+        if (inQuote) {
+            if (char === inQuote) {
+                inQuote = null;
+            }
+            current += char;
+        } else {
+            if (char === '"' || char === "'") {
+                inQuote = char;
+                current += char;
+            } else if (/\s/.test(char)) {
+                if (current.length > 0) {
+                    tokens.push(current);
+                    current = '';
+                }
+            } else {
+                current += char;
+            }
+        }
+    }
+    if (current.length > 0) {
+        tokens.push(current);
+    }
+
+    const looksLikePath = (str) => {
+        if (!str.includes('/') || /^(https?|file|ftp):\/\//i.test(str)) {
+            return false;
+        }
+
+        const firstSlashIdx = str.indexOf('/');
+        const lastSlashIdx = str.lastIndexOf('/');
+        if (firstSlashIdx === 0 && lastSlashIdx === 0) {
+            return false;
+        }
+
+        const hasDriveLetter = /^[a-zA-Z]:\//.test(str);
+        const hasRelativeStart = /^\.?\.?\//.test(str);
+        const hasMultipleSlashes = (str.match(/\//g) || []).length > 1;
+        const hasExtension = /\.[a-zA-Z0-9_-]+$/.test(str);
+
+        return hasDriveLetter || hasRelativeStart || hasMultipleSlashes || hasExtension;
+    };
+
+    const processedTokens = tokens.map(token => {
+        const unquoted = token.replace(/^['"]|['"]$/g, '');
+        if (looksLikePath(unquoted)) {
+            return token.replace(/\//g, '\\');
+        }
+        return token;
+    });
+
+    return processedTokens.join(' ');
+};
+
 export const exec_command = async (args, options = {}) => {
-    const { command } = parseArgs(args);
+    const { command: rawCommand } = parseArgs(args);
     const { onChunk } = options;
     
-    if (!command) return 'ERROR: Missing "command" argument for exec_command.';
+    if (!rawCommand) return 'ERROR: Missing "command" argument for exec_command.';
+
+    const command = adjustWindowsCommand(rawCommand);
 
     return new Promise((resolve) => {
         // Use shell: true for Windows (handles .cmd, .bat, pnpm etc)

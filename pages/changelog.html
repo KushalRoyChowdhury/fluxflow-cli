@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.9.20"]
+        const stableVersions = ["1.9.21"]
         const changelogData = {
+            "1.9.21": {
+                "note": "Stability Patch.",
+                "added": [],
+                "changed": [
+                    "Better path handling across OSs to reduce errors further."
+                ],
+                "fixes": []
+            },
             "1.9.20": {
                 "note": "Tool Removal",
                 "added": [],
