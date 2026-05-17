@@ -54,6 +54,12 @@ export const adjustWindowsCommand = (command) => {
         }
 
         if (char === '\\') {
+            // Check if the next character is a space (escaped space)
+            if (command[i + 1] === ' ') {
+                current += ' ';
+                i++; // Skip the space
+                continue;
+            }
             current += char;
             isEscaped = true;
             continue;
@@ -68,6 +74,18 @@ export const adjustWindowsCommand = (command) => {
             if (char === '"' || char === "'") {
                 inQuote = char;
                 current += char;
+            } else if (char === ';' && !current.includes('://')) {
+                if (current.length > 0) {
+                    tokens.push(current);
+                    current = '';
+                }
+                tokens.push('&');
+            } else if (char === '|' && !current.includes('://')) {
+                if (current.length > 0) {
+                    tokens.push(current);
+                    current = '';
+                }
+                tokens.push('|');
             } else if (/\s/.test(char)) {
                 if (current.length > 0) {
                     tokens.push(current);
@@ -83,30 +101,99 @@ export const adjustWindowsCommand = (command) => {
     }
 
     const looksLikePath = (str) => {
-        if (!str.includes('/') || /^(https?|file|ftp):\/\//i.test(str)) {
+        // Must contain at least one forward slash
+        if (!str.includes('/')) return false;
+
+        // Ignore URLs
+        if (/^(https?|file|ftp):\/\//i.test(str)) return false;
+
+        // Ignore Windows command-line switches (starts with / and contains no other slashes)
+        // e.g. /s, /q, /y, /?, /A, /help
+        if (str.startsWith('/') && (str.match(/\//g) || []).length === 1) {
             return false;
         }
 
-        const firstSlashIdx = str.indexOf('/');
-        const lastSlashIdx = str.lastIndexOf('/');
-        if (firstSlashIdx === 0 && lastSlashIdx === 0) {
-            return false;
-        }
+        // A path never has spaces directly adjacent to a slash (e.g. "a / b" is not a path)
+        if (/\s\/|\/\s/.test(str)) return false;
 
-        const hasDriveLetter = /^[a-zA-Z]:\//.test(str);
-        const hasRelativeStart = /^\.?\.?\//.test(str);
-        const hasMultipleSlashes = (str.match(/\//g) || []).length > 1;
-        const hasExtension = /\.[a-zA-Z0-9_-]+$/.test(str);
+        // Disqualify strings containing characters typical of code/expressions but never paths
+        if (/[\(\)\{\}\;\<\>\=\'\"]/.test(str)) return false;
 
-        return hasDriveLetter || hasRelativeStart || hasMultipleSlashes || hasExtension;
+        return true;
     };
 
-    const processedTokens = tokens.map(token => {
-        const unquoted = token.replace(/^['"]|['"]$/g, '');
-        if (looksLikePath(unquoted)) {
-            return token.replace(/\//g, '\\');
+    // Post-process tokens to translate Unix '| tee' and '| cat >' to Windows '>' or '>>'
+    // Also gracefully auto-corrects pipe typos '| file.txt' to '> file.txt'
+    const translatedTokens = [];
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (token === '|' && tokens[i + 1] === 'tee') {
+            if (tokens[i + 2] === '-a') {
+                translatedTokens.push('>>');
+                i += 2; // Skip 'tee' and '-a'
+            } else {
+                translatedTokens.push('>');
+                i += 1; // Skip 'tee'
+            }
+            continue;
         }
-        return token;
+
+        if (token === '|' && tokens[i + 1] === 'cat' && tokens[i + 2] === '>') {
+            translatedTokens.push('>');
+            i += 2; // Skip 'cat' and '>'
+            continue;
+        }
+
+        // Auto-correct '| folder/file.txt' to '> folder/file.txt'
+        if (token === '|') {
+            const nextToken = tokens[i + 1];
+            if (nextToken) {
+                const nextUnquoted = nextToken.replace(/^['"]|['"]$/g, '');
+                const isWritableFile = /\.(txt|md|json|log|csv|html|css|py|js|xml|yaml|yml|pdf|docx|pptx|xlsx)$/i.test(nextUnquoted);
+                if (looksLikePath(nextUnquoted) && isWritableFile) {
+                    translatedTokens.push('>');
+                    continue;
+                }
+            }
+        }
+
+        translatedTokens.push(token);
+    }
+
+    let inEchoArguments = false;
+    const processedTokens = translatedTokens.map(token => {
+        if (token === 'echo') {
+            inEchoArguments = true;
+            return token;
+        }
+
+        const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+        if (controlOperators.includes(token)) {
+            inEchoArguments = false;
+        }
+
+        const hasOuterQuotes = /^['"]|['"]$/.test(token);
+        let processed = token;
+
+        // If we are in echo arguments, strip outer quotes from this token!
+        if (inEchoArguments && hasOuterQuotes) {
+            processed = token.replace(/^['"]|['"]$/g, '');
+        }
+
+        const currentHasOuterQuotes = /^['"]|['"]$/.test(processed);
+        const unquoted = processed.replace(/^['"]|['"]$/g, '');
+        if (looksLikePath(unquoted)) {
+            processed = processed.replace(/\//g, '\\');
+        }
+
+        // If the processed token contains a space and is not quoted, wrap it in double quotes!
+        const finalUnquoted = processed.replace(/^['"]|['"]$/g, '');
+        if (finalUnquoted.includes(' ') && !currentHasOuterQuotes) {
+            processed = `"${finalUnquoted}"`;
+        }
+
+        return processed;
     });
 
     return processedTokens.join(' ');
@@ -167,15 +254,15 @@ export const exec_command = async (args, options = {}) => {
             const finalOutput = result.join('\n\n') || 'Command executed with no output.';
             
             if (code !== 0) {
-                resolve(`ERROR: Command [${command}] failed with exit code [${code}].\n\n${finalOutput}`);
+                resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);
             } else {
-                resolve(`SUCCESS: Command [${command}] completed.\n\n${finalOutput}`);
+                resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
             }
         });
 
         child.on('error', (err) => {
             activeChildProcess = null;
-            resolve(`ERROR: Failed to start command [${command}]: ${err.message}`);
+            resolve(`ERROR: Failed to start command [${rawCommand}]: ${err.message}`);
         });
     });
 };
