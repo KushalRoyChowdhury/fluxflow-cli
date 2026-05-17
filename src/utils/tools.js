@@ -27,7 +27,22 @@ const TOOL_MAP = {
     write_pdf,
     write_docx,
     search_keyword,
-    ask: ask_user
+    ask: ask_user,
+
+    // PascalCase Normalizations for Token Efficiency
+    Ask: ask_user,
+    WebSearch: web_search,
+    WebScrape: web_scrape,
+    ReadFile: view_file,
+    ReadFolder: read_folder,
+    WriteFile: write_file,
+    PatchFile: update_file,
+    WritePDF: write_pdf,
+    WriteDoc: write_docx,
+    Run: exec_command,
+    SearchKeyword: search_keyword,
+    Memory: memory,
+    Chat: chat
 };
 
 /**

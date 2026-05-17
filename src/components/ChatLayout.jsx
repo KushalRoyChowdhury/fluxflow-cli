@@ -15,6 +15,20 @@ const TOOL_LABELS = {
     'search_keyword': 'FindFiles',
     'write_pdf': 'CreatePDF',
     'write_docx': 'CreateDocument',
+
+    // PascalCase Support
+    'WriteFile': 'WriteFile',
+    'PatchFile': 'PatchFile',
+    'ReadFolder': 'ReadFolder',
+    'ReadFile': 'ReadFile',
+    'Run': 'RunCommand',
+    'WebSearch': 'WebSearch',
+    'WebScrape': 'WebScrape',
+    'SearchKeyword': 'SearchKeyword',
+    'WritePDF': 'WritePDF',
+    'WriteDoc': 'WriteDoc',
+    'Memory': 'Memory',
+    'Chat': 'Chat'
 };
 
 const cleanSignals = (text) => {
@@ -520,7 +534,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
-    const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]: ERROR:') &&
+    const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
     const isHomeWarning = msg.isHomeWarning;
@@ -579,7 +593,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         );
     }
 
-    if (msg.role === 'system' && msg.text?.includes('[TOOL_RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
+    if (msg.role === 'system' && msg.text?.includes('[TOOL RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
 
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);

@@ -56,7 +56,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
     const janitorContents = history.slice(-12)
-        .filter(msg => msg.text && !msg.text.includes('[TOOL_RESULT]') && !msg.text.includes('OBSERVATION:'))
+        .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:'))
         .map(msg => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
@@ -74,6 +74,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // fs.writeFileSync('janitorPrompt.txt', janitorPrompt);
 
     janitorContents.push({ role: 'system', parts: [{ text: janitorPrompt }] });
+
+    // fs.writeFileSync('janitorContents.txt', janitorPrompt);
 
     let finalSynthesis = '';
     let attempts = 0;
@@ -576,7 +578,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**.`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
-                if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL_RESULT]')) {
+                if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                     lastUserMsg.parts[0].text += jitInstruction;
                     addedMarker = true;
                 }
@@ -678,7 +680,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const toolContext = getActiveToolContext(turnText);
                         if (toolContext.inside) {
                             if (!lastToolEventTime) lastToolEventTime = Date.now();
-                            const potentialTool = toolContext.toolName;
+                            const rawToolName = toolContext.toolName;
+                            const NORMALIZE_MAP = {
+                                'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
+                                'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
+                                'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
+                                'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
+                                'Chat': 'chat', 'chat': 'chat'
+                            };
+                            const potentialTool = NORMALIZE_MAP[rawToolName] || rawToolName;
                             const partialArgs = toolContext.args || '';
 
                             // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
@@ -787,20 +797,29 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         while (allToolsFound.length > toolCallPointer) {
                             const toolCall = allToolsFound[toolCallPointer];
 
+                            const NORMALIZE_MAP = {
+                                'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
+                                'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
+                                'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
+                                'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
+                                'Chat': 'chat', 'chat': 'chat'
+                            };
+                            const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
+
                             // Status Update
-                            const displayLabel = TOOL_LABELS[toolCall.toolName] || toolCall.toolName;
-                            const detail = getToolDetail(toolCall.toolName, toolCall.args);
+                            const displayLabel = TOOL_LABELS[normToolName] || toolCall.toolName;
+                            const detail = getToolDetail(normToolName, toolCall.args);
                             yield { type: 'status', content: `${displayLabel}${detail ? ` (${detail})` : ''}...` };
 
                             // START VISUAL FEEDBACK FOR TOOLS
                             let label = '';
-                            if (toolCall.toolName === 'web_search') {
+                            if (normToolName === 'web_search') {
                                 const { query, limit = 10 } = parseArgs(toolCall.args);
                                 label = `🔍 SEARCHED: "${query}" (${limit})`.toUpperCase();
-                            } else if (toolCall.toolName === 'web_scrape') {
+                            } else if (normToolName === 'web_scrape') {
                                 const url = parseArgs(toolCall.args).url || '...';
                                 label = `📖 READ SITE: ${url}`.toUpperCase();
-                            } else if (toolCall.toolName === 'view_file') {
+                            } else if (normToolName === 'view_file') {
                                 const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
 
                                 const rawStart = StartLine || start_line;
@@ -830,20 +849,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else {
                                     label = `📄 ANALYZED FILE: ${targetPath} | LINES: ${sLine}-${actualEndLine} OF ${totalLines}`.toUpperCase();
                                 }
-                            } else if (toolCall.toolName === 'list_files' || toolCall.toolName === 'read_folder') {
-                                const action = toolCall.toolName === 'list_files' ? 'LIST' : 'ANALYSED';
+                            } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
+                                const action = normToolName === 'list_files' ? 'LIST' : 'ANALYSED';
                                 label = `📂 ${action} FOLDER: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
-                            } else if (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file') {
-                                const action = toolCall.toolName === 'write_file' ? 'WRITTEN' : 'UPDATED FILE';
+                            } else if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                const action = normToolName === 'write_file' ? 'WRITTEN' : 'UPDATED FILE';
                                 label = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                            } else if (toolCall.toolName === 'write_pdf') {
+                            } else if (normToolName === 'write_pdf') {
                                 label = `📑 PDF CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                            } else if (toolCall.toolName === 'write_docx') {
+                            } else if (normToolName === 'write_docx') {
                                 label = `📝 DOCX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                            } else if (toolCall.toolName === 'search_keyword') {
+                            } else if (normToolName === 'search_keyword') {
                                 const { keyword } = parseArgs(toolCall.args);
                                 label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
-                            } else if (toolCall.toolName === 'exec_command' || toolCall.toolName === 'ask') {
+                            } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                 label = '';
                             } else {
                                 label = `EXECUTED: ${toolCall.toolName}`.toUpperCase();
@@ -859,7 +878,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             // END VISUAL FEEDBACK
 
                             // EXECUTION LOGIC
-                            if (toolCall.toolName === 'exec_command') {
+                            if (normToolName === 'exec_command') {
                                 const { command } = parseArgs(toolCall.args);
                                 if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                                     const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
@@ -873,8 +892,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     });
                                     if (isViolating) {
                                         const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}` });
-                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
+                                        yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                         toolCallPointer++;
                                         continue;
                                     }
@@ -891,22 +910,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                                    toolResults.push({ role: 'user', text: `[TOOL_RESULT]: ERROR: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
-                                    yield { type: 'tool_result', content: `[TOOL_RESULT]: ERROR: ${denyMsg}` };
+                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
+                                    yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
                                     continue;
                                 }
                             }
 
                             if (settings.onToolApproval) {
-                                let shouldPrompt = (toolCall.toolName === 'write_file' || toolCall.toolName === 'update_file' || toolCall.toolName === 'exec_command');
+                                let shouldPrompt = (normToolName === 'write_file' || normToolName === 'update_file' || normToolName === 'exec_command');
                                 if (shouldPrompt) {
-                                    const approval = await settings.onToolApproval(toolCall.toolName, toolCall.args);
+                                    const approval = await settings.onToolApproval(normToolName, toolCall.args);
                                     if (approval === 'deny') {
-                                        if (toolCall.toolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
-                                        const denyMsg = `Permission Denied: User rejected the ${toolCall.toolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL_RESULT]: DENIED: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
-                                        yield { type: 'tool_result', content: `[TOOL_RESULT]: DENIED: ${denyMsg}` };
+                                        if (normToolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
+                                        const denyMsg = `Permission Denied: User rejected the ${normToolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
+                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
+                                        yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
                                         if (settings.onToolResult) settings.onToolResult('denied');
                                         toolCallPointer++;
@@ -917,7 +936,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             const effectiveStart = lastToolEventTime || Date.now();
                             yield { type: 'spinner', content: false };
-                            let result = await dispatchTool(toolCall.toolName, toolCall.args, {
+                            let result = await dispatchTool(normToolName, toolCall.args, {
                                 chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
                             });
                             yield { type: 'spinner', content: true };
@@ -932,7 +951,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 result = result.text;
                             }
 
-                            if (toolCall.toolName === 'exec_command' && settings.onExecEnd) {
+                            if (normToolName === 'exec_command' && settings.onExecEnd) {
                                 await new Promise(resolve => setTimeout(resolve, 800));
                                 settings.onExecEnd();
                             }
@@ -953,16 +972,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (settings.onToolResult) settings.onToolResult('failure');
                             }
 
-                            const aiContent = `[TOOL_RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
+                            const aiContent = `[TOOL RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
                             toolResults.push({ role: 'user', text: aiContent, binaryPart });
 
-                            let uiContent = `[TOOL_RESULT]: ${result || ''}`;
-                            if (toolCall.toolName === 'view_file' || toolCall.toolName === 'web_scrape') {
-                                uiContent = `[TOOL_RESULT]: ${label} (Context Locked for UI Clarity)`;
+                            let uiContent = `[TOOL RESULT]: ${result || ''}`;
+                            if (normToolName === 'view_file' || normToolName === 'web_scrape') {
+                                uiContent = `[TOOL RESULT]: ${label} (Context Locked for UI Clarity)`;
                             }
 
-                            yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: toolCall.toolName };
-                            if (toolCall.toolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
+                            yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: normToolName };
+                            if (normToolName === 'memory' && result.includes('SUCCESS')) yield { type: 'memory_updated' };
 
                             toolCallPointer++;
                         }

@@ -20,10 +20,10 @@ The execution flow of a single user prompt follows this loop:
 3. **Detection & Tool Execution**: Once the stream completes for a given turn, the entire response is scanned for tool calls using a custom regex and bracket-balancing parser (looking for `tool:functions.tool_name(args...)`).
    - If tools are found, the loop pauses.
    - Each tool is dispatched to its respective handler in `src/tools/`.
-   - Tool outputs are collected and appended to the context as `[TOOL_RESULT]: ...`.
+   - Tool outputs are collected and appended to the context as `[TOOL RESULT]: ...`.
 4. **Security Governance**: During tool execution, the loop enforces security checks (e.g., blocking `exec_command` from accessing system root drives if "External Workspace Access" is off) and pauses for Human-in-the-Loop (HITL) approval if necessary.
 5. **Turn Management & Continuation**: The model is instructed to append `[turn: finish]` if its goal is complete, or `[turn: continue]` if it expects tool results.
-   - If tools were called or `[turn: continue]` is present, the loop increments and re-prompts the model with the newly gathered `[TOOL_RESULT]` data.
+   - If tools were called or `[turn: continue]` is present, the loop increments and re-prompts the model with the newly gathered `[TOOL RESULT]` data.
    - If `[turn: finish]` is detected and no further tools were called, the main loop terminates, passing the final synthesized context to the background Janitor process.
 6. **Loop Limits & Resilience**: To prevent infinite loops or excessive API usage, **Flux mode** is capped at 50 iterations per user prompt, while **Flow mode** is capped at 5.
    - **Multi-Stage Failover**: The loop features a sophisticated 8-attempt retry engine with random backoff (800ms - 2s).
