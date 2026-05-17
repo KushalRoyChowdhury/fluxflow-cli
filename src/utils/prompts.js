@@ -17,6 +17,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true) => {
     let levelKey = thinkingLevel;
+    if (thinkingLevel === 'Fast') levelKey = 'Off';
     if (thinkingLevel === 'Low') levelKey = 'Minimal';
     if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
     const thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
@@ -66,11 +67,10 @@ High Priority: [SYSTEM], [STEERING HINT]
 
 -- THINKING RULES --
 ${thinkingConfig}
-***THINKING POLICY***
+${!thinkingLevel === 'Fast' ? `***THINKING POLICY***
 - Always use <think> ... </think> before responding
 - Never skip thinking, even for simple tasks, code, or greetings
-- Never jump to responses, regardless of task complexity
-
+- Never jump to responses, regardless of task complexity\n` : ''}
 ${TOOL_PROTOCOL(mode)}
 ${projectContextBlock}
 

@@ -466,7 +466,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
     const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\n[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -508,7 +508,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                     modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.\n\n[STEERING HINT]: ${hint}` });
+                    modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**\n' : ''}[STEERING HINT]: ${hint}` });
                 }
                 yield { type: 'status', content: 'Steering Hint Injected.' };
             }
@@ -575,7 +575,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**.`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**' : ''}`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
@@ -910,7 +910,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
+                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**' : ''}` });
                                     yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
                                     continue;
@@ -924,7 +924,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (approval === 'deny') {
                                         if (normToolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
                                         const denyMsg = `Permission Denied: User rejected the ${normToolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**.` });
+                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**' : ''}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
                                         if (settings.onToolResult) settings.onToolResult('denied');

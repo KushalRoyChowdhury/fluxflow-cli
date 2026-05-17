@@ -610,10 +610,11 @@ export default function App() {
         },
         {
             cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-                { cmd: 'low', desc: 'Fastest reasoning' },
-                { cmd: 'medium', desc: 'Balanced depth' },
-                { cmd: 'high', desc: 'Complex coding' },
-                { cmd: 'max', desc: 'Architectural depth' }
+                { cmd: 'fast', desc: 'No Reasoning (Fastest)' },
+                { cmd: 'low', desc: 'Quick Reasoning' },
+                { cmd: 'medium', desc: 'Balanced Reasoning' },
+                { cmd: 'high', desc: 'Deep Reasoning' },
+                { cmd: 'max', desc: 'Deepest Reasoning' }
             ]
         },
         {
