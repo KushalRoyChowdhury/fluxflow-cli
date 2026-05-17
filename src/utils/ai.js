@@ -32,7 +32,6 @@ const TOOL_LABELS = {
     'search_keyword': 'Finding Files',
     'ask': 'Asking User',
     'write_pdf': 'Creating PDF',
-    'write_pptx': 'Creating Presentation',
     'write_docx': 'Creating Document',
 };
 
@@ -674,7 +673,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                             let detail = null;
-                            if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_pptx', 'write_docx', 'search_keyword'].includes(potentialTool)) {
+                            if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword'].includes(potentialTool)) {
                                 const pArgs = parseArgs(partialArgs);
                                 const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                                 const keyword = pArgs.keyword;
@@ -831,8 +830,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 label = `📑 PDF CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'write_docx') {
                                 label = `📝 DOCX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
-                            } else if (toolCall.toolName === 'write_pptx') {
-                                label = `📊 PPTX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (toolCall.toolName === 'search_keyword') {
                                 const { keyword } = parseArgs(toolCall.args);
                                 label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();

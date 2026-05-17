@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.9.16"]
+        const stableVersions = ["1.9.20"]
         const changelogData = {
+            "1.9.20": {
+                "note": "Tool Removal",
+                "added": [],
+                "changed": [
+                    "Removed` PDF Generation` tool due to unreliability & quality issues."
+                ],
+                "fixes": []
+            },
             "1.9.16": {
                 "note": "Updated models.",
                 "added": [],
@@ -307,7 +315,7 @@
                 "added": [
                     "Implemented **Word-Level Stutter Detection** to catch and recover from character/word repetition loops.",
                     "Added **Dynamic Component Unmounting** during tool execution to reduce CPU overhead.",
-                    "Extended tool timeouts to **3 minutes** for `web_search`, `web_scrape`, and `write_pdf`."
+                    "Extended tool timeouts to **3 minutes** for `WebSearch`, `WebScrape`, and `WritePdf`."
                 ],
                 "changed": [
                     "Upgraded **Loop Detection** with a new 0.6 threshold for main response body analysis."
@@ -331,7 +339,7 @@
             "1.8.7": {
                 "note": "Vision & Stability Patch.",
                 "added": [
-                    "Implemented **Dynamic 800-line Viewport** for `view_file` with intelligent relative paging.",
+                    "Implemented **Dynamic 800-line Viewport** for `ReadFile` with intelligent relative paging.",
                     "Added **Read-Merge-Write** persistence safety to protect daily telemetry from zombie process resets."
                 ],
                 "changed": [
@@ -380,7 +388,7 @@
                 "added": [],
                 "changed": [
                     "More frequent & atomic saves of daily telemetry.",
-                    "Updated the `write_file` & `update_file` tool to handle newlines contextually.",
+                    "Updated the `WriteFile` & `UpdateFile` tool to handle newlines contextually.",
                 ],
                 "fixes": []
             },
@@ -410,8 +418,8 @@
             "1.7.0": {
                 "note": "The Office Suite.",
                 "added": [
-                    "Added `write_docx` tool for creating Word documents.",
-                    "Added `write_pptx` tool for creating PowerPoint presentations."
+                    "Added `WriteDocX` tool for creating Word documents.",
+                    "Added `WritePPTX` tool for creating PowerPoint presentations."
                 ],
                 "changed": [],
                 "fixes": []
@@ -442,7 +450,7 @@
                     "Improved LaTeX support."
                 ],
                 "fixes": [
-                    "Fixed a bug where occationally `write_file` tool gets confused by certain keywords resulting in half corrupted file writes.",
+                    "Fixed a bug where occationally `WriteFile` & `UpdateFile` tools get confused by certain keywords resulting in half corrupted file writes.",
                     "More reliable file operations with CRLF or LF. Resulting in less update failures."
                 ]
             },
@@ -468,7 +476,7 @@
                 "note": "New and Advanced Web tools.",
                 "added": [],
                 "changed": [
-                    "Re-written `web_search` and `web_scrape` tools to be the most reliable with JS hydration capabilities."
+                    "Re-written `WebSearch` and `WebScrape` tools to be the most reliable with JS hydration capabilities."
                 ],
                 "fixes": []
             },
@@ -485,15 +493,15 @@
                 "added": [
                     "Native Multimodal Support (PDF, JPG, PNG, WEBP).",
                     "High-Fidelity Context Retention for non-text assets.",
-                    "Added `write_pdf` tool to Generate Professional & Creative PDF Documents on the fly."
+                    "Added `WritePdf` tool to Generate Professional & Creative PDF Documents on the fly."
                 ],
                 "changed": [
-                    "Upgraded `view_file` tool to handle binary detection and base64 encoding."
+                    "Upgraded `ReadFile` tool to handle binary detection and base64 encoding."
                 ],
                 "fixes": []
             },
             "1.4.3": {
-                "note": "Minor patch to ensure better reliability with `\\n` and '\\n' characters in `write_file` & `update_file` operations.",
+                "note": "Minor patch to ensure better reliability with `\\n` and '\\n' characters in `WriteFile` & `UpdateFile` operations.",
                 "added": [],
                 "changed": [],
                 "fixes": []

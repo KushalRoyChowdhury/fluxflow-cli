@@ -67,10 +67,10 @@ Protocol: [SYSTEM] and [STEERING HINT] are high-priority
 
 -- THINKING INSTRUCTIONS --
 ${thinkingConfig}
-***CRITICAL THINKING POLICY***
-- Always use <think> ... </think> before answering or using any tool
+***THINKING POLICY***
+- Always use <think> ... </think> before responding
 - Never skip thinking, even for simple tasks, code, or greetings
-- Never jump to responses directly, regardless of task complexity or speed
+- Never jump to responses directly, regardless of task complexity
 
 ${TOOL_PROTOCOL(mode)}
 ${projectContextBlock}
@@ -91,10 +91,10 @@ ${projectContextBlock}
 -- RESPONSE PROTOCOL --
 - End with [turn: continue] for more steps or [turn: finish] when done
 - Multi-tool: Stack tools if needed, but always end with [turn: continue] if called any tools
-TO END THE LOOP YOU **MUST** WRITE [turn: finish] AT VERY END OF YOUR RESPONSE
+TO END THE LOOP, **MUST** WRITE [turn: finish] AT END OF RESPONSE
 
-[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.19 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
-=== END SYSTEM PROMPT ===`.trim();
+[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v1.9.20 | Turn Progress: ${currentLoop}/${maxLoops} steps (Prompt user if reached)
+=== SYSTEM PROMPT ===`.trim();
 };
 
 /**
