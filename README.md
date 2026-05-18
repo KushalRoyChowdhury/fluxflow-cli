@@ -22,7 +22,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX/PPTX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
-- **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Minimal to Max).
+- **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
 - **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.
 
 ## 🚀 Quick Start

@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "1.9.24",
+	"version": "1.9.25",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -34,7 +34,7 @@
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:html-to-docx --external:pptxgenjs --external:html2pptxgenjs --external:typescript"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:ink-spinner --external:ink-multiline-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:html-to-docx --external:typescript"
 	},
 	"dependencies": {
 		"@google/genai": "^1.50.1",

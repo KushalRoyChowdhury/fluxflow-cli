@@ -71,11 +71,21 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         true
     );
 
-    // fs.writeFileSync('janitorPrompt.txt', janitorPrompt);
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, 3500)}`;
+    if (agentRes.length > 3500) {
+        agentRes += '\n... (truncated) ...';
+    }
+    // replace the [Prompted on: ...] from user prompt
+    let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, '').trim();
+    // fs.writeFileSync('test.txt', originalTextProcessed);
+    // replace the consecutive newlines and literal escaped \n\n with clean formatting
+    agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
+    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, 600)}\n${originalTextProcessed.length > 600 ? '... (truncated) ...\n\n' : ''}
+[AGENT (current turn)]: ${agentRes}`
 
-    janitorContents.push({ role: 'system', parts: [{ text: janitorPrompt }] });
+    janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
 
-    // fs.writeFileSync('janitorContents.txt', janitorPrompt);
+    // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
 
     let finalSynthesis = '';
     let attempts = 0;
@@ -100,6 +110,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         model: janitorModel || 'gemma-4-26b-a4b-it',
                         contents: janitorContents,
                         config: {
+                            systemInstruction: janitorPrompt,
                             maxOutputTokens: 384,
                             temperature: 0.69,
                             safetySettings: [

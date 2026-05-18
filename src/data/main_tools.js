@@ -27,7 +27,7 @@ ${mode === 'Flux' ? `- DEV TOOLS (path = relative to CWD) -
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
 - File structure: Real newlines for code formatting`.trim() : `
-- DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE. If file access is needed, tell the user to switch to FLUX`.trim()}
+- DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE`.trim()}
 
 - Results: Passed as [TOOL RESULT] SYSTEM
 - Tool calls: End with [turn: continue]. Only use [turn: finish] after verifying goals

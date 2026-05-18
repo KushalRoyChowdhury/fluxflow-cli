@@ -45,7 +45,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color="gray" dimColor>┃ </Text>
 
                 <Box marginX={1}>
-                    <Text>✨</Text><Text color="blue"> {formatTokens(tokensTotal)} <Text dimColor>({Math.round((tokens / 254000) * 100)}%)</Text></Text>
+                    <Text>✨</Text><Text color="blue"> {formatTokens(tokensTotal)} <Text dimColor>({((tokens / 254000) * 100).toFixed(0)}%)</Text></Text>
                 </Box>
 
                 <Text color="gray" dimColor>┃ </Text>

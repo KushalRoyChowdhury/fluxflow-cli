@@ -22,7 +22,7 @@ You can control the application using `/` commands directly in the chat input:
 
 Flux Flow allows you to "Anchor" your data outside of the default user directory. This is perfect for users who want to keep their logs, chat history, and encrypted memories on an external drive, a VeraCrypt volume, or a specific project folder.
 
-- **How to Enable**: Open `/settings` and toggle **Use External Data**. 
+- **How to Enable**: Open `/settings` and toggle **Use External Data**.
 - **Portability**: Once set, the application will synchronously "pivot" all data operations to your specified `externalDataPath` upon startup.
 - **Privacy**: Keeps sensitive data off your primary system drive.
 
@@ -40,7 +40,7 @@ For power users, several commands support direct arguments to skip the menus:
 
 Flux Flow separates the model's "internal monologue" (reasoning) from its final response using `<think>` tags.
 
-- **Thinking Levels**: Depending on the mode, you can choose from **Low**, **Medium**, **High**, or **Max**. Higher levels allow the agent more "space" to reason through complex architecture or debugging problems.
+- **Thinking Levels**: Depending on the mode, you can choose from **Fast**, **Low**, **Medium**, **High**, or **xHigh**. Higher levels allow the agent more "space" to reason through complex architecture or debugging problems.
 - **Show/Hide Thinking**: You can toggle the visibility of the thinking process using `/thinking show/hide`.
   - When **Hidden**, the agent doesn't just disappear; it provides a "minimalist" view showing only the core **Headings** and **Action Steps** (bolded lines) from its reasoning. This keeps you informed of its current "step" without cluttering the screen with detailed internal monologue.
 

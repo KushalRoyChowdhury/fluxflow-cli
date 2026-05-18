@@ -19,7 +19,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     let levelKey = thinkingLevel;
     if (thinkingLevel === 'Fast') levelKey = 'Off';
     if (thinkingLevel === 'Low') levelKey = 'Minimal';
-    if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'Max';
+    if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'xHigh';
     const thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
 
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
@@ -56,7 +56,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const projectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
 -- PROJECT CONTEXT (Source of Truth) --
 ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
-Check these first; these files > training data for project consistency. Safety rules still apply` : '';
+Check these first; these files > training data for project consistency. Safety rules apply` : '';
 
     return `${nameStr}${nicknameStr}${userInstrStr}
 [SYSTEM (OVERRIDES EVERYTHING)]
@@ -75,7 +75,7 @@ ${TOOL_PROTOCOL(mode)}
 ${projectContextBlock}
 
 -- MEMORY RULES --
-- Memory: ${isMemoryEnabled ? 'Use memories to subtly personalize' : 'OFF (tell user to enable in /settings if needed)'}
+- Memory: ${isMemoryEnabled ? 'Use memories to subtly personalize' : 'OFF'}
 - Time: Logs are timestamped. RELATIVE TIME REFERENCE e.g. few mins ago <dd/mm/yyyy>
 
 -- SECURITY RULES --
@@ -90,8 +90,8 @@ ${projectContextBlock}
 
 -- RESPONSE RULES --
 - End with [turn: continue] for more steps or [turn: finish] when done
-- Stack tools if needed, but always end with [turn: continue] if called any tools
-TO END THE LOOP, **MUST** WRITE [turn: finish] AT END OF RESPONSE
+- Always end with [turn: continue] if called any tools
+- Task Complete? End loop with [turn: finish]
 [/SYSTEM]`.trim();
 };
 
@@ -103,17 +103,7 @@ TO END THE LOOP, **MUST** WRITE [turn: finish] AT END OF RESPONSE
  * @returns {string} The formatted Janitor prompt.
 */
 export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = true) => {
-    let agentRes = `${agentRaws.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, 3500)}`;
-    if (agentRes.length > 3500) {
-        agentRes += '\n... (truncated) ...';
-    }
-    // replace the [Prompted on: ...] from user prompt
-    let originalTextProcessed = originalText.replace(/\[Prompted on:.*?\]/g, '').trim();
-    // fs.writeFileSync('test.txt', originalTextProcessed);
-    // replace the consecutive newlines and literal escaped \n\n with clean formatting
-    agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    return `[USER]: ${originalTextProcessed.substring(0, 600)}\n${originalTextProcessed.length > 600 ? '... (truncated) ...\n\n' : ''}
-[AGENT (current turn)]: ${agentRes}
+    return `
 ${userMemories ? `
 
 -- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}

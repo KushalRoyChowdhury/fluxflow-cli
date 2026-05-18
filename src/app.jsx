@@ -610,11 +610,11 @@ export default function App() {
         },
         {
             cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-                { cmd: 'fast', desc: 'No Reasoning (Fastest)' },
-                { cmd: 'low', desc: 'Quick Reasoning' },
-                { cmd: 'medium', desc: 'Balanced Reasoning' },
-                { cmd: 'high', desc: 'Deep Reasoning' },
-                { cmd: 'max', desc: 'Deepest Reasoning' }
+                { cmd: 'Fast', desc: 'No Reasoning        (Fastest)' },
+                { cmd: 'Low', desc: 'Quick Reasoning     (Answers Quickly)' },
+                { cmd: 'Medium', desc: 'Balanced Reasoning  (Decent Depth)' },
+                { cmd: 'High', desc: 'Deep Reasoning      (Complex Problems)' },
+                { cmd: 'xHigh', desc: 'Extended Reasoning  (Advanced Logic & Code)' }
             ]
         },
         {
@@ -768,9 +768,9 @@ export default function App() {
                         const newMode = parts[1].toLowerCase() === 'flow' ? 'Flow' : 'Flux';
                         setMode(newMode);
                         if (newMode === 'Flow') {
-                            setThinkingLevel('Low');
+                            setThinkingLevel('Fast');
                         } else if (newMode === 'Flux') {
-                            setThinkingLevel('High');
+                            setThinkingLevel('Medium');
                         }
                         const s = emojiSpace(2);
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
@@ -780,25 +780,19 @@ export default function App() {
                     break;
                 }
                 case '/thinking': {
-                    const arg = parts[1]?.toLowerCase();
-                    if (arg === 'show') {
-                        setShowFullThinking(true);
-                        const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Full Thinking Process: VISIBLE`, isMeta: true }]; });
-                    } else if (arg === 'hide') {
-                        setShowFullThinking(false);
-                        const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Full Thinking Process: HIDDEN (Headings only)`, isMeta: true }]; });
-                    } else if (parts[1]) {
+                    let formattedLevel;
+                    if (parts[1]) {
                         let val = parts[1].toLowerCase();
-                        if (val === 'xhigh') val = 'max';
-                        const formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
+                        formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
+                        if (val === 'xhigh') {
+                            formattedLevel = 'xHigh';
+                        }
 
                         // Strict Mode Validation
-                        if (mode === 'Flow' && (formattedLevel === 'High' || formattedLevel === 'Max')) {
+                        if (mode === 'Flow' && (formattedLevel === 'Medium' || formattedLevel === 'High' || formattedLevel === 'xHigh')) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Deep Thinking.` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
