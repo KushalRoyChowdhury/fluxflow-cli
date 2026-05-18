@@ -47,6 +47,10 @@ const getToolDetail = (toolName, argsStr) => {
 };
 
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
+    if (process.stdout.isTTY) {
+        process.stdout.write(`\u001b]0;Finalizing...\u0007`);
+    }
+
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
@@ -175,8 +179,12 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 const janitorLogDir = path.join(LOGS_DIR, 'janitor');
                 fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
 
-                if (janitorToolCall.toolName === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
+                if (janitorToolCall.toolName.toLowerCase() === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
                     if (onMemoryUpdated) onMemoryUpdated();
+                    if (process.stdout.isTTY) {
+                        process.stdout.write(`\u001b]0;Memory Updated\u0007`);
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
             }
 
@@ -197,6 +205,18 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     if (attempts) {
         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n\n`)
+
+        if (attempts >= MAX_JANITOR_RETRIES) {
+            if (process.stdout.isTTY) {
+                process.stdout.write(`\u001b]0;Memory Error\u0007`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+    }
+
+    // Restore title to Idle when janitor finishes
+    if (process.stdout.isTTY) {
+        process.stdout.write(`\u001b]0;FluxFlow | Idle\u0007`);
     }
 };
 
@@ -477,7 +497,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
     const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -519,7 +539,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                     modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**\n' : ''}[STEERING HINT]: ${hint}` });
+                    modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**\n' : ''}[STEERING HINT]: ${hint}` });
                 }
                 yield { type: 'status', content: 'Steering Hint Injected.' };
             }
@@ -546,6 +566,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
             try {
                 if (isInitialAttempt) {
+                    if (process.stdout.isTTY) {
+                        process.stdout.write(`\u001b]0;Working...\u0007`);
+                    }
                     yield { type: 'turn_reset', content: true };
                     yield { type: 'spinner', content: true };
                     isInitialAttempt = false;
@@ -586,7 +609,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING PROTOCOL. NEVER START A RESPONSE WITHOUT THINKING**' : ''}`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING PROTOCOL. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
@@ -729,6 +752,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 lastToolSniffed = potentialTool;
                                 lastToolDetail = detail;
                                 yield { type: 'status', content: `${currentLabel}...` };
+
+                                if (process.stdout.isTTY) {
+                                    const TOOL_TITLES = {
+                                        'web_search': 'Searching Web',
+                                        'web_scrape': 'Reading Website',
+                                        'view_file': 'Reading File',
+                                        'read_folder': 'Listing Folder',
+                                        'list_files': 'Listing Folder',
+                                        'write_file': 'Writing File',
+                                        'update_file': 'Updating File',
+                                        'write_pdf': 'Creating PDF',
+                                        'write_docx': 'Creating Word Doc',
+                                        'search_keyword': 'Searching Keywords',
+                                        'exec_command': 'Running Command',
+                                        'ask': 'Asking User',
+                                        'memory': 'Updating Memory'
+                                    };
+                                    const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
+                                    process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
+                                }
                             }
                         }
 
@@ -921,7 +964,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**' : ''}` });
+                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}` });
                                     yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
                                     continue;
@@ -935,7 +978,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (approval === 'deny') {
                                         if (normToolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
                                         const denyMsg = `Permission Denied: User rejected the ${normToolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGHEST PRIORITY. NEVER START A RESPONSE WITHOUT THINKING**' : ''}` });
+                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
                                         if (settings.onToolResult) settings.onToolResult('denied');
@@ -951,6 +994,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
                             });
                             yield { type: 'spinner', content: true };
+
+                            // Restore title back to "Working..." after tool is complete
+                            if (process.stdout.isTTY) {
+                                process.stdout.write(`\u001b]0;Working...\u0007`);
+                            }
 
                             const toolEnd = Date.now();
                             yield { type: 'tool_time', content: toolEnd - effectiveStart };

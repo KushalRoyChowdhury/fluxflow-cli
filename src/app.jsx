@@ -449,6 +449,11 @@ export default function App() {
 
     useEffect(() => {
         async function init() {
+            // Set custom terminal tab title
+            if (process.stdout.isTTY) {
+                process.stdout.write(`\u001b]0;FluxFlow | Ready\u0007`);
+            }
+
             // 0. System Integrity Check (Chromium for PDF)
             if (!checkPuppeteerReady()) {
                 setMessages(prev => {
@@ -980,6 +985,7 @@ export default function App() {
             });
 
             const streamChat = async () => {
+                let hasFiredJanitor = false;
                 setIsProcessing(true);
                 setIsExpanded(false);
                 const apiStart = Date.now();
@@ -1139,6 +1145,7 @@ OUTPUT: ${execOutputRef.current}`;
                         }
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
+                            hasFiredJanitor = true;
                             runJanitorTask(
                                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats },
                                 packet.data.agentText,
@@ -1317,6 +1324,12 @@ OUTPUT: ${execOutputRef.current}`;
                 } finally {
                     setIsProcessing(false);
                     setStatusText(null);
+
+                    if (!hasFiredJanitor) {
+                        if (process.stdout.isTTY) {
+                            process.stdout.write(`\u001b]0;FluxFlow | Idle\u0007`);
+                        }
+                    }
 
                     // If a prompt was queued but the agent finished, show resolution modal
                     if (queuedPromptRef.current) {
