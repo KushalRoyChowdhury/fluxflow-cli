@@ -103,7 +103,7 @@ ${projectContextBlock}
  * @param {boolean} isMemoryEnabled - Whether the memory system is enabled.
  * @returns {string} The formatted Janitor prompt.
 */
-export const getJanitorInstruction = (originalText, agentRaws, userMemories = '', isMemoryEnabled = true, needTitle = true) => {
+export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true, needTitle = true) => {
     return `
 ${userMemories ? `
 

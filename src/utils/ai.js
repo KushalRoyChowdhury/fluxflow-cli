@@ -75,8 +75,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         true
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, 3500)}`;
-    if (agentRes.length > 3500) {
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, 24000)}`;
+    if (agentRes.length > 24000) {
         agentRes += '\n... (truncated) ...';
     }
     // replace the [Prompted on: ...] from user prompt
@@ -192,6 +192,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         } catch (janitorErr) {
             attempts++;
             const date = new Date().toLocaleString();
+            if (process.stdout.isTTY) {
+                process.stdout.write(`\u001b]0;Memory Error\u0007`);
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
             fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${String(janitorErr)}\n\n`);
@@ -797,7 +801,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             'low': 200,
                             'medium': 500,
                             'high': 2000,
-                            'max': 3500
+                            'max': 3500,
+                            'xhigh': 3500,
+                            'off': 50,
+                            'fast': 50,
                         };
                         const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
                         let isOverVerboseThinking = wordCount > cap;
