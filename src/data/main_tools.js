@@ -15,7 +15,7 @@ ${mode === 'Flux' ? `- DEV TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", start_line=N, end_line=N)]. Reads contents. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 3. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? -> update_file > write_file
-4. [tool:functions.PatchFile(path="...", content_to_replace="old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
+4. [tool:functions.PatchFile(path="...", content_to_replace="exact old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
 5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. A4 PDF. Use CSS for layout (100vh/vw). Handle page breaks; no manual footers
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
 7. [tool:functions.Run(command="...")]. Runs a shell command. Destructive/Irreversible ops -> ask user

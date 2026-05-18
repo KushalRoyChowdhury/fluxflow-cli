@@ -116,7 +116,7 @@ export const update_file = async (args) => {
         instances = matches.length;
 
         if (instances === 0) {
-            return `ERROR: Could not find match for "content_to_replace" in [${targetPath}]. Check for whitespace discrepancies or try providing more context.`;
+            return `ERROR: Could not find match for "content_to_replace" in [${targetPath}]. Check for whitespace discrepancies or ReadFile to get exact content.`;
         }
 
         if (instances > 1) {
