@@ -1,6 +1,14 @@
 # 🌊 Flux Flow
 ![Flux Flow Hero](./fluxflow.png)
 
+<p align="left">
+  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v1.10.0-blue?style=plastic" alt="FluxFlow Version"></a>
+  <a href="https://deepmind.google"><img src="https://img.shields.io/badge/Engine-Gemma%204-red?style=plastic" alt="Engine Gemma 4"></a>
+  <a href="https://pollinations.ai"><img src="https://img.shields.io/badge/Built%20With-pollinations.ai-cyan?style=plastic" alt="Built With pollinations.ai"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D20-green?style=plastic" alt="Node Compatibility"></a>
+</p>
+
 **A Beautiful, Autonomous Terminal AI Agent**
 
 Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
@@ -11,7 +19,11 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
-- **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using Pollinations AI. Use the `/image` command or ask the agent to create visuals. Features customizable models (Flux, ZImage, Qwen, Nanobanana-Pro), aspect ratios, seeds, and beautiful high-contrast UI budget telemetry cards.
+- **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using [Pollinations AI](https://pollinations.ai). Use the `/image` command or ask the agent to create visuals. Features:
+  - **Customizable Presets**: Supports models like Flux, ZImage, Qwen, and Nanobanana-Pro, custom aspect ratios, and randomized seeds.
+  - **Budget Telemetry**: Real-time credits tracker displayed in sleek high-contrast Ink terminal boxes.
+  - **PNG Metadata Embedding**: Autonomously injects custom `tEXt` metadata chunks (Title, Software, Author, Seed, Model, and exact Prompt details) straight into the output image headers.
+
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
 - **Document Engineering Suite**: Generate professional, branded PDF, DOCX, and PPTX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
 - **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
