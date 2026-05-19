@@ -949,8 +949,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const { keyword } = parseArgs(toolCall.args);
                                 label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
                             } else if (normToolName === 'generate_image') {
-                                const { title, prompt, outputPath, output } = parseArgs(toolCall.args);
-                                label = `🎨 IMAGE GENERATED: "${title || prompt}" -> ${outputPath || output || 'generated_image.png'}`.toUpperCase();
+                                const { title, prompt, path: argPath, outputPath, output } = parseArgs(toolCall.args);
+                                label = `🎨 IMAGE GENERATED: "${title || prompt}" -> ${argPath || outputPath || output || 'generated_image.png'}`.toUpperCase();
                             } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                 label = '';
                             } else {

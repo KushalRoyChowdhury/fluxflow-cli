@@ -200,7 +200,7 @@ export const generate_image = async (args) => {
         // 7. Update usage logs with successful transaction cost
         await recordImageGeneration(settings);
 
-        return `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}] with custom embedded metadata.`;
+        return `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}].`;
     } catch (err) {
         return `ERROR: Failed during image generation: ${err.message}`;
     }
