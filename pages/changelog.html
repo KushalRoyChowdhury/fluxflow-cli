@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.11.0", "1.10.0", "1.9.24"]
+        const stableVersions = ["1.11.0", "1.10.0", "1.11.1"]
         const changelogData = {
+            "1.11.1": {
+                "note": "Image Generation will be depriciated on v1.10 after MAY-23. Update to v1.11 to continue using the feature.",
+                "added": [],
+                "changed": [
+                    "Improved predictiveness of Image gen Quota resets."
+                ],
+                "fixes": [
+                    ""
+                ]
+            },
             "1.11.0": {
                 "note": "Secure Vault, Dynamic Quota & Logging Update.",
                 "added": [
