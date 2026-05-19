@@ -123,6 +123,158 @@ export const cleanupOldHistory = async (retentionSetting) => {
 };
 
 /**
+ * Helper to parse custom timestamp strings from logs robustly
+ */
+const parseCustomDate = (dateStr) => {
+    const cleanStr = dateStr.replace(/[\[\]]/g, '').trim();
+    const parsed = new Date(cleanStr);
+    if (!isNaN(parsed.getTime())) return parsed.getTime();
+
+    const parts = cleanStr.split(/,\s*|\s+/);
+    if (parts.length === 0) return null;
+
+    const datePart = parts[0];
+    const timePart = parts[1] || "";
+    const ampm = parts[2] || "";
+
+    const dateNums = datePart.split(/[-/.]/).map(Number);
+    if (dateNums.length !== 3) return null;
+
+    let year, month, day;
+    if (dateNums[0] > 1000) {
+        year = dateNums[0];
+        month = dateNums[1];
+        day = dateNums[2];
+    } else if (dateNums[2] > 1000) {
+        year = dateNums[2];
+        if (dateNums[0] > 12) {
+            day = dateNums[0];
+            month = dateNums[1];
+        } else if (dateNums[1] > 12) {
+            day = dateNums[1];
+            month = dateNums[0];
+        } else {
+            month = dateNums[0];
+            day = dateNums[1];
+        }
+    } else {
+        return null;
+    }
+
+    let hours = 0, minutes = 0, seconds = 0;
+    if (timePart) {
+        const timeNums = timePart.split(':').map(Number);
+        hours = timeNums[0] || 0;
+        minutes = timeNums[1] || 0;
+        seconds = timeNums[2] || 0;
+
+        if (ampm.toLowerCase() === 'pm' && hours < 12) {
+            hours += 12;
+        } else if (ampm.toLowerCase() === 'am' && hours === 12) {
+            hours = 0;
+        }
+    }
+
+    const d = new Date(year, month - 1, day, hours, minutes, seconds);
+    return isNaN(d.getTime()) ? null : d.getTime();
+};
+
+/**
+ * Parses and filters out log entries older than 7 days from inside a single log file
+ */
+const cleanupLogFile = async (filePath) => {
+    try {
+        if (!await fs.pathExists(filePath)) return;
+        const content = await fs.readFile(filePath, 'utf8');
+        if (!content.trim()) return;
+
+        const lines = content.split('\n');
+        const entries = [];
+        let currentEntry = null;
+        const entryStartRegex = /^\s*(?:DEBUG|ERROR|SEARCH|PUPPETEER)\b/i;
+
+        for (const line of lines) {
+            if (entryStartRegex.test(line)) {
+                if (currentEntry) {
+                    entries.push(currentEntry);
+                }
+                currentEntry = { header: line, body: [] };
+            } else {
+                if (currentEntry) {
+                    currentEntry.body.push(line);
+                } else {
+                    entries.push({ header: line, body: [] });
+                }
+            }
+        }
+        if (currentEntry) {
+            entries.push(currentEntry);
+        }
+
+        const threshold = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
+        const now = Date.now();
+        const keptEntries = [];
+        const timestampRegex = /(\d{1,4}[-/.]\d{1,4}[-/.]\d{1,4}(?:,\s*|\s+)?(?:\d{1,2}:\d{2}:\d{2}(?:\s*[aApP][mM])?)?)/;
+
+        for (const entry of entries) {
+            const entryText = entry.header + (entry.body.length > 0 ? '\n' + entry.body.join('\n') : '');
+            const match = entryText.match(timestampRegex);
+            
+            if (match) {
+                const timeMs = parseCustomDate(match[1]);
+                if (timeMs && (now - timeMs) > threshold) {
+                    // Expired entry - skip writing it back
+                    continue;
+                }
+            }
+            keptEntries.push(entryText);
+        }
+
+        // If all entries are filtered out or empty, we can clean/truncate the file
+        const finalContent = keptEntries.join('\n').trim();
+        if (finalContent) {
+            await fs.writeFile(filePath, finalContent + '\n', 'utf8');
+        } else {
+            await fs.writeFile(filePath, '', 'utf8');
+        }
+    } catch (e) {
+        // Silent catch for log file processing errors
+    }
+};
+
+/**
+ * Recursively cleans up old log entries within log files and deletes empty directories
+ */
+export const cleanupOldLogs = async (logsDir) => {
+    try {
+        if (!await fs.pathExists(logsDir)) return;
+
+        const cleanRecursive = async (dir) => {
+            const files = await fs.readdir(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                const stat = await fs.stat(fullPath);
+
+                if (stat.isDirectory()) {
+                    await cleanRecursive(fullPath);
+                    // Remove directory if empty after file pruning
+                    const subFiles = await fs.readdir(fullPath);
+                    if (subFiles.length === 0) {
+                        await fs.remove(fullPath);
+                    }
+                } else if (file.endsWith('.log')) {
+                    await cleanupLogFile(fullPath);
+                }
+            }
+        };
+
+        await cleanRecursive(logsDir);
+    } catch (e) {
+        // Silent catch to prevent startup disruption
+    }
+};
+
+/**
  * Returns a new history array with the oldest X exchanges removed.
  * Skip welcome message at index 0.
  */

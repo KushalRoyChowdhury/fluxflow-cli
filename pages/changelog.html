@@ -225,8 +225,21 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.10.0", "1.9.24"]
+        const stableVersions = ["1.11.0", "1.10.0", "1.9.24"]
         const changelogData = {
+            "1.11.0": {
+                "note": "Secure Vault, Dynamic Quota & Logging Update.",
+                "added": [
+                    "Integrated standard **AES-256-CBC Encryption** across all persistent files (`settings.json`, `usage.json`, `secrets.json`, `memories`, `history.json`), fully securing configuration data.",
+                    "Designed a highly advanced, chronological **Hour-by-Hour Dynamic Image Generation Quota** scaling engine with consecutive-hour usage suppression and an intelligent multi-tier credit recovery system (15 to 25 credits).",
+                    "Introduced a granular **Internal Log Janitor** that recursively prunes only expired log entries older than 7 days from inside log files, preserving recent stack traces while eliminating log bloat.",
+                    "Permanently relocated the persistent `usage.json` stats database coordinates to the home directory (`~/.fluxflow/usage.json`) for centralized configuration alignment."
+                ],
+                "changed": [
+                    "Phased out legacy XOR encryption, deploying a self-healing backwards-compatible parser that seamlessly auto-upgrades existing files on the first load.",
+                ],
+                "fixes": []
+            },
             "1.10.0": {
                 "note": "Creative, Web & Memory Update.",
                 "added": [

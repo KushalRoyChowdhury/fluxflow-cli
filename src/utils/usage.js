@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { USAGE_FILE } from './paths.js';
+import { encryptAes, decryptAes } from './crypto.js';
 
 let cachedUsage = null;
 let writeTimeout = null;
@@ -27,7 +28,13 @@ const loadUsageFromFile = async () => {
 
     try {
         if (await fs.exists(USAGE_FILE)) {
-            const data = await fs.readJson(USAGE_FILE);
+            const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
+            let data;
+            if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
+                data = JSON.parse(rawContent);
+            } else {
+                data = JSON.parse(decryptAes(rawContent));
+            }
             if (data && data.date === today && data.stats) {
                 // [RESILIENCE] Merge with defaults to ensure new keys (like toolDenied) are present
                 const mergedStats = { ...defaultStats, ...data.stats };
@@ -59,7 +66,12 @@ const flushUsage = async () => {
         let diskData = null;
         try {
             if (await fs.exists(USAGE_FILE)) {
-                diskData = await fs.readJson(USAGE_FILE);
+                const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
+                if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
+                    diskData = JSON.parse(rawContent);
+                } else {
+                    diskData = JSON.parse(decryptAes(rawContent));
+                }
             }
         } catch (e) {}
 
@@ -85,7 +97,8 @@ const flushUsage = async () => {
         }
 
         const tempFile = USAGE_FILE + '.tmp';
-        await fs.writeJson(tempFile, cachedUsage, { spaces: 2 });
+        const encryptedStr = encryptAes(JSON.stringify(cachedUsage, null, 2));
+        await fs.writeFile(tempFile, encryptedStr, 'utf8');
 
         // Physical Flush to ensure durability
         const fd = await fs.open(tempFile, 'r+');
@@ -205,6 +218,80 @@ export const checkQuota = async (key, settings) => {
 };
 
 /**
+ * Calculates the dynamic image hourly credit limit.
+ * Base limit is 25 credits (0.025).
+ * - If maxed (>80%) for 2 consecutive hours, drops to 15 credits (0.015).
+ * - If usage is still >80% at 15 credits, keeps at 15 credits.
+ * - Recovery increases:
+ *   - If usage <40%, increases by 5 credits (+0.005).
+ *   - If usage >= 40% and <60%, increases by 4 credits (+0.004).
+ *   - If usage >= 60% and <80%, increases by 2 credits (+0.002).
+ *   - If usage >= 80%, limit remains same unless consecutive maxes drop it to 15.
+ */
+export const getImageQuotaLimit = (imageCalls, now) => {
+    const hourMs = 60 * 60 * 1000;
+    if (!imageCalls || imageCalls.length === 0) {
+        return 0.025;
+    }
+
+    const oldestTimestamp = imageCalls[0].timestamp;
+    const startTime = Math.min(oldestTimestamp, now - 24 * hourMs);
+
+    const windows = [];
+    let currentEnd = now;
+    while (currentEnd > startTime) {
+        windows.unshift({ start: currentEnd - hourMs, end: currentEnd });
+        currentEnd -= hourMs;
+    }
+
+    const history = [];
+
+    for (const win of windows) {
+        const winCalls = imageCalls.filter(c => c.timestamp >= win.start && c.timestamp < win.end);
+        const usage = winCalls.reduce((sum, c) => sum + c.cost, 0);
+
+        let limit = 0.025;
+        if (history.length > 0) {
+            const prev1 = history[history.length - 1];
+            let consecutiveMax = false;
+
+            if (history.length >= 2) {
+                const prev2 = history[history.length - 2];
+                if (prev1.ratio >= 0.8 && prev2.ratio >= 0.8) {
+                    consecutiveMax = true;
+                }
+            }
+
+            if (consecutiveMax) {
+                limit = 0.015;
+            } else {
+                const prevLimit = prev1.limit;
+                const prevRatio = prev1.ratio;
+
+                if (prevRatio >= 0.8) {
+                    limit = prevLimit === 0.015 ? 0.015 : prevLimit;
+                } else if (prevRatio < 0.4) {
+                    limit = Math.min(0.025, prevLimit + 0.005);
+                } else if (prevRatio >= 0.4 && prevRatio < 0.6) {
+                    limit = Math.min(0.025, prevLimit + 0.004);
+                } else {
+                    limit = Math.min(0.025, prevLimit + 0.002);
+                }
+            }
+        }
+
+        const ratio = limit > 0 ? usage / limit : 0;
+        history.push({ limit, usage, ratio });
+    }
+
+    if (history.length > 0) {
+        return history[history.length - 1].limit;
+    }
+
+    return 0.025;
+};
+
+/**
  * Checks if the user is within the hourly image generation quota.
  * Enforced if keyType is 'Default'.
  */
@@ -234,7 +321,8 @@ export const checkImageQuota = async (settings) => {
     const activeCalls = stats.imageCalls.filter(c => c.timestamp >= oneHourAgo);
     const totalSpent = activeCalls.reduce((sum, c) => sum + c.cost, 0);
 
-    return (totalSpent + currentCost) <= 0.020;
+    const currentLimit = getImageQuotaLimit(stats.imageCalls, now);
+    return (totalSpent + currentCost) <= currentLimit;
 };
 
 /**
@@ -251,7 +339,8 @@ export const getImageQuotaStats = async () => {
 
     const activeCalls = stats.imageCalls.filter(c => c.timestamp >= oneHourAgo);
     const totalSpent = activeCalls.reduce((sum, c) => sum + c.cost, 0);
-    const remaining = Math.max(0, 0.020 - totalSpent);
+    const currentLimit = getImageQuotaLimit(stats.imageCalls, now);
+    const remaining = Math.max(0, currentLimit - totalSpent);
 
     let nextResetMin = 0;
     let reclaimCost = 0;
@@ -267,7 +356,8 @@ export const getImageQuotaStats = async () => {
         remaining,
         activeCallsCount: activeCalls.length,
         nextResetMin,
-        reclaimCost
+        reclaimCost,
+        limit: currentLimit
     };
 };
 

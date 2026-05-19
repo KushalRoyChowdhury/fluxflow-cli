@@ -6,3 +6,4 @@ settings.json
 readme-npm.md
 readme-git.md
 dist/
+src/utils/fallback_key.js

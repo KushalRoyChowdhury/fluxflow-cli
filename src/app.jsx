@@ -17,7 +17,7 @@ import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey } from './utils/secrets.js';
 import { initAI, getAIStream, signalTermination, runJanitorTask } from './utils/ai.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
-import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } from './utils/history.js';
+import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
@@ -499,10 +499,11 @@ export default function App() {
                 initAI(key); // Initialize Gemini SDK
             }
 
-            // 3. Clean up old history
+            // 3. Clean up old history and logs (older than 7 days)
             if (saved.systemSettings?.autoDeleteHistory) {
                 cleanupOldHistory(saved.systemSettings.autoDeleteHistory);
             }
+            cleanupOldLogs(LOGS_DIR);
 
             // 4. Check for updates after settings are loaded
             performVersionCheck(false, freshSettings);
@@ -618,7 +619,7 @@ export default function App() {
                     cmd: 'setup', desc: 'Configure defaults', subs: [
                         {
                             cmd: 'key', desc: 'Set API key strategy', subs: [
-                                { cmd: 'default', desc: 'Default (Quota: 20 credits/hr)' },
+                                { cmd: 'default', desc: 'Default (Quota: Dynamic 25 max/hr)' },
                                 { cmd: 'custom', desc: 'Custom Key' }
                             ]
                         },
@@ -839,7 +840,7 @@ export default function App() {
                                         id: Date.now(),
                                         role: 'system',
                                         isImageStats: true,
-                                        text: `• Hourly Limit: 20 credits\n` +
+                                        text: `• Hourly Limit: ${Number((stats.limit * 1000).toFixed(0))} credits\n` +
                                              `• Spent (Last 1hr): ${Number((stats.totalSpent * 1000).toFixed(0))} credits\n` +
                                              `• Remaining: ${Number((stats.remaining * 1000).toFixed(0))} credits\n` +
                                              `• Requests (Last 1hr): ${stats.activeCallsCount} requests\n` +

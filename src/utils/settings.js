@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { SETTINGS_FILE } from './paths.js';
+import { readAesEncryptedJson, writeAesEncryptedJson } from './crypto.js';
 
 const DEFAULT_SETTINGS = {
     mode: 'Flux',
@@ -43,7 +44,7 @@ export const loadSettings = async () => {
     let settingsObj = { ...DEFAULT_SETTINGS };
     try {
         if (await fs.exists(SETTINGS_FILE)) {
-            const saved = await fs.readJson(SETTINGS_FILE);
+            const saved = readAesEncryptedJson(SETTINGS_FILE);
             
             // SECURITY SELF-HEALING MIGRATION:
             // Extract and migrate custom Pollinations API Key from settings.json to encrypted secrets.json
@@ -55,7 +56,7 @@ export const loadSettings = async () => {
                     
                     // Scrub immediately from settings file on disk
                     saved.imageSettings.apiKey = '';
-                    await fs.writeJson(SETTINGS_FILE, saved, { spaces: 2 });
+                    writeAesEncryptedJson(SETTINGS_FILE, saved);
                 } catch (e) {}
             }
 
@@ -85,7 +86,7 @@ export const loadSettings = async () => {
     if (settingsObj.showFullThinking === false) {
         settingsObj.showFullThinking = true;
         try {
-            await fs.writeJson(SETTINGS_FILE, settingsObj, { spaces: 2 });
+            writeAesEncryptedJson(SETTINGS_FILE, settingsObj);
         } catch (e) {}
     }
 
@@ -143,7 +144,7 @@ export const saveSettings = async (settings) => {
         }
 
         await fs.ensureDir(path.dirname(SETTINGS_FILE));
-        await fs.writeJson(SETTINGS_FILE, updated, { spaces: 2 });
+        writeAesEncryptedJson(SETTINGS_FILE, updated);
         return true;
     } catch (err) {
         console.error('Failed to save settings:', err);
