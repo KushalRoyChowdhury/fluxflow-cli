@@ -253,10 +253,21 @@ export const getImageQuotaStats = async () => {
     const totalSpent = activeCalls.reduce((sum, c) => sum + c.cost, 0);
     const remaining = Math.max(0, 0.020 - totalSpent);
 
+    let nextResetMin = 0;
+    let reclaimCost = 0;
+    if (activeCalls.length > 0) {
+        const earliestCall = activeCalls.reduce((min, c) => c.timestamp < min.timestamp ? c : min, activeCalls[0]);
+        const nextResetTimestamp = earliestCall.timestamp + 60 * 60 * 1000;
+        nextResetMin = Math.max(0, Math.ceil((nextResetTimestamp - now) / (60 * 1000)));
+        reclaimCost = earliestCall.cost;
+    }
+
     return {
         totalSpent,
         remaining,
-        activeCallsCount: activeCalls.length
+        activeCallsCount: activeCalls.length,
+        nextResetMin,
+        reclaimCost
     };
 };
 

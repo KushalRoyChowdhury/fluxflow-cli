@@ -20,7 +20,7 @@ ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
 7. [tool:functions.Run(command="...")]. Runs a shell command. Destructive/Irreversible ops -> ask user
 8. [tool:functions.SearchKeyword(keyword="...")]. Global search. Finds definitions/logic without reading every file
-9. Generate Image: [tool:functions.GenerateImage(title="...", prompt="...", path="... png", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. Generates image using AI. Usage: Mockups, PDF thumbnails, any visual content
+9. [tool:functions.GenerateImage(prompt="...", path="... png", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. AI images. Usage: Mockups, PDF thumbnails, any visual content
 
 - VERIFY RESULT CONTENTS. Fix errors. No hallucinations
 - File tools > code chat

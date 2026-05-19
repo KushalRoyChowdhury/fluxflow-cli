@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { loadSettings } from '../utils/settings.js';
-import { checkImageQuota, recordImageGeneration } from '../utils/usage.js';
+import { checkImageQuota, recordImageGeneration, getImageQuotaStats } from '../utils/usage.js';
 
 /**
  * Injects custom metadata chunks into a PNG buffer.
@@ -96,7 +96,8 @@ export const generate_image = async (args) => {
         // 2. Perform image hourly quota check
         const hasQuota = await checkImageQuota(settings);
         if (!hasQuota) {
-            return 'ERROR: Insufficient Quota for selected quality. Either reduce quality for wait for next refresh cycle.';
+            const stats = await getImageQuotaStats();
+            return `ERROR: Insufficient Quota for selected quality. Either tell user reduce quality or wait for next refresh cycle (${stats.nextResetMin || 60}m).`;
         }
 
         // 3. Resolve key and strategy
@@ -142,7 +143,7 @@ export const generate_image = async (args) => {
 
         // 4. Construct URL and send request
         const seed = Math.floor(Math.random() * 10000000);
-        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${selectedModel}&width=${width}&height=${height}&seed=${seed}`;
+        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${selectedModel}&width=${width}&height=${height}&seed=${seed}&enhance=true&reasoning=high&quality=high`;
         const response = await fetch(url, {
             method: 'GET',
             headers: {

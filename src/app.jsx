@@ -822,11 +822,11 @@ export default function App() {
                         if (imageSettings.keyType === 'Custom') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { 
-                                    id: Date.now(), 
-                                    role: 'system', 
-                                    text: `🔗${s}[SYSTEM] Key strategy is Custom. Redirecting to Pollinations dashboard (https://enter.pollinations.ai/#pollen)...`, 
-                                    isMeta: true 
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `🔗${s}[SYSTEM] Key strategy is Custom. Redirecting to Pollinations dashboard (https://enter.pollinations.ai/#pollen)...`,
+                                    isMeta: true
                                 }];
                             });
                             exec('start https://enter.pollinations.ai/#pollen');
@@ -835,25 +835,26 @@ export default function App() {
                                 const stats = await getImageQuotaStats();
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { 
-                                        id: Date.now(), 
-                                        role: 'system', 
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
                                         isImageStats: true,
-                                        text: `• Hourly Limit: 0.0200 credits\n` +
-                                             `• Spent (Last 1hr): ${stats.totalSpent.toFixed(4)} credits\n` +
-                                             `• Remaining: ${stats.remaining.toFixed(4)} credits\n` +
-                                             `• Requests (Last 1hr): ${stats.activeCallsCount} requests`, 
-                                        isMeta: true 
+                                        text: `• Hourly Limit: 0.020 credits\n` +
+                                             `• Spent (Last 1hr): ${stats.totalSpent.toFixed(3)} credits\n` +
+                                             `• Remaining: ${stats.remaining.toFixed(3)} credits\n` +
+                                             `• Requests (Last 1hr): ${stats.activeCallsCount} requests\n` +
+                                             (stats.nextResetMin > 0 ? `• Refreshes in: ${stats.nextResetMin}m` : ''),
+                                        isMeta: true
                                     }];
                                 });
                             } catch (e) {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { 
-                                        id: Date.now(), 
-                                        role: 'system', 
-                                        text: `❌ [SYSTEM] Failed to load image quota stats.`, 
-                                        isMeta: true 
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `❌ [SYSTEM] Failed to load image quota stats.`,
+                                        isMeta: true
                                     }];
                                 });
                             }
@@ -1813,7 +1814,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Image Credits:</Text></Box>
-                                <Text color="white">{(sessionImageCredits || 0).toFixed(4)} credits</Text>
+                                <Text color="white">{(sessionImageCredits || 0).toFixed(3)} credits</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
@@ -1851,7 +1852,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
-                                <Text color="white">{(dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0).toFixed(4)} credits</Text>
+                                <Text color="white">{(dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0).toFixed(3)} credits</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
@@ -2439,7 +2440,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Image Credits:</Text></Box>
-                                    <Text color="white">{(sessionImageCredits || 0).toFixed(4)} credits</Text>
+                                    <Text color="white">{(sessionImageCredits || 0).toFixed(3)} credits</Text>
                                 </Box>
                             </Box>
 

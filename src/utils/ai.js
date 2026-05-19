@@ -626,6 +626,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else if (retryCount === MAX_RETRIES) {
                     targetModel = 'gemini-3.1-flash-lite';
                     yield { type: 'model_update', content: 'Trying with fallback model lite' };
+                } else if (retryCount > 12 && retryCount < MAX_RETRIES - 2 && settings.apiKey !== "custom") {
+                    targetModel = 'gemma-4-31b-it';
+                    yield { type: 'model_update', content: 'Trying with fallback Gemma Model' };
                 } else if (retryCount > 0) {
                     yield { type: 'model_update', content: null };
                 }
@@ -949,8 +952,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const { keyword } = parseArgs(toolCall.args);
                                 label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
                             } else if (normToolName === 'generate_image') {
-                                const { title, prompt, path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                                label = `🎨 IMAGE GENERATED: "${title || prompt}" -> ${argPath || outputPath || output || 'generated_image.png'}`.toUpperCase();
+                                const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
+                                label = `🎨 IMAGE GENERATED: ${argPath || outputPath || output || 'generated_image.png'}`.toUpperCase();
                             } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                 label = '';
                             } else {
@@ -1120,6 +1123,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
                 fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
+
+                // RETRY ONLY ON 500-LEVEL (500, 503, ETC.) AND 408 TIMEOUT ERRORS
+                const status = err.status || err.statusCode || err.code;
+                const isRetryable = (
+                    (status && ((status >= 500 && status < 600) || status === 408)) ||
+                    (!status && (
+                        /status[ :]+(5\d\d|408)/i.test(String(err)) ||
+                        /code[ :]+(5\d\d|408)/i.test(String(err)) ||
+                        /(500|503|408)/.test(String(err))
+                    ))
+                );
+
+                if (!isRetryable) {
+                    if (retryCount < MAX_RETRIES - 3) {
+                        throw err;
+                    }
+                }
 
                 if (turnText.trim().length > 0) {
                     // IN-STREAM RECOVERY
