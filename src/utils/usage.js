@@ -218,15 +218,51 @@ export const checkQuota = async (key, settings) => {
 };
 
 /**
- * Calculates the dynamic image hourly credit limit.
+ * Groups raw image calls into consecutive, non-overlapping chronological 1-hour buckets.
+ * The first call made starts a fixed 1-hour bucket window. Subsequent calls fall into
+ * that bucket until the hour expires, at which point the next call starts a new bucket.
+ */
+export const getImageQuotaBuckets = (imageCalls) => {
+    const hourMs = 60 * 60 * 1000;
+    if (!imageCalls || imageCalls.length === 0) {
+        return [];
+    }
+
+    // Sort ascending
+    const sortedCalls = [...imageCalls].sort((a, b) => a.timestamp - b.timestamp);
+    const buckets = [];
+
+    for (const call of sortedCalls) {
+        if (buckets.length > 0) {
+            const lastBucket = buckets[buckets.length - 1];
+            if (call.timestamp >= lastBucket.start && call.timestamp < lastBucket.end) {
+                lastBucket.calls.push(call);
+                lastBucket.spent += call.cost;
+                continue;
+            }
+        }
+        // Start a new 1-hour bucket
+        buckets.push({
+            start: call.timestamp,
+            end: call.timestamp + hourMs,
+            calls: [call],
+            spent: call.cost
+        });
+    }
+
+    return buckets;
+};
+
+/**
+ * Calculates the dynamic image hourly credit limit based on historical bucket utilization.
  * Base limit is 25 credits (0.025).
  * - If maxed (>80%) for 2 consecutive hours, drops to 15 credits (0.015).
  * - If usage is still >80% at 15 credits, keeps at 15 credits.
+ * - If usage >= 80%, limit remains same unless consecutive maxes drop it to 15.
  * - Recovery increases:
  *   - If usage <40%, increases by 5 credits (+0.005).
  *   - If usage >= 40% and <60%, increases by 4 credits (+0.004).
  *   - If usage >= 60% and <80%, increases by 2 credits (+0.002).
- *   - If usage >= 80%, limit remains same unless consecutive maxes drop it to 15.
  */
 export const getImageQuotaLimit = (imageCalls, now) => {
     const hourMs = 60 * 60 * 1000;
@@ -234,23 +270,16 @@ export const getImageQuotaLimit = (imageCalls, now) => {
         return 0.025;
     }
 
-    const oldestTimestamp = imageCalls[0].timestamp;
-    const startTime = Math.min(oldestTimestamp, now - 24 * hourMs);
-
-    const windows = [];
-    let currentEnd = now;
-    while (currentEnd > startTime) {
-        windows.unshift({ start: currentEnd - hourMs, end: currentEnd });
-        currentEnd -= hourMs;
+    const buckets = getImageQuotaBuckets(imageCalls);
+    if (buckets.length === 0) {
+        return 0.025;
     }
 
     const history = [];
 
-    for (const win of windows) {
-        const winCalls = imageCalls.filter(c => c.timestamp >= win.start && c.timestamp < win.end);
-        const usage = winCalls.reduce((sum, c) => sum + c.cost, 0);
-
+    for (const bucket of buckets) {
         let limit = 0.025;
+
         if (history.length > 0) {
             const prev1 = history[history.length - 1];
             let consecutiveMax = false;
@@ -280,15 +309,57 @@ export const getImageQuotaLimit = (imageCalls, now) => {
             }
         }
 
-        const ratio = limit > 0 ? usage / limit : 0;
-        history.push({ limit, usage, ratio });
+        const ratio = limit > 0 ? bucket.spent / limit : 0;
+        history.push({ limit, spent: bucket.spent, ratio });
     }
 
-    if (history.length > 0) {
+    // Determine current active limit.
+    const lastBucket = buckets[buckets.length - 1];
+    if (now < lastBucket.end) {
         return history[history.length - 1].limit;
     }
 
-    return 0.025;
+    // If last bucket expired, simulate recovery over the idle gap
+    let currentLimit = history[history.length - 1].limit;
+    let prevLimit = currentLimit;
+    let prevRatio = history[history.length - 1].ratio;
+    let simulatedTime = lastBucket.end;
+
+    let consecutiveMaxCount = 0;
+    for (let k = history.length - 1; k >= 0; k--) {
+        if (history[k].ratio >= 0.8) {
+            consecutiveMaxCount++;
+        } else {
+            break;
+        }
+    }
+
+    while (simulatedTime <= now) {
+        let limit = 0.025;
+        const consecutiveMax = consecutiveMaxCount >= 2;
+
+        if (consecutiveMax) {
+            limit = 0.015;
+        } else {
+            if (prevRatio >= 0.8) {
+                limit = prevLimit === 0.015 ? 0.015 : prevLimit;
+            } else if (prevRatio < 0.4) {
+                limit = Math.min(0.025, prevLimit + 0.005);
+            } else if (prevRatio >= 0.4 && prevRatio < 0.6) {
+                limit = Math.min(0.025, prevLimit + 0.004);
+            } else {
+                limit = Math.min(0.025, prevLimit + 0.002);
+            }
+        }
+
+        prevLimit = limit;
+        prevRatio = 0; // Simulated idle hour has 0% usage
+        consecutiveMaxCount = 0;
+        simulatedTime += hourMs;
+        currentLimit = limit;
+    }
+
+    return currentLimit;
 };
 
 /**
@@ -316,10 +387,15 @@ export const checkImageQuota = async (settings) => {
     }
 
     const now = Date.now();
-    const oneHourAgo = now - 60 * 60 * 1000;
+    const buckets = getImageQuotaBuckets(stats.imageCalls);
+    let totalSpent = 0;
 
-    const activeCalls = stats.imageCalls.filter(c => c.timestamp >= oneHourAgo);
-    const totalSpent = activeCalls.reduce((sum, c) => sum + c.cost, 0);
+    if (buckets.length > 0) {
+        const lastBucket = buckets[buckets.length - 1];
+        if (now >= lastBucket.start && now < lastBucket.end) {
+            totalSpent = lastBucket.spent;
+        }
+    }
 
     const currentLimit = getImageQuotaLimit(stats.imageCalls, now);
     return (totalSpent + currentCost) <= currentLimit;
@@ -335,21 +411,26 @@ export const getImageQuotaStats = async () => {
     }
 
     const now = Date.now();
-    const oneHourAgo = now - 60 * 60 * 1000;
+    const buckets = getImageQuotaBuckets(stats.imageCalls);
 
-    const activeCalls = stats.imageCalls.filter(c => c.timestamp >= oneHourAgo);
-    const totalSpent = activeCalls.reduce((sum, c) => sum + c.cost, 0);
+    let activeCalls = [];
+    let totalSpent = 0;
+    let nextResetMin = 0;
+
+    if (buckets.length > 0) {
+        const lastBucket = buckets[buckets.length - 1];
+        if (now >= lastBucket.start && now < lastBucket.end) {
+            activeCalls = lastBucket.calls;
+            totalSpent = lastBucket.spent;
+            nextResetMin = Math.max(0, Math.ceil((lastBucket.end - now) / (60 * 1000)));
+        }
+    }
+
     const currentLimit = getImageQuotaLimit(stats.imageCalls, now);
     const remaining = Math.max(0, currentLimit - totalSpent);
 
-    let nextResetMin = 0;
-    let reclaimCost = 0;
-    if (activeCalls.length > 0) {
-        const earliestCall = activeCalls.reduce((min, c) => c.timestamp < min.timestamp ? c : min, activeCalls[0]);
-        const nextResetTimestamp = earliestCall.timestamp + 60 * 60 * 1000;
-        nextResetMin = Math.max(0, Math.ceil((nextResetTimestamp - now) / (60 * 1000)));
-        reclaimCost = earliestCall.cost;
-    }
+    // In the classic block-reset pattern, the entire spent amount is returned upon expiration.
+    const reclaimCost = totalSpent;
 
     return {
         totalSpent,
