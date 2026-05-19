@@ -40,10 +40,26 @@ const DEFAULT_SETTINGS = {
  * Loads settings from the JSON file
  */
 export const loadSettings = async () => {
+    let settingsObj = { ...DEFAULT_SETTINGS };
     try {
         if (await fs.exists(SETTINGS_FILE)) {
             const saved = await fs.readJson(SETTINGS_FILE);
-            const merged = {
+            
+            // SECURITY SELF-HEALING MIGRATION:
+            // Extract and migrate custom Pollinations API Key from settings.json to encrypted secrets.json
+            if (saved.imageSettings && saved.imageSettings.apiKey) {
+                try {
+                    const legacyKey = saved.imageSettings.apiKey;
+                    const { saveSecret } = await import('./secrets.js');
+                    await saveSecret('POLLINATIONS_API_KEY', legacyKey);
+                    
+                    // Scrub immediately from settings file on disk
+                    saved.imageSettings.apiKey = '';
+                    await fs.writeJson(SETTINGS_FILE, saved, { spaces: 2 });
+                } catch (e) {}
+            }
+
+            settingsObj = {
                 ...DEFAULT_SETTINGS,
                 ...saved,
                 quotas: { ...DEFAULT_SETTINGS.quotas, ...saved.quotas },
@@ -51,20 +67,29 @@ export const loadSettings = async () => {
                 profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData },
                 imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings }
             };
-
-            // [MIGRATION LOCK]: Always force showFullThinking to true. 
-            // If it was false in the old config, save the new "true" value now.
-            if (merged.showFullThinking === false) {
-                merged.showFullThinking = true;
-                await fs.writeJson(SETTINGS_FILE, merged, { spaces: 2 });
-            }
-
-            return merged;
         }
     } catch (err) {
         console.error('Failed to load settings:', err);
     }
-    return DEFAULT_SETTINGS;
+
+    try {
+        // Dynamic Custom API Key Injection from secrets.json
+        const { getSecret } = await import('./secrets.js');
+        const customApiKey = await getSecret('POLLINATIONS_API_KEY');
+        if (customApiKey) {
+            settingsObj.imageSettings.apiKey = customApiKey;
+        }
+    } catch (e) {}
+
+    // [MIGRATION LOCK]: Always force showFullThinking to true. 
+    if (settingsObj.showFullThinking === false) {
+        settingsObj.showFullThinking = true;
+        try {
+            await fs.writeJson(SETTINGS_FILE, settingsObj, { spaces: 2 });
+        } catch (e) {}
+    }
+
+    return settingsObj;
 };
 
 /**
@@ -99,7 +124,24 @@ export const saveSettings = async (settings) => {
             await migrateToExternal(settings.systemSettings.externalDataPath);
         }
 
+        // Intercept Pollinations custom API Key to save to secrets.json
+        if (settings.imageSettings && settings.imageSettings.apiKey !== undefined) {
+            const { saveSecret, removeSecret } = await import('./secrets.js');
+            const keyToSave = settings.imageSettings.apiKey;
+            if (keyToSave) {
+                await saveSecret('POLLINATIONS_API_KEY', keyToSave);
+            } else {
+                await removeSecret('POLLINATIONS_API_KEY');
+            }
+        }
+
         const updated = { ...current, ...settings };
+
+        // Scrub apiKey from imageSettings so it NEVER gets written to settings.json
+        if (updated.imageSettings) {
+            updated.imageSettings = { ...updated.imageSettings, apiKey: '' };
+        }
+
         await fs.ensureDir(path.dirname(SETTINGS_FILE));
         await fs.writeJson(SETTINGS_FILE, updated, { spaces: 2 });
         return true;

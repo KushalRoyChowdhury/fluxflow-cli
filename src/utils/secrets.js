@@ -22,6 +22,18 @@ export const getAPIKey = async () => {
 };
 
 /**
+ * Load a specific secret key
+ */
+export const getSecret = async (key) => {
+    try {
+        const secrets = readEncryptedJson(SECRET_FILE, {});
+        return secrets[key] || null;
+    } catch (e) {
+        return null;
+    }
+};
+
+/**
  * Persist API Key to JSON (Preserving existing keys)
  */
 export const saveSecret = async (key, value) => {
