@@ -587,6 +587,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let isStutteringLoop = false;
         let isInitialAttempt = true;
         let accumulatedContext = '';
+        let dedupeBuffer = '';
+        let isDedupeActive = false;
 
         while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
             try {
@@ -597,7 +599,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     yield { type: 'turn_reset', content: true };
                     yield { type: 'spinner', content: true };
                     isInitialAttempt = false;
-                    accumulatedContext = '';
+                    if (inStreamRetryCount === 1) {
+                        accumulatedContext = '';
+                    }
                 }
                 // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                 const contents = modifiedHistory
@@ -689,8 +693,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield { type: 'model_update', content: null };
                 yield { type: 'status', content: 'Working...' };
 
-                let dedupeBuffer = '';
-                let isDedupeActive = accumulatedContext.length > 0;
+                dedupeBuffer = '';
+                isDedupeActive = accumulatedContext.length > 0;
 
                 for await (const chunk of stream) {
                     if (TERMINATION_SIGNAL) {
@@ -1149,6 +1153,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // Count the successful call
                 await incrementUsage('agent');
             } catch (err) {
+                // [FLUSH DEDUPE ON ERROR] - If stream cut off, flush any remaining buffered text
+                if (isDedupeActive && dedupeBuffer.length > 0) {
+                    let overlapLen = 0;
+                    const maxPossibleOverlap = Math.min(accumulatedContext.length, dedupeBuffer.length);
+                    for (let len = maxPossibleOverlap; len > 0; len--) {
+                        if (accumulatedContext.endsWith(dedupeBuffer.substring(0, len))) {
+                            overlapLen = len;
+                            break;
+                        }
+                    }
+                    const cleanText = dedupeBuffer.substring(overlapLen);
+                    if (cleanText) {
+                        const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                        if (dedupeClean) {
+                            turnText += dedupeClean;
+                        }
+                    }
+                    isDedupeActive = false;
+                    dedupeBuffer = '';
+                }
+
                 const errMsg = err.status || (err.error && err.error.message) || String(err);
                 const errLog = String(err);
                 // Log error in /logs/agent/error.log
@@ -1174,18 +1199,35 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                // Sus on accumulated context. We'll continue to test it before removing or permanently keepeing it.
-                if (turnText.trim().length > 0 || accumulatedContext.length > 0) {
+                if (turnText.trim().length > 0 || inStreamRetryCount > 1) {
                     // IN-STREAM RECOVERY
                     if (inStreamRetryCount <= MAX_RETRIES) {
                         inStreamRetryCount++;
                         const waitTime = Math.min(1000 * Math.pow(2, inStreamRetryCount - 1), 24000);
-                        modifiedHistory.push({ role: 'agent', text: turnText });
-                        if (toolResults.length > 0) {
-                            toolResults.forEach(tr => modifiedHistory.push(tr));
+                        
+                        if (turnText.trim().length > 0) {
+                            modifiedHistory.push({ role: 'agent', text: turnText });
+                            
+                            const recoveryText = "[SYSTEM: STREAM RECOVERY]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption.\n- NO REPETITION: Do not repeat any text already written.\n- NO RE-THINK: Do not restart or open <think> if reasoning already started.\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start.\n- STEALTH: Do not mention/apologize for cutoff.\n- KEEP LENGTH: Maintain standard depth/length.";
+
+                            if (toolResults.length > 0) {
+                                // Merge recovery prompt into the last tool result to avoid consecutive user roles
+                                toolResults.forEach((tr, idx) => {
+                                    if (idx === toolResults.length - 1) {
+                                        modifiedHistory.push({
+                                            ...tr,
+                                            text: `${tr.text}\n\n${recoveryText}`
+                                        });
+                                    } else {
+                                        modifiedHistory.push(tr);
+                                    }
+                                });
+                            } else {
+                                modifiedHistory.push({ role: 'user', text: recoveryText });
+                            }
+                            accumulatedContext += turnText;
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly, DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start.\n- Visually the new pickup and continuation should look natual sentence flow.\n- Dont mention about the cutoff.\n- DON'T try to think shorter, keep length standard." });
-                        accumulatedContext += turnText;
+
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
                             yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [${i}s]...` };
