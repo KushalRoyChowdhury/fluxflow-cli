@@ -585,7 +585,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let toolCallPointer = 0;
         let isThinkingLoop = false;
         let isStutteringLoop = false;
-        let isResponseCut = false;
         let isInitialAttempt = true;
         let accumulatedContext = '';
 
@@ -701,7 +700,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         break;
                     }
                     if (chunk.text) {
-                        isResponseCut = false;
                         if (isDedupeActive) {
                             dedupeBuffer += chunk.text;
                             // Wait for a small window to find a reliable overlap
@@ -830,8 +828,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             'high': 2000,
                             'max': 3500,
                             'xhigh': 3500,
-                            'off': 50,
-                            'fast': 50,
                         };
                         const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
                         let isOverVerboseThinking = wordCount > cap;
@@ -858,24 +854,61 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         // 4. Stutter / Word Loop Check (Global)
-                        const allWords = contextSafeText.split(/\s+/).filter(w => w.length > 0);
-                        if (allWords.length > 12) {
-                            let stutterDetected = false;
-                            for (let i = 0; i < allWords.length - 10; i++) {
-                                const sub = allWords.slice(i, i + 5).join(' ');
-                                const next = allWords.slice(i + 5, i + 10).join(' ');
-                                if (sub === next) {
+                        const allWords = contextSafeText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+                        let stutterDetected = false;
+
+                        // 4a. Word-level consecutive period repetition
+                        if (allWords.length > 5) {
+                            for (let p = 1; p <= 15; p++) {
+                                const R = Math.max(3, Math.ceil(8 / p));
+                                if (allWords.length < p * R) continue;
+                                let isRepeating = true;
+                                const pattern = allWords.slice(allWords.length - p);
+                                const patternStr = pattern.join(' ');
+                                for (let r = 1; r < R; r++) {
+                                    const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
+                                    if (prevPattern.join(' ') !== patternStr) {
+                                        isRepeating = false;
+                                        break;
+                                    }
+                                }
+                                if (isRepeating) {
                                     stutterDetected = true;
                                     break;
                                 }
                             }
-                            if (stutterDetected) {
-                                yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
-                                isThinkingLoop = false;
-                                isStutteringLoop = true;
-                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                break;
+                        }
+
+                        // 4b. Character-level consecutive period repetition
+                        if (!stutterDetected) {
+                            const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, '');
+                            if (cleanChars.length >= 10) {
+                                for (let p = 1; p <= 10; p++) {
+                                    const R = Math.max(4, Math.ceil(12 / p));
+                                    if (cleanChars.length < p * R) continue;
+                                    const pattern = cleanChars.substring(cleanChars.length - p);
+                                    let isRepeating = true;
+                                    for (let r = 1; r < R; r++) {
+                                        const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
+                                        if (prevPattern !== pattern) {
+                                            isRepeating = false;
+                                            break;
+                                        }
+                                    }
+                                    if (isRepeating) {
+                                        stutterDetected = true;
+                                        break;
+                                    }
+                                }
                             }
+                        }
+
+                        if (stutterDetected) {
+                            yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
+                            isThinkingLoop = false;
+                            isStutteringLoop = true;
+                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            break;
                         }
 
                         // [REAL-TIME TOOL EXECUTION]
@@ -1141,7 +1174,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
 
-                if (turnText.trim().length > 0) {
+                // Sus on accumulated context. We'll continue to test it before removing or permanently keepeing it.
+                if (turnText.trim().length > 0 || accumulatedContext.length > 0) {
                     // IN-STREAM RECOVERY
                     if (inStreamRetryCount <= MAX_RETRIES) {
                         inStreamRetryCount++;
@@ -1150,8 +1184,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (toolResults.length > 0) {
                             toolResults.forEach(tr => modifiedHistory.push(tr));
                         }
-                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly, DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start.\n- Visually the new pickup and continuation should look natual sentence flow.\n- DON'T try to think shorter, keep length standard." });
-                        isResponseCut = true;
+                        modifiedHistory.push({ role: 'user', text: "[SYSTEM] Response got cut for internal error, continue from checkpoint seamlessly, DON'T repeat what you already said! PICK UP FROM THE WORD IN A WAY THAT USER SHOULD NOT NOTICE ANY CUTOFF. Rules:\n- Do not reuse <think> if the thinking already started just continue from the word and end it properly.\n- If the cutoff was in middle of a tool call, start the tool call from start.\n- Visually the new pickup and continuation should look natual sentence flow.\n- Dont mention about the cutoff.\n- DON'T try to think shorter, keep length standard." });
                         accumulatedContext += turnText;
                         // show live decremental countdown
                         for (let i = waitTime / 1000; i > 0; i--) {
@@ -1247,13 +1280,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // If the model hasn't finished, we must provide a user turn to keep the loop going.
         // If there are no tool results, we send a 'continue' signal to prompt the model.
-        if (toolResults.length > 0 && !isResponseCut) {
+        if (toolResults.length > 0) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
             modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
             isStutteringLoop = false;
-            isResponseCut = false;
         }
     }
     yield { type: 'status', content: null };
