@@ -707,7 +707,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (isDedupeActive) {
                             dedupeBuffer += chunk.text;
                             // Wait for a small window to find a reliable overlap
-                            if (dedupeBuffer.length >= 100) {
+                            if (dedupeBuffer.length >= 30) {
                                 let overlapLen = 0;
                                 const maxPossibleOverlap = Math.min(accumulatedContext.length, dedupeBuffer.length);
 
