@@ -32,7 +32,7 @@ const withLock = (op) => {
 export const loadHistory = async () => {
     if (await fs.pathExists(HISTORY_FILE)) {
         try {
-            return await fs.readJson(HISTORY_FILE);
+            return readEncryptedJson(HISTORY_FILE, {});
         } catch (e) {
             return {};
         }
@@ -60,8 +60,7 @@ export const saveChat = async (id, name, messages) => {
             messages: persistentMessages,
             updatedAt: Date.now()
         };
-        await fs.ensureDir(path.dirname(HISTORY_FILE));
-        await fs.writeJson(HISTORY_FILE, history, { spaces: 2 });
+        writeEncryptedJson(HISTORY_FILE, history);
     });
 };
 
@@ -78,8 +77,7 @@ export const saveChatTitle = async (id, title) => {
             // Janitor often runs BEFORE the main app's first save — create a skeleton entry
             history[id] = { name: title, messages: [], updatedAt: Date.now() };
         }
-        await fs.ensureDir(path.dirname(HISTORY_FILE));
-        await fs.writeJson(HISTORY_FILE, history, { spaces: 2 });
+        writeEncryptedJson(HISTORY_FILE, history);
     });
 };
 
@@ -87,7 +85,7 @@ export const deleteChat = async (id) => {
     return withLock(async () => {
         const history = await loadHistory();
         delete history[id];
-        await fs.writeJson(HISTORY_FILE, history, { spaces: 2 });
+        writeEncryptedJson(HISTORY_FILE, history);
 
         // Also clean up temp memory if it exists
         const temp = readEncryptedJson(TEMP_MEM_FILE, {});
