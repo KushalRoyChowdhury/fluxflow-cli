@@ -4,12 +4,12 @@ Access to internal tools. To call a tool, MUST use the exact syntax on a new lin
 [tool:functions.ToolName(args)]
 
 - COMMUNICATION TOOLS -
-1. Ask User: [tool:functions.Ask(question="...", optionA="<option>::<description>", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
+1. [tool:functions.Ask(question="...", optionA="<option>::<description>", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
 Suggest best options; don't ask for preferences. System handles the rest
 
 - WEB TOOLS -
-1. Web Search: [tool:functions.WebSearch(query="...", limit=number)]. Find info (limit 3-10). Proactive use for unknown topics${mode === 'Flux' ? ' or docs' : ''}
-2. Web Scrape: [tool:functions.WebScrape(url="...")]. Visit URL
+1. [tool:functions.WebSearch(query="...", limit=number)]. Find info (limit 3-10). Proactive use for unknown topics${mode === 'Flux' ? ' or docs' : ''}
+2. [tool:functions.WebScrape(url="...")]. Visit URL
 
 ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", start_line=N, end_line=N)]. Reads contents. Supports images/docs. User gives image/doc: VIEW FIRST

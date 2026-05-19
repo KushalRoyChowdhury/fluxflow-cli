@@ -618,19 +618,19 @@ export default function App() {
                     cmd: 'setup', desc: 'Configure defaults', subs: [
                         {
                             cmd: 'key', desc: 'Set API key strategy', subs: [
-                                { cmd: 'default', desc: 'Default (Quota: 0.020 credits/hr)' },
+                                { cmd: 'default', desc: 'Default (Quota: 20 credits/hr)' },
                                 { cmd: 'custom', desc: 'Custom Key' }
                             ]
                         },
                         {
                             cmd: 'quality', desc: 'Set default quality', subs: [
-                                { cmd: 'low', desc: '(0.001/img)' },
-                                { cmd: 'low-high', desc: '(0.002/img)' },
-                                { cmd: 'medium', desc: '(0.008/img)' },
-                                { cmd: 'medium-high', desc: '(0.01/img)' },
-                                { cmd: 'high', desc: '(0.045/img)' },
-                                { cmd: 'ultra', desc: '(0.0488/img)' },
-                                { cmd: 'premium', desc: '(0.1/img)' }
+                                { cmd: 'low', desc: imageSettings?.keyType === 'Custom' ? '(0.001/img)' : '(1/img)' },
+                                { cmd: 'low-high', desc: imageSettings?.keyType === 'Custom' ? '(0.002/img)' : '(2/img)' },
+                                { cmd: 'medium', desc: imageSettings?.keyType === 'Custom' ? '(0.008/img)' : '(8/img)' },
+                                { cmd: 'medium-high', desc: imageSettings?.keyType === 'Custom' ? '(0.01/img)' : '(10/img)' },
+                                { cmd: 'high', desc: imageSettings?.keyType === 'Custom' ? '(0.045/img)' : '(45/img)' },
+                                { cmd: 'ultra', desc: imageSettings?.keyType === 'Custom' ? '(0.0488/img)' : '(49/img)' },
+                                { cmd: 'premium', desc: imageSettings?.keyType === 'Custom' ? '(0.1/img)' : '(100/img)' }
                             ]
                         }
                     ]
@@ -839,9 +839,9 @@ export default function App() {
                                         id: Date.now(),
                                         role: 'system',
                                         isImageStats: true,
-                                        text: `• Hourly Limit: 0.020 credits\n` +
-                                             `• Spent (Last 1hr): ${stats.totalSpent.toFixed(3)} credits\n` +
-                                             `• Remaining: ${stats.remaining.toFixed(3)} credits\n` +
+                                        text: `• Hourly Limit: 20 credits\n` +
+                                             `• Spent (Last 1hr): ${Number((stats.totalSpent * 1000).toFixed(0))} credits\n` +
+                                             `• Remaining: ${Number((stats.remaining * 1000).toFixed(0))} credits\n` +
                                              `• Requests (Last 1hr): ${stats.activeCallsCount} requests\n` +
                                              (stats.nextResetMin > 0 ? `• Refreshes in: ${stats.nextResetMin}m` : ''),
                                         isMeta: true
@@ -1814,7 +1814,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Image Credits:</Text></Box>
-                                <Text color="white">{(sessionImageCredits || 0).toFixed(3)} credits</Text>
+                                <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
@@ -1852,7 +1852,7 @@ OUTPUT: ${execOutputRef.current}`;
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
-                                <Text color="white">{(dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0).toFixed(3)} credits</Text>
+                                <Text color="white">{Number(((dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
@@ -2440,7 +2440,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Image Credits:</Text></Box>
-                                    <Text color="white">{(sessionImageCredits || 0).toFixed(3)} credits</Text>
+                                    <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
                                 </Box>
                             </Box>
 
