@@ -592,6 +592,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
             try {
+                turnText = ''; // [CRITICAL STATE SYNC] - Reset turnText at start of every attempt
                 if (isInitialAttempt) {
                     if (process.stdout.isTTY) {
                         process.stdout.write(`\u001b]0;Working...\u0007`);
@@ -1149,6 +1150,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
 
                 if (TERMINATION_SIGNAL) break;
+
+                // [SILENT CUTOFF WATCHDOG]
+                // If stream closed cleanly but we don't have finish/continue signals or tool executions,
+                // it is highly likely that a silent cutoff occurred. Trigger the recovery engine!
+                const signalSafeText = (turnText || '').trim();
+                const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
+                const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
+                const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
+
+                if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0) {
+                    throw new Error("Silent stream cutoff (500): Model stream closed cleanly but missing turn finish/continue signals.");
+                }
+
                 success = true;
                 // Count the successful call
                 await incrementUsage('agent');
@@ -1180,7 +1194,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const date = new Date().toLocaleString();
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
+                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\nDEBUG STATE: turnText='${turnText}', length=${turnText.trim().length}, inStreamRetryCount=${inStreamRetryCount}, retryCount=${retryCount}, isDedupeActive=${isDedupeActive}, dedupeBuffer='${dedupeBuffer}'\n\n----------------------------------------------------------------------\n\n`);
 
                 // RETRY ONLY ON 500-LEVEL (500, 503, ETC.) AND 408 TIMEOUT ERRORS
                 const status = err.status || err.statusCode || err.code;
