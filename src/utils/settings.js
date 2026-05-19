@@ -28,6 +28,11 @@ const DEFAULT_SETTINGS = {
         name: null,
         nickname: null,
         instructions: null
+    },
+    imageSettings: {
+        keyType: 'Default',
+        quality: 'Low-High',
+        apiKey: ''
     }
 };
 
@@ -43,7 +48,8 @@ export const loadSettings = async () => {
                 ...saved,
                 quotas: { ...DEFAULT_SETTINGS.quotas, ...saved.quotas },
                 systemSettings: { ...DEFAULT_SETTINGS.systemSettings, ...saved.systemSettings },
-                profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData }
+                profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData },
+                imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings }
             };
 
             // [MIGRATION LOCK]: Always force showFullThinking to true. 

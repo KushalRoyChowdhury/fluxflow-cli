@@ -11,6 +11,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
+- **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using Pollinations AI. Use the `/image` command or ask the agent to create visuals. Features customizable models (Flux, ZImage, Qwen, Nanobanana-Pro), aspect ratios, seeds, and beautiful high-contrast UI budget telemetry cards.
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
 - **Document Engineering Suite**: Generate professional, branded PDF, DOCX, and PPTX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
 - **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.

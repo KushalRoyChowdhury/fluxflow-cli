@@ -15,6 +15,7 @@ const TOOL_LABELS = {
     'search_keyword': 'FindFiles',
     'write_pdf': 'CreatePDF',
     'write_docx': 'CreateDocument',
+    'generate_image': 'GenerateImage',
 
     // PascalCase Support
     'WriteFile': 'WriteFile',
@@ -28,7 +29,8 @@ const TOOL_LABELS = {
     'WritePDF': 'WritePDF',
     'WriteDoc': 'WriteDoc',
     'Memory': 'Memory',
-    'Chat': 'Chat'
+    'Chat': 'Chat',
+    'GenerateImage': 'GenerateImage'
 };
 
 const cleanSignals = (text) => {
@@ -122,7 +124,7 @@ const cleanSignals = (text) => {
         .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
         .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
         .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
-        .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
+        .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
 };
 
@@ -595,6 +597,23 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     if (msg.role === 'system' && msg.text?.includes('[TOOL RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
 
+    if (msg.isImageStats) {
+        return (
+            <Box marginBottom={1} paddingX={1} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={0} width="100%">
+                    <Box paddingX={1} backgroundColor="#0e1b21">
+                        <Text color="cyan" bold>💳  IMAGE STATS</Text>
+                    </Box>
+                    <Box paddingX={1} marginTop={1} marginBottom={1} flexDirection="column">
+                        {msg.text.split('\n').map((line, i) => (
+                            <Text key={i} color="white">{line}</Text>
+                        ))}
+                    </Box>
+                </Box>
+            </Box>
+        );
+    }
+
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : 'No selection';
@@ -652,30 +671,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
             { cmd: '/resume', desc: 'Load previous session' },
             { cmd: '/save', desc: 'Force save current chat' },
             { cmd: '/chats', desc: 'List all chat sessions' },
-            {
-                cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
-                    { cmd: 'flux', desc: 'Enable Dev toolset' },
-                    { cmd: 'flow', desc: 'Enable Chat mode' }
-                ]
-            },
-            {
-                cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-                    { cmd: 'low', desc: 'Fastest reasoning' },
-                    { cmd: 'medium', desc: 'Balanced depth' },
-                    { cmd: 'high', desc: 'Complex coding' },
-                    { cmd: 'max', desc: 'Architectural depth' },
-                    { cmd: 'show', desc: 'Show full thoughts' },
-                    { cmd: 'hide', desc: 'Show concise thoughts' }
-                ]
-            },
-            {
-                cmd: '/model', desc: 'Switch AI model', subs: [
-                    { cmd: 'gemma-4-31b-it', desc: 'Standard Default (Free, Recommended)' },
-                    { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
-                    { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Free limited quota)' },
-                    { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast (Paid, Free limited quota)' }
-                ]
-            },
+            { cmd: '/image', desc: 'Generate images' },
+            { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
+            { cmd: '/thinking', desc: 'Set AI reasoning depth' },
+            { cmd: '/model', desc: 'Switch AI model' },
             { cmd: '/settings', desc: 'Configure system prefs' },
             { cmd: '/key', desc: 'Manage API keys' },
             { cmd: '/profile', desc: 'Edit developer persona' },
@@ -684,18 +683,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
             { cmd: '/reset', desc: 'Wipe all project data' },
             { cmd: '/about', desc: 'Project info & credits' },
             { cmd: '/changelog', desc: 'View latest updates' },
-            {
-                cmd: '/fluxflow', desc: 'Project management', subs: [
-                    { cmd: 'init', desc: 'Create FluxFlow.md template' }
-                ]
-            },
-            {
-                cmd: '/update', desc: 'Check/Install updates', subs: [
-                    { cmd: 'check', desc: 'Check for new version' },
-                    { cmd: 'latest', desc: 'Install latest release' }
-                ]
-            }
+            { cmd: '/fluxflow', desc: 'Project management' },
+            { cmd: '/update', desc: 'Check/Install updates' }
         ];
+
 
         return (
             <Box marginBottom={1} paddingX={1} width="100%">

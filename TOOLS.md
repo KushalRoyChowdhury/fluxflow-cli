@@ -8,9 +8,10 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | :--- | :---: | :---: |
 | **Web Search** | ✅ | ✅ |
 | **Web Scrape** | ✅ | ✅ |
-| **Write PDF** | ✅ | ✅ |
-| **Write DOCX** | ✅ | ✅ |
-| **Write PPTX** | ✅ | ✅ |
+| **Generate Image** | ✅ | ❌ |
+| **Write PDF** | ✅ | ❌ |
+| **Write DOCX** | ✅ | ❌ |
+| **Write PPTX** | ✅ | ❌ |
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
@@ -31,6 +32,11 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
   - **Native Translation**: Uses `html2pptxgenjs` to translate HTML tags (`<h1>`, `<ul>`, `<b>`) directly into selectable PowerPoint text objects.
   - **Rich Styling**: Supports CSS-like properties (color, font-size, text-align) for professional slide design.
   - **Flat Protocol**: Optimized for AI stability using a flat HTML string interface.
+
+### 🎨 Creative & Visual
+- **`generate_image`**: Generates high-fidelity images using Pollinations AI.
+  - **Customization**: Supports customizable models (Flux, ZImage, Qwen, Nanobanana-Pro, etc.), aspect ratios, custom prompt generation, and random seeds.
+  - **Telemetry**: Tracks hourly credit usage (Low, Medium, Ultra, Premium tiers) with built-in daily limit checks and interactive dashboard displays.
 
 ### 📁 File System Operations
 - **`list_files`**: Lists the contents of a directory to help the agent understand the project structure.

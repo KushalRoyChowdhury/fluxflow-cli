@@ -12,6 +12,7 @@ import { ask_user } from '../tools/ask_user.js';
 import { write_pdf } from '../tools/write_pdf.js';
 import { write_docx } from '../tools/write_docx.js';
 import { search_keyword } from '../tools/search_keyword.js';
+import { generate_image } from '../tools/generate_image.js';
 
 const TOOL_MAP = {
     web_search,
@@ -27,6 +28,7 @@ const TOOL_MAP = {
     write_pdf,
     write_docx,
     search_keyword,
+    generate_image,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -42,7 +44,8 @@ const TOOL_MAP = {
     Run: exec_command,
     SearchKeyword: search_keyword,
     Memory: memory,
-    Chat: chat
+    Chat: chat,
+    GenerateImage: generate_image
 };
 
 /**

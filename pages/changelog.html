@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.9.24", "1.9.21"]
+        const stableVersions = ["1.10.0", "1.9.24"]
         const changelogData = {
+            "1.10.0": {
+                "note": "Creative, Web & Memory Update.",
+                "added": [
+                    "Introduced fully-featured **Image Generation** with customizable models, aspect ratios, seeds, and real-time budget telemetry tracking.",
+                    "Get 20 generations per hour on Low preset. BYOK from `pollinations.ai` for higher quotas."
+                ],
+                "changed": [
+                    "Improved **Memory Reliability** by optimizing the Janitor tool selection logic for temporary and user long-term memory updates.",
+                    "Enhanced robustness of **Web Search & Scrape tools** by configuring resilient realistic Chrome identities."
+                ],
+                "fixes": []
+            },
             "1.9.24": {
                 "note": "Reasoning Speed & Platform Hardening Patch.",
                 "added": [

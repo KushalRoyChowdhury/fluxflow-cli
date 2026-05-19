@@ -21,7 +21,7 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory } 
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
-import { getDailyUsage, addToUsage, initUsage, forceFlushUsage } from './utils/usage.js';
+import { getDailyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -181,6 +181,7 @@ export default function App() {
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
     const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
+    const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
@@ -190,6 +191,8 @@ export default function App() {
     const [sessionToolDenied, setSessionToolDenied] = useState(0);
     const [sessionApiTime, setSessionApiTime] = useState(0);
     const [sessionToolTime, setSessionToolTime] = useState(0);
+    const [sessionImageCount, setSessionImageCount] = useState(0);
+    const [sessionImageCredits, setSessionImageCredits] = useState(0);
     const [dailyUsage, setDailyUsage] = useState(null);
     const [chatId, setChatId] = useState(generateChatId());
     const [activeCommand, setActiveCommand] = useState(null);
@@ -487,6 +490,7 @@ export default function App() {
             };
             setSystemSettings(freshSettings);
             setProfileData(saved.profileData);
+            setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
 
             // 2. Load API key
             const key = await getAPIKey();
@@ -540,10 +544,11 @@ export default function App() {
                 activeModel,
                 showFullThinking,
                 systemSettings,
-                profileData
+                profileData,
+                imageSettings
             });
         }
-    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, isInitializing]);
+    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing]);
 
     const handleSetup = async (val) => {
         const key = val.trim();
@@ -608,6 +613,32 @@ export default function App() {
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/chats', desc: 'List all chat sessions' },
         {
+            cmd: '/image', desc: 'Generate images using Pollinations', subs: [
+                {
+                    cmd: 'setup', desc: 'Configure defaults', subs: [
+                        {
+                            cmd: 'key', desc: 'Set API key strategy', subs: [
+                                { cmd: 'default', desc: 'Default (Quota: 0.020 credits/hr)' },
+                                { cmd: 'custom', desc: 'Custom Key' }
+                            ]
+                        },
+                        {
+                            cmd: 'quality', desc: 'Set default quality', subs: [
+                                { cmd: 'low', desc: '(0.001/img)' },
+                                { cmd: 'low-high', desc: '(0.002/img)' },
+                                { cmd: 'medium', desc: '(0.008/img)' },
+                                { cmd: 'medium-high', desc: '(0.01/img)' },
+                                { cmd: 'high', desc: '(0.045/img)' },
+                                { cmd: 'ultra', desc: '(0.0488/img)' },
+                                { cmd: 'premium', desc: '(0.1/img)' }
+                            ]
+                        }
+                    ]
+                },
+                { cmd: 'stats', desc: 'Show remaining credits or Pollinations balance status' }
+            ]
+        },
+        {
             cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
                 { cmd: 'flux', desc: 'Enable Dev toolset' },
                 { cmd: 'flow', desc: 'Enable Chat mode' }
@@ -651,7 +682,7 @@ export default function App() {
         }
     ];
 
-    const handleSubmit = (value) => {
+    const handleSubmit = async (value) => {
         // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
         if (suggestions.length > 0) {
             const nextMatch = suggestions[selectedIndex] || suggestions[0];
@@ -659,8 +690,9 @@ export default function App() {
             if (parts.length === 1) {
                 setInput(nextMatch.cmd + ' ');
             } else {
-                // For sub-commands, preserve the parent command
-                setInput(parts[0] + ' ' + nextMatch.cmd + ' ');
+                // Replace the last part (the query) with the selected command
+                const parentParts = parts.slice(0, -1);
+                setInput(parentParts.join(' ') + ' ' + nextMatch.cmd + ' ');
             }
             setSelectedIndex(0);
             return;
@@ -781,6 +813,138 @@ export default function App() {
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
+                    }
+                    break;
+                }
+                case '/image': {
+                    if (parts[1]?.toLowerCase() === 'stats') {
+                        const s = emojiSpace(2);
+                        if (imageSettings.keyType === 'Custom') {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { 
+                                    id: Date.now(), 
+                                    role: 'system', 
+                                    text: `🔗${s}[SYSTEM] Key strategy is Custom. Redirecting to Pollinations dashboard (https://enter.pollinations.ai/#pollen)...`, 
+                                    isMeta: true 
+                                }];
+                            });
+                            exec('start https://enter.pollinations.ai/#pollen');
+                        } else {
+                            try {
+                                const stats = await getImageQuotaStats();
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { 
+                                        id: Date.now(), 
+                                        role: 'system', 
+                                        isImageStats: true,
+                                        text: `• Hourly Limit: 0.0200 credits\n` +
+                                             `• Spent (Last 1hr): ${stats.totalSpent.toFixed(4)} credits\n` +
+                                             `• Remaining: ${stats.remaining.toFixed(4)} credits\n` +
+                                             `• Requests (Last 1hr): ${stats.activeCallsCount} requests`, 
+                                        isMeta: true 
+                                    }];
+                                });
+                            } catch (e) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { 
+                                        id: Date.now(), 
+                                        role: 'system', 
+                                        text: `❌ [SYSTEM] Failed to load image quota stats.`, 
+                                        isMeta: true 
+                                    }];
+                                });
+                            }
+                        }
+                    } else if (parts[1]?.toLowerCase() === 'setup') {
+                        if (parts[2]?.toLowerCase() === 'key') {
+                            if (parts[3]) {
+                                const matchedKey = ['default', 'custom'].find(k => k === parts[3].toLowerCase());
+                                if (matchedKey) {
+                                    const strategy = matchedKey === 'default' ? 'Default' : 'Custom';
+                                    setImageSettings(prev => ({ ...prev, keyType: strategy }));
+                                    const s = emojiSpace(2);
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Image key strategy set to ${strategy}`, isMeta: true }];
+                                    });
+
+                                    if (strategy === 'Custom') {
+                                        setInputConfig({
+                                            label: "Enter Pollinations API key (starting with sk_):",
+                                            note: "Get a key from https://enter.pollinations.ai",
+                                            key: 'imageSettings',
+                                            subKey: 'apiKey',
+                                            value: imageSettings.apiKey || '',
+                                            returnView: 'chat'
+                                        });
+                                        setActiveView('input');
+                                    }
+                                } else {
+                                    const s = emojiSpace(2);
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Invalid key option. Choose: Default or Custom.`, isMeta: true }];
+                                    });
+                                }
+                            } else {
+                                const s = emojiSpace(2);
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup Key <Default|Custom>`, isMeta: true }];
+                                });
+                            }
+                        } else if (parts[2]?.toLowerCase() === 'quality') {
+                            if (parts[3]) {
+                                // Match exactly Low, Low-High, Medium, Medium-High, High, Ultra, Premium (case-insensitive check)
+                                const matched = ['low', 'low-high', 'medium', 'medium-high', 'high', 'ultra', 'premium'].find(q => q === parts[3].toLowerCase());
+                                if (matched) {
+                                    // Map to the correct capitalized quality name
+                                    const qualityMap = {
+                                        'low': 'Low',
+                                        'low-high': 'Low-High',
+                                        'medium': 'Medium',
+                                        'medium-high': 'Medium-High',
+                                        'high': 'High',
+                                        'ultra': 'Ultra',
+                                        'premium': 'Premium'
+                                    };
+                                    const chosenQuality = qualityMap[matched];
+                                    setImageSettings(prev => ({ ...prev, quality: chosenQuality }));
+                                    const s = emojiSpace(2);
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Image quality set to ${chosenQuality}`, isMeta: true }];
+                                    });
+                                } else {
+                                    const s = emojiSpace(2);
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Invalid quality level. Choose from: Low, Low-High, Medium, Medium-High, High, Ultra, Premium.`, isMeta: true }];
+                                    });
+                                }
+                            } else {
+                                const s = emojiSpace(2);
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup Quality <Low|Low-High|Medium|Medium-High|High|Ultra>`, isMeta: true }];
+                                });
+                            }
+                        } else {
+                            const s = emojiSpace(2);
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
+                            });
+                        }
+                    } else {
+                        const s = emojiSpace(2);
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
+                        });
                     }
                     break;
                 }
@@ -1029,10 +1193,28 @@ OUTPUT: ${execOutputRef.current}`;
                                 setIsTerminalFocused(false);
                                 setExecOutput('');
                             },
-                            onToolResult: (status) => {
-                                if (status === 'success') setSessionToolSuccess(prev => prev + 1);
-                                else if (status === 'denied') setSessionToolDenied(prev => prev + 1);
-                                else setSessionToolFailure(prev => prev + 1);
+                            onToolResult: (status, toolName) => {
+                                if (status === 'success') {
+                                    setSessionToolSuccess(prev => prev + 1);
+                                    if (toolName === 'generate_image') {
+                                        setSessionImageCount(prev => prev + 1);
+                                        const costs = {
+                                            'Low': 0.001,
+                                            'Low-High': 0.002,
+                                            'Medium': 0.008,
+                                            'Medium-High': 0.01,
+                                            'High': 0.045,
+                                            'Ultra': 0.0488,
+                                            'Premium': 0.1
+                                        };
+                                        const cost = costs[imageSettings.quality] || 0.002;
+                                        setSessionImageCredits(prev => prev + cost);
+                                    }
+                                } else if (status === 'denied') {
+                                    setSessionToolDenied(prev => prev + 1);
+                                } else {
+                                    setSessionToolFailure(prev => prev + 1);
+                                }
                             },
                             onToolApproval: async (tool, args) => {
                                 const isAuto = autoAcceptWrites || systemSettings.autoExec;
@@ -1379,19 +1561,23 @@ OUTPUT: ${execOutputRef.current}`;
             const cleanQuery = query.startsWith('/') ? query.slice(1) : query;
             return COMMANDS.filter(c => {
                 const cleanCmd = c.cmd.startsWith('/') ? c.cmd.slice(1) : c.cmd;
-                return cleanCmd.includes(cleanQuery);
+                return cleanCmd.toLowerCase().includes(cleanQuery);
             });
         }
 
-        // Level 2: Sub-commands
-        if (parts.length === 2) {
-            const parent = COMMANDS.find(c => c.cmd === parts[0].toLowerCase());
-            if (parent && parent.subs) {
-                return parent.subs.filter(s => s.cmd.includes(query));
+        // Deep Nested Commands Autocomplete Engine
+        let currentList = COMMANDS;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i].toLowerCase();
+            const found = currentList.find(c => c.cmd.toLowerCase() === part);
+            if (found && found.subs) {
+                currentList = found.subs;
+            } else {
+                return [];
             }
         }
 
-        return [];
+        return currentList.filter(s => s.cmd.toLowerCase().includes(query));
     }, [input]);
 
     // Reset selected index when input changes to avoid OOB
@@ -1547,19 +1733,37 @@ OUTPUT: ${execOutputRef.current}`;
                                     } else if (key === 'janitorModel') {
                                         setJanitorModel(val);
                                         newSettings.janitorModel = val;
-                                    } else if (key === 'externalDataPath') {
+                                                                        } else if (key === 'externalDataPath') {
                                         const newSysSettings = { ...systemSettings, useExternalData: true, externalDataPath: val.trim() };
                                         setSystemSettings(newSysSettings);
                                         newSettings.systemSettings = newSysSettings;
                                         setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '📁 [EXTERNAL STORAGE] Flux Flow will use ' + val.trim() + ' for data after restart.' }]);
+                                    } else if (key === 'imageSettings') {
+                                        const apiKeyInput = val.trim();
+                                        if (apiKeyInput.startsWith('sk_')) {
+                                            const updatedSettings = { ...imageSettings, apiKey: apiKeyInput };
+                                            setImageSettings(updatedSettings);
+                                            newSettings.imageSettings = updatedSettings;
+                                            setMessages(prev => {
+                                                setCompletedIndex(prev.length + 1);
+                                                return [...prev, { id: Date.now(), role: 'system', text: `🔑 [IMAGE KEY] Custom API key saved successfully.`, isMeta: true }];
+                                            });
+                                        } else {
+                                            setImageSettings(prev => ({ ...prev, keyType: 'Default' }));
+                                            newSettings.imageSettings = { ...imageSettings, keyType: 'Default' };
+                                            setMessages(prev => {
+                                                setCompletedIndex(prev.length + 1);
+                                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [IMAGE KEY ERROR] API key must start with sk_. Key strategy reset to Default.`, isMeta: true }];
+                                            });
+                                        }
                                     }
 
                                     if (next) {
                                         setInputConfig(next(key === 'quotas' ? newQuotas : val));
                                     } else {
-                                        saveSettings({ ...newSettings, apiTier, quotas: newQuotas });
+                                        saveSettings({ ...newSettings, apiTier, quotas: newQuotas, imageSettings: newSettings.imageSettings || imageSettings });
                                         setInputConfig(null);
-                                        setActiveView('settings');
+                                        setActiveView(inputConfig?.returnView || 'settings');
                                     }
                                 }}
                             />
@@ -1604,6 +1808,14 @@ OUTPUT: ${execOutputRef.current}`;
                                 <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                             </Box>
                             <Box>
+                                <Box width={25}><Text color="blue">Images Made:</Text></Box>
+                                <Text color="white">{sessionImageCount || 0}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Image Credits:</Text></Box>
+                                <Text color="white">{(sessionImageCredits || 0).toFixed(4)} credits</Text>
+                            </Box>
+                            <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
                                 <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
                                 <Text color="green">✓ {sessionToolSuccess}</Text>
@@ -1632,6 +1844,14 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
                                 <Text color="white">{formatTokens(dailyUsage?.tokens || 0)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Images Made Today:</Text></Box>
+                                <Text color="white">{dailyUsage?.imageCalls?.length || 0}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
+                                <Text color="white">{(dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0).toFixed(4)} credits</Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
@@ -2212,6 +2432,14 @@ OUTPUT: ${execOutputRef.current}`;
                                 <Box>
                                     <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
                                     <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Images Made:</Text></Box>
+                                    <Text color="white">{sessionImageCount || 0}</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Image Credits:</Text></Box>
+                                    <Text color="white">{(sessionImageCredits || 0).toFixed(4)} credits</Text>
                                 </Box>
                             </Box>
 

@@ -33,6 +33,7 @@ const TOOL_LABELS = {
     'ask': 'Asking User',
     'write_pdf': 'Creating PDF',
     'write_docx': 'Creating Document',
+    'generate_image': 'Generating Image',
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -61,10 +62,31 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const janitorContents = history.slice(-12)
         .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:'))
-        .map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim() }]
-        }));
+        .map(msg => {
+            let processedText = msg.text
+                .replace(/\[tool:functions\..*?\]/g, '')
+                .replace(/<think>[\s\S]*?<\/think>/g, '')
+                .replace(/\[Prompted on:.*?\]/g, '')
+                .replace(/\[turn: continue\]/g, '')
+                .replace(/\[turn: finish\]/g, '')
+                .replace(/\[TOOL RESULTS\]/g, '')
+                .replace(/\[tool results\]/g, '')
+                .replace(/\r?\n\r?\n/g, '\n')
+                .replace(/\n\n/g, '\n')
+                .replace(/\\n\\n/g, '')
+                .trim();
+
+            const limit = msg.role === 'user' ? 1500 : 24000;
+            let truncatedText = processedText.substring(0, limit);
+            if (processedText.length > limit) {
+                truncatedText += '\n... (truncated) ...';
+            }
+
+            return {
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: truncatedText }]
+            };
+        });
 
     const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     const janitorPrompt = getJanitorInstruction(
@@ -84,7 +106,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // fs.writeFileSync('test.txt', originalTextProcessed);
     // replace the consecutive newlines and literal escaped \n\n with clean formatting
     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, 600)}\n${originalTextProcessed.length > 600 ? '... (truncated) ...\n\n' : ''}
+    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, 1500)}\n${originalTextProcessed.length > 1500 ? '... (truncated) ...\n\n' : ''}
 [AGENT (current turn)]: ${agentRes}`
 
     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
@@ -724,7 +746,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                'Chat': 'chat', 'chat': 'chat'
+                                'Chat': 'chat', 'chat': 'chat',
+                                'GenerateImage': 'generate_image', 'generate_image': 'generate_image'
                             };
                             const potentialTool = NORMALIZE_MAP[rawToolName] || rawToolName;
                             const partialArgs = toolContext.args || '';
@@ -771,7 +794,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         'search_keyword': 'Searching Keywords',
                                         'exec_command': 'Running Command',
                                         'ask': 'Asking User',
-                                        'memory': 'Updating Memory'
+                                        'memory': 'Updating Memory',
+                                        'generate_image': 'Generating Image'
                                     };
                                     const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                     process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -863,7 +887,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                'Chat': 'chat', 'chat': 'chat'
+                                'Chat': 'chat', 'chat': 'chat',
+                                'GenerateImage': 'generate_image', 'generate_image': 'generate_image'
                             };
                             const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -923,6 +948,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             } else if (normToolName === 'search_keyword') {
                                 const { keyword } = parseArgs(toolCall.args);
                                 label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
+                            } else if (normToolName === 'generate_image') {
+                                const { title, prompt, outputPath, output } = parseArgs(toolCall.args);
+                                label = `🎨 IMAGE GENERATED: "${title || prompt}" -> ${outputPath || output || 'generated_image.png'}`.toUpperCase();
                             } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                 label = '';
                             } else {
@@ -988,7 +1016,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
-                                        if (settings.onToolResult) settings.onToolResult('denied');
+                                        if (settings.onToolResult) settings.onToolResult('denied', normToolName);
                                         toolCallPointer++;
                                         continue;
                                     }
@@ -1027,7 +1055,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             if (isSuccess) {
                                 await incrementUsage('toolSuccess');
-                                if (settings.onToolResult) settings.onToolResult('success');
+                                if (settings.onToolResult) settings.onToolResult('success', normToolName);
                             } else if (isDenied) {
                                 // Already incremented above in the direct deny block, but let's be safe for other tools
                                 // actually, direct deny block handles it.
@@ -1035,7 +1063,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // Let's check if we already handled it.
                             } else {
                                 await incrementUsage('toolFailure');
-                                if (settings.onToolResult) settings.onToolResult('failure');
+                                if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                             }
 
                             const aiContent = `[TOOL RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;

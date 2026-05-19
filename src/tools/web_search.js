@@ -32,7 +32,7 @@ export const web_search = async (argsString) => {
             const page = await browser.newPage();
 
             // 2. Set Realistic Identity
-            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36');
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.97 Safari/537.36');
             await page.setViewport({ width: 1366, height: 768 });
 
             // 3. Jitter Delay
@@ -72,10 +72,10 @@ export const web_search = async (argsString) => {
 
             const finalResults = results.join('\n\n');
 
-            // Log for audit
-            const toolLogDir = path.join(LOGS_DIR, 'tools');
-            if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            fs.appendFileSync(path.join(toolLogDir, 'search-results.log'), `SEARCH ${new Date().toLocaleString()} - Query: [${query}]. Count: ${results.length}.\nContent:\n${finalResults}\n\n--------------------------------------------------------\n\n\n`);
+            // // Log for audit
+            // const toolLogDir = path.join(LOGS_DIR, 'tools');
+            // if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
+            // fs.appendFileSync(path.join(toolLogDir, 'search-results.log'), `SEARCH ${new Date().toLocaleString()} - Query: [${query}]. Count: ${results.length}.\nContent:\n${finalResults}\n\n--------------------------------------------------------\n\n\n`);
 
             // fs.writeFileSync('search.txt', finalResults);
             await browser.close();
