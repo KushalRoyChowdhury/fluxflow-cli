@@ -80,7 +80,7 @@ const FLUX_LOGO = gradient(['#00ffff', '#0077ff', '#ff00ff']).multiline(
 ╚═╝     ╚══════╝ ╚═════╝ ╚═╝  ╚═╝    ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝`
 );
 
-export default function App() {
+export default function App({ args = [] }) {
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
     const { stdout } = useStdout();
@@ -94,6 +94,47 @@ export default function App() {
     });
 
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const persistedModelRef = useRef(null);
+
+    // Parse CLI startup arguments
+    const parsedArgs = useMemo(() => {
+        const parsed = {};
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+            if (arg === '--model' && args[i + 1]) {
+                parsed.model = args[i + 1];
+                i++;
+            } else if (arg === '--memory' && args[i + 1]) {
+                parsed.memory = args[i + 1].toLowerCase();
+                i++;
+            } else if (arg === '--resume' && args[i + 1]) {
+                parsed.resume = args[i + 1];
+                i++;
+            } else if (arg === '--update' && args[i + 1]) {
+                parsed.update = args[i + 1].toLowerCase();
+                i++;
+            } else if (arg === '--package' && args[i + 1]) {
+                const pkg = args[i + 1].toLowerCase();
+                if (['npm', 'pnpm', 'yarn', 'bun'].includes(pkg)) {
+                    parsed.package = pkg;
+                }
+                i++;
+            } else if (arg === '--auto-del' && args[i + 1]) {
+                const del = args[i + 1].toLowerCase();
+                if (['1d', '7d', '30d'].includes(del)) {
+                    parsed.autoDel = del;
+                }
+                i++;
+            } else if (arg === '--auto-exec' && args[i + 1]) {
+                parsed.autoExec = args[i + 1].toLowerCase();
+                i++;
+            } else if (arg === '--external-access' && args[i + 1]) {
+                parsed.externalAccess = args[i + 1].toLowerCase();
+                i++;
+            }
+        }
+        return parsed;
+    }, [args]);
 
     const performVersionCheck = async (manual = false, settingsOverride = null) => {
         const settingsToUse = settingsOverride || systemSettings;
@@ -474,7 +515,14 @@ export default function App() {
             const saved = await loadSettings();
             setMode(saved.mode);
             setThinkingLevel(saved.thinkingLevel);
-            setActiveModel(saved.activeModel);
+
+            persistedModelRef.current = saved.activeModel;
+            if (parsedArgs.model) {
+                setActiveModel(parsedArgs.model);
+            } else {
+                setActiveModel(saved.activeModel);
+            }
+
             setShowFullThinking(saved.showFullThinking);
             setApiTier(saved.apiTier || 'Free');
             setQuotas(saved.quotas || { agentLimit: 1500, searchLimit: 100, customModelId: '', customLimit: 0 });
@@ -488,6 +536,33 @@ export default function App() {
                 customUpdateCommand: '',
                 ...(saved.systemSettings || {})
             };
+
+            if (parsedArgs.memory === 'on') {
+                freshSettings.memory = true;
+            } else if (parsedArgs.memory === 'off') {
+                freshSettings.memory = false;
+            }
+
+            if (parsedArgs.package) {
+                freshSettings.updateManager = parsedArgs.package;
+            }
+
+            if (parsedArgs.autoDel) {
+                freshSettings.autoDeleteHistory = parsedArgs.autoDel;
+            }
+
+            if (parsedArgs.autoExec === 'on') {
+                freshSettings.autoExec = true;
+            } else if (parsedArgs.autoExec === 'off') {
+                freshSettings.autoExec = false;
+            }
+
+            if (parsedArgs.externalAccess === 'on') {
+                freshSettings.allowExternalAccess = true;
+            } else if (parsedArgs.externalAccess === 'off') {
+                freshSettings.allowExternalAccess = false;
+            }
+
             setSystemSettings(freshSettings);
             setProfileData(saved.profileData);
             setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
@@ -505,11 +580,40 @@ export default function App() {
             }
             cleanupOldLogs(LOGS_DIR);
 
-            // 4. Check for updates after settings are loaded
-            performVersionCheck(false, freshSettings);
+            // 4. Check for updates / handle CLI flags
+            if (parsedArgs.update === 'check') {
+                performVersionCheck(true, freshSettings);
+            } else if (parsedArgs.update === 'latest') {
+                setActiveView('update');
+                performVersionCheck(true, freshSettings);
+            } else {
+                performVersionCheck(false, freshSettings);
+            }
 
-            // 5. Prime usage cache
+            // 5. Prime usage cache and handle resume flag
             await initUsage();
+
+            if (parsedArgs.resume) {
+                const h = await loadHistory();
+                const id = parsedArgs.resume;
+                if (h[id]) {
+                    setChatId(id);
+                    const resumedMsgs = [...h[id].messages];
+                    const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
+                    if (!hasLogo) {
+                        resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...', isMeta: true });
+                    }
+                    setMessages(resumedMsgs);
+                    setActiveView('chat');
+                    setMessages(prev => {
+                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED VIA CLI: [${id}]`, isMeta: true }];
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
+                } else {
+                    setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `❌ ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+                }
+            }
 
             setIsInitializing(false);
         }
@@ -539,17 +643,18 @@ export default function App() {
     // Auto-save watcher
     useEffect(() => {
         if (!isInitializing) {
+            const modelToSave = (parsedArgs.model && activeModel === parsedArgs.model) ? persistedModelRef.current : activeModel;
             saveSettings({
                 mode,
                 thinkingLevel,
-                activeModel,
+                activeModel: modelToSave || activeModel,
                 showFullThinking,
                 systemSettings,
                 profileData,
                 imageSettings
             });
         }
-    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing]);
+    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs]);
 
     const handleSetup = async (val) => {
         const key = val.trim();

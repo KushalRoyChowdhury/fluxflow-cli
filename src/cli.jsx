@@ -48,5 +48,5 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     // 3. CLEAN SLATE
     process.stdout.write('\x1Bc');
 
-    render(<App />, { exitOnCtrlC: false });
+    render(<App args={process.argv.slice(2)} />, { exitOnCtrlC: false });
 }
