@@ -76,6 +76,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
                             width="100%"
                             backgroundColor={isSelected ? "#2a2a2a" : undefined}
                             paddingX={1}
+                            marginBottom={idx === allOptions.length - 1 ? 0 : 1}
                         >
                             <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
                                 {isSelected ? '❯ ' : '  '}{opt.label}

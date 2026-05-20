@@ -16,11 +16,11 @@ ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 3. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? -> update_file > write_file
 4. [tool:functions.PatchFile(path="...", content_to_replace="exact old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
-5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. A4 PDF. Use CSS for layout (100vh/vw). Handle page breaks; no manual footers
+5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. A4 PDF. HTML/CSS for premium layout (100vh/vw). Handle page breaks; no manual footers
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
 7. [tool:functions.Run(command="...")]. Runs a shell command. Destructive/Irreversible ops -> ask user
 8. [tool:functions.SearchKeyword(keyword="...")]. Global search. Finds definitions/logic without reading every file
-9. [tool:functions.GenerateImage(path="... png", prompt="...", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. AI images. Usage: Mockups, PDF thumbnails, any visual content
+9. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. AI images. Usage: Mockups, PDF thumbnails, any visual content
 
 - VERIFY RESULT CONTENTS. Fix errors. No hallucinations
 - File tools > code chat

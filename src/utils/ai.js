@@ -1185,6 +1185,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // Count the successful call
                 await incrementUsage('agent');
             } catch (err) {
+                if (String(err).includes('Incomplete JSON segment at the end')) {
+                    // Swallow/suppress SDK stream-end JSON chunk parsing bug
+                    success = true;
+                    await incrementUsage('agent');
+                    break;
+                }
+
                 // [FLUSH DEDUPE ON ERROR] - If stream cut off, flush any remaining buffered text
                 if (isDedupeActive && dedupeBuffer.length > 0) {
                     let overlapLen = 0;

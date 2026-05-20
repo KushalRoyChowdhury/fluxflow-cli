@@ -90,6 +90,17 @@ export const generate_image = async (args) => {
         return 'ERROR: Missing "prompt" argument for generate_image.';
     }
 
+    // [SAFETY FILTER] Inappropriate / NSFW / Violent content filter
+    const BLOCKED_KEYWORDS = [
+        'nsfw', 'naked', 'nudity', 'nude', 'porn', 'sex', 'xxx', 'erotic', 'gore', 'bloody',
+        'violence', 'abuse', 'suicide', 'murder', 'hentai', 'pedophile', 'rape'
+    ];
+    const promptLower = prompt.toLowerCase();
+    const isBlocked = BLOCKED_KEYWORDS.some(kw => promptLower.includes(kw));
+    if (isBlocked) {
+        return 'ERROR: Prompt blocked by system safety filter (inappropriate or unsafe content detected).';
+    }
+
     try {
         // 1. Load active system settings
         const settings = await loadSettings();
@@ -142,9 +153,11 @@ export const generate_image = async (args) => {
             }
         }
 
-        // 4. Construct URL and send request
+        // 4. Construct URL and send request with hardcoded generic negative prompt
         const seed = Math.floor(Math.random() * 10000000);
-        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${selectedModel}&width=${width}&height=${height}&seed=${seed}&enhance=true&reasoning=high&quality=high`;
+        const negativePrompt = "deformed, distorted, disfigured, poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, disconnected limbs, mutation, mutated hands and fingers, blurry, low quality, low resolution, extra fingers, censored, watermarks, signatures";
+        
+        const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${selectedModel}&width=${width}&height=${height}&seed=${seed}&enhance=true&reasoning=high&quality=high&negative=${encodeURIComponent(negativePrompt)}`;
         const response = await fetch(url, {
             method: 'GET',
             headers: {

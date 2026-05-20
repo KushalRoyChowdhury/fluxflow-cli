@@ -11,7 +11,7 @@ export const search_keyword = async (args) => {
 
     const isWindows = process.platform === 'win32';
     const excludes = ['node_modules', '.git', 'dist', '.next', '.gemini'];
-    
+
     // Command construction with shell-level exclusions for speed
     let command = '';
     if (isWindows) {
@@ -41,8 +41,8 @@ export const search_keyword = async (args) => {
             // Filter out common noise directories to keep results high-fidelity
             const filteredLines = rawLines.filter(line => {
                 const lower = line.toLowerCase();
-                return !lower.includes('node_modules') && 
-                       !lower.includes('.git') && 
+                return !lower.includes('node_modules') &&
+                       !lower.includes('.git') &&
                        !lower.includes('dist') &&
                        !lower.includes('.next') &&
                        !lower.includes('.gemini');
@@ -54,12 +54,12 @@ export const search_keyword = async (args) => {
                 // Format: path:line:content (standard for both grep and findstr)
                 const firstColon = line.indexOf(':');
                 const secondColon = line.indexOf(':', firstColon + 1);
-                
+
                 if (firstColon === -1 || secondColon === -1) return null;
-                
+
                 const filePath = line.substring(0, firstColon).replace(/^(\.\/|\.\\)/, '');
                 const lineNum = line.substring(firstColon + 1, secondColon);
-                
+
                 // Return exactly as requested: relative_path line_num
                 return `${filePath} ${lineNum}`;
             }).filter(Boolean);
@@ -67,7 +67,7 @@ export const search_keyword = async (args) => {
             let output = `Found ${filteredLines.length} matches:\n\n`;
             output += matches.join('\n');
             if (filteredLines.length > 100) {
-                output += '\n\n... (Truncated to first 100 matches to avoid context bloat)';
+                output += '\n\n... (Truncated to first 100 matches)';
             }
 
             resolve(output);

@@ -31,6 +31,13 @@ export const view_file = async (args) => {
 
         // --- MULTIMODAL DETECTION ---
         const ext = path.extname(targetPath).toLowerCase();
+
+        const videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.mpeg', '.mpg'];
+        if (videoExtensions.includes(ext)) {
+            const format = ext.slice(1).toUpperCase();
+            return `ERROR: Unable to read. Type ${format} not supported`;
+        }
+
         const mimeMap = {
             '.pdf': 'application/pdf',
             '.jpg': 'image/jpeg',

@@ -75,7 +75,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
         return (
             <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={2} paddingY={1}>
                 <Text color="green" bold>✅ UPDATE SUCCESSFUL!</Text>
-                <Text marginTop={1}>Flux Flow has been upgraded to <Text color="cyan">v{latest}</Text>.</Text>
+                <Text marginTop={1}>Flux Flow has been updated to <Text color="cyan">v{latest}</Text>.</Text>
                 <Text marginTop={1} color="yellow" bold>CRITICAL: Please restart your terminal session to apply changes.</Text>
                 <Box marginTop={1}>
                     <Text dimColor>(Press ESC to return to chat)</Text>

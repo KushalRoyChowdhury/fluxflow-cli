@@ -2,7 +2,6 @@ import { web_search } from '../tools/web_search.js';
 import { web_scrape } from '../tools/web_scrape.js';
 import { memory } from '../tools/memory.js';
 import { chat } from '../tools/chat.js';
-import { list_files } from '../tools/list_files.js';
 import { view_file } from '../tools/view_file.js';
 import { write_file } from '../tools/write_file.js';
 import { update_file } from '../tools/update_file.js';
@@ -19,7 +18,6 @@ const TOOL_MAP = {
     web_scrape,
     memory,
     chat,
-    list_files,
     view_file,
     write_file,
     update_file,

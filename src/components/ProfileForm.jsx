@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
 
-export default function ProfileForm({ onSave, onCancel }) {
+export default function ProfileForm({ initialData, onSave, onCancel }) {
     const [step, setStep] = useState(0);
     const [currentInput, setCurrentInput] = useState('');
-    const [profile, setProfile] = useState({ name: '', nickname: '', instructions: '' });
+    const [profile, setProfile] = useState(() => ({
+        name: initialData?.name || '',
+        nickname: initialData?.nickname || '',
+        instructions: initialData?.instructions || ''
+    }));
 
     const steps = [
         { key: 'name', label: 'Enter your Name: ' },
         { key: 'nickname', label: 'Enter a Nickname (Agent will use this): ' },
         { key: 'instructions', label: 'System Instructions (Persona overrides): ' }
     ];
+
+    useEffect(() => {
+        const currentKey = steps[step].key;
+        setCurrentInput(profile[currentKey] || '');
+    }, [step, profile]);
 
     const handleSubmit = (val) => {
         if (val.trim().toLowerCase() === '/cancel') {

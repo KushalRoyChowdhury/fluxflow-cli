@@ -34,11 +34,11 @@ import { formatTokens } from './utils/text.js';
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
 
-// Centralized Version Control: dynamically fetch version from package.json
+// Centralized Version Control: dynamically fetch version and date from package.json
 const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const versionFluxflow = packageJson.version;
-const updatedOn = '2026-05-20';
+const updatedOn = packageJson.date || '2026-05-20';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -656,10 +656,11 @@ export default function App() {
         },
         {
             cmd: '/model', desc: 'Switch AI model', subs: [
-                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default (Free, Recommended)' : 'Standard Default (Free, Recommended) - Use Free API Key to use this model ' },
-                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable (Paid)' },
+                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default   (Free, Recommended)' : 'Standard Default   (Free, Recommended) - Use Free API Key to use this model ' },
+                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable       (Paid)' },
                 { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Limited Free quota)' },
-                { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast (Paid, Decent Free quota)' }
+                { cmd: 'gemini-3.5-flash', desc: 'New                (Paid, Limited Free quota)' },
+                { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast         (Paid, Decent Free quota)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -683,9 +684,9 @@ export default function App() {
         }
     ];
 
-    const handleSubmit = async (value) => {
+    const handleSubmit = async (value, isProgrammatic = false) => {
         // [INTELLIGENT AUTOCOMPLETE] If suggestions are active, Enter fills the command instead of submitting.
-        if (suggestions.length > 0) {
+        if (!isProgrammatic && suggestions.length > 0) {
             const nextMatch = suggestions[selectedIndex] || suggestions[0];
             const parts = value.split(' ');
             if (parts.length === 1) {
@@ -2067,6 +2068,7 @@ OUTPUT: ${execOutputRef.current}`;
             case 'profile':
                 return (
                     <ProfileForm
+                        initialData={profileData}
                         onSave={(profile) => {
                             setProfileData(profile);
                             setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✅ Profile updated: ${profile.name} (${profile.nickname})` }]);
@@ -2085,7 +2087,7 @@ OUTPUT: ${execOutputRef.current}`;
                                 setActiveView('chat');
                                 // Defer execution to ensure state has settled and modal is unmounted
                                 setTimeout(() => {
-                                    handleSubmit(val);
+                                    handleSubmit(val, true);
                                 }, 500);
                             }}
                             onEdit={(val) => {

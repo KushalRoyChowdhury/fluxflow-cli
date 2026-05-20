@@ -43,20 +43,54 @@ const defaultStats = {
 const loadUsageFromFile = async () => {
     const today = new Date().toISOString().split('T')[0];
 
+    const tempFile = USAGE_FILE + '.tmp';
     let primaryData = null;
     let backupData = null;
 
-    // 1. Try reading primary usage file
+    // A. Check for pending .tmp write recovery first (Self-Healing Loop)
     try {
-        if (await fs.exists(USAGE_FILE)) {
-            const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
+        if (await fs.exists(tempFile)) {
+            const rawContent = (await fs.readFile(tempFile, 'utf8')).trim();
+            let parsed = null;
             if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                primaryData = JSON.parse(rawContent);
+                parsed = JSON.parse(rawContent);
             } else {
-                primaryData = JSON.parse(decryptAes(rawContent));
+                parsed = JSON.parse(decryptAes(rawContent));
+            }
+
+            if (parsed && parsed.date && parsed.stats) {
+                // .tmp is intact and valid - Recover it immediately and complete rename
+                primaryData = parsed;
+                try {
+                    await fs.rename(tempFile, USAGE_FILE);
+                } catch (e) {}
+            } else {
+                // Invalid structure inside .tmp - remove corrupted file safely
+                try {
+                    await fs.remove(tempFile);
+                } catch (e) {}
             }
         }
-    } catch (err) {}
+    } catch (err) {
+        // Tmp file parsing or decryption failed (corrupted) - safely clean it up
+        try {
+            await fs.remove(tempFile);
+        } catch (e) {}
+    }
+
+    // 1. Try reading primary usage file (if not already recovered from .tmp)
+    if (!primaryData) {
+        try {
+            if (await fs.exists(USAGE_FILE)) {
+                const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
+                if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
+                    primaryData = JSON.parse(rawContent);
+                } else {
+                    primaryData = JSON.parse(decryptAes(rawContent));
+                }
+            }
+        } catch (err) {}
+    }
 
     // 2. Try reading backup redundancy file
     try {

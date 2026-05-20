@@ -1,16 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
-import { readEncryptedJson, writeEncryptedJson } from '../utils/crypto.js';
-import { MEMORIES_FILE } from '../utils/paths.js';
+import { readEncryptedJson, writeEncryptedJson, readAesEncryptedJson } from '../utils/crypto.js';
+import { MEMORIES_FILE, SETTINGS_FILE } from '../utils/paths.js';
 import { emojiSpace } from '../utils/terminal.js';
 
 export default function MemoryModal({ onClose }) {
     const [memories, setMemories] = useState([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [isMemoryOn, setIsMemoryOn] = useState(true);
 
     const loadMemories = () => {
         const data = readEncryptedJson(MEMORIES_FILE, []);
         setMemories(data);
+
+        try {
+            const settings = readAesEncryptedJson(SETTINGS_FILE, {});
+            const memoryOn = settings.systemSettings?.memory !== false;
+            setIsMemoryOn(memoryOn);
+        } catch (e) {
+            setIsMemoryOn(true);
+        }
     };
 
     useEffect(() => {
@@ -44,9 +53,13 @@ export default function MemoryModal({ onClose }) {
                 <Text color="cyan" bold>🧠 AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
             </Box>
 
-            {memories.length === 0 ? (
+            {!isMemoryOn && memories.length > 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                    <Text italic color="gray">Still Learning...</Text>
+                    <Text italic color="gray">Memory is currently Off...</Text>
+                </Box>
+            ) : memories.length === 0 ? (
+                <Box paddingX={2} paddingY={1}>
+                    <Text italic color="gray">{isMemoryOn ? "Learning..." : "Memory not available..."}</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column">
