@@ -581,6 +581,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let lastToolSniffed = null;
         let lastToolDetail = null;
         let lastToolEventTime = null;
+        let lastToolFinishedAt = 0;
         let toolResults = [];
         let toolCallPointer = 0;
         let isThinkingLoop = false;
@@ -1066,6 +1067,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
                             }
 
+                            // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
+                            if (lastToolFinishedAt > 0) {
+                                const timeSinceLastTool = Date.now() - lastToolFinishedAt;
+                                if (timeSinceLastTool < 1000) {
+                                    await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastTool));
+                                }
+                            }
+
                             const effectiveStart = lastToolEventTime || Date.now();
                             yield { type: 'spinner', content: false };
                             let result = await dispatchTool(normToolName, toolCall.args, {
@@ -1079,6 +1088,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             const toolEnd = Date.now();
+                            lastToolFinishedAt = toolEnd;
                             yield { type: 'tool_time', content: toolEnd - effectiveStart };
                             lastToolEventTime = toolEnd;
 

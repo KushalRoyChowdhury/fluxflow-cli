@@ -36,7 +36,9 @@ const TOOL_LABELS = {
 const cleanSignals = (text) => {
     if (!text) return text;
 
-    let result = text;
+    let result = text
+        .replace(/<\/think>(\r?\n){2}/gi, '</think>')
+        .replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
     const trigger = 'tool:functions.';
 
     // Greedy loop to strip all tool calls

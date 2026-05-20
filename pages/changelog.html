@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.11.0", "1.10.0", "1.11.1"]
+        const stableVersions = ["1.11.3", "1.11.1", "1.11.0"]
         const changelogData = {
+            "1.11.3": {
+                "note": "PDF Image rendering, Pacing Delay & UI Layout Update.",
+                "added": [
+                    "Integrated a powerful dynamic Base64 Image Resolution Engine in the PDF exporter, rendering local images perfectly.",
+                    "Introduced an adaptive, minimum 1-second pacing delay between consecutive tool executions to ensure a smooth, readable terminal execution rhythm.",
+                    "Added a sneaky `--bypass` override to the `/thinking` command, letting developers unlock higher reasoning levels in Flow mode."
+                ],
+                "changed": [],
+                "fixes": [
+                    "Resolved a `/clear` and `/resume` layout bug that trapped the gradient logo inside the welcome message's border."
+                ]
+            },
             "1.11.1": {
                 "note": "Image Generation will be depriciated on v1.10 after MAY-23. Update to v1.11 to continue using the feature.",
                 "added": [],

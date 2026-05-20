@@ -1,7 +1,24 @@
 import fs from 'fs-extra';
 import path from 'path';
+import os from 'os';
 import { USAGE_FILE } from './paths.js';
 import { encryptAes, decryptAes } from './crypto.js';
+
+const getLocalBackupPath = () => {
+    if (process.platform === 'win32') {
+        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+        return path.join(localAppData, 'FxFl', 'backups', 'backup.json');
+    }
+    if (process.platform === 'darwin') {
+        return path.join(os.homedir(), 'Library', 'Application Support', 'FxFl', 'backups', 'backup.json');
+    }
+    const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+    return path.join(xdgDataHome, 'fxfl', 'backups', 'backup.json');
+};
+
+const BACKUP_FILE = getLocalBackupPath();
+
+const generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
 let cachedUsage = null;
 let writeTimeout = null;
@@ -26,28 +43,74 @@ const defaultStats = {
 const loadUsageFromFile = async () => {
     const today = new Date().toISOString().split('T')[0];
 
+    let primaryData = null;
+    let backupData = null;
+
+    // 1. Try reading primary usage file
     try {
         if (await fs.exists(USAGE_FILE)) {
             const rawContent = (await fs.readFile(USAGE_FILE, 'utf8')).trim();
-            let data;
             if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                data = JSON.parse(rawContent);
+                primaryData = JSON.parse(rawContent);
             } else {
-                data = JSON.parse(decryptAes(rawContent));
-            }
-            if (data && data.date === today && data.stats) {
-                // [RESILIENCE] Merge with defaults to ensure new keys (like toolDenied) are present
-                const mergedStats = { ...defaultStats, ...data.stats };
-                if (!Array.isArray(mergedStats.imageCalls)) {
-                    mergedStats.imageCalls = [];
-                }
-                return {
-                    ...data,
-                    stats: mergedStats
-                };
+                primaryData = JSON.parse(decryptAes(rawContent));
             }
         }
     } catch (err) {}
+
+    // 2. Try reading backup redundancy file
+    try {
+        if (await fs.exists(BACKUP_FILE)) {
+            const rawContent = (await fs.readFile(BACKUP_FILE, 'utf8')).trim();
+            if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
+                backupData = JSON.parse(rawContent);
+            } else {
+                backupData = JSON.parse(decryptAes(rawContent));
+            }
+        }
+    } catch (err) {}
+
+    let resolvedData = null;
+
+    if (primaryData && backupData) {
+        // Both exist - Check for saveId mismatch (meaning the backup copy was interrupted/missed)
+        if (primaryData.saveId !== backupData.saveId) {
+            // Primary is written first, so it is assumed newer. Fallback copy to restore alignment.
+            resolvedData = primaryData;
+            try {
+                await fs.ensureDir(path.dirname(BACKUP_FILE));
+                await fs.copy(USAGE_FILE, BACKUP_FILE);
+            } catch (e) {}
+        } else {
+            resolvedData = primaryData;
+        }
+    } else if (primaryData && !backupData) {
+        // Backup got wiped or is missing - Copy primary to backup
+        resolvedData = primaryData;
+        try {
+            await fs.ensureDir(path.dirname(BACKUP_FILE));
+            await fs.copy(USAGE_FILE, BACKUP_FILE);
+        } catch (e) {}
+    } else if (!primaryData && backupData) {
+        // Primary got wiped or deleted - Restore from backup redundancy!
+        resolvedData = backupData;
+        try {
+            await fs.ensureDir(path.dirname(USAGE_FILE));
+            await fs.copy(BACKUP_FILE, USAGE_FILE);
+        } catch (e) {}
+    }
+
+    if (resolvedData && resolvedData.date === today && resolvedData.stats) {
+        // [RESILIENCE] Merge with defaults to ensure new keys (like toolDenied) are present
+        const mergedStats = { ...defaultStats, ...resolvedData.stats };
+        if (!Array.isArray(mergedStats.imageCalls)) {
+            mergedStats.imageCalls = [];
+        }
+        return {
+            ...resolvedData,
+            stats: mergedStats
+        };
+    }
 
     return { date: today, stats: { ...defaultStats } };
 };
@@ -96,6 +159,9 @@ const flushUsage = async () => {
             }
         }
 
+        // Append unique save ID to verify alignment during boot sequence
+        cachedUsage.saveId = generateSaveId();
+
         const tempFile = USAGE_FILE + '.tmp';
         const encryptedStr = encryptAes(JSON.stringify(cachedUsage, null, 2));
         await fs.writeFile(tempFile, encryptedStr, 'utf8');
@@ -105,7 +171,17 @@ const flushUsage = async () => {
         await fs.fsync(fd);
         await fs.close(fd);
 
+        // Atomic rename to commit change
         await fs.rename(tempFile, USAGE_FILE);
+
+        // Mirror changes to encrypted backup redundancy directory
+        try {
+            await fs.ensureDir(path.dirname(BACKUP_FILE));
+            await fs.copy(USAGE_FILE, BACKUP_FILE);
+        } catch (backupErr) {
+            // Silently ignore backup write failure to avoid blocking app flow
+        }
+
         isDirty = false;
         lastWriteTime = Date.now();
     } catch (e) {}

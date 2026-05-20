@@ -38,7 +38,7 @@ const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
 const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const versionFluxflow = packageJson.version;
-const updatedOn = '2026-05-17';
+const updatedOn = '2026-05-20';
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -775,7 +775,8 @@ export default function App() {
                                 const resumedMsgs = [...target.messages];
                                 const hasLogo = resumedMsgs[0]?.text?.includes('███████╗');
                                 if (!hasLogo) {
-                                    resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Resuming Flux Flow Session...\n' });
+                                    resumedMsgs.unshift({ id: 'welcome-' + Date.now(), role: 'system', text: '🌊⚡ Resuming Flux Flow Session...', isMeta: true });
+                                    resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', text: FLUX_LOGO, isLogo: true, isMeta: true });
                                 }
 
                                 setMessages(resumedMsgs);
@@ -794,8 +795,11 @@ export default function App() {
 
                 case '/clear': {
                     // Soft clear by resetting message state (Ink handles the visual refresh)
-                    setMessages([{ id: 'welcome-' + Date.now(), role: 'system', text: FLUX_LOGO + '\n\n🌊⚡ Welcome back to Flux Flow! Context cleared.\n', isMeta: true }]);
-                    setCompletedIndex(1);
+                    setMessages([
+                        { id: 'logo-' + Date.now(), role: 'system', text: FLUX_LOGO, isLogo: true, isMeta: true },
+                        { id: 'welcome-' + Date.now(), role: 'system', text: '🌊⚡ Welcome back to Flux Flow! Context cleared.', isMeta: true }
+                    ]);
+                    setCompletedIndex(2);
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
@@ -954,21 +958,22 @@ export default function App() {
                     let formattedLevel;
                     if (parts[1]) {
                         let val = parts[1].toLowerCase();
+                        const isBypass = parts.includes('--bypass');
                         formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
                         if (val === 'xhigh') {
                             formattedLevel = 'xHigh';
                         }
 
                         // Strict Mode Validation
-                        if (mode === 'Flow' && (formattedLevel === 'Medium' || formattedLevel === 'High' || formattedLevel === 'xHigh')) {
+                        if (!isBypass && mode === 'Flow' && (formattedLevel === 'Medium' || formattedLevel === 'High' || formattedLevel === 'xHigh')) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
-                            const s = emojiSpace(2);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Thinking level set to ${formattedLevel}`, isMeta: true }]; });
+                            const s = emojiSpace(1);
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧 [SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated 🕵️${s})` : ''}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('thinking');
