@@ -39,16 +39,16 @@ export const write_pdf = async (args) => {
 
         const page = await browser.newPage();
 
-        // [IMAGE RESOLUTION ENGINE]
+        // [IMAGE & RESOURCE RESOLUTION ENGINE]
         // Puppeteer's about:blank strict security blocks local file URIs.
-        // We dynamically intercept local relative/absolute image paths and convert them to Base64 Data URIs.
+        // We dynamically intercept local stylesheets (<link rel="stylesheet">), local image paths in HTML <img> tags,
+        // and CSS url() definitions, converting them to inlined styles and Base64 Data URIs to prevent layout/image breakage.
         let resolvedContent = content;
-        const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
-        let match;
-        while ((match = imgRegex.exec(content)) !== null) {
-            const originalSrc = match[1];
+        const resolvedCache = {};
+
+        const resolveToBase64 = async (originalSrc) => {
             if (!originalSrc || originalSrc.startsWith('http://') || originalSrc.startsWith('https://') || originalSrc.startsWith('data:')) {
-                continue;
+                return null;
             }
             try {
                 const imgPath = path.resolve(process.cwd(), originalSrc);
@@ -56,13 +56,75 @@ export const write_pdf = async (args) => {
                     const ext = path.extname(imgPath).toLowerCase().replace('.', '') || 'png';
                     const mime = ext === 'jpg' ? 'jpeg' : (ext === 'svg' ? 'svg+xml' : ext);
                     const base64 = await fs.readFile(imgPath, 'base64');
-                    const dataUri = `data:image/${mime};base64,${base64}`;
-                    resolvedContent = resolvedContent.split(originalSrc).join(dataUri);
+                    return `data:image/${mime};base64,${base64}`;
                 }
             } catch (e) {
                 // Silently ignore unresolvable images
             }
+            return null;
+        };
+
+        // 1. Resolve local external stylesheets to inline style tags
+        const linkRegex = /<link[^>]+href=["']([^"']+)["']/gi;
+        const cssCache = {};
+        let match;
+        while ((match = linkRegex.exec(content)) !== null) {
+            const originalHref = match[1];
+            const fullTag = match[0];
+            if (originalHref && fullTag.toLowerCase().includes('stylesheet') && !originalHref.startsWith('http://') && !originalHref.startsWith('https://') && !originalHref.startsWith('data:')) {
+                try {
+                    const cssPath = path.resolve(process.cwd(), originalHref);
+                    if (await fs.pathExists(cssPath)) {
+                        const cssContent = await fs.readFile(cssPath, 'utf-8');
+                        cssCache[fullTag] = `<style>${cssContent}</style>`;
+                    }
+                } catch (e) {
+                    // Silently ignore CSS errors
+                }
+            }
         }
+        for (const [tag, styleTag] of Object.entries(cssCache)) {
+            resolvedContent = resolvedContent.split(tag).join(styleTag);
+        }
+
+        // 2. Discover local images in <img> tags
+        const imgRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+        while ((match = imgRegex.exec(resolvedContent)) !== null) {
+            const originalSrc = match[1];
+            if (originalSrc && !resolvedCache[originalSrc]) {
+                const dataUri = await resolveToBase64(originalSrc);
+                if (dataUri) {
+                    resolvedCache[originalSrc] = dataUri;
+                }
+            }
+        }
+
+        // 3. Discover local images in CSS url() expressions
+        const urlRegex = /url\(\s*['"]?([^'")]+?)['"]?\s*\)/gi;
+        while ((match = urlRegex.exec(resolvedContent)) !== null) {
+            const originalSrc = match[1].trim();
+            if (originalSrc && !resolvedCache[originalSrc]) {
+                const dataUri = await resolveToBase64(originalSrc);
+                if (dataUri) {
+                    resolvedCache[originalSrc] = dataUri;
+                }
+            }
+        }
+
+        // 4. Safely substitute resolved base64 resources inside src attributes and url() expressions specifically
+        // to prevent substring collision bugs (e.g. replacing 'bg.png' inside 'hero-bg.png' or inside unrelated text)
+        for (const [originalSrc, dataUri] of Object.entries(resolvedCache)) {
+            const escapedSrc = originalSrc.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            
+            // Safe replacement in HTML src attributes
+            const srcRegex = new RegExp(`(src=["'])(${escapedSrc})(["'])`, 'gi');
+            resolvedContent = resolvedContent.replace(srcRegex, `$1${dataUri}$3`);
+
+            // Safe replacement in CSS url() definitions
+            const urlReplaceRegex = new RegExp(`url\\(\\s*(['"]?)(${escapedSrc})\\1\\s*\\)`, 'gi');
+            resolvedContent = resolvedContent.replace(urlReplaceRegex, `url($1${dataUri}$1)`);
+        }
+
 
         // Inject global print styles to ensure multi-page consistency
         const styledContent = `
@@ -103,7 +165,7 @@ export const write_pdf = async (args) => {
         // Generate PDF Buffer
         const pdfBytes = await page.pdf({
             format: 'A4',
-            landscape: orientation.toLowerCase() === 'landscape',
+            landscape: String(orientation).toLowerCase() === 'landscape',
             margin: {
                 top: margin,
                 right: margin,
