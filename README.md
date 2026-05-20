@@ -77,6 +77,26 @@ To keep this README concise, detailed information about specific components of F
 - **[Agent Tools & Capabilities](./TOOLS.md)**: A comprehensive list of the tools available to the agent (e.g., File I/O, Execution, Web tools).
 - **[UI & Interaction Features](./UI_FEATURES.md)**: Details on commands, thinking levels, and human-in-the-loop verification.
 
+## 💻 CLI Startup Arguments
+
+Customize your session parameters directly from your console launch command:
+
+```bash
+fluxflow [options]
+```
+
+### Supported Flags:
+- `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.1-pro-preview`). Keps settings file untouched.
+- `--memory <on|off>`: Toggle persistent long-term agent memory for the session.
+- `--resume <session-id>`: Resume a previous chat session programmatically.
+- `--update <check|latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
+- `--package <npm|pnpm|yarn|bun>`: Override default package manager to run core application updates.
+- `--auto-del <1d|7d|30d>`: Set automated chat log deletion schedule.
+- `--auto-exec <on|off>`: Toggle autonomous command execution permission.
+- `--external-access <on|off>`: Toggle permission to let agent read files outside CWD.
+
+---
+
 ## 🔒 Security & Privacy
 
 Flux Flow runs entirely locally on your machine.
