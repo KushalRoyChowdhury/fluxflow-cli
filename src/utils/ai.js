@@ -585,6 +585,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let toolCallPointer = 0;
         let isThinkingLoop = false;
         let isStutteringLoop = false;
+        let isGeneralLoop = false;
         let isInitialAttempt = true;
         let accumulatedContext = '';
         let dedupeBuffer = '';
@@ -854,6 +855,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (respRepetitionRatio > repetitionThresholdResponse) {
                             yield { type: 'status', content: `Response Loop Detected. Re-centering...` };
                             isThinkingLoop = false;
+                            isGeneralLoop = true;
                             await new Promise(resolve => setTimeout(resolve, 3000));
                             break;
                         }
@@ -1154,13 +1156,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // [SILENT CUTOFF WATCHDOG]
                 // If stream closed cleanly but we don't have finish/continue signals or tool executions,
                 // it is highly likely that a silent cutoff occurred. Trigger the recovery engine!
+                // Exception: If the text ends normally with punctuation (., !, ?, quotes, code fences), 
+                // we assume the model finished its response but forgot the command tags. We bypass recovery
+                // and let the outer loop's loop-reset safety valve handle the continue/finish prompts!
                 const signalSafeText = (turnText || '').trim();
                 const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
                 const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
                 const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
 
-                if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0) {
-                    throw new Error("Silent stream cutoff (500): Model stream closed cleanly but missing turn finish/continue signals.");
+                const pureOutputText = signalSafeText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText);
+
+                if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
+                    throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals.");
                 }
 
                 success = true;
@@ -1255,6 +1263,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // CONNECTION RETRY
                     if (retryCount <= MAX_RETRIES) {
                         retryCount++;
+                        inStreamRetryCount = 1;      // [BUGFIX] - Reset stream recovery budget on connection retry!
+                        accumulatedContext = '';     // [BUGFIX] - Clear stream recovery checkpoint on connection retry!
                         const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
                         isInitialAttempt = true;
                         yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
@@ -1342,6 +1352,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
             isThinkingLoop = false;
             isStutteringLoop = false;
+            isGeneralLoop = false;
         }
     }
     yield { type: 'status', content: null };

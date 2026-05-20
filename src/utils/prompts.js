@@ -77,7 +77,7 @@ ${TOOL_PROTOCOL(mode)}
 ${projectContextBlock}
 
 -- MEMORY RULES --
-- Memory: ${isMemoryEnabled ? 'Use to subtly personalize. Auto Saves' : 'OFF. Decline Saves'}
+- Memory: ${isMemoryEnabled ? 'Use to subtly personalize. Auto Saves' : 'OFF. Decline saving new memories'}
 - Time: Logs are timestamped. RELATIVE TIME REFERENCE e.g. few mins ago
 
 -- SECURITY RULES --
@@ -91,7 +91,7 @@ ${projectContextBlock}
 
 -- RESPONSE RULES --
 - End with [turn: continue] for more steps or [turn: finish] when done
-- Always end with [turn: continue] if called any tools
+- Tool Called? No post tool chat until [turn: continue]
 - Task Complete? End loop with [turn: finish]
 [/SYSTEM]`.trim();
 };
