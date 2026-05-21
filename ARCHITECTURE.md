@@ -15,7 +15,7 @@ The core intelligence of Flux Flow resides in `src/utils/ai.js`. It does not rel
 
 The execution flow of a single user prompt follows this loop:
 
-1. **Context Assembly**: The user's prompt is combined with the system instructions, temporary session context, persistent user memories, and the current chat history. If the history gets too large (e.g., >128k tokens) and compression is disabled, it is gracefully truncated.
+1. **Context Assembly**: The user's prompt is combined with the system instructions, temporary session context, persistent user memories, and the current chat history. If the history gets too large (e.g., >254k tokens) and compression is disabled, it is gracefully truncated.
 2. **Stream Processing**: The main loop initiates a streaming request to the Gemini API (`client.models.generateContentStream`). It yields chunks of text and status updates directly back to the React UI as they arrive.
 3. **Detection & Tool Execution**: Once the stream completes for a given turn, the entire response is scanned for tool calls using a custom regex and bracket-balancing parser (looking for `tool:functions.tool_name(args...)`).
    - If tools are found, the loop pauses.
