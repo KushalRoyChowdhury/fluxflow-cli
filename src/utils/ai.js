@@ -118,6 +118,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const MAX_JANITOR_RETRIES = 5; // Total Retries = 6
 
     while (attempts <= MAX_JANITOR_RETRIES) {
+        if (process.stdout.isTTY) {
+            process.stdout.write(`\u001b]0;Retrying Memory (${attempts + 1})...\u0007`);
+        }
         try {
             if (!(await checkQuota('background', settings))) {
                 return;
@@ -217,7 +220,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
             if (process.stdout.isTTY) {
                 process.stdout.write(`\u001b]0;Memory Error\u0007`);
             }
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
             fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${String(janitorErr)}\n\n`);
@@ -725,7 +728,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const cleanText = dedupeBuffer.substring(overlapLen);
                                 if (cleanText) {
                                     // [SEAMLESS PICKUP] Strip redundant <think> tags if model restarts them during dedupe
-                                    const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                                    const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                                    const dedupeClean = hasOpenThink
+                                        ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
+                                        : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
                                     if (dedupeClean) {
                                         turnText += dedupeClean;
                                         yield { type: 'text', content: dedupeClean };
@@ -957,7 +963,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 const sLine = parseInt(rawStart) || 1;
                                 const eLine = parseInt(rawEnd) || (rawStart ? (sLine + 800) : 800);
- 
+
                                 let totalLines = '...';
                                 let actualEndLine = eLine;
                                 try {
@@ -1151,7 +1157,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     const cleanText = dedupeBuffer.substring(overlapLen);
                     if (cleanText) {
-                        const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                        const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                        const dedupeClean = hasOpenThink
+                            ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
+                            : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
                         if (dedupeClean) {
                             turnText += dedupeClean;
                             yield { type: 'text', content: dedupeClean };
@@ -1166,7 +1175,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // [SILENT CUTOFF WATCHDOG]
                 // If stream closed cleanly but we don't have finish/continue signals or tool executions,
                 // it is highly likely that a silent cutoff occurred. Trigger the recovery engine!
-                // Exception: If the text ends normally with punctuation (., !, ?, quotes, code fences), 
+                // Exception: If the text ends normally with punctuation (., !, ?, quotes, code fences),
                 // we assume the model finished its response but forgot the command tags. We bypass recovery
                 // and let the outer loop's loop-reset safety valve handle the continue/finish prompts!
                 const signalSafeText = (turnText || '').trim();
@@ -1204,7 +1213,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     const cleanText = dedupeBuffer.substring(overlapLen);
                     if (cleanText) {
-                        const dedupeClean = cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                        const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                        const dedupeClean = hasOpenThink
+                            ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
+                            : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
                         if (dedupeClean) {
                             turnText += dedupeClean;
                         }
@@ -1219,7 +1231,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const date = new Date().toLocaleString();
                 const agentErrDir = path.join(LOGS_DIR, 'agent');
                 if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\nDEBUG STATE: turnText='${turnText}', length=${turnText.trim().length}, inStreamRetryCount=${inStreamRetryCount}, retryCount=${retryCount}, isDedupeActive=${isDedupeActive}, dedupeBuffer='${dedupeBuffer}'\n\n----------------------------------------------------------------------\n\n`);
+                fs.appendFileSync(path.join(agentErrDir, 'error.log'), `ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
 
                 // RETRY ONLY ON 500-LEVEL (500, 503, ETC.) AND 408 TIMEOUT ERRORS
                 const status = err.status || err.statusCode || err.code;
