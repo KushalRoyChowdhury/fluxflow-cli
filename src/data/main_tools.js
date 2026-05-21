@@ -16,7 +16,7 @@ ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 3. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? -> update_file > write_file
 4. [tool:functions.PatchFile(path="...", content_to_replace="exact old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
-5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. MUST HAVE PROPER A4 PAGE BREAKS. HTML/CSS for premium layout (100vh/vw). No manual footers
+5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. **USE PROPER PROACTIVE A4 PAGE BREAKS**. HTML/CSS for PREMIUM layout (100vh/vw). No manual footers
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
 7. [tool:functions.Run(command="...")]. Runs a shell command. Destructive/Irreversible ops -> ask user
 8. [tool:functions.SearchKeyword(keyword="...")]. Global search. Finds definitions/logic without reading every file

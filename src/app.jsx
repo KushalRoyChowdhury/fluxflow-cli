@@ -918,7 +918,7 @@ export default function App({ args = [] }) {
                         if (newMode === 'Flow') {
                             setThinkingLevel('Fast');
                         } else if (newMode === 'Flux') {
-                            setThinkingLevel('Medium');
+                            setThinkingLevel('High');
                         }
                         const s = emojiSpace(2);
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });

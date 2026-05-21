@@ -537,6 +537,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
     let fullAgentResponseChunks = [];
+    let wasToolCalledInLastLoop = false;
 
     // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
     // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
@@ -587,6 +588,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let lastToolFinishedAt = 0;
         let toolResults = [];
         let toolCallPointer = 0;
+        let anyToolExecutedInThisTurn = false;
         let isThinkingLoop = false;
         let isStutteringLoop = false;
         let isGeneralLoop = false;
@@ -1127,6 +1129,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             const aiContent = `[TOOL RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
                             toolResults.push({ role: 'user', text: aiContent, binaryPart });
+                            anyToolExecutedInThisTurn = true;
 
                             let uiContent = `[TOOL RESULT]: ${result || ''}`;
                             if (normToolName === 'view_file' || normToolName === 'web_scrape') {
@@ -1375,14 +1378,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // If the model hasn't finished, we must provide a user turn to keep the loop going.
         // If there are no tool results, we send a 'continue' signal to prompt the model.
-        if (toolResults.length > 0) {
+        if (toolResults.length > 0 || anyToolExecutedInThisTurn) {
             toolResults.forEach(tr => modifiedHistory.push(tr));
         } else {
-            modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
+            if (wasToolCalledInLastLoop) {
+                modifiedHistory.push({ role: 'user', text: `[SYSTEM] System executed the tool with no explicit result, continue with your task or use  [turn: finish] if completed.` });
+            } else {
+                modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
+            }
             isThinkingLoop = false;
             isStutteringLoop = false;
             isGeneralLoop = false;
         }
+        wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
     }
     yield { type: 'status', content: null };
 };
