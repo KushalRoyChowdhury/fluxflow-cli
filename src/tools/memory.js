@@ -20,6 +20,7 @@ export const memory = async (rawArgs, context = {}) => {
     const content = parseArg('content');
     const contentNew = parseArg('content-new');
     const contentOld = parseArg('content-old');
+    const id = parseArg('id');
 
     // Prioritize context-provided chatId (supporting both naming conventions) to avoid 'default-session'
     const chatId = parseArg('chat-id') || context.chatId || context.sessionId || 'default-session';
@@ -52,37 +53,49 @@ export const memory = async (rawArgs, context = {}) => {
         if (method === 'add') {
             if (!content) return "ERROR: Missing 'content' for memory addition.";
 
+            const now = new Date();
+            const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+            const formattedContent = content.includes('[Saved on:')
+                ? content
+                : `${content.trim()} [Saved on: ${dateStr}]`;
+
             // LIMIT CHECK: Combined length should not exceed 1024 * 4 = 4096 chars
             const MAX_CHARS = 1024 * 4;
             let currentTotalLength = memories.reduce((acc, m) => acc + (m.memory?.length || 0), 0);
 
             // Prune oldest until there is room
-            while (memories.length > 0 && (currentTotalLength + content.length) > MAX_CHARS) {
+            while (memories.length > 0 && (currentTotalLength + formattedContent.length) > MAX_CHARS) {
                 const removed = memories.shift();
                 currentTotalLength -= (removed.memory?.length || 0);
             }
 
-            const newMemory = { id: `mem-${Date.now().toString(36)}`, memory: content };
+            const newMemory = { id: `mem-${Date.now().toString(36)}`, memory: formattedContent };
             memories.push(newMemory);
             writeEncryptedJson(MEMORIES_FILE, memories);
-            return `SUCCESS: Memory added with ID [${newMemory.id}]. (Vault Size: ${currentTotalLength + content.length} chars)`;
+            return `SUCCESS: Memory added with ID [${newMemory.id}]. (Vault Size: ${currentTotalLength + formattedContent.length} chars)`;
         }
 
         if (method === 'update') {
-            const memId = contentOld;
-            const newText = contentNew;
-            if (!memId || !newText) return "ERROR: Missing 'content-old' (id) or 'content-new' for update.";
+            const memId = id || contentOld;
+            const newText = contentNew || content;
+            if (!memId || !newText) return "ERROR: Missing 'id' or content for update.";
             const index = memories.findIndex(m => m.id === memId);
             if (index === -1) return `ERROR: Memory ID [${memId}] not found.`;
 
-            memories[index].memory = newText;
+            const now = new Date();
+            const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
+            const formattedText = newText.includes('[Saved on:')
+                ? newText
+                : `${newText.trim()} [Saved on: ${dateStr}]`;
+
+            memories[index].memory = formattedText;
             writeEncryptedJson(MEMORIES_FILE, memories);
             return `SUCCESS: Memory [${memId}] updated.`;
         }
 
         if (method === 'delete') {
-            const memId = content;
-            if (!memId) return "ERROR: Missing 'content' (id) for deletion.";
+            const memId = id || content;
+            if (!memId) return "ERROR: Missing 'id' for deletion.";
             const initialLen = memories.length;
             const updatedMemories = memories.filter(m => m.id !== memId);
             if (updatedMemories.length === initialLen) return `ERROR: Memory ID [${memId}] not found.`;

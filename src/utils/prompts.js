@@ -98,11 +98,11 @@ ${projectContextBlock}
 
 /**
  * Generates the instruction for the Janitor (refiner) model.
- * @param {string} originalText - The original user prompt.
- * @param {string} agentRaws - The raw, multi-turn output from the agentic loop.
+ * @param {string} userMemories - The formatted persistent user memories.
  * @param {boolean} isMemoryEnabled - Whether the memory system is enabled.
+ * @param {boolean} needTitle - Whether a new chat title is needed.
  * @returns {string} The formatted Janitor prompt.
-*/
+ */
 export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true, needTitle = true) => {
     return `
 ${userMemories ? `
