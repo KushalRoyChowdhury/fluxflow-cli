@@ -65,7 +65,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const janitorContents = history.slice(0, -1)
         .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
-        .slice(-18)
+        .slice(-14)
         .map(msg => {
             let processedText = msg.text
                 .replace(/\[tool:functions\..*?\]/g, '')
@@ -133,7 +133,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     while (attempts <= MAX_JANITOR_RETRIES) {
         if (process.stdout.isTTY) {
-            process.stdout.write(`\u001b]0;Retrying Memory (${attempts + 1})...\u0007`);
+            process.stdout.write(`\u001b]0;Retrying Finalizing... (${attempts + 1})...\u0007`);
         }
         try {
             if (!(await checkQuota('background', settings))) {
@@ -237,7 +237,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
             attempts++;
             const date = new Date().toLocaleString();
             if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;Memory Error\u0007`);
+                process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
             }
             await new Promise(resolve => setTimeout(resolve, 1000));
             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
@@ -256,7 +256,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
         if (attempts >= MAX_JANITOR_RETRIES) {
             if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;Memory Error\u0007`);
+                process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
             }
             await new Promise(resolve => setTimeout(resolve, 3000));
         }

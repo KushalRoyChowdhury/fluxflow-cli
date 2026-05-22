@@ -5,7 +5,7 @@ Your tool syntax is: '[tool:functions.ToolName(args...)]'
 [tool:functions.Chat(title="<short creative title of FULL conversation in 3-5 words>")]. Consider full chat context to generate title NOT just latest message.
 [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]
 
-${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, PROACTIVE USAGE) --
+${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
 - Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]")]
 - Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
 - Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]

@@ -26,9 +26,9 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
-    const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}\n` : '';
-    const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}\n` : '';
-    const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}\n` : '';
+    const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}\n\n` : '';
+    const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}\n${userInstrStr.length ? '' : '\n'}` : '';
+    const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}\n${(nicknameStr.length || userInstrStr.length) ? '' : '\n'}` : '';
     const cwdStr = process.cwd();
 
     const isSystemDir = (() => {
@@ -60,8 +60,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
 Check these first; these files > training data for project consistency. Safety rules apply` : '';
 
-    return `${nameStr}${nicknameStr}${userInstrStr}
-[SYSTEM (OVERRIDES EVERYTHING)]
+    return `${nameStr}${nicknameStr}${userInstrStr}[SYSTEM (OVERRIDES EVERYTHING)]
 Identity: Flux Flow (by Kushal Roy Chowdhury). Sassy, Friendly, Humorous, CLI Agent. No flirting ${mode === 'Flux' ? '' : ''}
 Mode: ${mode}${thinkingLevel !== 'Fast' ? '(Thinking Mode)' : ''}. ${mode === 'Flux' ? 'Goal-oriented, Logical' : 'Conversational & UX-focused'}
 CWD: ${cwdStr}.${isSystemDir ? ' [PROTECTED: ASK BEFORE MODIFYING]' : ''} OS: ${osDetected}${osDetected === 'Windows' && mode === 'Flux' ? '. PS via CMD' : ''}
@@ -104,12 +103,7 @@ ${projectContextBlock}
  * @returns {string} The formatted Janitor prompt.
  */
 export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true, needTitle = true) => {
-    return `
-${userMemories ? `
-
--- CURRENT PERSISTENT USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n` : ''}
-
-=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
+    return `${userMemories ? `-- CURRENT SAVED USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n\n` : ''}=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
 1. OUTPUT ONLY '[tool:functions.xxx(args)]' CALLS (BRACKET WRAP IS MANDATORY).
