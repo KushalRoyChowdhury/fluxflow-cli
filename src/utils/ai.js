@@ -52,6 +52,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         process.stdout.write(`\u001b]0;Finalizing...\u0007`);
     }
 
+    const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
+    const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
+
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
@@ -76,7 +79,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 .replace(/\\n\\n/g, '')
                 .trim();
 
-            const limit = msg.role === 'user' ? 1500 : 24000;
+            const limit = msg.role === 'user' ? USER_CONTEXT_LENGTH : AGENT_CONTEXT_LENGTH;
             let truncatedText = processedText.substring(0, limit);
             if (processedText.length > limit) {
                 truncatedText += '\n... (truncated) ...';
@@ -97,8 +100,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         true
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, 24000)}`;
-    if (agentRes.length > 24000) {
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
     // replace the [Prompted on: ...] from user prompt
@@ -106,7 +109,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // fs.writeFileSync('test.txt', originalTextProcessed);
     // replace the consecutive newlines and literal escaped \n\n with clean formatting
     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, 1500)}\n${originalTextProcessed.length > 1500 ? '... (truncated) ...\n\n' : ''}
+    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
 [AGENT (current turn)]: ${agentRes}`
 
     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });

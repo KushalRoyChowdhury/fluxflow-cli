@@ -42,7 +42,8 @@ export default function MemoryModal({ onClose }) {
     });
 
     const cleanDisplay = (text) => {
-        return text.replace(/\[Saved on: .*?\]/g, '').trim();
+        if (!text) return '';
+        return text.replace(/\[Saved on: .*?\]/g, '').replace(/\\+'/g, "'").trim();
     };
 
     const s = emojiSpace(2);
