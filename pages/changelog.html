@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.12.0"]
+        const stableVersions = ["1.12.8"]
         const changelogData = {
+            "1.12.8": {
+                "note": "Chat Export & Cleanup Update.",
+                "added": [
+                    "Introduced the `/export` command to export the active chat session logs in a clean, structured `.txt` format.",
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "1.12.0": {
                 "note": "Terminal Startup Arguments & UX Refinements.",
                 "added": [

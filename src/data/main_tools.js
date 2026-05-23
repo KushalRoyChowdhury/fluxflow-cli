@@ -30,6 +30,6 @@ ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 - File structure: Real newlines for code formatting`.trim() : `
 - DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE`.trim()}
 
-- Results: Passed as [TOOL RESULT] SYSTEM
+- Results: Passed as [TOOL RESULT] (system)
 - Tool calls: End with [turn: continue]. Only use [turn: finish] after verifying goals
 - Multi-call: Stack upto 5`.trim();

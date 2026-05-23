@@ -80,6 +80,87 @@ const FLUX_LOGO = gradient(['#00ffff', '#0077ff', '#ff00ff']).multiline(
 ╚═╝     ╚══════╝ ╚═════╝ ╚═╝  ╚═╝    ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝`
 );
 
+const parseAgentText = (text) => {
+    const blocks = [];
+    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+
+    let lastIdx = 0;
+    let match;
+    while ((match = toolRegex.exec(text)) !== null) {
+        const toolName = match[1];
+        const startIdx = match.index + match[0].length - 1; // Index of '('
+
+        let balance = 0;
+        let inString = null;
+        let isEscaped = false;
+        let endIdx = -1;
+        let closingParenIdx = -1;
+
+        for (let i = startIdx; i < text.length; i++) {
+            const char = text[i];
+
+            if (!inString && (char === '"' || char === "'" || char === '`')) {
+                inString = char;
+                isEscaped = false;
+            } else if (inString && char === inString && !isEscaped) {
+                inString = null;
+            }
+
+            if (!inString) {
+                if (char === '(') balance++;
+                else if (char === ')') balance--;
+
+                if (balance === 0) {
+                    closingParenIdx = i;
+                    let j = i + 1;
+                    while (j < text.length && /\s/.test(text[j])) j++;
+                    if (j < text.length && text[j] === ']') {
+                        endIdx = j;
+                        break;
+                    }
+                }
+            }
+
+            // Toggle escape state
+            if (char === '\\') {
+                isEscaped = !isEscaped;
+            } else {
+                isEscaped = false;
+            }
+        }
+
+        if (endIdx !== -1) {
+            // Text before the tool call
+            const beforeText = text.substring(lastIdx, match.index);
+            if (beforeText.trim()) {
+                blocks.push({ type: 'output', content: beforeText });
+            }
+
+            const finalArgsText = text.substring(startIdx + 1, closingParenIdx);
+            blocks.push({
+                type: 'tool',
+                toolName: toolName.trim(),
+                args: finalArgsText.trim()
+            });
+
+            lastIdx = endIdx + 1;
+            toolRegex.lastIndex = lastIdx;
+        } else {
+            // If it didn't find a closing bracket, just break
+            break;
+        }
+    }
+
+    if (lastIdx < text.length) {
+        const remainingText = text.substring(lastIdx);
+        if (remainingText.trim()) {
+            blocks.push({ type: 'output', content: remainingText });
+        }
+    }
+
+    return blocks;
+};
+
 export default function App({ args = [] }) {
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
@@ -717,6 +798,7 @@ export default function App({ args = [] }) {
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/save', desc: 'Force save current chat' },
+        { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
         {
             cmd: '/image', desc: 'Generate images using Pollinations', subs: [
@@ -1135,6 +1217,87 @@ export default function App({ args = [] }) {
                     const name = parts.slice(1).join(' ') || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
                     setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `💾 [MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
+                    break;
+                }
+                case '/export': {
+                    const exportFile = `export-fluxflow-${chatId}.txt`;
+                    const exportPath = path.join(process.cwd(), exportFile);
+                    
+                    const exportLines = [];
+                    let insideAgentBlock = false;
+
+                    for (let i = 0; i < messages.length; i++) {
+                        const msg = messages[i];
+                        if (!msg) continue;
+
+                        if (msg.role === 'system' || msg.isMeta || msg.isLogo || String(msg.id).startsWith('welcome')) {
+                            continue;
+                        }
+
+                        if (msg.role === 'user') {
+                            let cleanUserText = msg.text || '';
+                            cleanUserText = cleanUserText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
+                            
+                            if (exportLines.length > 0) {
+                                exportLines.push('');
+                            }
+                            exportLines.push('[USER]');
+                            exportLines.push(cleanUserText);
+                            insideAgentBlock = false;
+                        } else if (msg.role === 'think') {
+                            if (!insideAgentBlock) {
+                                exportLines.push('');
+                                exportLines.push('[AGENT]');
+                                insideAgentBlock = true;
+                            }
+                            const cleanThinkText = (msg.text || '')
+                                .replace(/\[turn:\s*continue\]/gi, '')
+                                .replace(/\[turn:\s*finish\]/gi, '')
+                                .replace(/\[TOOL RESULTS\]/gi, '')
+                                .trim();
+                            if (cleanThinkText) {
+                                exportLines.push('[thoughts]');
+                                exportLines.push(cleanThinkText);
+                            }
+                        } else if (msg.role === 'agent') {
+                            if (!insideAgentBlock) {
+                                exportLines.push('');
+                                exportLines.push('[AGENT]');
+                                insideAgentBlock = true;
+                            }
+
+                            const blocks = parseAgentText(msg.text || '');
+                            for (const block of blocks) {
+                                if (block.type === 'output') {
+                                    const cleanContent = block.content
+                                        .replace(/\[turn:\s*continue\]/gi, '')
+                                        .replace(/\[turn:\s*finish\]/gi, '')
+                                        .replace(/\[TOOL RESULTS\]/gi, '')
+                                        .trim();
+                                    if (cleanContent) {
+                                        exportLines.push('[output]');
+                                        exportLines.push(cleanContent);
+                                    }
+                                } else if (block.type === 'tool') {
+                                    exportLines.push('[tool]');
+                                    exportLines.push(`${block.toolName} ${block.args}`);
+                                }
+                            }
+                        }
+                    }
+
+                    const fileContent = exportLines.join('\n');
+                    fs.writeFileSync(exportPath, fileContent, 'utf8');
+
+                    setMessages(prev => { 
+                        setCompletedIndex(prev.length + 1); 
+                        return [...prev, { 
+                            id: Date.now(), 
+                            role: 'system', 
+                            text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`, 
+                            isMeta: true 
+                        }]; 
+                    });
                     break;
                 }
                 case '/chats': {
