@@ -847,7 +847,6 @@ export default function App({ args = [] }) {
                 { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable       (Paid)' },
                 { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Limited Free quota)' },
                 { cmd: 'gemini-3.5-flash', desc: 'New                (Paid, Limited Free quota)' },
-                { cmd: 'gemini-3.1-flash-lite', desc: 'Ultra Fast         (Paid, Decent Free quota)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -1222,7 +1221,7 @@ export default function App({ args = [] }) {
                 case '/export': {
                     const exportFile = `export-fluxflow-${chatId}.txt`;
                     const exportPath = path.join(process.cwd(), exportFile);
-                    
+
                     const exportLines = [];
                     let insideAgentBlock = false;
 
@@ -1237,7 +1236,7 @@ export default function App({ args = [] }) {
                         if (msg.role === 'user') {
                             let cleanUserText = msg.text || '';
                             cleanUserText = cleanUserText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-                            
+
                             if (exportLines.length > 0) {
                                 exportLines.push('');
                             }
@@ -1289,14 +1288,14 @@ export default function App({ args = [] }) {
                     const fileContent = exportLines.join('\n');
                     fs.writeFileSync(exportPath, fileContent, 'utf8');
 
-                    setMessages(prev => { 
-                        setCompletedIndex(prev.length + 1); 
-                        return [...prev, { 
-                            id: Date.now(), 
-                            role: 'system', 
-                            text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`, 
-                            isMeta: true 
-                        }]; 
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, {
+                            id: Date.now(),
+                            role: 'system',
+                            text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`,
+                            isMeta: true
+                        }];
                     });
                     break;
                 }

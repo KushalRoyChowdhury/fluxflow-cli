@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 
 // Simple XOR Key - In a real app, this would be more complex
-const XOR_KEY = 0x42; 
+const XOR_KEY = 0x42;
 
 const xorTransform = (data) => {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
@@ -50,12 +50,12 @@ export const readEncryptedJson = (filePath, defaultValue = {}) => {
         if (!fs.existsSync(filePath)) return defaultValue;
         const rawContent = fs.readFileSync(filePath);
         const fileContent = rawContent.toString('utf8').trim();
-        
+
         // 1. Backwards compatibility: if it starts with '{' or '[', parse as raw JSON
         if (fileContent.startsWith('{') || fileContent.startsWith('[')) {
             return JSON.parse(fileContent);
         }
-        
+
         // 2. Try AES decryption
         try {
             const decrypted = decryptAes(fileContent);
@@ -63,13 +63,13 @@ export const readEncryptedJson = (filePath, defaultValue = {}) => {
         } catch (aesErr) {
             // Not AES or AES failed, fallback to XOR.
         }
-        
+
         // 3. Fallback to legacy XOR decryption
         const decryptedDataXor = xorTransform(rawContent).toString('utf8');
         if (decryptedDataXor.startsWith('{') || decryptedDataXor.startsWith('[')) {
             return JSON.parse(decryptedDataXor);
         }
-        
+
         throw new Error('Unsupported or corrupt encryption format');
     } catch (err) {
         console.error(`Vault Read Error [${path.basename(filePath)}]:`, err.message);
@@ -86,7 +86,7 @@ export const writeEncryptedJson = (filePath, data) => {
     try {
         const dir = path.dirname(filePath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        
+
         const jsonData = JSON.stringify(data, null, 2);
         const encrypted = encryptAes(jsonData);
         fs.writeFileSync(filePath, encrypted, 'utf8');

@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
-import { HISTORY_FILE, TEMP_MEM_FILE } from './paths.js';
+import { HISTORY_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE } from './paths.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
 let WRITE_LOCK = Promise.resolve();
@@ -92,6 +92,13 @@ export const deleteChat = async (id) => {
         if (temp[id]) {
             delete temp[id];
             writeEncryptedJson(TEMP_MEM_FILE, temp);
+        }
+
+        // Also clean up temp memory cache if it exists
+        const cache = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
+        if (cache[id]) {
+            delete cache[id];
+            writeEncryptedJson(TEMP_MEM_CHAT_FILE, cache);
         }
         return history;
     });

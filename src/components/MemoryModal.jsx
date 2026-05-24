@@ -46,12 +46,31 @@ export default function MemoryModal({ onClose }) {
         return text.replace(/\[Saved on: .*?\]/g, '').replace(/\\+'/g, "'").trim();
     };
 
+    const totalCapacity = 4 * 1024 * 2; // 8192 chars
+    const currentLength = memories.reduce((acc, m) => acc + (m.memory?.length || 0), 0);
+    const usagePercent = Math.min(100, Math.round((currentLength / totalCapacity) * 100));
+
+    const barWidth = 12;
+    const filledCount = Math.round((usagePercent / 100) * barWidth);
+    const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
+
+    const getBarColor = () => {
+        if (usagePercent < 50) return "green";
+        if (usagePercent < 90) return "yellow";
+        return "red";
+    };
+
     const s = emojiSpace(2);
 
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width={80}>
-            <Box paddingX={1} marginBottom={1}>
+            <Box paddingX={1} marginBottom={1} justifyContent="space-between">
                 <Text color="cyan" bold>🧠 AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
+                <Box>
+                    <Text color="gray">Vault: </Text>
+                    <Text color={getBarColor()}>{barStr}</Text>
+                    <Text color="white" bold> {usagePercent}%</Text>
+                </Box>
             </Box>
 
             {!isMemoryOn && memories.length > 0 ? (

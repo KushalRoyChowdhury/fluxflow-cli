@@ -225,8 +225,17 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.12.8"]
+        const stableVersions = ["1.13.0", "1.12.8"]
         const changelogData = {
+            "1.13.0": {
+                "note": "Advanced Memory Architecture.",
+                "added": [
+                    "Added 2 layered Memory System with Global & Session memory. With L1 & L2 caching.",
+                    "Designed biological **Ebbinghaus-style Geometric Memory Decay** logic to model natural forgetting curves.",
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "1.12.8": {
                 "note": "Chat Export & Cleanup Update.",
                 "added": [

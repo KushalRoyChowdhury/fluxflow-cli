@@ -12,6 +12,8 @@ import { write_pdf } from '../tools/write_pdf.js';
 import { write_docx } from '../tools/write_docx.js';
 import { search_keyword } from '../tools/search_keyword.js';
 import { generate_image } from '../tools/generate_image.js';
+import { saveSummary } from '../tools/saveSummary.js';
+import { addMemScore } from '../tools/addMemScore.js';
 
 const TOOL_MAP = {
     web_search,
@@ -27,6 +29,8 @@ const TOOL_MAP = {
     write_docx,
     search_keyword,
     generate_image,
+    saveSummary,
+    addMemScore,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -43,7 +47,14 @@ const TOOL_MAP = {
     SearchKeyword: search_keyword,
     Memory: memory,
     Chat: chat,
-    GenerateImage: generate_image
+    GenerateImage: generate_image,
+    saveSumary: saveSummary,
+    SaveSummary: saveSummary,
+    SaveSumary: saveSummary,
+    add_mem_score: addMemScore,
+    AddMemScore: addMemScore,
+    addMemoryScore: addMemScore,
+    AddMemoryScore: addMemScore
 };
 
 /**

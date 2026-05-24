@@ -5,14 +5,21 @@ import { TEMP_MEM_FILE, MEMORIES_FILE } from '../utils/paths.js';
  * Memory tool for the agent and janitor.
  * Supports temporary chat context and persistent user memories.
  */
+
+const USER_MEMORY_SIZE = 4 * (1024 * 2);// Rough token estimate, 2k tokens
+
 export const memory = async (rawArgs, context = {}) => {
-    // Parser for named arguments: key='value' or key="value"
+    // Parser for named arguments supporting both quoted values and unquoted numbers/strings
     const parseArg = (key) => {
-        // More robust regex that matches until a quote is found followed by a boundary (comma, space, or end)
-        // This allows single quotes inside values (e.g., content='The user's hobby')
-        const regex = new RegExp(`${key}\\s*=\\s*(["'])(.*?)\\1(?=\\s*[,)]|\\s+\\w+\\s*=|$)`, 's');
-        const match = rawArgs.match(regex);
-        return match ? match[2].trim() : null;
+        const quotedRegex = new RegExp(`${key}\\s*[:=]\\s*(["'])(.*?)\\1(?=\\s*[,)]|\\s+\\w+\\s*[:=]|$)`, 's');
+        const quotedMatch = rawArgs.match(quotedRegex);
+        if (quotedMatch) return quotedMatch[2].trim();
+
+        const unquotedRegex = new RegExp(`${key}\\s*[:=]\\s*([^,\\s)]+)`, 's');
+        const unquotedMatch = rawArgs.match(unquotedRegex);
+        if (unquotedMatch) return unquotedMatch[1].trim();
+
+        return null;
     };
 
     const action = parseArg('action');
@@ -31,24 +38,18 @@ export const memory = async (rawArgs, context = {}) => {
         const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
         if (!tempStorage[chatId]) tempStorage[chatId] = [];
 
-        // LIMIT CHECK: Combined length should not exceed 1024 * 4 = 4096 chars
-        const MAX_CHARS = 1024 * 4;
-        let currentTotalLength = tempStorage[chatId].reduce((acc, m) => acc + m.length, 0);
-
-        // Prune oldest until there is room for the new content
-        while (tempStorage[chatId].length > 0 && (currentTotalLength + content.length) > MAX_CHARS) {
-            const removed = tempStorage[chatId].shift();
-            currentTotalLength -= removed.length;
-        }
-
         tempStorage[chatId].push(content);
         writeEncryptedJson(TEMP_MEM_FILE, tempStorage);
 
-        return `SUCCESS: Temporary context saved for session [${chatId}]. (Size: ${currentTotalLength + content.length} chars)`;
+        const currentTotalLength = tempStorage[chatId].reduce((acc, m) => acc + m.length, 0);
+        return `SUCCESS: Temporary context saved for session [${chatId}]. (Size: ${currentTotalLength} chars)`;
     }
 
     if (action === 'user') {
-        const memories = readEncryptedJson(MEMORIES_FILE, []);
+        const memories = readEncryptedJson(MEMORIES_FILE, []).map(m => {
+            if (m.score === undefined) m.score = 0.5;
+            return m;
+        });
 
         if (method === 'add') {
             if (!content) return "ERROR: Missing 'content' for memory addition.";
@@ -59,8 +60,8 @@ export const memory = async (rawArgs, context = {}) => {
                 ? content
                 : `${content.trim()} [Saved on: ${dateStr}]`;
 
-            // LIMIT CHECK: Combined length should not exceed 1024 * 4 = 4096 chars
-            const MAX_CHARS = 1024 * 4;
+            // LIMIT CHECK
+            const MAX_CHARS = USER_MEMORY_SIZE;
             let currentTotalLength = memories.reduce((acc, m) => acc + (m.memory?.length || 0), 0);
 
             // Prune oldest until there is room
@@ -69,10 +70,17 @@ export const memory = async (rawArgs, context = {}) => {
                 currentTotalLength -= (removed.memory?.length || 0);
             }
 
-            const newMemory = { id: `mem-${Date.now().toString(36)}`, memory: formattedContent };
+            const scoreArg = parseArg('score');
+            const initialScore = scoreArg ? parseFloat(scoreArg) : 0.5;
+
+            const newMemory = { 
+                id: `mem-${Date.now().toString(36)}`, 
+                memory: formattedContent,
+                score: Math.min(2.0, isNaN(initialScore) ? 0.5 : initialScore)
+            };
             memories.push(newMemory);
             writeEncryptedJson(MEMORIES_FILE, memories);
-            return `SUCCESS: Memory added with ID [${newMemory.id}]. (Vault Size: ${currentTotalLength + formattedContent.length} chars)`;
+            return `SUCCESS: Memory added with ID [${newMemory.id}] and score [${newMemory.score}]. (Vault Size: ${currentTotalLength + formattedContent.length} chars)`;
         }
 
         if (method === 'update') {

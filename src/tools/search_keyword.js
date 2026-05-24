@@ -17,16 +17,16 @@ export const search_keyword = async (args) => {
     if (isWindows) {
         // PowerShell optimization: filter directories early and resolve relative paths correctly
         const excludePattern = excludes.join('|').replace(/\./g, '\\.');
-        command = `powershell -Command "Get-ChildItem -Path . -Recurse -File | Where-Object { $_.FullName -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' | Select-Object -First 100 | ForEach-Object { $rel = Resolve-Path $_.Path -Relative; '{0}:{1}:' -f $rel, $_.LineNumber }"`;
+        command = `powershell -Command "Get-ChildItem -Path . -Recurse -File | Where-Object { $_.FullName -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' | Select-Object -First 150 | ForEach-Object { $rel = Resolve-Path $_.Path -Relative; '{0}:{1}:' -f $rel, $_.LineNumber }"`;
     } else {
         // Grep optimization: skip directories entirely
         const excludeDirArgs = excludes.map(d => `--exclude-dir="${d}"`).join(' ');
-        command = `grep -rnI ${excludeDirArgs} "${keyword}" . | head -n 100`;
+        command = `grep -rnI ${excludeDirArgs} "${keyword}" . | head -n 150`;
     }
 
     return new Promise((resolve) => {
-        // We use a large buffer (10MB) to handle large results
-        exec(command, { cwd: process.cwd(), maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+        // We use a large buffer (15MB) to handle large results
+        exec(command, { cwd: process.cwd(), maxBuffer: 15 * 1024 * 1024 }, (error, stdout, stderr) => {
             // Handle no matches (error code 1 for grep)
             if (error && error.code === 1 && !stdout) {
                 return resolve(`Found 0 matches for keyword: "${keyword}"`);
@@ -48,9 +48,9 @@ export const search_keyword = async (args) => {
                        !lower.includes('.gemini');
             });
 
-            if (filteredLines.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}" (Filtered out system noise)`);
+            if (filteredLines.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}"`);
 
-            const matches = filteredLines.slice(0, 100).map(line => {
+            const matches = filteredLines.slice(0, 150).map(line => {
                 // Format: path:line:content (standard for both grep and findstr)
                 const firstColon = line.indexOf(':');
                 const secondColon = line.indexOf(':', firstColon + 1);
@@ -66,8 +66,8 @@ export const search_keyword = async (args) => {
 
             let output = `Found ${filteredLines.length} matches:\n\n`;
             output += matches.join('\n');
-            if (filteredLines.length > 100) {
-                output += '\n\n... (Truncated to first 100 matches)';
+            if (filteredLines.length > 150) {
+                output += '\n\n... (Truncated to first 150 matches)';
             }
 
             resolve(output);

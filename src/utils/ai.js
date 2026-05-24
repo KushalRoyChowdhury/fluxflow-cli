@@ -3,14 +3,14 @@ import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './
 import { getTruncatedHistory } from './history.js';
 import { checkQuota, incrementUsage, addToUsage } from './usage.js';
 import { dispatchTool } from './tools.js';
-import { readEncryptedJson } from './crypto.js';
+import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import { emojiSpace } from './terminal.js';
 
-import { LOGS_DIR, TEMP_MEM_FILE, MEMORIES_FILE } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE } from './paths.js';
 
 let client = null;
 
@@ -154,8 +154,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         contents: janitorContents,
                         config: {
                             systemInstruction: janitorPrompt,
-                            maxOutputTokens: 384,
-                            temperature: 0.69,
+                            maxOutputTokens: 512,
+                            temperature: 0.3,
                             safetySettings: [
                                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                 { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -215,20 +215,50 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
             }
 
             const janitorToolCalls = detectToolCalls(finalSynthesis);
+            let scoreToolCalled = false;
             for (const janitorToolCall of janitorToolCalls) {
+                const toolName = janitorToolCall.toolName;
+                if (['addMemScore', 'add_mem_score', 'AddMemScore', 'addMemoryScore', 'AddMemoryScore'].includes(toolName)) {
+                    scoreToolCalled = true;
+                }
                 const toolContext = { chatId: chatId, sessionId: chatId, history };
-                const result = await dispatchTool(janitorToolCall.toolName, janitorToolCall.args, toolContext);
+                const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
 
                 const date = new Date().toLocaleString();
                 const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${janitorToolCall.toolName}]: ${result}\n`);
+                fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
 
-                if (janitorToolCall.toolName.toLowerCase() === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
+                if (toolName.toLowerCase() === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
                     if (onMemoryUpdated) onMemoryUpdated();
                     if (process.stdout.isTTY) {
                         process.stdout.write(`\u001b]0;Memory Updated\u0007`);
                     }
                     await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+
+            // Apply 0.05% global geometric decay if no memory was referenced/scored this turn
+            if (!scoreToolCalled) {
+                try {
+                    const memories = readEncryptedJson(MEMORIES_FILE, []);
+                    if (memories.length > 0) {
+                        const updatedMemories = [];
+                        for (const mem of memories) {
+                            if (mem.score === undefined) {
+                                mem.score = 0.5;
+                            }
+                            mem.score *= 0.9995; // 0.05% decay when no memory is referenced
+                            if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
+
+                            mem.score = Math.round(mem.score * 100000) / 100000;
+                            if (mem.score > 0) {
+                                updatedMemories.push(mem);
+                            }
+                        }
+                        writeEncryptedJson(MEMORIES_FILE, updatedMemories);
+                    }
+                } catch (decayErr) {
+                    // Silently ignore or log background decay failure
                 }
             }
 
@@ -505,6 +535,113 @@ export const initAI = (apiKey) => {
 };
 
 /**
+ * Detects past chats with substantial turn-level memories, batch-summarizes/merges them
+ * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
+ */
+const consolidatePastMemories = async (currentChatId, settings) => {
+    try {
+        const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
+
+        // 1. Calculate total memories across all chats in L1
+        const totalMemoriesCount = Object.values(tempStorage).flat().length;
+        if (totalMemoriesCount <= 15) return;
+
+        // 2. Identify past chats that have more than 2 individual memories in L1
+        const chatsToSummarize = Object.keys(tempStorage).filter(id => {
+            return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 3;
+        });
+
+        if (chatsToSummarize.length === 0) return;
+
+        // 3. Construct a single batch prompt for the model
+        let prompt = `You are a silent background process for the FluxFlow CLI Agent.
+Your task is to summarize or merge temporary context memories from one or more past conversation sessions.
+For each Chat ID provided, you must output a tool call to save the consolidated summary.
+
+The tool call format MUST be:
+[tool:functions.saveSummary(id="<chat-id>", summary="<updated summary string, max 400 words>")]
+
+Guidelines:
+- Create a single, updated, highly cohesive, and concise summary statement (max 400 words) for each Chat ID. It should contain WHAT user talked about, WHAT were the tasks, Temporal info, HOW/WHAT the model responded. DON'T REMOVE ANY KEY AND TURN BY TURN INFO DENSITY.
+- Focus on key goals, preferences, modified files, and technical decisions.
+- Under no circumstances write normal conversational text. Output ONLY the tool calls.
+- You can stack multiple tool calls for multiple chats.
+
+Chats to process:
+
+`;
+
+        const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
+        for (const id of chatsToSummarize) {
+            const rawMemories = tempStorage[id];
+            const newMemoryListStr = rawMemories.map(m => `- ${m}`).join('\n');
+            const oldSummary = cacheStorage[id];
+
+            prompt += `[Chat ID: ${id}]\n`;
+            if (oldSummary) {
+                prompt += `- Existing Summary: "${oldSummary}"\n`;
+                prompt += `-- New Memories to integrate:\n${newMemoryListStr}\n\n`;
+            } else {
+                prompt += `-- Individual Memories:\n${newMemoryListStr}\n\n`;
+            }
+        }
+
+        // 4. Send the batch request to Gemini 3.1 Flash Lite with a programmatic retry loop (max 3 attempts)
+        let attempts = 0;
+        const maxAttempts = 3;
+        let success = false;
+
+        while (attempts < maxAttempts && !success) {
+            attempts++;
+            try {
+                const response = await client.models.generateContent({
+                    model: 'gemini-3.1-flash-lite',
+                    contents: prompt,
+                    config: {
+                        temperature: 0.3,
+                        safetySettings: [
+                            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                        ],
+                        thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.LOW }
+                    }
+                });
+
+                const responseText = response.text || '';
+                const janitorToolCalls = detectToolCalls(responseText);
+
+                if (janitorToolCalls.length === 0) {
+                    throw new Error("No tool calls detected in synthesis response");
+                }
+
+                for (const janitorToolCall of janitorToolCalls) {
+                    const toolName = janitorToolCall.toolName;
+                    if (['saveSummary', 'saveSumary', 'SaveSummary', 'SaveSumary'].includes(toolName)) {
+                        await dispatchTool(toolName, janitorToolCall.args, { chatId: currentChatId });
+                    }
+                }
+                success = true;
+            } catch (err) {
+                if (attempts >= maxAttempts) {
+                    throw new Error(`Failed after ${maxAttempts} attempts. Last error: ${err.message}`);
+                }
+            }
+        }
+
+    } catch (err) {
+        // Silently log failures to the janitor log directory so it never disrupts user chat
+        const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+        if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
+        fs.appendFileSync(
+            path.join(janitorLogDir, 'error.log'),
+            `[${new Date().toLocaleString()}] Past memory batch consolidation error: ${err.message}\n`
+        );
+    }
+};
+
+/**
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
@@ -529,11 +666,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
     }
 
+    // --- PAST CHATS SUMMARIZATION ON NEW CHAT START ---
+    if (isFirstPrompt && isMemoryEnabled) {
+        yield { type: 'status', content: 'Condensing past chat memories...' };
+        await consolidatePastMemories(chatId, settings);
+    }
+    // --------------------------------------------------
+
     // Harvest temporary memories from different sessions only
     const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
-    const otherMemories = Object.entries(tempStorage)
+    const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
+
+    const otherRawMemories = Object.entries(tempStorage)
         .filter(([id]) => id !== chatId)
-        .flatMap(([_, mems]) => mems)
+        .flatMap(([_, mems]) => mems);
+
+    const cachedSummaries = Object.entries(cacheStorage)
+        .filter(([id]) => id !== chatId)
+        .slice(-20) // Limit to at most the 20 most recent chats
+        .map(([id, summary]) => `[Chat Summary]: ${summary}`);
+
+    const otherMemories = [...cachedSummaries, ...otherRawMemories]
         .map(mem => `- ${mem}`)
         .join('\n');
 
@@ -654,8 +807,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     targetModel = 'gemini-3-flash-preview';
                     yield { type: 'model_update', content: 'Trying with fallback model' };
                 } else if (retryCount === MAX_RETRIES) {
-                    targetModel = 'gemini-3.1-flash-lite';
-                    yield { type: 'model_update', content: 'Trying with fallback model lite' };
+                    targetModel = 'gemini-3.5-flash';
+                    yield { type: 'model_update', content: 'Trying with fallback model' };
                 } else if (retryCount > 12 && retryCount < MAX_RETRIES - 2 && settings.apiKey !== "custom") {
                     targetModel = 'gemma-4-31b-it';
                     yield { type: 'model_update', content: 'Trying with fallback Gemma Model' };
@@ -684,7 +837,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
                 }
 
-                // fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
+                fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
