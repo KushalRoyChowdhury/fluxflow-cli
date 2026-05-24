@@ -544,11 +544,11 @@ const consolidatePastMemories = async (currentChatId, settings) => {
 
         // 1. Calculate total memories across all chats in L1
         const totalMemoriesCount = Object.values(tempStorage).flat().length;
-        if (totalMemoriesCount <= 15) return;
+        if (totalMemoriesCount <= 2) return;
 
         // 2. Identify past chats that have more than 2 individual memories in L1
         const chatsToSummarize = Object.keys(tempStorage).filter(id => {
-            return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 3;
+            return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 2;
         });
 
         if (chatsToSummarize.length === 0) return;

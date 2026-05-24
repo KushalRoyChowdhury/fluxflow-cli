@@ -12,7 +12,7 @@ ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON C
 
 -- Memory Relevance Decay Tool --
 - Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
-  You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was highly relevant, referenced, or helpful in the agent's response or user prompt. You can stack multiple calls.
+  You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was relevant, referenced, or helpful in the agent's response or user prompt IN CURRENT MESSAGE. You can stack multiple calls.
 
 Explicit Triggers for permanent memory:
 - User explicitly asks to 'remember' something.
