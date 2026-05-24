@@ -1,4 +1,4 @@
-export const TOOL_PROTOCOL = (mode) => `
+export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. To call a tool, MUST use the exact syntax on a new line:
 [tool:functions.ToolName(args)]
@@ -18,7 +18,7 @@ ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 4. [tool:functions.PatchFile(path="...", content_to_replace="exact old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
 5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. **USE PROPER PROACTIVE A4 PAGE BREAKS**. HTML/CSS for PREMIUM layout (100vh/vw). No manual footers
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
-7. [tool:functions.Run(command="...")]. Runs a shell command. Destructive/Irreversible ops -> ask user
+7. [tool:functions.Run(command="...")]. Runs a ${osDetected === 'Windows' ? 'Windows CMD' : 'Bash'} command. Destructive/Irreversible ops -> ask user
 8. [tool:functions.SearchKeyword(keyword="...")]. Global search. Finds definitions/logic without reading every file
 9. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. AI images. Usage: Mockups, PDF thumbnails, any visual content
 
