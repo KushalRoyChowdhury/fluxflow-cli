@@ -837,7 +837,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
                 }
 
-                fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
+                // fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
