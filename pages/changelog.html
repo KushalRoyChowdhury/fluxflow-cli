@@ -225,8 +225,17 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.13.0", "1.12.8"]
+        const stableVersions = ["1.14.0", "1.13.0"]
         const changelogData = {
+            "1.14.0": {
+                "note": "Git-less Time Travel Reversion System.",
+                "added": [
+                    "Introduced a Git-less codebase Time Travel Reversion system, enabling transaction-based rollbacks to any selected prompt in the conversation, reverting all modified, added, or deleted files back to their exact pre-prompt state.",
+                    "Added the `/revert` command and double-ESC shortcut to easily trigger the Time Travel flow."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "1.13.0": {
                 "note": "Advanced Memory Architecture.",
                 "added": [
