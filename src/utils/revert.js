@@ -64,10 +64,7 @@ export const RevertManager = {
      * Finalizes the transaction and saves it to ledger.json.
      */
     async commitTransaction() {
-        if (!currentTransaction || currentTransaction.changes.length === 0) {
-            currentTransaction = null;
-            return;
-        }
+        if (!currentTransaction) return;
 
         // Use the secure crypto read/write routines
         const ledger = readEncryptedJson(LEDGER_FILE, []);

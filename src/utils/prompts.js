@@ -87,7 +87,7 @@ ${projectContextBlock}
 -- FORMATTING --
 - Clean, concise responses
 - Tables: GFM (Max 4 cols, short rows)
-- NO LaTeX. Code blocks for literature.${mode === 'Flux' ? '' : ' Kaomojis'}
+- NO LaTeX. Code blocks for literature${mode === 'Flux' ? '' : '. Kaomojis'}
 
 -- RESPONSE RULES --
 - End with [turn: continue] for more steps or [turn: finish] when done
