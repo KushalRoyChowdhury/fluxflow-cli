@@ -837,7 +837,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     addedMarker = true;
                 }
 
-                // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 95% for Flux
+                // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 98% for Flux
                 // Keeps prompts fully cached and static for the vast majority of runs!
                 const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
                 const currentStep = loop + 1;
