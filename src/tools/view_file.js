@@ -7,11 +7,11 @@ import { parseArgs } from '../utils/arg_parser.js';
  * Reads a file, optionally within a specific line range.
  */
 export const view_file = async (args) => {
-    let { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(args);
+    let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args);
 
     // Normalize argument names and apply dynamic 800-line paging logic
-    const sLine = parseInt(StartLine || start_line);
-    const eLine = parseInt(EndLine || end_line);
+    const sLine = parseInt(StartLine || start_line || startLine);
+    const eLine = parseInt(EndLine || end_line || endLine);
 
     const finalStart = sLine || 1;
     const finalEnd = eLine || (sLine ? (sLine + 800) : 800);

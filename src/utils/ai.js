@@ -749,7 +749,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                     modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**\n' : ''}[STEERING HINT]: ${hint}` });
+                    modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[STEERING HINT]: ${hint}` });
                 }
                 yield { type: 'status', content: 'Steering Hint Injected.' };
             }
@@ -829,7 +829,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                 // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING PROTOCOL. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}`;
+                const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING PROTOCOL. DO NOT START A RESPONSE WITHOUT <think> ... </think>**' : ''}`;
                 const lastUserMsg = contents[contents.length - 1];
                 let addedMarker = false;
                 if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
@@ -839,13 +839,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 95% for Flux
                 // Keeps prompts fully cached and static for the vast majority of runs!
-                const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.95 : 0.7));
+                const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
                 const currentStep = loop + 1;
                 if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                     lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
                 }
 
-                // fs.writeFileSync("contents.txt", currentSystemInstruction + '\n\n' + firstUserMsg);
+                // fs.writeFileSync("contents.txt", currentSystemInstruction + `\n\n` + firstUserMsg);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
@@ -1138,10 +1138,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const url = parseArgs(toolCall.args).url || '...';
                                 label = `📖 READ SITE: ${url}`.toUpperCase();
                             } else if (normToolName === 'view_file') {
-                                const { path: targetPath, StartLine, EndLine, start_line, end_line } = parseArgs(toolCall.args);
+                                const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
 
-                                const rawStart = StartLine || start_line;
-                                const rawEnd = EndLine || end_line;
+                                const rawStart = StartLine || start_line || startLine;
+                                const rawEnd = EndLine || end_line || endLine;
 
                                 const sLine = parseInt(rawStart) || 1;
                                 const eLine = parseInt(rawEnd) || (rawStart ? (sLine + 800) : 800);
@@ -1231,7 +1231,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
-                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}` });
+                                    toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                     yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
                                     continue;
@@ -1245,7 +1245,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (approval === 'deny') {
                                         if (normToolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
                                         const denyMsg = `Permission Denied: User rejected the ${normToolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
-                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}${thinkingLevel != 'Fast' ? '\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS STRICT PRIORITY. DO NOT START A RESPONSE WITHOUT THINKING**' : ''}` });
+                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
                                         if (settings.onToolResult) settings.onToolResult('denied', normToolName);

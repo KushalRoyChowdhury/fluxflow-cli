@@ -361,13 +361,13 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
             }
 
             // Headings
-            const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)/);
+            const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
             if (headingMatch) {
                 const level = headingMatch[1].length;
                 const hText = headingMatch[2];
                 result.push(
-                    <Box key={i} marginTop={1} marginBottom={0} width="100%">
-                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : 'yellow'} underline>
+                    <Box key={i} marginTop={1} marginBottom={1} width="100%">
+                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : 'white'} underline>
                             {hText.toUpperCase()}
                         </Text>
                     </Box>
@@ -578,7 +578,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     if (msg.isVisualFeedback) {
         return (
-            <Box marginBottom={1} paddingX={1} width="100%">
+            // [SPACE POINT]
+            <Box marginBottom={0} marginTop={0} paddingX={1} width="100%">
                 <Text color="white">{msg.text}</Text>
             </Box>
         );
@@ -740,7 +741,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     }, [content, msg.role, showFullThinking, msg.isStreaming]);
 
     return (
-        <Box marginBottom={1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
+        // [SPACE POINT]
+        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
                 <Box
                     backgroundColor="#262626"
@@ -773,13 +775,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
             ) : msg.role === 'think' ? (
                 <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
                     <Text bold color="white">Thinking...</Text>
+                    {/* [SPACE POINT] */}
                     <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
                         {formatThinkText(finalContent, columns)}
                     </Box>
                 </Box>
             ) : (
                 <Box flexDirection="column" paddingX={1} marginTop={0} width="100%">
-                    <CodeRenderer text={finalContent} columns={columns} />
+                    <CodeRenderer text={finalContent.replace(/ \|\n\n/g, ' |\n')} columns={columns} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
                             <Text color="yellow" italic>✨ [Memory Updated]</Text>

@@ -2489,8 +2489,8 @@ OUTPUT: ${execOutputRef.current}`;
                             <Text color="gray">--- PROPOSED CONTENT / DIFF ---</Text>
                             {(() => {
                                 const args = parseArgs(pendingApproval?.args || '{}');
-                                const oldVal = args.TargetContent || args.content_to_replace || null;
-                                const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || null;
+                                const oldVal = args.TargetContent || args.content_to_replace || args.replaceContent || null;
+                                const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
 
                                 if (oldVal && newVal) {
                                     return (
@@ -2500,7 +2500,7 @@ OUTPUT: ${execOutputRef.current}`;
                                         </Box>
                                     );
                                 }
-                                return <Text color="white" wrap="anywhere">{newVal.replace(/\[\/n\]?/g, '\\n') || 'Updating file content...'}</Text>;
+                                return <Text color="white" wrap="anywhere">{(newVal ? newVal.replace(/\[\/n\]?/g, '\\n') : null) || 'Updating file content...'}</Text>;
                             })()}
                         </Box>
 
