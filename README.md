@@ -26,6 +26,10 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
 - **Document Engineering Suite**: Generate professional, branded PDF, DOCX, and PPTX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
+- **Codebase Time Travel (Git-less Reversion)**: Refactor and build with absolute fearlessness. Flux Flow maintains transaction-based secure snapshots of files before they are generated or edited:
+  - **Instant Rollback**: Revert your workspace files (source code, generated documents, images) to their exact state prior to any selected prompt in the history.
+  - **Double-ESC Shortcut**: Press `ESC` twice while idle to pop open a sleek selection modal.
+  - **`/revert` Command**: Run the `/revert` command directly in the chat to open the checkpoint viewer.
 - **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
 - **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
 - **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
