@@ -28,7 +28,7 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
     const visiblePrompts = prompts.slice(startIndex, startIndex + MAX_VISIBLE);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={0} width={95}>
+        <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
                 <Text color="cyan" bold>🔄 CODEBASE TIME TRAVEL: SELECT UNDO POINT</Text>
             </Box>
@@ -100,8 +100,8 @@ function formatPromptPreview(prompt) {
     if (!prompt) return '';
     const firstLine = prompt.split('\n')[0] || '';
     const words = firstLine.split(/\s+/).filter(Boolean);
-    if (words.length > 50) {
-        return words.slice(0, 50).join(' ') + '...';
+    if (words.length > 25) {
+        return words.slice(0, 25).join(' ') + '...';
     }
     if (prompt.includes('\n')) {
         return firstLine + '...';

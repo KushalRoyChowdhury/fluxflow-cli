@@ -51,7 +51,7 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
     const visibleKeys = keys.slice(startIndex, startIndex + MAX_VISIBLE);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width={95}>
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
                 <Text color="cyan" bold>💠 CHAT HISTORY: RESUME CONVERSATION</Text>
             </Box>

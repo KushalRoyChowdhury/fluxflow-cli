@@ -63,7 +63,7 @@ export default function MemoryModal({ onClose }) {
     const s = emojiSpace(2);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width={80}>
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1} justifyContent="space-between">
                 <Text color="cyan" bold>🧠 AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
                 <Box>
