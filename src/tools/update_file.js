@@ -1,17 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Update File Tool (Smart Patching)
  * Replaces a specific block of text with new content.
  */
 export const update_file = async (args) => {
-    let { path: targetPath, content_to_replace, content_to_add } = parseArgs(args);
+    const parsed = parseArgs(args);
+    const targetPath = parsed.path;
+    let content_to_replace = parsed.content_to_replace !== undefined ? parsed.content_to_replace : parsed.replaceContent;
+    let content_to_add = parsed.content_to_add !== undefined ? parsed.content_to_add : parsed.newContent;
 
     if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
-    if (content_to_replace === undefined) return 'ERROR: Missing "content_to_replace" argument.';
-    if (content_to_add === undefined) return 'ERROR: Missing "content_to_add" argument.';
+    if (content_to_replace === undefined) return 'ERROR: Missing "replaceContent" argument.';
+    if (content_to_add === undefined) return 'ERROR: Missing "newContent" argument.';
 
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -25,6 +29,9 @@ export const update_file = async (args) => {
         if (!fs.existsSync(absolutePath)) {
             return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
         }
+
+        // Record file change for Reversion Time Travel
+        await RevertManager.recordFileChange(absolutePath);
 
         // --- LF NORMALIZATION ARMISTICE ---
         let diskContent = fs.readFileSync(absolutePath, 'utf8');

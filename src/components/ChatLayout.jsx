@@ -671,6 +671,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
             { cmd: '/help', desc: 'Show all available commands' },
             { cmd: '/clear', desc: 'Clear terminal screen' },
             { cmd: '/resume', desc: 'Load previous session' },
+            { cmd: '/revert', desc: 'Revert codebase to checkpoint' },
             { cmd: '/save', desc: 'Force save current chat' },
             { cmd: '/export', desc: 'Export current chat in a .txt file' },
             { cmd: '/chats', desc: 'List all chat sessions' },

@@ -14,21 +14,21 @@ Suggest best options; don't ask for preferences. System handles the rest
 ${mode === 'Flux' ? `- FILE TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", start_line=N, end_line=N)]. Reads contents. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
-3. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? -> update_file > write_file
-4. [tool:functions.PatchFile(path="...", content_to_replace="exact old content", content_to_add="new content")]. Surgical patching. Unsure content_to_replace? -> view_file >> guessing.
-5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. **USE PROPER PROACTIVE A4 PAGE BREAKS**. HTML/CSS for PREMIUM layout (100vh/vw). No manual footers
+3. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
+4. [tool:functions.PatchFile(path="...", replaceContent="exact old content", newContent="new content")]. Surgical patching. Unsure replaceContent? ReadFile > guessing
+5. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout (100vh/vw). No manual footers
 6. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word doc. Proper margins and page breaks
-7. [tool:functions.Run(command="...")]. Runs a ${osDetected === 'Windows' ? 'Windows CMD' : 'Bash'} command. Destructive/Irreversible ops -> ask user
+7. [tool:functions.Run(command="...")]. Runs a ${osDetected === 'Windows' ? 'Windows CMD' : 'Bash'} command. Destructive/Irreversible ops -> Ask user
 8. [tool:functions.SearchKeyword(keyword="...")]. Global search. Finds definitions/logic without reading every file
 9. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1, 4:3, 3:4")]. AI images. Usage: Mockups, PDF thumbnails, any visual content
 
 - VERIFY RESULT CONTENTS. Fix errors. No hallucinations
-- File tools > code chat
+- File tools > long chat
 
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
 - File structure: Real newlines for code formatting`.trim() : `
-- DEV TOOLS ARE NOT AVAILABLE IN FLOW MODE`.trim()}
+- FILE TOOLS ARE NOT AVAILABLE IN FLOW MODE`.trim()}
 
 - Results: Passed as [TOOL RESULT] (system)
 - Tool calls: End with [turn: continue]. Only use [turn: finish] after verifying goals

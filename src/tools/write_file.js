@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Write File Tool
@@ -21,6 +22,9 @@ export const write_file = async (args) => {
     const parentDir = path.dirname(absolutePath);
 
     try {
+        // Record file change for Reversion Time Travel
+        await RevertManager.recordFileChange(absolutePath);
+
         // --- ANCESTRY CAPTURE (For v1.1.x Reliability & Reversal) ---
         let ancestry = '';
         if (fs.existsSync(absolutePath)) {

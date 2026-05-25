@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs-extra';
 import { PDFDocument } from 'pdf-lib';
 import { parseArgs } from '../utils/arg_parser.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Write PDF Tool (Stable Puppeteer Version)
@@ -25,6 +26,9 @@ export const write_pdf = async (args) => {
     try {
         // Ensure directory exists
         await fs.ensureDir(path.dirname(absolutePath));
+
+        // Record file change for Reversion Time Travel
+        await RevertManager.recordFileChange(absolutePath);
 
         // Launch the bundled Chromium
         browser = await puppeteer.launch({

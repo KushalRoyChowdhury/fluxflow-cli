@@ -55,3 +55,5 @@ export const USAGE_FILE = path.join(FLUXFLOW_DIR, 'usage.json');
 export const MEMORIES_FILE = path.join(SECRET_DIR, 'memories.json');
 export const TEMP_MEM_FILE = path.join(SECRET_DIR, 'memory-temp.json');
 export const TEMP_MEM_CHAT_FILE = path.join(SECRET_DIR, 'temp-memory-chat.json');
+export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
+export const LEDGER_FILE = path.join(SECRET_DIR, 'ledger.json');

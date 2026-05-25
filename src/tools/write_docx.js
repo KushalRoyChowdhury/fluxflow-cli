@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import HTMLtoDOCX from 'html-to-docx';
 import { parseArgs } from '../utils/arg_parser.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Write DOCX Tool
@@ -21,6 +22,9 @@ export const write_docx = async (args) => {
     try {
         // Ensure directory exists
         await fs.ensureDir(path.dirname(absolutePath));
+
+        // Record file change for Reversion Time Travel
+        await RevertManager.recordFileChange(absolutePath);
 
         // Generate DOCX Buffer
         const fileName = path.basename(targetPath);

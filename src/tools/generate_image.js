@@ -4,6 +4,7 @@ import { parseArgs } from '../utils/arg_parser.js';
 import { loadSettings } from '../utils/settings.js';
 import { checkImageQuota, recordImageGeneration, getImageQuotaStats } from '../utils/usage.js';
 import { FALLBACK_IMAGE_KEY } from '../utils/fallback_key.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Injects custom metadata chunks into a PNG buffer.
@@ -210,6 +211,10 @@ export const generate_image = async (args) => {
 
         const absolutePath = path.resolve(process.cwd(), outputPath);
         await fs.ensureDir(path.dirname(absolutePath));
+        
+        // Record file change for Reversion Time Travel
+        await RevertManager.recordFileChange(absolutePath);
+
         await fs.writeFile(absolutePath, finalBuffer);
 
         // 7. Update usage logs with successful transaction cost

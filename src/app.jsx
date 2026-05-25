@@ -21,6 +21,8 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, c
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
+import { RevertManager } from './utils/revert.js';
+import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
@@ -378,6 +380,9 @@ export default function App({ args = [] }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [escPressed, setEscPressed] = useState(false);
     const [escTimer, setEscTimer] = useState(null);
+    const [escPressCount, setEscPressCount] = useState(0);
+    const [recentPrompts, setRecentPrompts] = useState([]);
+    const escDoubleTimerRef = useRef(null);
     const [queuedPrompt, setQueuedPrompt] = useState(null);
     const [resolutionData, setResolutionData] = useState(null);
     const [tempModelOverride, setTempModelOverride] = useState(null);
@@ -524,8 +529,36 @@ export default function App({ args = [] }) {
                     setEscPressed(false);
                     if (escTimer) clearTimeout(escTimer);
                 }
-            } else if (activeView !== 'chat') {
-                setActiveView('chat');
+            } else {
+                if (activeView === 'revert') {
+                    setActiveView('chat');
+                    setEscPressCount(0);
+                } else if (activeView !== 'chat') {
+                    setActiveView('chat');
+                } else {
+                    setEscPressCount(prev => {
+                        const nextCount = prev + 1;
+                        if (nextCount === 1) {
+                            if (escDoubleTimerRef.current) clearTimeout(escDoubleTimerRef.current);
+                            escDoubleTimerRef.current = setTimeout(() => setEscPressCount(0), 1000);
+                        } else if (nextCount === 2) {
+                            if (escDoubleTimerRef.current) clearTimeout(escDoubleTimerRef.current);
+                            setEscPressCount(0);
+                            RevertManager.getChatHistory(chatId).then(prompts => {
+                                if (prompts.length > 0) {
+                                    setRecentPrompts(prompts.reverse()); // latest first
+                                    setActiveView('revert');
+                                } else {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: 'ℹ️ No revert checkpoints found for this session.', isMeta: true }];
+                                    });
+                                }
+                            });
+                        }
+                        return nextCount;
+                    });
+                }
             }
         }
 
@@ -797,6 +830,7 @@ export default function App({ args = [] }) {
         { cmd: '/help', desc: 'Show all available commands' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/resume', desc: 'Load previous session' },
+        { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
@@ -990,6 +1024,21 @@ export default function App({ args = [] }) {
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
+                    break;
+                }
+                case '/revert': {
+                    RevertManager.getChatHistory(chatId).then(prompts => {
+                        if (prompts.length > 0) {
+                            setRecentPrompts(prompts.reverse()); // latest first
+                            setActiveView('revert');
+                        } else {
+                            const s = emojiSpace(2);
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: `No revert checkpoints found for this session.`, isMeta: true }];
+                            });
+                        }
+                    });
                     break;
                 }
                 case '/mode': {
@@ -2292,6 +2341,71 @@ OUTPUT: ${execOutputRef.current}`;
                         />
                     </Box>
                 );
+            case 'revert':
+                return (
+                    <Box width="100%" alignItems="center" justifyContent="center">
+                        <RevertModal
+                            prompts={recentPrompts}
+                            onSelect={async (txId) => {
+                                try {
+                                    const result = await RevertManager.rollbackToBefore(txId);
+                                    if (result.success) {
+                                        const { targetPrompt } = result;
+
+                                        // Find index of reverted user message
+                                        const targetIdx = messages.findIndex(m =>
+                                            m.role === 'user' &&
+                                            m.text &&
+                                            (m.text.startsWith(targetPrompt) || m.text.includes(targetPrompt))
+                                        );
+
+                                        let newMsgs = [...messages];
+                                        if (targetIdx !== -1) {
+                                            newMsgs = messages.slice(0, targetIdx);
+                                        }
+
+                                        setMessages(newMsgs);
+                                        setCompletedIndex(newMsgs.length);
+                                        setInput(targetPrompt);
+                                        setIsExpanded(targetPrompt.split('\n').length > 2);
+
+                                        // Persist reverted history
+                                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isMeta);
+                                        await saveChat(chatId, null, historyToSave);
+
+                                        const s = emojiSpace(2);
+                                        setMessages(prev => {
+                                            const finalMsgs = [...prev, {
+                                                id: 'revert-ok-' + Date.now(),
+                                                role: 'system',
+                                                text: `🔄${s}[TIME TRAVEL] Codebase rolled back successfully! Reverted prompt loaded to input box.`,
+                                                isMeta: true
+                                            }];
+                                            setCompletedIndex(finalMsgs.length);
+                                            return finalMsgs;
+                                        });
+
+                                        setActiveView('chat');
+                                    }
+                                } catch (err) {
+                                    const s = emojiSpace(2);
+                                    setMessages(prev => {
+                                        const finalMsgs = [...prev, {
+                                            id: 'revert-err-' + Date.now(),
+                                            role: 'system',
+                                            text: `❌${s}[TIME TRAVEL ERROR] Failed to rollback: ${err.message}`,
+                                            isMeta: true
+                                        }];
+                                        setCompletedIndex(finalMsgs.length);
+                                        return finalMsgs;
+                                    });
+                                    setActiveView('chat');
+                                }
+                            }}
+                            onClose={() => setActiveView('chat')}
+                        />
+                    </Box>
+                );
             case 'resume':
                 return (
                     <Box width="100%" alignItems="center" justifyContent="center">
@@ -2567,6 +2681,8 @@ OUTPUT: ${execOutputRef.current}`;
                                                             <Text color="yellow">  Press TAB to interact with terminal...</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
+                                                        ) : escPressCount === 1 ? (
+                                                            <Text color="cyan" bold>  Press ESC again to revert codebase to checkpoint...</Text>
                                                         ) : (
                                                             <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}

@@ -11,6 +11,7 @@ import fs from 'fs';
 import { emojiSpace } from './terminal.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE } from './paths.js';
+import { RevertManager } from './revert.js';
 
 let client = null;
 
@@ -224,16 +225,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 const toolContext = { chatId: chatId, sessionId: chatId, history };
                 const result = await dispatchTool(toolName, janitorToolCall.args, toolContext);
 
-                const date = new Date().toLocaleString();
-                const janitorLogDir = path.join(LOGS_DIR, 'janitor');
-                fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
+                // const date = new Date().toLocaleString();
+                // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
+                // fs.appendFileSync(path.join(janitorLogDir, 'debug.log'), `DEBUG [${date}]: RESULT [${toolName}]: ${result}\n`);
 
-                if (toolName.toLowerCase() === 'memory' && !janitorToolCall.args.includes("action='temp'")) {
-                    if (onMemoryUpdated) onMemoryUpdated();
-                    if (process.stdout.isTTY) {
-                        process.stdout.write(`\u001b]0;Memory Updated\u0007`);
+                if (toolName.toLowerCase() === 'memory') {
+                    const isUserAction = janitorToolCall.args.includes("action='user'") || janitorToolCall.args.includes('action="user"');
+                    if (isUserAction && !result.startsWith("ERROR")) {
+                        if (onMemoryUpdated) onMemoryUpdated();
+                        if (process.stdout.isTTY) {
+                            process.stdout.write(`\u001b]0;Memory Updated\u0007`);
+                        }
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                     }
-                    await new Promise(resolve => setTimeout(resolve, 3000));
                 }
             }
 
@@ -656,10 +660,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const hasTitleSignal = originalText.includes('[TITLE-UPDATE]');
     const needTitle = isFirstPrompt || hasTitleSignal;
 
-    // Strip [TITLE-UPDATE] signal from the text before model processing
-    const agentText = originalText.replace(/\[TITLE-UPDATE\]/g, '').trim();
+    // Strip [TITLE-UPDATE] signal and temporal grounding from the text before model processing and transaction start
+    let agentText = originalText.replace(/\[TITLE-UPDATE\]/g, '').trim();
+    agentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
 
-    let modifiedHistory = [...history.slice(0, -1)];
+    await RevertManager.startTransaction(chatId, agentText);
+
+    try {
+        let modifiedHistory = [...history.slice(0, -1)];
 
     // Truncation Logic (Compression 0.0)
     if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
@@ -1563,6 +1571,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             isGeneralLoop = false;
         }
         wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
+    }
+    } finally {
+        await RevertManager.commitTransaction();
     }
     yield { type: 'status', content: null };
 };
