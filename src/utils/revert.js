@@ -71,8 +71,8 @@ export const RevertManager = {
 
         ledger.push(currentTransaction);
 
-        // Enforce the 500 entry overall limit
-        if (ledger.length > 500) {
+        // Enforce the 512000 entry overall limit
+        if (ledger.length > 512000) {
             const removed = ledger.shift();
             if (removed.changes) {
                 for (const change of removed.changes) {
