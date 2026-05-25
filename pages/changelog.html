@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.14.0", "1.13.0"]
+        const stableVersions = ["1.14.0", "1.14.5"]
         const changelogData = {
+            "1.14.5": {
+                "note": "General Improvements and Optimizations",
+                "added": [],
+                "changed": [
+                    "Optimized System Prompt Engineering to reduce token usage and improve performance."
+                ],
+                "fixes": [
+                    "Refined UI for more unified and clean experience."
+                ]
+            },
             "1.14.0": {
                 "note": "Git-less Time Travel Reversion System.",
                 "added": [
