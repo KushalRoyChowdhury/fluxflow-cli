@@ -30,4 +30,4 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 - FILE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
 
 - Results: Passed as [TOOL RESULT] (system priority)
-- Multi-call: Stack upto 5`.trim();
+- Multi-call: MAX Stack 3 per turn`.trim();

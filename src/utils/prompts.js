@@ -68,7 +68,7 @@ CWD: ${cwdStr}${isSystemDir ? '. [PROTECTED: ASK BEFORE MODIFYING]' : ''}
 -- THINKING RULES --
 ${thinkingConfig}
 ${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- Avoid spiraling in thinking loop once best approach is found\n` : ''}
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n` : ''}
 ${TOOL_PROTOCOL(mode, osDetected)}
 ${projectContextBlock}
 -- MEMORY RULES --

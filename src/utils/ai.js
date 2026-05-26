@@ -70,7 +70,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         .map(msg => {
             let processedText = msg.text
                 .replace(/\[tool:functions\..*?\]/g, '')
-                .replace(/<think>[\s\S]*?<\/think>/g, '')
+                .replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '')
                 .replace(/\[Prompted on:.*?\]/g, '')
                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
@@ -105,14 +105,14 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
     const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
 
-    const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
     const janitorPrompt = getJanitorInstruction(
         janitorUserMemories,
         isMemoryEnabled,
         needTitle
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/<think>.*<\/think>/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
@@ -354,7 +354,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
 
     while ((match = toolRegex.exec(text)) !== null) {
         const before = text.substring(lastIdx, match.index);
-        result += stripThoughts ? before.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '') : before;
+        result += stripThoughts ? before.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '') : before;
 
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
@@ -399,7 +399,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
     }
 
     if (lastIdx < text.length) {
-        result += stripThoughts ? text.substring(lastIdx).replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '') : text.substring(lastIdx);
+        result += stripThoughts ? text.substring(lastIdx).replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '') : text.substring(lastIdx);
     }
     return result;
 };
@@ -725,7 +725,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     // Only Agent Msgs should be stripped.
     modifiedHistory.forEach(msg => {
         if (msg.text && msg.role === 'agent') {
-            msg.text = msg.text.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').trim();
+            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '').trim();
         }
     });
 
@@ -845,7 +845,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
                 }
 
-                // fs.writeFileSync("contents.txt", currentSystemInstruction + `\n\n` + firstUserMsg);
+                // fs.writeFileSync(`contents_${thinkingLevel}.txt`, currentSystemInstruction + `\n\n` + firstUserMsg);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
@@ -910,10 +910,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const cleanText = dedupeBuffer.substring(overlapLen);
                                 if (cleanText) {
                                     // [SEAMLESS PICKUP] Strip redundant <think> tags if model restarts them during dedupe
-                                    const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                                    const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
                                     const dedupeClean = hasOpenThink
-                                        ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
-                                        : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                                        ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
+                                        : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
                                     if (dedupeClean) {
                                         turnText += dedupeClean;
                                         yield { type: 'text', content: dedupeClean };
@@ -1002,7 +1002,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
                         // Shield loop detection from text inside tool calls (closed or unclosed)
                         const contextSafeText = getContextSafeText(turnText, false);
-                        const thinkBlocks = contextSafeText.match(/<think>([\s\S]*?)(?:<\/think>|$)/gi) || [];
+                        const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
                         const thinkContent = thinkBlocks.join('').trim();
 
                         // 1. Repetitive Sentence Check (The most common loop symptom)
@@ -1018,11 +1018,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                         // Dynamic Thinking Cap based on tier
                         const thinkingCaps = {
-                            'low': 200,
-                            'medium': 500,
-                            'high': 2000,
-                            'max': 3500,
-                            'xhigh': 3500,
+                            'low': 256,
+                            'medium': 768,
+                            'high': 2048,
+                            'max': 4096,
+                            'xhigh': 4096,
                         };
                         const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
                         let isOverVerboseThinking = wordCount > cap;
@@ -1109,7 +1109,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                         // [REAL-TIME TOOL EXECUTION]
                         // We use a version that only strips thoughts but preserves full tool arguments
-                        const toolActionableText = turnText.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '');
+                        const toolActionableText = turnText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '');
                         const allToolsFound = detectToolCalls(toolActionableText);
                         while (allToolsFound.length > toolCallPointer) {
                             const toolCall = allToolsFound[toolCallPointer];
@@ -1340,10 +1340,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     const cleanText = dedupeBuffer.substring(overlapLen);
                     if (cleanText) {
-                        const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                        const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
                         const dedupeClean = hasOpenThink
-                            ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
-                            : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                            ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
+                            : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
                         if (dedupeClean) {
                             turnText += dedupeClean;
                             yield { type: 'text', content: dedupeClean };
@@ -1366,7 +1366,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
                 const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
 
-                const pureOutputText = signalSafeText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                const pureOutputText = signalSafeText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
                 const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText);
 
                 if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
@@ -1396,10 +1396,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     const cleanText = dedupeBuffer.substring(overlapLen);
                     if (cleanText) {
-                        const hasOpenThink = /<(think|thought)>(?:(?!<\/(?:think|thought)>)[\s\S])*$/i.test(accumulatedContext);
+                        const hasOpenThink = /(?:<(think|thought)>|\[(think|thought)\])(?:(?!(?:<\/(?:think|thought)>|\[\/(?:think|thought)\]))[\s\S])*$/i.test(accumulatedContext);
                         const dedupeClean = hasOpenThink
-                            ? cleanText.replace(/^\s*<(think|thought)>\s*/gi, '')
-                            : cleanText.replace(/^\s*<(think|thought)>[\s\S]*?<\/(think|thought)>\s*/gi, '').replace(/^\s*<(think|thought)>\s*/gi, '');
+                            ? cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '')
+                            : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
                         if (dedupeClean) {
                             turnText += dedupeClean;
                         }
@@ -1503,10 +1503,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // [SAFETY] Surgical extraction of top-level thinking blocks only.
         // We avoid global stripping to protect documentation or code that might mention <think> tags.
         let textToProcess = turnText;
-        const thinkMatch = turnText.match(/<think>([\s\S]*?)<\/think>/i);
+        const thinkMatch = turnText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\])/i);
         if (thinkMatch) {
             // Only strip if it's at the very beginning or followed by significant output
-            textToProcess = turnText.replace(/<think>[\s\S]*?<\/think>/i, '');
+            textToProcess = turnText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/i, '');
         }
 
         const signalSafeText = getSanitizedText(turnText);
@@ -1527,7 +1527,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         if (isActuallyFinished) {
             const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
-            const cleanedFullResponse = fullAgentTextRaw.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
 
             yield {
                 type: 'interactive_turn_finished',
