@@ -742,7 +742,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     return (
         // [SPACE POINT]
-        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
+        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
                 <Box
                     backgroundColor="#262626"
