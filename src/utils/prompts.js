@@ -80,12 +80,13 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- Tables: Max 4 cols, short rows
-- NO LaTeX. Code blocks for literature${mode === 'Flux' ? '' : '. Kaomojis'}
+- Tables: Max 4 cols
+- NO LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 
 -- RESPONSE RULES --
 - End with [turn: continue] to continue or [turn: finish] when task done
 - Tool Called? No post tool response until [turn: continue]
+- **MAX 3 TOOL CALL PER TURN**
 - Task Complete? End loop with [turn: finish]
 [/SYSTEM]`.trim();
 };
