@@ -554,7 +554,7 @@ export default function App({ args = [] }) {
                                 } else {
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: 'ℹ️ No revert checkpoints found for this session.', isMeta: true }];
+                                        return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 No revert checkpoints found for this session.', isMeta: true }];
                                     });
                                 }
                             });
@@ -615,7 +615,7 @@ export default function App({ args = [] }) {
                 process.stdout.write(`\u001b]0;FluxFlow | Ready\u0007`);
             }
 
-            // 0. System Integrity Check (Chromium for PDF)
+            // 0. System Integrity Check (Build-in Chromium)
             if (!checkPuppeteerReady()) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
@@ -2819,7 +2819,7 @@ OUTPUT: ${execOutputRef.current}`;
                     const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
 
                     return (
-                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={1}>
+                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={1}>
                             <Box marginBottom={1}>
                                 <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
                             </Box>

@@ -20,17 +20,17 @@ const getActivePreset = (settings) => {
         settings.allowExternalAccess === false &&
         settings.networkAccess === false &&
         approve === '' &&
-        disallow === 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format' &&
-        alwaysAsk === '' &&
+        disallow === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
+        alwaysAsk === 'killall, pkill, taskkill, shutdown, reboot, init 0, init 6, Stop-Process, Stop-Service, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, netsh advfirewall, iptables -F, ufw disable, git reset --hard, git clean -fd, npm r, npm uninstall' &&
         settings.autoApproveGit === false;
 
     const isBalanced =
         settings.autoExec === true &&
         settings.allowExternalAccess === false &&
         settings.networkAccess !== false &&
-        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, help, mkdir, touch, md' &&
-        disallow === 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format' &&
-        alwaysAsk === '' &&
+        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time' &&
+        disallow === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
+        alwaysAsk === 'killall, pkill, taskkill, Stop-Process, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, shutdown, reboot, init 0, init 6, git reset --hard, git clean -fd, npm r, npm uninstall' &&
         settings.autoApproveGit === false;
 
     const isAutonomous =
@@ -39,7 +39,7 @@ const getActivePreset = (settings) => {
         settings.networkAccess !== false &&
         approve === '' &&
         disallow === '' &&
-        alwaysAsk === '' &&
+        alwaysAsk === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
         settings.autoApproveGit === true;
 
     if (isStrict) return 'Strict';
@@ -50,7 +50,7 @@ const getActivePreset = (settings) => {
 
 const truncateCSV = (val) => {
     if (!val || val.trim() === '') return 'None';
-    if (val.length > 20) return val.substring(0, 17) + '...';
+    if (val.length > 40) return val.substring(0, 40) + '...';
     return val;
 };
 
@@ -163,16 +163,16 @@ export default function SettingsMenu({
                     updated.allowExternalAccess = false;
                     updated.networkAccess = false;
                     updated.autoApproveCommands = '';
-                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format';
-                    updated.alwaysAskCommands = '';
+                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
+                    updated.alwaysAskCommands = 'killall, pkill, taskkill, shutdown, reboot, init 0, init 6, Stop-Process, Stop-Service, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, netsh advfirewall, iptables -F, ufw disable, git reset --hard, git clean -fd, npm r, npm uninstall';
                     updated.autoApproveGit = false;
                 } else if (nextPreset === 'Balanced') {
                     updated.autoExec = true;
                     updated.allowExternalAccess = false;
                     updated.networkAccess = true;
-                    updated.autoApproveCommands = 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, help, mkdir, touch, md';
-                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format';
-                    updated.alwaysAskCommands = '';
+                    updated.autoApproveCommands = 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time';
+                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
+                    updated.alwaysAskCommands = 'killall, pkill, taskkill, Stop-Process, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, shutdown, reboot, init 0, init 6, git reset --hard, git clean -fd, npm r, npm uninstall';
                     updated.autoApproveGit = false;
                 } else if (nextPreset === 'Autonomous') {
                     updated.autoExec = true;
@@ -180,7 +180,7 @@ export default function SettingsMenu({
                     updated.networkAccess = true;
                     updated.autoApproveCommands = '';
                     updated.autoDisallowCommands = '';
-                    updated.alwaysAskCommands = '';
+                    updated.alwaysAskCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
                     updated.autoApproveGit = true;
                 }
                 return updated;
