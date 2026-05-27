@@ -104,6 +104,8 @@ fluxflow [options]
 ## 🔒 Security & Privacy
 
 Flux Flow runs entirely locally on your machine.
+- **Sandbox Presets**: Choose from **Strict**, **Balanced**, **Autonomous**, or **Custom** profiles to fine-tune agent autonomy out of the box.
+- **Granular Command Policies**: Configure Auto-Approve (`Auto` / `Read-Only` / `None`), Auto-Disallow (`Auto` / `Destructive` / `None`), Network Access toggle, and Auto-Approve Git Commits independently.
 - **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`. Sensitive data is encrypted.
 - **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
 - **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
