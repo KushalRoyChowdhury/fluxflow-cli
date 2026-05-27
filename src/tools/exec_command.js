@@ -207,6 +207,18 @@ export const exec_command = async (args, options = {}) => {
 
     const command = adjustWindowsCommand(rawCommand);
 
+    const systemSettings = options.systemSettings || {};
+    const netEnv = {};
+    if (systemSettings.networkAccess === false) {
+        netEnv.HTTP_PROXY = 'http://127.0.0.1:9999';
+        netEnv.HTTPS_PROXY = 'http://127.0.0.1:9999';
+        netEnv.ALL_PROXY = 'socks5://127.0.0.1:9999';
+        netEnv.http_proxy = 'http://127.0.0.1:9999';
+        netEnv.https_proxy = 'http://127.0.0.1:9999';
+        netEnv.all_proxy = 'socks5://127.0.0.1:9999';
+        netEnv.NO_PROXY = 'localhost,127.0.0.1';
+    }
+
     return new Promise((resolve) => {
         // Use shell: true for Windows (handles .cmd, .bat, pnpm etc)
         // Inject interactive environment variables to "trick" CLI tools into showing prompts
@@ -217,7 +229,8 @@ export const exec_command = async (args, options = {}) => {
                 ...process.env, 
                 CI: 'false', 
                 TERM: 'xterm-256color',
-                FORCE_COLOR: '1'
+                FORCE_COLOR: '1',
+                ...netEnv
             }
         });
         activeChildProcess = child;

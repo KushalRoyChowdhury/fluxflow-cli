@@ -11,6 +11,7 @@ import TextInput from 'ink-text-input';
 import ChatLayout, { MessageItem } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
+import SettingsMenu from './components/SettingsMenu.jsx';
 import ProfileForm from './components/ProfileForm.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
@@ -1508,6 +1509,7 @@ export default function App({ args = [] }) {
                             },
                             onExecEnd: () => {
                                 setMessages(prev => {
+                                    if (!activeCommandRef.current) return prev;
                                     const finalStatus = `[TERMINAL_RECORD]
 COMMAND: ${activeCommandRef.current}
 OUTPUT: ${execOutputRef.current}`;
@@ -1913,75 +1915,15 @@ OUTPUT: ${execOutputRef.current}`;
         switch (activeView) {
             case 'settings':
                 return (
-                    <CommandMenu
-                        title="System Settings"
-                        items={[
-                            { label: `Toggle Memory                           [ ${systemSettings.memory ? 'ON' : 'OFF'} ]`, value: 'memory' },
-                            { label: `Toggle Auto-Exec                        [ ${systemSettings.autoExec ? 'ON' : 'OFF'} ]`, value: 'autoExec' },
-                            { label: `External Workspace Access               [ ${systemSettings.allowExternalAccess ? 'ON' : 'OFF'} ]`, value: 'externalAccess' },
-                            { label: `API Tier                                [ ${apiTier} ]`, value: 'apiTier' },
-                            { label: `Auto-Delete History                     [ ${systemSettings.autoDeleteHistory || '30d'} ]`, value: 'autoDelete' },
-                            { label: `Auto-Update                             [ ${systemSettings.autoUpdate ? 'ON' : 'OFF'} ]`, value: 'autoUpdate' },
-                            { label: `Preferred Updater                       [ ${(systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase()} ]`, value: 'updateManager' },
-                            { label: `Save AppData Externally                 [ ${systemSettings.useExternalData ? 'ON' : 'OFF'} ]`, value: 'externalData' },
-                            { label: 'Exit Settings', value: 'Cancel' }
-                        ]}
-                        onSelect={(item) => {
-                            if (item.value === 'memory') setSystemSettings(s => ({ ...s, memory: !s.memory }));
-                            else if (item.value === 'autoExec') {
-                                if (!systemSettings.autoExec) {
-                                    if (systemSettings.allowExternalAccess) {
-                                        setActiveView('doubleDanger');
-                                    } else {
-                                        setActiveView('autoExecDanger');
-                                    }
-                                } else {
-                                    setSystemSettings(s => ({ ...s, autoExec: false }));
-                                }
-                            }
-                            else if (item.value === 'externalAccess') {
-                                if (!systemSettings.allowExternalAccess) {
-                                    if (systemSettings.autoExec) {
-                                        setActiveView('doubleDanger');
-                                    } else {
-                                        setActiveView('externalDanger');
-                                    }
-                                } else {
-                                    setSystemSettings(s => ({ ...s, allowExternalAccess: false }));
-                                }
-                            }
-                            else if (item.value === 'apiTier') setActiveView('apiTier');
-                            else if (item.value === 'autoDelete') {
-                                const options = ['1d', '7d', '30d'];
-                                const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || '30d');
-                                const nextIndex = (currentIndex + 1) % options.length;
-                                setSystemSettings(s => ({ ...s, autoDeleteHistory: options[nextIndex] }));
-                            }
-                            else if (item.value === 'autoUpdate') {
-                                setSystemSettings(s => ({ ...s, autoUpdate: !s.autoUpdate }));
-                            }
-                            else if (item.value === 'externalData') {
-                                if (!systemSettings.useExternalData) {
-                                    setInputConfig({
-                                        label: "Enter absolute path for External AppData:",
-                                        note: "All history, logs and secrets will be stored here. ~/.fluxflow/settings.json stays as anchor.",
-                                        key: 'externalDataPath',
-                                        value: systemSettings.externalDataPath || ''
-                                    });
-                                    setActiveView('input');
-                                } else {
-                                    const newSettings = { ...systemSettings, useExternalData: false };
-                                    setSystemSettings(newSettings);
-                                    saveSettings({ systemSettings: newSettings, apiTier, quotas });
-                                    setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🏠 [STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart.' }]);
-                                    setActiveView('chat');
-                                }
-                            }
-                            else if (item.value === 'updateManager') {
-                                setActiveView('updateManager');
-                            }
-                            else if (item.value === 'Cancel') setActiveView('chat');
-                        }}
+                    <SettingsMenu
+                        systemSettings={systemSettings}
+                        setSystemSettings={setSystemSettings}
+                        apiTier={apiTier}
+                        setActiveView={setActiveView}
+                        setInputConfig={setInputConfig}
+                        saveSettings={saveSettings}
+                        quotas={quotas}
+                        setMessages={setMessages}
                     />
                 );
 
@@ -2195,7 +2137,7 @@ OUTPUT: ${execOutputRef.current}`;
             case 'autoExecDanger':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} width="100%">
-                        <Text color="yellow" bold underline>⚠️ SECURITY WARNING: AUTO-EXEC MODE</Text>
+                        <Text color="yellow" bold underline>⚠️ SECURITY WARNING: AUTO EXECUTE MODE</Text>
                         <Text marginTop={1}>Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step.</Text>
                         <Text marginTop={1} color="yellow">RISKS INVOLVED:</Text>
                         <Text>• The agent may execute destructive commands (rm -rf, etc.) by mistake.</Text>
@@ -2248,7 +2190,7 @@ OUTPUT: ${execOutputRef.current}`;
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1} width="100%">
                         <Text color="red" bold underline>⛔ CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK</Text>
-                        <Text marginTop={1}>You are attempting to enable BOTH [Auto-Exec] and [External Workspace Access] simultaneously.</Text>
+                        <Text marginTop={1}>You are attempting to enable BOTH [Auto Execute] and [External Workspace Access] simultaneously.</Text>
                         <Text marginTop={1} color="red" bold>THIS IS NOT RECOMMENDED.</Text>
                         <Text marginTop={1} color="yellow">THE CRITICAL RISK:</Text>
                         <Text>The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision.</Text>

@@ -1189,13 +1189,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 label = `EXECUTED: ${toolCall.toolName}`.toUpperCase();
                             }
 
-                            if (label) {
-                                const boxWidth = Math.min(label.length + 4, 115);
-                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
-                            }
                             // END VISUAL FEEDBACK
 
                             // EXECUTION LOGIC
@@ -1213,6 +1206,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     });
                                     if (isViolating) {
                                         const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
+                                        if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
+                                        yield { type: 'exec_start' };
+                                        await new Promise(resolve => setTimeout(resolve, 50));
+                                        if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
+                                        await new Promise(resolve => setTimeout(resolve, 50));
+                                        if (settings.onExecEnd) settings.onExecEnd();
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                         toolCallPointer++;
@@ -1231,6 +1230,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                     const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
+                                    if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                        const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
+                                        const deniedLabel = `💾 ${action}: ${parsedArgs.path || '...'}`.toUpperCase();
+                                        const boxWidth = Math.min(deniedLabel.length + 4, 115);
+                                        const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                        const boxMid = `│ ${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                        const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                        yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                    }
                                     toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                     yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
                                     toolCallPointer++;
@@ -1241,10 +1249,86 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (settings.onToolApproval) {
                                 let shouldPrompt = (normToolName === 'write_file' || normToolName === 'update_file' || normToolName === 'exec_command');
                                 if (shouldPrompt) {
-                                    const approval = await settings.onToolApproval(normToolName, toolCall.args);
+                                    const systemSettings = settings.systemSettings || {};
+                                    const autoExec = systemSettings.autoExec;
+                                    const autoApprove = systemSettings.autoApproveCommands || 'Read-Only';
+                                    const autoDisallow = systemSettings.autoDisallowCommands || 'Destructive';
+
+                                    let decision = null; // 'allow', 'deny', or null (prompt)
+
+                                    if (normToolName === 'exec_command') {
+                                        const { command } = parseArgs(toolCall.args);
+                                        const cmdTrimmed = (command || '').trim();
+
+                                        const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
+                                        const destructiveRegex = /\b(rm\s+-rf|rm\s+-f|del\s+\/f|rd\s+\/s|rmdir\s+\/s|format)\b/i;
+                                        const creationRegex = /^(mkdir|touch|md|ni|New-Item)\b/i;
+                                        const isReadOnly = safeRegex.test(cmdTrimmed);
+                                        const isDestructive = destructiveRegex.test(cmdTrimmed);
+                                        const isCreation = creationRegex.test(cmdTrimmed);
+
+                                        // 1. Auto-approve check (HIGHEST PRIORITY)
+                                        if (autoApprove === 'Auto') {
+                                            decision = 'allow';
+                                        } else if (autoApprove === 'Read-Only' && isReadOnly) {
+                                            decision = 'allow';
+                                        } else if (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
+                                            decision = 'allow';
+                                        }
+
+                                        // 2. Auto-disallow check (MIDDLE PRIORITY)
+                                        if (!decision) {
+                                            // Network access check
+                                            if (systemSettings.networkAccess === false) {
+                                                const networkCmdRegex = /\b(curl|wget|npm|yarn|pnpm|pip|pip3|ssh|docker|git\s+(clone|push|pull|fetch))\b/i;
+                                                if (networkCmdRegex.test(cmdTrimmed)) {
+                                                    decision = 'deny';
+                                                }
+                                            }
+
+                                            if (!decision) {
+                                                if (autoDisallow === 'Auto' && (isDestructive || (!isReadOnly && !isCreation))) {
+                                                    decision = 'deny';
+                                                } else if (autoDisallow === 'Destructive' && isDestructive) {
+                                                    decision = 'deny';
+                                                }
+                                            }
+                                        }
+
+                                        // 3. Auto-execute fallback (LOWEST PRIORITY)
+                                        if (!decision && autoExec) {
+                                            decision = 'allow';
+                                        }
+                                    } else {
+                                        // For file writes/updates (write_file, update_file)
+                                        // File tools should not get affected by sandbox auto approve or disallow, only fallback to autoExec
+                                        if (autoExec) {
+                                            decision = 'allow';
+                                        }
+                                    }
+
+                                    let approval = decision;
+                                    if (!approval) {
+                                        approval = await settings.onToolApproval(normToolName, toolCall.args);
+                                    }
+
                                     if (approval === 'deny') {
-                                        if (normToolName === 'exec_command' && settings.onExecEnd) settings.onExecEnd();
-                                        const denyMsg = `Permission Denied: User rejected the ${normToolName === 'exec_command' ? 'terminal execution' : 'file edit'}.`;
+                                        const denyMsg = `Permission Denied: Prohibited ${normToolName === 'exec_command' ? 'command' : 'file edit'}.`;
+                                        if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                            const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
+                                            const deniedLabel = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                            const boxWidth = Math.min(deniedLabel.length + 4, 115);
+                                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                            const boxMid = `│ ${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                        }
+                                        if (normToolName === 'exec_command') {
+                                            await new Promise(resolve => setTimeout(resolve, 50));
+                                            if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
+                                            await new Promise(resolve => setTimeout(resolve, 50));
+                                            if (settings.onExecEnd) settings.onExecEnd();
+                                        }
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
                                         await incrementUsage('toolDenied');
@@ -1253,6 +1337,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         continue;
                                     }
                                 }
+                            }
+
+                            if (label) {
+                                const boxWidth = Math.min(label.length + 4, 115);
+                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             }
 
                             // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
@@ -1266,7 +1358,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const effectiveStart = lastToolEventTime || Date.now();
                             yield { type: 'spinner', content: false };
                             let result = await dispatchTool(normToolName, toolCall.args, {
-                                chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser
+                                chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
+                                systemSettings: settings.systemSettings
                             });
                             yield { type: 'spinner', content: true };
 

@@ -110,7 +110,7 @@ const cleanSignals = (text) => {
 
     // Secondary cleanup for protocol signals and success/error markers
     return result
-        .replace(/^\[TOOL_RESULT\]:\s*/gi, '')
+        .replace(/\[TOOL RESULT\]:?\s*/gi, '')
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')

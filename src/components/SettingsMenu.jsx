@@ -1,0 +1,346 @@
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
+
+const CATEGORIES = [
+    { id: 'memory', label: '🧠 Memory', desc: 'Manage system context & agent\'s memory' },
+    { id: 'security', label: '🔒 Security', desc: 'Configure permissions & data safety' },
+    { id: 'updater', label: '🔄 Updater', desc: 'Manage application updates' },
+    { id: 'other', label: '📋 Other', desc: 'Miscellaneous preferences' },
+    { id: 'exit', label: '🚪 Exit Settings', desc: 'Return to chat view' }
+];
+
+const getActivePreset = (settings) => {
+    const approve = settings.autoApproveCommands || 'Read-Only';
+    const disallow = settings.autoDisallowCommands || 'Destructive';
+
+    const isStrict = 
+        settings.autoExec === false &&
+        settings.allowExternalAccess === false &&
+        settings.networkAccess === false &&
+        approve === 'None' &&
+        disallow === 'Auto' &&
+        settings.autoApproveGit === false;
+        
+    const isBalanced =
+        settings.autoExec === true &&
+        settings.allowExternalAccess === false &&
+        settings.networkAccess !== false &&
+        approve === 'Read-Only' &&
+        disallow === 'Destructive' &&
+        settings.autoApproveGit === false;
+        
+    const isAutonomous =
+        settings.autoExec === true &&
+        settings.allowExternalAccess === true &&
+        settings.networkAccess !== false &&
+        approve === 'Auto' &&
+        disallow === 'None' &&
+        settings.autoApproveGit === true;
+
+    if (isStrict) return 'Strict';
+    if (isBalanced) return 'Balanced';
+    if (isAutonomous) return 'Autonomous';
+    return settings.sandboxPreset || 'Balanced';
+};
+
+export default function SettingsMenu({
+    systemSettings,
+    setSystemSettings,
+    apiTier,
+    setActiveView,
+    setInputConfig,
+    saveSettings,
+    quotas,
+    setMessages
+}) {
+    const [activeColumn, setActiveColumn] = useState('categories'); // 'categories' or 'items'
+    const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
+    const [selectedItemIndex, setSelectedItemIndex] = useState(0);
+
+    // Get items for current category
+    const getCategoryItems = (catId) => {
+        switch (catId) {
+            case 'memory':
+                return [
+                    { label: 'Toggle Memory', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
+                ];
+            case 'security':
+                const activePreset = getActivePreset(systemSettings);
+                return [
+                    { label: 'Sandbox Preset', value: 'sandboxPreset', status: activePreset, section: 'Sandbox' },
+                    { label: 'Auto Execute', value: 'autoExec', status: systemSettings.autoExec ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'External Workspace Access', value: 'externalAccess', status: systemSettings.allowExternalAccess ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'Network Access (Terminal)', value: 'networkAccess', status: systemSettings.networkAccess !== false ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'Auto Approve Commands', value: 'autoApprove', status: systemSettings.autoApproveCommands || 'Read-Only', section: 'Sandbox' },
+                    { label: 'Auto Disallow Commands', value: 'autoDisallow', status: systemSettings.autoDisallowCommands || 'Destructive', section: 'Sandbox' },
+                    { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
+                    { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' }
+                ];
+            case 'updater':
+                return [
+                    { label: 'Auto-Update', value: 'autoUpdate', status: systemSettings.autoUpdate ? 'ON' : 'OFF' },
+                    { label: 'Preferred Updater', value: 'updateManager', status: (systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase() }
+                ];
+            case 'other':
+                return [
+                    { label: 'API Tier', value: 'apiTier', status: apiTier }
+                ];
+            default:
+                return [];
+        }
+    };
+
+    const currentCatId = CATEGORIES[selectedCategoryIndex].id;
+    const currentItems = getCategoryItems(currentCatId);
+
+    useInput((input, key) => {
+        if (activeColumn === 'categories') {
+            if (key.upArrow) {
+                setSelectedCategoryIndex(prev => (prev - 1 + CATEGORIES.length) % CATEGORIES.length);
+            } else if (key.downArrow) {
+                setSelectedCategoryIndex(prev => (prev + 1) % CATEGORIES.length);
+            } else if (key.return || key.rightArrow) {
+                const targetCat = CATEGORIES[selectedCategoryIndex];
+                if (targetCat.id === 'exit') {
+                    setActiveView('chat');
+                } else {
+                    setActiveColumn('items');
+                    setSelectedItemIndex(0);
+                }
+            }
+        } else if (activeColumn === 'items') {
+            if (key.upArrow) {
+                setSelectedItemIndex(prev => (prev - 1 + currentItems.length) % currentItems.length);
+            } else if (key.downArrow) {
+                setSelectedItemIndex(prev => (prev + 1) % currentItems.length);
+            } else if (key.leftArrow || key.escape) {
+                setActiveColumn('categories');
+            } else if (key.return) {
+                const item = currentItems[selectedItemIndex];
+                handleSelect(item);
+            }
+        }
+    });
+
+    const handleSelect = (item) => {
+        if (item.value === 'memory') {
+            setSystemSettings(s => ({ ...s, memory: !s.memory }));
+        } else if (item.value === 'sandboxPreset') {
+            const activePreset = getActivePreset(systemSettings);
+            const presets = ['Autonomous', 'Balanced', 'Strict'];
+            const curIndex = presets.indexOf(activePreset);
+            const nextIndex = (curIndex + 1) % presets.length;
+            const nextPreset = presets[nextIndex];
+            
+            setSystemSettings(s => {
+                const updated = { ...s, sandboxPreset: nextPreset };
+                if (nextPreset === 'Strict') {
+                    updated.autoExec = false;
+                    updated.allowExternalAccess = false;
+                    updated.networkAccess = false;
+                    updated.autoApproveCommands = 'None';
+                    updated.autoDisallowCommands = 'Auto';
+                    updated.autoApproveGit = false;
+                } else if (nextPreset === 'Balanced') {
+                    updated.autoExec = true;
+                    updated.allowExternalAccess = false;
+                    updated.networkAccess = true;
+                    updated.autoApproveCommands = 'Read-Only';
+                    updated.autoDisallowCommands = 'Destructive';
+                    updated.autoApproveGit = false;
+                } else if (nextPreset === 'Autonomous') {
+                    updated.autoExec = true;
+                    updated.allowExternalAccess = true;
+                    updated.networkAccess = true;
+                    updated.autoApproveCommands = 'Auto';
+                    updated.autoDisallowCommands = 'None';
+                    updated.autoApproveGit = true;
+                }
+                return updated;
+            });
+        } else if (item.value === 'autoExec') {
+            if (!systemSettings.autoExec) {
+                if (systemSettings.allowExternalAccess) {
+                    setActiveView('doubleDanger');
+                } else {
+                    setActiveView('autoExecDanger');
+                }
+            } else {
+                setSystemSettings(s => ({ ...s, autoExec: false, sandboxPreset: 'Custom' }));
+            }
+        } else if (item.value === 'externalAccess') {
+            if (!systemSettings.allowExternalAccess) {
+                if (systemSettings.autoExec) {
+                    setActiveView('doubleDanger');
+                } else {
+                    setActiveView('externalDanger');
+                }
+            } else {
+                setSystemSettings(s => ({ ...s, allowExternalAccess: false, sandboxPreset: 'Custom' }));
+            }
+        } else if (item.value === 'networkAccess') {
+            setSystemSettings(s => ({ ...s, networkAccess: s.networkAccess === false, sandboxPreset: 'Custom' }));
+        } else if (item.value === 'autoApprove') {
+            const approveOptions = ['Auto', 'None', 'Read-Only'];
+            const curIndex = approveOptions.indexOf(systemSettings.autoApproveCommands || 'Read-Only');
+            const nextIndex = (curIndex + 1) % approveOptions.length;
+            setSystemSettings(s => ({ ...s, autoApproveCommands: approveOptions[nextIndex], sandboxPreset: 'Custom' }));
+        } else if (item.value === 'autoApproveGit') {
+            setSystemSettings(s => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: 'Custom' }));
+        } else if (item.value === 'autoDisallow') {
+            const disallowOptions = ['Auto', 'None', 'Destructive'];
+            const curIndex = disallowOptions.indexOf(systemSettings.autoDisallowCommands || 'Destructive');
+            const nextIndex = (curIndex + 1) % disallowOptions.length;
+            setSystemSettings(s => ({ ...s, autoDisallowCommands: disallowOptions[nextIndex], sandboxPreset: 'Custom' }));
+        } else if (item.value === 'apiTier') {
+            setActiveView('apiTier');
+        } else if (item.value === 'autoDelete') {
+            const options = ['1d', '7d', '30d'];
+            const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || '30d');
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => ({ ...s, autoDeleteHistory: options[nextIndex] }));
+        } else if (item.value === 'autoUpdate') {
+            setSystemSettings(s => ({ ...s, autoUpdate: !s.autoUpdate }));
+        } else if (item.value === 'externalData') {
+            if (!systemSettings.useExternalData) {
+                setInputConfig({
+                    label: "Enter absolute path for External AppData:",
+                    note: "All history, logs and secrets will be stored here. ~/.fluxflow/settings.json stays as anchor.",
+                    key: 'externalDataPath',
+                    value: systemSettings.externalDataPath || ''
+                });
+                setActiveView('input');
+            } else {
+                const newSettings = { ...systemSettings, useExternalData: false };
+                setSystemSettings(newSettings);
+                saveSettings({ systemSettings: newSettings, apiTier, quotas });
+                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🏠 [STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart.' }]);
+                setActiveView('chat');
+            }
+        } else if (item.value === 'updateManager') {
+            setActiveView('updateManager');
+        }
+    };
+
+    return (
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+            {/* Title Bar */}
+            <Box paddingX={1} paddingY={0} marginBottom={1} borderStyle="single" borderColor="magenta" width="100%">
+                <Text color="magenta" bold>🔧 SYSTEM CONFIGURATION</Text>
+            </Box>
+
+            {/* Main Area: 2 Columns */}
+            <Box flexDirection="row" width="100%" minHeight={8}>
+                {/* Left Column: Categories */}
+                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'cyan' : 'gray'} padding={1}>
+                    <Box marginBottom={1}>
+                        <Text color={activeColumn === 'categories' ? 'cyan' : 'white'} bold underline>
+                            CATEGORIES
+                        </Text>
+                    </Box>
+                    {CATEGORIES.map((cat, index) => {
+                        const isSelected = selectedCategoryIndex === index;
+                        const isExit = cat.id === 'exit';
+                        return (
+                            <Box
+                                key={cat.id}
+                                marginTop={isExit ? 1 : 0}
+                                backgroundColor={isSelected ? (activeColumn === 'categories' ? '#2a2a2a' : '#1e1e1e') : undefined}
+                                paddingX={1}
+                            >
+                                <Text
+                                    color={isSelected ? (activeColumn === 'categories' ? 'cyan' : 'yellow') : 'white'}
+                                    bold={isSelected}
+                                >
+                                    {isSelected ? '❯ ' : '  '}{cat.label}
+                                </Text>
+                            </Box>
+                        );
+                    })}
+                </Box>
+
+                {/* Right Column: Settings */}
+                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'cyan' : 'gray'} padding={1} marginLeft={1}>
+                    <Box marginBottom={1}>
+                        <Text color={activeColumn === 'items' ? 'cyan' : 'white'} bold underline>
+                            {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
+                        </Text>
+                    </Box>
+
+                    {currentItems.length > 0 ? (
+                        (() => {
+                            let lastSection = null;
+                            const elements = [];
+
+                            currentItems.forEach((item, index) => {
+                                const isSelected = activeColumn === 'items' && selectedItemIndex === index;
+                                // Calculate padding to align statuses perfectly
+                                const labelLength = item.label.length;
+                                const dotsCount = Math.max(2, 35 - labelLength);
+                                const dots = '.'.repeat(dotsCount);
+
+                                const getStatusColor = (item) => {
+                                    if (currentCatId === 'security') {
+                                        if ((item.value === 'autoExec' || item.value === 'externalAccess') && item.status === 'ON') {
+                                            return 'red';
+                                        }
+                                        return 'yellow';
+                                    }
+                                    return item.status === 'ON' ? 'green' : (item.status === 'OFF' ? 'red' : 'yellow');
+                                };
+
+                                // Render section header if it changed
+                                if (item.section && item.section !== lastSection) {
+                                    lastSection = item.section;
+                                    elements.push(
+                                        <Box key={`sec-hdr-${item.section}`} marginTop={elements.length > 0 ? 1 : 0} marginBottom={0} paddingX={1}>
+                                            <Text color="magenta" bold underline>📂 {item.section.toUpperCase()}</Text>
+                                        </Box>
+                                    );
+                                }
+
+                                elements.push(
+                                    <Box key={item.value} backgroundColor={isSelected ? '#2a2a2a' : undefined} paddingX={2}>
+                                        <Text
+                                            color={isSelected ? 'cyan' : 'white'}
+                                            bold={isSelected}
+                                        >
+                                            {isSelected ? '❯ ' : '  '}{item.label}
+                                        </Text>
+                                        <Text color="gray" dimColor>{dots}</Text>
+                                        <Text color={getStatusColor(item)} bold>
+                                            [ {item.status} ]
+                                        </Text>
+                                    </Box>
+                                );
+                            });
+
+                            return elements;
+                        })()
+                    ) : (
+                        <Box paddingX={1}>
+                            <Text color="gray" italic>
+                                {CATEGORIES[selectedCategoryIndex].desc}
+                            </Text>
+                        </Box>
+                    )}
+                </Box>
+            </Box>
+
+            {/* Navigation Guide Footer */}
+            <Box paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
+                <Text color="gray" dimColor italic>
+                    {activeColumn === 'categories'
+                        ? '▲▼ Select Category • Enter/► to configure'
+                        : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back'}
+                </Text>
+                {activeColumn === 'categories' && (
+                    <Text color="gray" dimColor>
+                        {CATEGORIES[selectedCategoryIndex].desc}
+                    </Text>
+                )}
+            </Box>
+        </Box>
+    );
+}

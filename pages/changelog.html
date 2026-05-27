@@ -225,8 +225,17 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.15.0", "1.14.5"]
+        const stableVersions = ["1.16.0", "1.15.0"]
         const changelogData = {
+            "1.16.0": {
+                "note": "Enhanced Sandboxing & Security Policies",
+                "added": [
+                    "Granular Sandbox Presets: Added Strict, Balanced, Autonomous, and Custom sandboxes.",
+                    "Comprehensive Security Rules: Integrated Auto-Approve, Auto-Disallow, Git Commit approvals, and Network Access controls."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "1.15.0": {
                 "note": "Enhanced Thinking Intelligence",
                 "added": [
