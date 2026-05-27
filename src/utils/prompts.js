@@ -86,7 +86,6 @@ ${projectContextBlock}
 -- RESPONSE RULES --
 - End with [turn: continue] to continue or [turn: finish] when task done
 - Tool Called? No post tool response until [turn: continue]
-- **STRICT: MAX 3 TOOL CALL STACK PER TURN**
 - Task Complete? End loop with [turn: finish]
 [/SYSTEM]`.trim();
 };

@@ -1,6 +1,7 @@
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. To call a tool, MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
+- **STRICT POLICY: MAX 3 TOOL CALLS PER TURN. Next Turn, verify results and plan next**
 
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
