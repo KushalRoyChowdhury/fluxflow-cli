@@ -34,6 +34,8 @@ const defaultStats = {
     toolDenied: 0,
     duration: 0,
     tokens: 0,
+    linesAdded: 0,
+    linesRemoved: 0,
     imageCalls: []
 };
 

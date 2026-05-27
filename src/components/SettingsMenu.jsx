@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import TextInput from 'ink-text-input';
 
 const CATEGORIES = [
     { id: 'memory', label: '🧠 Memory', desc: 'Manage system context & agent\'s memory' },
@@ -10,37 +11,47 @@ const CATEGORIES = [
 ];
 
 const getActivePreset = (settings) => {
-    const approve = settings.autoApproveCommands || 'Read-Only';
-    const disallow = settings.autoDisallowCommands || 'Destructive';
+    const approve = settings.autoApproveCommands || '';
+    const disallow = settings.autoDisallowCommands || '';
+    const alwaysAsk = settings.alwaysAskCommands || '';
 
-    const isStrict = 
+    const isStrict =
         settings.autoExec === false &&
         settings.allowExternalAccess === false &&
         settings.networkAccess === false &&
-        approve === 'None' &&
-        disallow === 'Auto' &&
+        approve === '' &&
+        disallow === 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format' &&
+        alwaysAsk === '' &&
         settings.autoApproveGit === false;
-        
+
     const isBalanced =
         settings.autoExec === true &&
         settings.allowExternalAccess === false &&
         settings.networkAccess !== false &&
-        approve === 'Read-Only' &&
-        disallow === 'Destructive' &&
+        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, help, mkdir, touch, md' &&
+        disallow === 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format' &&
+        alwaysAsk === '' &&
         settings.autoApproveGit === false;
-        
+
     const isAutonomous =
         settings.autoExec === true &&
         settings.allowExternalAccess === true &&
         settings.networkAccess !== false &&
-        approve === 'Auto' &&
-        disallow === 'None' &&
+        approve === '' &&
+        disallow === '' &&
+        alwaysAsk === '' &&
         settings.autoApproveGit === true;
 
     if (isStrict) return 'Strict';
     if (isBalanced) return 'Balanced';
     if (isAutonomous) return 'Autonomous';
-    return settings.sandboxPreset || 'Balanced';
+    return settings.sandboxPreset || 'Custom';
+};
+
+const truncateCSV = (val) => {
+    if (!val || val.trim() === '') return 'None';
+    if (val.length > 20) return val.substring(0, 17) + '...';
+    return val;
 };
 
 export default function SettingsMenu({
@@ -56,6 +67,8 @@ export default function SettingsMenu({
     const [activeColumn, setActiveColumn] = useState('categories'); // 'categories' or 'items'
     const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
+    const [editingItem, setEditingItem] = useState(null);
+    const [editValue, setEditValue] = useState('');
 
     // Get items for current category
     const getCategoryItems = (catId) => {
@@ -71,8 +84,9 @@ export default function SettingsMenu({
                     { label: 'Auto Execute', value: 'autoExec', status: systemSettings.autoExec ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'External Workspace Access', value: 'externalAccess', status: systemSettings.allowExternalAccess ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Network Access (Terminal)', value: 'networkAccess', status: systemSettings.networkAccess !== false ? 'ON' : 'OFF', section: 'Sandbox' },
-                    { label: 'Auto Approve Commands', value: 'autoApprove', status: systemSettings.autoApproveCommands || 'Read-Only', section: 'Sandbox' },
-                    { label: 'Auto Disallow Commands', value: 'autoDisallow', status: systemSettings.autoDisallowCommands || 'Destructive', section: 'Sandbox' },
+                    { label: 'Always Ask Commands', value: 'alwaysAsk', status: truncateCSV(systemSettings.alwaysAskCommands), section: 'Sandbox' },
+                    { label: 'Auto Approve Commands', value: 'autoApprove', status: truncateCSV(systemSettings.autoApproveCommands), section: 'Sandbox' },
+                    { label: 'Auto Disapprove Commands', value: 'autoDisallow', status: truncateCSV(systemSettings.autoDisallowCommands), section: 'Sandbox' },
                     { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
                     { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' }
@@ -95,6 +109,13 @@ export default function SettingsMenu({
     const currentItems = getCategoryItems(currentCatId);
 
     useInput((input, key) => {
+        if (editingItem) {
+            if (key.escape) {
+                setEditingItem(null);
+            }
+            return;
+        }
+
         if (activeColumn === 'categories') {
             if (key.upArrow) {
                 setSelectedCategoryIndex(prev => (prev - 1 + CATEGORIES.length) % CATEGORIES.length);
@@ -108,6 +129,8 @@ export default function SettingsMenu({
                     setActiveColumn('items');
                     setSelectedItemIndex(0);
                 }
+            } else if (key.escape) {
+                setActiveView('chat');
             }
         } else if (activeColumn === 'items') {
             if (key.upArrow) {
@@ -132,29 +155,32 @@ export default function SettingsMenu({
             const curIndex = presets.indexOf(activePreset);
             const nextIndex = (curIndex + 1) % presets.length;
             const nextPreset = presets[nextIndex];
-            
+
             setSystemSettings(s => {
                 const updated = { ...s, sandboxPreset: nextPreset };
                 if (nextPreset === 'Strict') {
                     updated.autoExec = false;
                     updated.allowExternalAccess = false;
                     updated.networkAccess = false;
-                    updated.autoApproveCommands = 'None';
-                    updated.autoDisallowCommands = 'Auto';
+                    updated.autoApproveCommands = '';
+                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format';
+                    updated.alwaysAskCommands = '';
                     updated.autoApproveGit = false;
                 } else if (nextPreset === 'Balanced') {
                     updated.autoExec = true;
                     updated.allowExternalAccess = false;
                     updated.networkAccess = true;
-                    updated.autoApproveCommands = 'Read-Only';
-                    updated.autoDisallowCommands = 'Destructive';
+                    updated.autoApproveCommands = 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, help, mkdir, touch, md';
+                    updated.autoDisallowCommands = 'rm -rf, rm -f, del /f, rd /s, rmdir /s, format';
+                    updated.alwaysAskCommands = '';
                     updated.autoApproveGit = false;
                 } else if (nextPreset === 'Autonomous') {
                     updated.autoExec = true;
                     updated.allowExternalAccess = true;
                     updated.networkAccess = true;
-                    updated.autoApproveCommands = 'Auto';
-                    updated.autoDisallowCommands = 'None';
+                    updated.autoApproveCommands = '';
+                    updated.autoDisallowCommands = '';
+                    updated.alwaysAskCommands = '';
                     updated.autoApproveGit = true;
                 }
                 return updated;
@@ -181,18 +207,17 @@ export default function SettingsMenu({
             }
         } else if (item.value === 'networkAccess') {
             setSystemSettings(s => ({ ...s, networkAccess: s.networkAccess === false, sandboxPreset: 'Custom' }));
+        } else if (item.value === 'alwaysAsk') {
+            setEditingItem('alwaysAskCommands');
+            setEditValue(systemSettings.alwaysAskCommands || '');
         } else if (item.value === 'autoApprove') {
-            const approveOptions = ['Auto', 'None', 'Read-Only'];
-            const curIndex = approveOptions.indexOf(systemSettings.autoApproveCommands || 'Read-Only');
-            const nextIndex = (curIndex + 1) % approveOptions.length;
-            setSystemSettings(s => ({ ...s, autoApproveCommands: approveOptions[nextIndex], sandboxPreset: 'Custom' }));
+            setEditingItem('autoApproveCommands');
+            setEditValue(systemSettings.autoApproveCommands || '');
         } else if (item.value === 'autoApproveGit') {
             setSystemSettings(s => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: 'Custom' }));
         } else if (item.value === 'autoDisallow') {
-            const disallowOptions = ['Auto', 'None', 'Destructive'];
-            const curIndex = disallowOptions.indexOf(systemSettings.autoDisallowCommands || 'Destructive');
-            const nextIndex = (curIndex + 1) % disallowOptions.length;
-            setSystemSettings(s => ({ ...s, autoDisallowCommands: disallowOptions[nextIndex], sandboxPreset: 'Custom' }));
+            setEditingItem('autoDisallowCommands');
+            setEditValue(systemSettings.autoDisallowCommands || '');
         } else if (item.value === 'apiTier') {
             setActiveView('apiTier');
         } else if (item.value === 'autoDelete') {
@@ -273,6 +298,14 @@ export default function SettingsMenu({
                             let lastSection = null;
                             const elements = [];
 
+                            const getListItems = (val) => (val || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                            const approveList = getListItems(systemSettings.autoApproveCommands);
+                            const disallowList = getListItems(systemSettings.autoDisallowCommands);
+                            const askList = getListItems(systemSettings.alwaysAskCommands);
+                            const allLists = [...approveList, ...disallowList, ...askList];
+                            const uniqueLists = new Set(allLists);
+                            const hasConflict = currentCatId === 'security' && allLists.length !== uniqueLists.size;
+
                             currentItems.forEach((item, index) => {
                                 const isSelected = activeColumn === 'items' && selectedItemIndex === index;
                                 // Calculate padding to align statuses perfectly
@@ -300,21 +333,66 @@ export default function SettingsMenu({
                                     );
                                 }
 
+                                const isEditingThis = isSelected && editingItem &&
+                                    ((editingItem === 'alwaysAskCommands' && item.value === 'alwaysAsk') ||
+                                     (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
+                                     (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow'));
+                                const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'autoApprove' || item.value === 'autoDisallow';
+
                                 elements.push(
-                                    <Box key={item.value} backgroundColor={isSelected ? '#2a2a2a' : undefined} paddingX={2}>
-                                        <Text
-                                            color={isSelected ? 'cyan' : 'white'}
-                                            bold={isSelected}
-                                        >
-                                            {isSelected ? '❯ ' : '  '}{item.label}
-                                        </Text>
-                                        <Text color="gray" dimColor>{dots}</Text>
-                                        <Text color={getStatusColor(item)} bold>
-                                            [ {item.status} ]
-                                        </Text>
+                                    <Box key={item.value} flexDirection="column">
+                                        <Box backgroundColor={isSelected && !isEditingThis ? '#2a2a2a' : undefined} paddingX={2}>
+                                            <Text
+                                                color={isSelected ? 'cyan' : 'white'}
+                                                bold={isSelected}
+                                            >
+                                                {isSelected ? '❯ ' : '  '}{item.label}
+                                            </Text>
+                                            {!isCommandListItem && (
+                                                <>
+                                                    <Text color="gray" dimColor>{dots}</Text>
+                                                    <Text color={getStatusColor(item)} bold>
+                                                        [ {item.status} ]
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </Box>
+                                        {isCommandListItem && !isEditingThis && item.status !== 'None' && (
+                                            <Box paddingX={4} marginBottom={1}>
+                                                <Text color="gray" dimColor>↳ {item.status}</Text>
+                                            </Box>
+                                        )}
+                                        {isEditingThis && (
+                                            <Box flexDirection="column" marginLeft={4} marginBottom={1}>
+                                                <Box paddingX={1} borderStyle="single" borderColor="cyan" flexDirection="row">
+                                                    <Text color="cyan" bold>{'> '} </Text>
+                                                    <TextInput
+                                                        value={editValue}
+                                                        onChange={setEditValue}
+                                                        onSubmit={(val) => {
+                                                            const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: 'Custom' };
+                                                            setSystemSettings(newSysSettings);
+                                                            saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                                                            setEditingItem(null);
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Text color="gray" dimColor italic>  Comma separated • Press Enter to save, Esc to cancel</Text>
+                                            </Box>
+                                        )}
                                     </Box>
                                 );
                             });
+
+                            if (hasConflict) {
+                                elements.push(
+                                    <Box key="conflict-warning" marginTop={1} paddingX={1}>
+                                        <Text color="red" dimColor italic>
+                                            * Conflicting commands will be ignored and defaulted to highest priority
+                                        </Text>
+                                    </Box>
+                                );
+                            }
 
                             return elements;
                         })()

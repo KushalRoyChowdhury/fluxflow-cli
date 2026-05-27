@@ -36,6 +36,8 @@ import { formatTokens } from './utils/text.js';
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
+let linesAdded = 0;
+let linesRemoved = 0;
 
 // Centralized Version Control: dynamically fetch version and date from package.json
 const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
@@ -534,7 +536,7 @@ export default function App({ args = [] }) {
                 if (activeView === 'revert') {
                     setActiveView('chat');
                     setEscPressCount(0);
-                } else if (activeView !== 'chat') {
+                } else if (activeView !== 'chat' && activeView !== 'settings') {
                     setActiveView('chat');
                 } else {
                     setEscPressCount(prev => {
@@ -1025,6 +1027,8 @@ export default function App({ args = [] }) {
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
+                    linesAdded = 0;
+                    linesRemoved = 0;
                     break;
                 }
                 case '/revert': {
@@ -1082,10 +1086,10 @@ export default function App({ args = [] }) {
                                         role: 'system',
                                         isImageStats: true,
                                         text: `• Hourly Limit: ${Number((stats.limit * 1000).toFixed(0))} credits\n` +
-                                             `• Spent (Last 1hr): ${Number((stats.totalSpent * 1000).toFixed(0))} credits\n` +
-                                             `• Remaining: ${Number((stats.remaining * 1000).toFixed(0))} credits\n` +
-                                             `• Requests (Last 1hr): ${stats.activeCallsCount} requests\n` +
-                                             (stats.nextResetMin > 0 ? `• Refreshes in: ${stats.nextResetMin}m` : ''),
+                                            `• Spent (Last 1hr): ${Number((stats.totalSpent * 1000).toFixed(0))} credits\n` +
+                                            `• Remaining: ${Number((stats.remaining * 1000).toFixed(0))} credits\n` +
+                                            `• Requests (Last 1hr): ${stats.activeCallsCount} requests\n` +
+                                            (stats.nextResetMin > 0 ? `• Refreshes in: ${stats.nextResetMin}m` : ''),
                                         isMeta: true
                                     }];
                                 });
@@ -1706,6 +1710,62 @@ OUTPUT: ${execOutputRef.current}`;
                                 binaryPart: packet.binaryPart, // v1.5.0 Multimodal Support
                                 toolName: packet.toolName
                             }]);
+
+                            // Track code changes
+                            if (packet.toolName === 'update_file' && packet.aiContent) {
+                                const diffLines = packet.aiContent.split('\n');
+                                let added = 0;
+                                let removed = 0;
+                                let insideDiff = false;
+                                for (const line of diffLines) {
+                                    if (line.includes('[DIFF_START]')) {
+                                        insideDiff = true;
+                                        continue;
+                                    }
+                                    if (line.includes('[DIFF_END]')) {
+                                        insideDiff = false;
+                                        continue;
+                                    }
+                                    if (insideDiff) {
+                                        if (/^\+\d+/.test(line)) {
+                                            added++;
+                                        } else if (/^\-\d+/.test(line)) {
+                                            removed++;
+                                        }
+                                    }
+                                }
+                                linesAdded += added;
+                                linesRemoved += removed;
+                                addToUsage('linesAdded', added);
+                                addToUsage('linesRemoved', removed);
+                            } else if (packet.toolName === 'write_file' && packet.aiContent) {
+                                const statsMatch = packet.aiContent.match(/- Stats: \[(\d+) lines/);
+                                const verifiedLinesCount = statsMatch ? parseInt(statsMatch[1]) : 0;
+
+                                let oldLinesCount = 0;
+                                if (packet.aiContent.includes('Old File contents:')) {
+                                    const ancestryLines = packet.aiContent.split('\n');
+                                    let insideOldFile = false;
+                                    for (const line of ancestryLines) {
+                                        if (line.includes('Old File contents:')) {
+                                            insideOldFile = true;
+                                            continue;
+                                        }
+                                        if (insideOldFile) {
+                                            if (line.trim() === '') {
+                                                insideOldFile = false;
+                                            } else if (/^\d+ \|/.test(line)) {
+                                                oldLinesCount++;
+                                            }
+                                        }
+                                    }
+                                }
+                                linesAdded += verifiedLinesCount;
+                                linesRemoved += oldLinesCount;
+                                addToUsage('linesAdded', verifiedLinesCount);
+                                addToUsage('linesRemoved', oldLinesCount);
+                            }
+
                             continue;
                         }
 
@@ -1752,7 +1812,7 @@ OUTPUT: ${execOutputRef.current}`;
                             // Clean up any partial tags from the visible text
                             chunkText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '', isStreaming: true }]);
+                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() }]);
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
@@ -1763,11 +1823,14 @@ OUTPUT: ${execOutputRef.current}`;
                             const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
                             setMessages(prev => {
-                                const newMsgs = prev.map(m =>
-                                    m.id === currentThinkId
-                                        ? { ...m, text: m.text + thinkPart, isStreaming: true }
-                                        : m
-                                );
+                                const newMsgs = prev.map(m => {
+                                    if (m.id === currentThinkId) {
+                                        const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
+                                        const duration = Date.now() - startTime;
+                                        return { ...m, text: m.text + thinkPart, isStreaming: false, duration };
+                                    }
+                                    return m;
+                                });
 
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
@@ -1789,7 +1852,9 @@ OUTPUT: ${execOutputRef.current}`;
                                             transitioning = true;
                                             const parts = newText.split(/<\/think>/gi);
                                             transitionContent = parts.slice(1).join('</think>') || '';
-                                            return { ...m, text: parts[0] };
+                                            const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
+                                            const duration = Date.now() - startTime;
+                                            return { ...m, text: parts[0], isStreaming: false, duration };
                                         }
                                         return { ...m, text: newText, isStreaming: true };
                                     }
@@ -1999,7 +2064,11 @@ OUTPUT: ${execOutputRef.current}`;
                                     } else if (key === 'janitorModel') {
                                         setJanitorModel(val);
                                         newSettings.janitorModel = val;
-                                                                        } else if (key === 'externalDataPath') {
+                                    } else if (key === 'autoApproveCommands' || key === 'autoDisallowCommands' || key === 'alwaysAskCommands') {
+                                        const newSysSettings = { ...systemSettings, [key]: val.trim(), sandboxPreset: 'Custom' };
+                                        setSystemSettings(newSysSettings);
+                                        newSettings.systemSettings = newSysSettings;
+                                    } else if (key === 'externalDataPath') {
                                         const newSysSettings = { ...systemSettings, useExternalData: true, externalDataPath: val.trim() };
                                         setSystemSettings(newSysSettings);
                                         newSettings.systemSettings = newSysSettings;
@@ -2082,6 +2151,10 @@ OUTPUT: ${execOutputRef.current}`;
                                 <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
                             </Box>
                             <Box>
+                                <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
+                                <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
+                            </Box>
+                            <Box>
                                 <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
                                 <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
                                 <Text color="green">✓ {sessionToolSuccess}</Text>
@@ -2118,6 +2191,10 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
                                 <Text color="white">{Number(((dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Code Changes Today:</Text></Box>
+                                <Text color="white"><Text color="green">+{dailyUsage?.linesAdded || 0}</Text> <Text color="red">-{dailyUsage?.linesRemoved || 0}</Text></Text>
                             </Box>
                             <Box>
                                 <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
@@ -2762,6 +2839,10 @@ OUTPUT: ${execOutputRef.current}`;
                                 <Box>
                                     <Box width={20}><Text color="blue">Success Rate:</Text></Box>
                                     <Text color="white">{successRate}%</Text>
+                                </Box>
+                                <Box>
+                                    <Box width={20}><Text color="blue">Code Changes:</Text></Box>
+                                    <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
                                 </Box>
                                 <Box>
                                     <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>

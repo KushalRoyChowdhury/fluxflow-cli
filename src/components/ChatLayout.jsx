@@ -535,6 +535,17 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     return <MarkdownText text={text} columns={columns} />;
 });
 
+const formatThinkingDuration = (ms) => {
+    const totalSecs = Math.round(ms / 1000);
+    if (totalSecs <= 0) return '0s';
+    const m = Math.floor(totalSecs / 60);
+    const s = totalSecs % 60;
+    if (m > 0) {
+        return `${m}m ${s}s`;
+    }
+    return `${totalSecs}s`;
+};
+
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
@@ -774,7 +785,15 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
             ) : msg.role === 'think' ? (
                 <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
-                    <Text bold color="white">Thinking...</Text>
+                    {msg.isStreaming && !msg.duration ? (
+                        <Text bold color="white">✧ Thinking...</Text>
+                    ) : (
+                        <Text bold color="white">
+                            ✦ Thought{msg.duration ? (
+                                <Text dimColor color="gray"> for <Text bold color="cyan">{formatThinkingDuration(msg.duration)}</Text></Text>
+                            ) : ''}
+                        </Text>
+                    )}
                     {/* [SPACE POINT] */}
                     <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
                         {formatThinkText(finalContent, columns)}

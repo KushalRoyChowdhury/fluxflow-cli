@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.16.0", "1.15.0"]
+        const stableVersions = ["1.16.1"]
         const changelogData = {
+            "1.16.1": {
+                "note": "Improved User control on sandboxed commands and Telemetry Tracking.",
+                "added": [
+                    "Always Ask Command List: Force prompt verification for specific sensitive commands regardless of general settings.",
+                    "Thinking Duration Visualizer: Displays a beautiful dimmed timer next to 'Thought' (e.g. 'for 5s') once reasoning completes.",
+                    "High-Fidelity Code Changes Tracker: Real-time telemetry monitoring of total lines added/removed (+X -Y) inside session summaries, the live /stats dashboard, and persistent daily usage logs."
+                ],
+                "changed": [
+                    "User-Typed Sandbox Overrides: Replaced fixed toggle presets with inline, comma-separated customizable text inputs for Auto Approve and Auto Disapprove."
+                ],
+                "fixes": []
+            },
             "1.16.0": {
                 "note": "Enhanced Sandboxing & Security Policies",
                 "added": [

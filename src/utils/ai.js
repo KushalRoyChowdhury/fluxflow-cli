@@ -1171,7 +1171,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const action = normToolName === 'list_files' ? 'LIST' : 'ANALYSED';
                                 label = `📂 ${action} FOLDER: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
                             } else if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                const action = normToolName === 'write_file' ? 'WRITTEN' : 'UPDATED FILE';
+                                const action = normToolName === 'write_file' ? 'WRITTEN' : 'PATCHED';
                                 label = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                             } else if (normToolName === 'write_pdf') {
                                 label = `📑 PDF CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
@@ -1229,7 +1229,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const absoluteTarget = path.resolve(targetPath);
                                 const absoluteCwd = path.resolve(process.cwd());
                                 if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
-                                    const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace. To enable this, ask the user to turn on "External Workspace Access" in /settings.`;
+                                    const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                                     if (normToolName === 'write_file' || normToolName === 'update_file') {
                                         const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
                                         const deniedLabel = `💾 ${action}: ${parsedArgs.path || '...'}`.toUpperCase();
@@ -1251,52 +1251,58 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (shouldPrompt) {
                                     const systemSettings = settings.systemSettings || {};
                                     const autoExec = systemSettings.autoExec;
-                                    const autoApprove = systemSettings.autoApproveCommands || 'Read-Only';
-                                    const autoDisallow = systemSettings.autoDisallowCommands || 'Destructive';
 
                                     let decision = null; // 'allow', 'deny', or null (prompt)
+                                    let forcePrompt = false;
+                                    let disallowMatch = false;
+                                    let isNetworkDeny = false;
 
                                     if (normToolName === 'exec_command') {
                                         const { command } = parseArgs(toolCall.args);
                                         const cmdTrimmed = (command || '').trim();
 
-                                        const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
-                                        const destructiveRegex = /\b(rm\s+-rf|rm\s+-f|del\s+\/f|rd\s+\/s|rmdir\s+\/s|format)\b/i;
-                                        const creationRegex = /^(mkdir|touch|md|ni|New-Item)\b/i;
-                                        const isReadOnly = safeRegex.test(cmdTrimmed);
-                                        const isDestructive = destructiveRegex.test(cmdTrimmed);
-                                        const isCreation = creationRegex.test(cmdTrimmed);
+                                        const matchesList = (cmd, csv) => {
+                                            if (!csv) return false;
+                                            const list = csv.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                                            const lowerCmd = cmd.toLowerCase();
+                                            return list.some(item => lowerCmd.startsWith(item));
+                                        };
 
-                                        // 1. Auto-approve check (HIGHEST PRIORITY)
-                                        if (autoApprove === 'Auto') {
+                                        const askMatch = matchesList(cmdTrimmed, systemSettings.alwaysAskCommands);
+                                        const approveMatch = matchesList(cmdTrimmed, systemSettings.autoApproveCommands);
+                                        disallowMatch = matchesList(cmdTrimmed, systemSettings.autoDisallowCommands);
+
+                                        // 1. Always Ask (HIGHEST PRIORITY)
+                                        if (askMatch) {
+                                            forcePrompt = true;
+                                        }
+                                        // 2. Auto Approve
+                                        else if (approveMatch) {
                                             decision = 'allow';
-                                        } else if (autoApprove === 'Read-Only' && isReadOnly) {
-                                            decision = 'allow';
-                                        } else if (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
+                                        }
+                                        // 3. Git commit approve
+                                        else if (systemSettings.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
                                             decision = 'allow';
                                         }
 
-                                        // 2. Auto-disallow check (MIDDLE PRIORITY)
-                                        if (!decision) {
+                                        if (!forcePrompt && !decision) {
                                             // Network access check
                                             if (systemSettings.networkAccess === false) {
                                                 const networkCmdRegex = /\b(curl|wget|npm|yarn|pnpm|pip|pip3|ssh|docker|git\s+(clone|push|pull|fetch))\b/i;
                                                 if (networkCmdRegex.test(cmdTrimmed)) {
                                                     decision = 'deny';
+                                                    isNetworkDeny = true;
                                                 }
                                             }
 
-                                            if (!decision) {
-                                                if (autoDisallow === 'Auto' && (isDestructive || (!isReadOnly && !isCreation))) {
-                                                    decision = 'deny';
-                                                } else if (autoDisallow === 'Destructive' && isDestructive) {
-                                                    decision = 'deny';
-                                                }
+                                            // 4. Auto Disallow
+                                            if (!decision && disallowMatch) {
+                                                decision = 'deny';
                                             }
                                         }
 
-                                        // 3. Auto-execute fallback (LOWEST PRIORITY)
-                                        if (!decision && autoExec) {
+                                        // 5. Auto Execute Fallback
+                                        if (!forcePrompt && !decision && autoExec) {
                                             decision = 'allow';
                                         }
                                     } else {
@@ -1308,12 +1314,36 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
 
                                     let approval = decision;
+                                    let denyReason = '';
+                                    if (decision === 'deny') {
+                                        if (isNetworkDeny) {
+                                            denyReason = 'network';
+                                        } else if (disallowMatch) {
+                                            denyReason = 'settings';
+                                        } else {
+                                            denyReason = 'prohibited';
+                                        }
+                                    }
+
                                     if (!approval) {
                                         approval = await settings.onToolApproval(normToolName, toolCall.args);
+                                        if (approval === 'deny') {
+                                            denyReason = 'user';
+                                        }
                                     }
 
                                     if (approval === 'deny') {
-                                        const denyMsg = `Permission Denied: Prohibited ${normToolName === 'exec_command' ? 'command' : 'file edit'}.`;
+                                        let denyMsg = `Permission Denied: Prohibited ${normToolName === 'exec_command' ? 'Command' : 'file edit'}.`;
+                                        if (denyReason === 'user') {
+                                            denyMsg = 'Permission Denied by User';
+                                        } else if (denyReason === 'settings') {
+                                            denyMsg = 'Permission Denied by User Policy';
+                                        } else if (denyReason === 'network') {
+                                            denyMsg = 'Permission Denied: Sandbox Network Access Disabled by User Policy.';
+                                        } else if (denyReason === 'prohibited' && normToolName === 'exec_command') {
+                                            denyMsg = 'Permission Denied: Prohibited Command';
+                                        }
+
                                         if (normToolName === 'write_file' || normToolName === 'update_file') {
                                             const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
                                             const deniedLabel = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
