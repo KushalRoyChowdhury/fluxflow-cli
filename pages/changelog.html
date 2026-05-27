@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.16.1"]
+        const stableVersions = ["1.16.2", "1.16.1"]
         const changelogData = {
+            "1.16.2": {
+                "note": "Session Stats Bug Fix.",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Resolved a bug where session code changes stats (+X -Y) would incorrectly reset to 0 after executing the /clear command."
+                ]
+            },
             "1.16.1": {
                 "note": "Improved User control on sandboxed commands and Telemetry Tracking.",
                 "added": [

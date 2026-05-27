@@ -1027,8 +1027,6 @@ export default function App({ args = [] }) {
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
-                    linesAdded = 0;
-                    linesRemoved = 0;
                     break;
                 }
                 case '/revert': {
