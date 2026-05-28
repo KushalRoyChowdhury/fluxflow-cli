@@ -100,8 +100,8 @@ function formatPromptPreview(prompt) {
     if (!prompt) return '';
     const firstLine = prompt.split('\n')[0] || '';
     const words = firstLine.split(/\s+/).filter(Boolean);
-    if (words.length > 25) {
-        return words.slice(0, 25).join(' ') + '...';
+    if (words.length > 15) {
+        return words.slice(0, 15).join(' ') + '...';
     }
     if (prompt.includes('\n')) {
         return firstLine + '...';

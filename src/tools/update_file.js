@@ -177,7 +177,7 @@ export const update_file = async (args) => {
 
         // Updated lines (fully indented)
         // Calculate the corresponding range in the new content
-        const newAffectedEndPos = startPos + content_to_add.length;
+        const newAffectedEndPos = startPos + finalContentToAdd.length;
         const newLineEndPos = newFileContent.indexOf('\n', newAffectedEndPos);
         const actualNewEndPos = newLineEndPos === -1 ? newFileContent.length : newLineEndPos;
         const fullNewLines = newFileContent.substring(lineStartPos, actualNewEndPos).split('\n');

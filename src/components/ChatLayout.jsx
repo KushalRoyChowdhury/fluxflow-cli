@@ -293,7 +293,8 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     const colChars = Math.floor(availableWidth / header.length) - 2; // Padding buffer
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="#333" paddingX={1} marginY={1} width="100%" flexGrow={1}>
+        // Table MarginY here
+        <Box flexDirection="column" borderStyle="round" borderColor="#454545ff" paddingX={1} marginY={0} width="100%" flexGrow={1}>
             {/* Header with Integrated Divider */}
             <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor="#444" marginBottom={1} paddingBottom={0} width="100%">
                 {header.map((cell, i) => (
@@ -442,7 +443,7 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const diffLines = diffBody.split('\n');
 
     return (
-        <Box flexDirection="column" width="100%">
+        <Box flexDirection="column" width="100%" marginBottom={0}>
             <Box flexDirection="column" backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
                     <DiffLine key={i} line={line} columns={columns} />
@@ -512,7 +513,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                         const gutterWidth = String(codeLines.length).length;
 
                         return (
-                            <Box key={i} flexDirection="column" marginY={1} backgroundColor="#111" borderStyle="round" borderColor="#333" paddingX={1} width="100%">
+                            <Box key={i} flexDirection="column" marginY={0} backgroundColor="#111" borderStyle="round" borderColor="#333" paddingX={1} width="100%">
                                 <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
                                     <Text backgroundColor="#333" color="white"> {lang.toUpperCase()} </Text>
                                 </Box>
@@ -531,7 +532,15 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                             </Box>
                         );
                     }
-                    return <MarkdownText key={i} text={part} columns={columns} />;
+                    let cleanPart = part;
+                    if (i > 0) {
+                        cleanPart = cleanPart.replace(/^[\r\n]+/, '');
+                    }
+                    if (i < parts.length - 1) {
+                        cleanPart = cleanPart.replace(/[\r\n]+$/, '');
+                    }
+                    if (!cleanPart) return null;
+                    return <MarkdownText key={i} text={cleanPart} columns={columns} />;
                 })}
             </Box>
         );
@@ -759,7 +768,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     return (
         // [SPACE POINT]
-        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 1} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
+        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 1} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
                 <Box
                     backgroundColor="#262626"
@@ -796,7 +805,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     ) : (
                         <Text bold color="white">
                             ✦ Thought{msg.duration ? (
-                                <Text dimColor color="gray"> for <Text bold color="cyan">{formatThinkingDuration(msg.duration)}</Text></Text>
+                                <Text color="gray"> for <Text bold color="cyan">{formatThinkingDuration(msg.duration)}</Text></Text>
                             ) : ''}
                         </Text>
                     )}
@@ -814,10 +823,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                         </Box>
                     )}
                     {msg.role === 'agent' && msg.workedDuration ? (
-                        <Box marginTop={1} width="100%">
-                            <Text dimColor color="gray">
-                                [⚡ Worked for <Text bold color="cyan">{formatThinkingDuration(msg.workedDuration)}</Text> ]
-                            </Text>
+                        <Box marginTop={1} marginBottom={2} width="100%">
+                            <Text>[</Text><Text color="gray">
+                                ⚡ Worked for <Text bold color="cyan">{formatThinkingDuration(msg.workedDuration)}</Text>
+                            </Text><Text>]</Text>
                         </Box>
                     ) : null}
                 </Box>
