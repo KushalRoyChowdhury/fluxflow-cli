@@ -706,7 +706,69 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
     const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-    const firstUserMsg = `${memoryPrompt}\n[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CORE PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+    const getDirTree = (dir, prefix = '') => {
+        try {
+            const files = fs.readdirSync(dir);
+            const sep = path.sep;
+            if (files.length > 70) {
+                return `${prefix}└── ${path.basename(dir)}${sep}...\n`;
+            }
+
+            let result = '';
+            const COLLAPSED_DIRS = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor'];
+
+            const filtered = files.filter(f => !COLLAPSED_DIRS.includes(f));
+            const collapsedInDir = files.filter(f => COLLAPSED_DIRS.includes(f)).sort();
+
+            const sorted = filtered.sort((a, b) => {
+                try {
+                    const aStat = fs.statSync(path.join(dir, a));
+                    const bStat = fs.statSync(path.join(dir, b));
+                    if (aStat.isDirectory() && !bStat.isDirectory()) return -1;
+                    if (!aStat.isDirectory() && bStat.isDirectory()) return 1;
+                } catch (e) {}
+                return a.localeCompare(b);
+            });
+
+            sorted.push(...collapsedInDir);
+
+            sorted.forEach((file, index) => {
+                const isLast = index === sorted.length - 1;
+                const filePath = path.join(dir, file);
+                const connector = isLast ? '└── ' : '├── ';
+                const childPrefix = prefix + (isLast ? '    ' : '│   ');
+
+                if (COLLAPSED_DIRS.includes(file)) {
+                    result += `${prefix}${connector}${file}${sep}...\n`;
+                    return;
+                }
+
+                try {
+                    const stat = fs.statSync(filePath);
+                    if (stat.isDirectory()) {
+                        const subFiles = fs.readdirSync(filePath);
+                        if (subFiles.length > 80) {
+                            result += `${prefix}${connector}${file}${sep}...\n`;
+                        } else {
+                            result += `${prefix}${connector}${file}${sep}\n`;
+                            result += getDirTree(filePath, childPrefix);
+                        }
+                    } else {
+                        result += `${prefix}${connector}${file}\n`;
+                    }
+                } catch (e) {
+                    result += `${prefix}${connector}${file}\n`;
+                }
+            });
+            return result;
+        } catch (e) {
+            return '';
+        }
+    };
+
+    let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd());
+
+    const firstUserMsg = `[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CORE PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
     modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
     let lastUsage = null;
@@ -845,7 +907,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
                 }
 
-                // fs.writeFileSync(`contents_${thinkingLevel}.txt`, currentSystemInstruction + `\n\n` + firstUserMsg);
+                // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `<bos>\n<system>\n${currentSystemInstruction}\n\n<user>\n${firstUserMsg}\n<eos>`);
 
                 stream = await client.models.generateContentStream({
                     model: targetModel || "gemma-4-31b-it",
@@ -1385,7 +1447,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
                             }
 
-                            const effectiveStart = lastToolEventTime || Date.now();
+                            const executionStart = Date.now();
                             yield { type: 'spinner', content: false };
                             let result = await dispatchTool(normToolName, toolCall.args, {
                                 chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
@@ -1400,7 +1462,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             const toolEnd = Date.now();
                             lastToolFinishedAt = toolEnd;
-                            yield { type: 'tool_time', content: toolEnd - effectiveStart };
+                            yield { type: 'tool_time', content: toolEnd - executionStart };
                             lastToolEventTime = toolEnd;
 
                             let binaryPart = null;

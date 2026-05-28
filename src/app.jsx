@@ -166,6 +166,47 @@ const parseAgentText = (text) => {
     return blocks;
 };
 
+const getProjectFiles = (() => {
+    let cachedFiles = null;
+    let lastScanTime = 0;
+
+    return (dir) => {
+        const now = Date.now();
+        if (cachedFiles && now - lastScanTime < 5000) { // Cache for 5 seconds
+            return cachedFiles;
+        }
+
+        const fileList = [];
+        const scan = (currentDir) => {
+            try {
+                const files = fs.readdirSync(currentDir);
+                for (const file of files) {
+                    if (['node_modules', '.git', '.gemini', 'dist', 'build', '.next', '.cache', 'out'].includes(file)) {
+                        continue;
+                    }
+                    const filePath = path.join(currentDir, file);
+                    const stat = fs.statSync(filePath);
+                    if (stat.isDirectory()) {
+                        scan(filePath);
+                    } else {
+                        fileList.push({
+                            name: file,
+                            relativePath: path.relative(process.cwd(), filePath)
+                        });
+                    }
+                }
+            } catch (e) {
+                // Ignore errors
+            }
+        };
+
+        scan(dir);
+        cachedFiles = fileList;
+        lastScanTime = now;
+        return fileList;
+    };
+})();
+
 export default function App({ args = [] }) {
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
@@ -180,6 +221,7 @@ export default function App({ args = [] }) {
     });
 
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [isFilePickerDismissed, setIsFilePickerDismissed] = useState(false);
     const persistedModelRef = useRef(null);
 
     // Parse CLI startup arguments
@@ -517,6 +559,10 @@ export default function App({ args = [] }) {
 
         // 1. ESC Logic
         if (key.escape) {
+            if (suggestions.length > 0 && activeView === 'chat') {
+                setIsFilePickerDismissed(true);
+                return;
+            }
             if (confirmExit) {
                 setConfirmExit(false);
                 return;
@@ -1923,7 +1969,16 @@ OUTPUT: ${execOutputRef.current}`;
                     }
 
                     setMessages(prev => {
-                        const newMsgs = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                        const totalDuration = Date.now() - apiStart;
+                        let foundLastAgent = false;
+                        const newMsgs = [...prev].reverse().map(m => {
+                            let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
+                            if (!foundLastAgent && updated.role === 'agent') {
+                                foundLastAgent = true;
+                                updated = { ...updated, workedDuration: totalDuration };
+                            }
+                            return updated;
+                        }).reverse();
                         const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isMeta);
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);
@@ -1941,33 +1996,57 @@ OUTPUT: ${execOutputRef.current}`;
     };
 
     const suggestions = useMemo(() => {
-        if (!input.startsWith('/')) return [];
-        const parts = input.split(' ');
-        const query = parts[parts.length - 1].toLowerCase();
+        if (input.startsWith('/') && !isFilePickerDismissed) {
+            const parts = input.split(' ');
+            const query = parts[parts.length - 1].toLowerCase();
 
-        // Level 1: Main Commands
-        if (parts.length === 1) {
-            const cleanQuery = query.startsWith('/') ? query.slice(1) : query;
-            return COMMANDS.filter(c => {
-                const cleanCmd = c.cmd.startsWith('/') ? c.cmd.slice(1) : c.cmd;
-                return cleanCmd.toLowerCase().includes(cleanQuery);
+            // Level 1: Main Commands
+            if (parts.length === 1) {
+                const cleanQuery = query.startsWith('/') ? query.slice(1) : query;
+                return COMMANDS.filter(c => {
+                    const cleanCmd = c.cmd.startsWith('/') ? c.cmd.slice(1) : c.cmd;
+                    return cleanCmd.toLowerCase().includes(cleanQuery);
+                });
+            }
+
+            // Deep Nested Commands Autocomplete Engine
+            let currentList = COMMANDS;
+            for (let i = 0; i < parts.length - 1; i++) {
+                const part = parts[i].toLowerCase();
+                const found = currentList.find(c => c.cmd.toLowerCase() === part);
+                if (found && found.subs) {
+                    currentList = found.subs;
+                } else {
+                    return [];
+                }
+            }
+
+            return currentList.filter(s => s.cmd.toLowerCase().includes(query));
+        }
+
+        // File Autocomplete Support
+        const parts = input.split(' ');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart.startsWith('@') && !isFilePickerDismissed) {
+            const hashIndex = lastPart.indexOf('#');
+            const hasHash = hashIndex !== -1;
+            const query = hasHash ? lastPart.substring(1, hashIndex).toLowerCase() : lastPart.slice(1).toLowerCase();
+            const suffix = hasHash ? lastPart.substring(hashIndex) : '';
+            const projectFiles = getProjectFiles(process.cwd());
+
+            const matches = projectFiles.filter(f => f.name.toLowerCase().includes(query));
+            return matches.map(f => {
+                const relPath = f.relativePath.replace(/\\/g, '/');
+                const formattedPath = relPath.startsWith('.') ? relPath : './' + relPath;
+                return {
+                    cmd: '@[' + formattedPath + suffix + ']',
+                    desc: f.relativePath
+                };
             });
         }
 
-        // Deep Nested Commands Autocomplete Engine
-        let currentList = COMMANDS;
-        for (let i = 0; i < parts.length - 1; i++) {
-            const part = parts[i].toLowerCase();
-            const found = currentList.find(c => c.cmd.toLowerCase() === part);
-            if (found && found.subs) {
-                currentList = found.subs;
-            } else {
-                return [];
-            }
-        }
-
-        return currentList.filter(s => s.cmd.toLowerCase().includes(query));
-    }, [input]);
+        return [];
+    }, [input, isFilePickerDismissed]);
 
     // Reset selected index when input changes to avoid OOB
     useEffect(() => {
@@ -2711,6 +2790,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                     onChange={(val) => {
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
+                                                        setIsFilePickerDismissed(false);
                                                     }}
                                                     onSubmit={handleSubmit}
                                                     maxRows={3}
@@ -2895,8 +2975,15 @@ OUTPUT: ${execOutputRef.current}`;
                             paddingY={0}
                             width="100%"
                         >
-                            <Box paddingX={1} marginBottom={0}>
-                                <Text color="gray" bold dimColor>🔍 COMMAND SUGGESTIONS</Text>
+                            <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
+                                <Text color="gray" bold dimColor>
+                                    {suggestions[0]?.cmd?.startsWith('@') ? "📁 FILE SUGGESTIONS" : "🔍 COMMAND SUGGESTIONS"}
+                                </Text>
+                                {suggestions[0]?.cmd?.startsWith('@') && (
+                                    <Text color="gray" dimColor italic>
+                                        (Use '#Lstart-Lend' to specify line numbers)
+                                    </Text>
+                                )}
                             </Box>
 
                             {visible.map((s, i) => {

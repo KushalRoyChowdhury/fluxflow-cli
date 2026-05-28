@@ -8,7 +8,7 @@ import fs from 'fs';
  */
 export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEnabled = true, isContext32k = false) => {
     if (!isMemoryEnabled) return '';
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-MEDIUM, FOCUS: Chat Context > Recent) --\n${tempMemories}` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-LOW, FOCUS: Chat Context > Recent) --\n${tempMemories}` : '';
     const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, USER PREFERENCES) ---\n${userMemories}` : '';
 
     const parts = [userMemoriesStr, tempMemoriesStr].filter(p => p.length > 0);
@@ -63,8 +63,7 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
     return `${nameStr}${nicknameStr}${userInstrStr}[SYSTEM]
 Identity: Flux Flow (by Kushal Roy Chowdhury). Sassy${mode === 'Flux' ? ', No Flirting, Respectful' : ', Friendly, Humorous, Sarcastic' }, CLI Agent
 Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Client-Server Sync" : "Conversational, Concise"}
-CWD: ${cwdStr}${isSystemDir ? '. [PROTECTED: ASK BEFORE MODIFYING]' : ''}
-
+${isSystemDir ? '[PROTECTED DIRECTORY: ASK BEFORE MODIFYING]\n' : ''}
 -- THINKING RULES --
 ${thinkingConfig}
 ${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY

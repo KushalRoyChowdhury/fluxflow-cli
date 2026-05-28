@@ -177,7 +177,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
     if (!text) return null;
 
     // Split by the outer-most markdown groups (check triple backticks BEFORE single ones, use non-greedy matching)
-    const parts = text.split(/(```[\s\S]*?```|`[^`]+`|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
+    const parts = text.split(/(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
 
     return (
         <Text color={color} wrap="anywhere">
@@ -202,6 +202,12 @@ const InlineMarkdown = React.memo(({ text, color }) => {
 
                 if (part.startsWith('`') && part.endsWith('`')) {
                     return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
+                }
+
+                if (part.startsWith('@[') && part.endsWith(']')) {
+                    const filePath = part.slice(2, -1);
+                    const basename = filePath.split('/').pop().split('\\').pop();
+                    return <Text key={j} color="cyan" backgroundColor="#1a1a2e"> {basename} </Text>;
                 }
 
                 // 📐 Advanced LaTeX support
@@ -777,7 +783,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                                     <Text bold color="white">{lineIdx === 0 ? '❯' : ' '}</Text>
                                 </Box>
                                 <Box flexGrow={1} marginLeft={1}>
-                                    <Text color={msg.color || "white"} wrap="anywhere">{line}</Text>
+                                    <InlineMarkdown text={line} color={msg.color || "white"} />
                                 </Box>
                             </Box>
                         ))}
@@ -807,6 +813,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                             <Text color="yellow" italic>✨ [Memory Updated]</Text>
                         </Box>
                     )}
+                    {msg.role === 'agent' && msg.workedDuration ? (
+                        <Box marginTop={1} width="100%">
+                            <Text dimColor color="gray">
+                                [⚡ Worked for <Text bold color="cyan">{formatThinkingDuration(msg.workedDuration)}</Text> ]
+                            </Text>
+                        </Box>
+                    ) : null}
                 </Box>
             )}
         </Box>

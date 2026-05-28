@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.16.2", "1.16.1"]
+        const stableVersions = ["1.17.0", "1.16.2", "1.16.1"]
         const changelogData = {
+            "1.17.0": {
+                "note": "Precision Grounding & Inline Reference Update.",
+                "added": [
+                    "Inline File Completion Engine: Real-time autocomplete suggestions via '@filename' within the main chat console.",
+                    "Precise Line Ranges (#Lstart-Lend): Integrated interactive hash ranges inside file pickers, enabling users to isolate target lines directly during completion.",
+                    "Improved Directory Context nuance for better understanding of project structure to agent."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "1.16.2": {
                 "note": "Session Stats Bug Fix.",
                 "added": [],
