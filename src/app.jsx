@@ -6,7 +6,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
-import { MultilineInput } from 'ink-multiline-input';
+import { MultilineInput } from './components/MultilineInput.jsx';
 import TextInput from 'ink-text-input';
 import ChatLayout, { MessageItem } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
@@ -213,6 +213,7 @@ export default function App({ args = [] }) {
     const { stdout } = useStdout();
 
     const [input, setInput] = useState('');
+    const [inputKey, setInputKey] = useState(0);
     const [isExpanded, setIsExpanded] = useState(false);
     const [mode, setMode] = useState('Flux');
     const [terminalSize, setTerminalSize] = useState({
@@ -966,6 +967,7 @@ export default function App({ args = [] }) {
                 setInput(parentParts.join(' ') + ' ' + nextMatch.cmd + ' ');
             }
             setSelectedIndex(0);
+            setInputKey(prev => prev + 1);
             return;
         }
 
@@ -2790,6 +2792,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                     </Box>
                                                 )}
                                                 <MultilineInput
+                                                    key={`input-${inputKey}`}
                                                     focus={!isTerminalFocused}
                                                     value={input}
                                                     onChange={(val) => {
@@ -3012,7 +3015,11 @@ OUTPUT: ${execOutputRef.current}`;
                                                 bold={isActive}
                                                 dimColor={isGemmaDisabled && !isActive}
                                             >
-                                                {s.cmd}
+                                                {s.cmd?.startsWith('@[') && s.cmd?.endsWith(']') ? (() => {
+                                                    const pathPart = s.cmd.slice(2, -1);
+                                                    const parts = pathPart.split(/[/\\]/);
+                                                    return parts[parts.length - 1];
+                                                })() : s.cmd}
                                             </Text>
                                         </Box>
                                         <Box flexGrow={1}>

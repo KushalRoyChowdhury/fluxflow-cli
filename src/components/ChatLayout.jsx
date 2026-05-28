@@ -201,13 +201,18 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 }
 
                 if (part.startsWith('`') && part.endsWith('`')) {
-                    return <Text key={j} color="cyan" backgroundColor="#003333"> {part.slice(1, -1)} </Text>;
+                    const content = part.slice(1, -1);
+                    const formatted = content.replace(/@\[(.*?)\]/g, (match, p1) => {
+                        return p1.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
+                    });
+                    const hasFileRef = content.includes('@[');
+                    return <Text key={j} color="cyan" bold={hasFileRef} backgroundColor={hasFileRef ? "#111124" : "#003333"}> {formatted} </Text>;
                 }
 
                 if (part.startsWith('@[') && part.endsWith(']')) {
                     const filePath = part.slice(2, -1);
-                    const basename = filePath.split('/').pop().split('\\').pop();
-                    return <Text key={j} color="cyan" backgroundColor="#1a1a2e"> {basename} </Text>;
+                    const basename = filePath.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
+                    return <Text key={j} color="cyan" bold backgroundColor="#111124"> {basename} </Text>;
                 }
 
                 // 📐 Advanced LaTeX support
