@@ -99,14 +99,17 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
 function formatPromptPreview(prompt) {
     if (!prompt) return '';
     const firstLine = prompt.split('\n')[0] || '';
-    const words = firstLine.split(/\s+/).filter(Boolean);
-    if (words.length > 15) {
-        return words.slice(0, 15).join(' ') + '...';
+    const formatted = firstLine.replace(/@\[(.*?)\]/g, (match, p1) => {
+        const parts = p1.replace(/\\/g, '/').split('/');
+        return `[${parts[parts.length - 1]}]`;
+    });
+    if (formatted.length > 69) {
+        return formatted.slice(0, 67) + '...';
     }
     if (prompt.includes('\n')) {
-        return firstLine + '...';
+        return formatted + '...';
     }
-    return firstLine;
+    return formatted;
 }
 
 function formatDate(timestamp) {
