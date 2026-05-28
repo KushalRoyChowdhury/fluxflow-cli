@@ -1525,7 +1525,8 @@ export default function App({ args = [] }) {
                 let hasFiredJanitor = false;
                 setIsProcessing(true);
                 setIsExpanded(false);
-                const apiStart = Date.now();
+                let apiStart = Date.now();
+                let isFirstPacket = true;
                 try {
                     const cleanHistoryForAI = [...messages, userMessage]
                         .filter(m =>
@@ -1677,6 +1678,10 @@ OUTPUT: ${execOutputRef.current}`;
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
                     for await (const packet of stream) {
+                        if (isFirstPacket && packet.type === 'text') {
+                            apiStart = Date.now();
+                            isFirstPacket = false;
+                        }
                         if (packet.type === 'status') {
                             setStatusText(packet.content);
                             continue;

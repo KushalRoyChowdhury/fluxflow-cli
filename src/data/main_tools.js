@@ -1,7 +1,7 @@
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. To call a tool, MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
-- **STRICT POLICY: MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
+STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}
 
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
@@ -23,7 +23,6 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
-- File tools >>> Long chat
 
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
