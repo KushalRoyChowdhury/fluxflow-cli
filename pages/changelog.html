@@ -225,8 +225,24 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.17.0", "1.16.2", "1.16.1"]
+        const stableVersions = ["1.17.6"]
         const changelogData = {
+            "1.18.0": {
+                "note": "Performance Tuning & Multi-Block Patching.",
+                "added": [
+                    "Added recursion limit to project tree generation to prevent context bloat."
+                ],
+                "changed": [
+                    "Redesinged Input Cursor.",
+                    "Refined Diff UI.",
+                    "Advance Interactive Terminal on Supported Devices/Environments.",
+                    "Improved Accessibility.",
+                    "Upgraded the patching tool to support up to 8 simultaneous search-and-replace transactions in a single turn."
+                ],
+                "fixes": [
+                    "Resolved cursor visibility and spacing issues in the multiline input console."
+                ]
+            },
             "1.17.0": {
                 "note": "Precision Grounding & Inline Reference Update.",
                 "added": [

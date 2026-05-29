@@ -706,7 +706,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-        const getDirTree = (dir, prefix = '') => {
+        const getDirTree = (dir, prefix = '', depth = 1) => {
             try {
                 const files = fs.readdirSync(dir);
                 const sep = path.sep;
@@ -747,11 +747,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const stat = fs.statSync(filePath);
                         if (stat.isDirectory()) {
                             const subFiles = fs.readdirSync(filePath);
-                            if (subFiles.length > 80) {
+                            // [CONTEXT PROTECTION] Limit depth to 7 levels OR 80+ files
+                            if (subFiles.length > 80 || depth >= 7) {
                                 result += `${prefix}${connector}${file}${sep}...\n`;
                             } else {
                                 result += `${prefix}${connector}${file}${sep}\n`;
-                                result += getDirTree(filePath, childPrefix);
+                                result += getDirTree(filePath, childPrefix, depth + 1);
                             }
                         } else {
                             result += `${prefix}${connector}${file}\n`;
@@ -769,7 +770,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         yield { type: 'status', content: 'Gathering Context...' };
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd());
 
-        const firstUserMsg = `[METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -892,7 +893,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                    const jitInstruction = `\n\n[SYSTEM] Tool result received. Analyze output and proceed with your turn.${thinkingLevel != 'Fast' ? '**STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**' : ''}`;
+                    const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? '. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**' : ''}`;
                     const lastUserMsg = contents[contents.length - 1];
                     let addedMarker = false;
                     if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
@@ -1628,7 +1629,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[SYSTEM: STREAM RECOVERY]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption.\n- NO REPETITION: Do not repeat any text already written.\n- NO RE-THINK: Do not restart or open <think> if reasoning already started.\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start.\n- STEALTH: Do not mention/apologize for cutoff.\n- KEEP LENGTH: Maintain standard depth/length.";
+                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block with </think> if opened\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
@@ -1650,7 +1651,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
-                                yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [${i}s]...` };
+                                yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
                             yield { type: 'status', content: `Error Occured. Recovering Stream...` };
@@ -1665,15 +1666,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             accumulatedContext = '';     // [BUGFIX] - Clear stream recovery checkpoint on connection retry!
                             const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
                             isInitialAttempt = true;
-                            yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${(waitTime / 1000).toFixed(0)}s]...` };
+                            yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]...` };
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
-                                yield { type: 'status', content: `Retrying Connection (${retryCount}/${MAX_RETRIES}) [${i}s]...` };
+                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
-                            yield { type: 'status', content: `Retrying Connection...` };
+                            yield { type: 'status', content: `Trying to reach ${modelName}...` };
                         } else {
-                            throw new Error(`Model cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
+                            throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
                         }
                     }
                 }

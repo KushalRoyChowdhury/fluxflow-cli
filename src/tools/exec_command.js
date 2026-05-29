@@ -1,6 +1,16 @@
 import { spawn } from 'child_process';
 import { parseArgs } from '../utils/arg_parser.js';
 
+// Attempt to load node-pty for a more authentic terminal experience
+let pty = null;
+try {
+    // Dynamic import to avoid crashing if not installed
+    const ptyModule = await import('node-pty');
+    pty = ptyModule.default || ptyModule;
+} catch (err) {
+    // Fallback to child_process.spawn will be used
+}
+
 /**
  * Execute Command Tool
  * Runs a terminal command and returns the output.
@@ -8,11 +18,17 @@ import { parseArgs } from '../utils/arg_parser.js';
  * @param {Object} options - Tool options including onChunk callback
  */
 export let activeChildProcess = null;
+export let isActiveCommandPty = false;
 
 export const writeToActiveCommand = (data) => {
     try {
-        if (activeChildProcess && activeChildProcess.stdin && activeChildProcess.stdin.writable) {
-            activeChildProcess.stdin.write(data);
+        if (activeChildProcess) {
+            if (isActiveCommandPty && typeof activeChildProcess.write === 'function') {
+                // node-pty process
+                activeChildProcess.write(data);
+            } else if (activeChildProcess.stdin && activeChildProcess.stdin.writable) {
+                activeChildProcess.stdin.write(data);
+            }
         }
     } catch (err) {
         // Silently catch EPIPE or other stream errors to prevent app crash
@@ -22,12 +38,18 @@ export const writeToActiveCommand = (data) => {
 export const terminateActiveCommand = () => {
     if (activeChildProcess) {
         try {
-            // Forcefully terminate the process and all its children
-            activeChildProcess.kill('SIGKILL');
+            if (isActiveCommandPty && typeof activeChildProcess.destroy === 'function') {
+                // node-pty cleanup
+                activeChildProcess.destroy();
+            } else if (typeof activeChildProcess.kill === 'function') {
+                // Forcefully terminate the process and all its children
+                activeChildProcess.kill('SIGKILL');
+            }
         } catch (err) {
             // Process might already be dead
         }
         activeChildProcess = null;
+        isActiveCommandPty = false;
     }
 };
 
@@ -35,7 +57,7 @@ export const terminateActiveCommand = () => {
  * Programmatically converts forward slashes to backslashes for path-like arguments
  * in Windows commands to prevent shell execution errors.
  */
-export const adjustWindowsCommand = (command) => {
+export const adjustWindowsCommand = (command, usePowerShell = false) => {
     if (process.platform !== 'win32') return command;
 
     // Split command by space, respecting single/double quotes
@@ -79,7 +101,7 @@ export const adjustWindowsCommand = (command) => {
                     tokens.push(current);
                     current = '';
                 }
-                tokens.push('&');
+                tokens.push(usePowerShell ? ';' : '&');
             } else if (char === '|' && !current.includes('://')) {
                 if (current.length > 0) {
                     tokens.push(current);
@@ -202,11 +224,10 @@ export const adjustWindowsCommand = (command) => {
 export const exec_command = async (args, options = {}) => {
     const { command: rawCommand } = parseArgs(args);
     const { onChunk } = options;
-    
+
     if (!rawCommand) return 'ERROR: Missing "command" argument for exec_command.';
 
-    const command = adjustWindowsCommand(rawCommand);
-
+    const isWin = process.platform === 'win32';
     const systemSettings = options.systemSettings || {};
     const netEnv = {};
     if (systemSettings.networkAccess === false) {
@@ -220,62 +241,139 @@ export const exec_command = async (args, options = {}) => {
     }
 
     return new Promise((resolve) => {
-        // Use shell: true for Windows (handles .cmd, .bat, pnpm etc)
-        // Inject interactive environment variables to "trick" CLI tools into showing prompts
-        const child = spawn(command, { 
-            shell: true, 
+        const attempt = (usePowerShell) => {
+            const command = adjustWindowsCommand(rawCommand, usePowerShell);
+            const shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
+            const shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+
+            if (pty) {
+                try {
+                    const ptyProcess = pty.spawn(shell, shellArgs, {
+                        name: 'xterm-256color',
+                        cols: options.cols || 120,
+                        rows: options.rows || 30,
+                        cwd: process.cwd(),
+                        env: { 
+                            ...process.env, 
+                            CI: 'false', 
+                            TERM: 'xterm-256color',
+                            FORCE_COLOR: '1',
+                            ...netEnv
+                        }
+                    });
+                    activeChildProcess = ptyProcess;
+                    isActiveCommandPty = true;
+                    let output = '';
+
+                    ptyProcess.onData((data) => {
+                        output += data;
+                        if (onChunk) onChunk(data);
+                    });
+
+                    ptyProcess.onExit(({ exitCode }) => {
+                        activeChildProcess = null;
+                        const finalOutput = output || 'Command executed with no output.';
+                        if (exitCode !== 0) {
+                            resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
+                        } else {
+                            resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
+                        }
+                    });
+                    return true;
+                } catch (err) {
+                    if (isWin && usePowerShell && err.code === 'ENOENT') {
+                        return false; // Trigger CMD attempt
+                    }
+                    // Fallback to child_process if pty fails for other reasons
+                    runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+                    return true;
+                }
+            } else {
+                runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+                return true;
+            }
+        };
+
+        if (isWin) {
+            if (!attempt(true)) {
+                attempt(false);
+            }
+        } else {
+            attempt(false);
+        }
+    });
+};
+
+/**
+ * Standard child_process.spawn fallback
+ */
+const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true) => {
+    const isWin = process.platform === 'win32';
+    const shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
+    const shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+
+    const child = isWin
+        ? spawn(shell, shellArgs, { cwd: process.cwd(), env: { ...process.env, ...netEnv } })
+        : spawn(command, {
+            shell: true,
             cwd: process.cwd(),
-            env: { 
-                ...process.env, 
-                CI: 'false', 
+            env: {
+                ...process.env,
+                CI: 'false',
                 TERM: 'xterm-256color',
                 FORCE_COLOR: '1',
                 ...netEnv
             }
         });
-        activeChildProcess = child;
-        
-        // Handle stdin errors (like EPIPE)
-        if (child.stdin) {
-            child.stdin.on('error', () => {
-                activeChildProcess = null; // Clean up on stream error
-            });
+
+    activeChildProcess = child;
+    isActiveCommandPty = false;
+
+    // Handle stdin errors (like EPIPE)
+    if (child.stdin) {
+        child.stdin.on('error', () => {
+            activeChildProcess = null; // Clean up on stream error
+        });
+    }
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+        const chunk = data.toString();
+        stdout += chunk;
+        if (onChunk) onChunk(chunk);
+    });
+
+    child.stderr.on('data', (data) => {
+        const chunk = data.toString();
+        stderr += chunk;
+        if (onChunk) onChunk(chunk);
+    });
+
+    child.on('close', (code) => {
+        activeChildProcess = null;
+        const result = [];
+        if (stdout) result.push(`STDOUT:\n${stdout}`);
+        if (stderr) result.push(`STDERR:\n${stderr}`);
+        if (code !== 0) result.push(`EXIT CODE: ${code}`);
+
+        const finalOutput = result.join('\n\n') || 'Command executed with no output.';
+
+        if (code !== 0) {
+            resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);
+        } else {
+            resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
         }
-        
-        let stdout = '';
-        let stderr = '';
+    });
 
-        child.stdout.on('data', (data) => {
-            const chunk = data.toString();
-            stdout += chunk;
-            if (onChunk) onChunk(chunk);
-        });
-
-        child.stderr.on('data', (data) => {
-            const chunk = data.toString();
-            stderr += chunk;
-            if (onChunk) onChunk(chunk);
-        });
-
-        child.on('close', (code) => {
-            activeChildProcess = null;
-            const result = [];
-            if (stdout) result.push(`STDOUT:\n${stdout}`);
-            if (stderr) result.push(`STDERR:\n${stderr}`);
-            if (code !== 0) result.push(`EXIT CODE: ${code}`);
-
-            const finalOutput = result.join('\n\n') || 'Command executed with no output.';
-            
-            if (code !== 0) {
-                resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);
-            } else {
-                resolve(`SUCCESS: Command [${rawCommand}] completed.\n\n${finalOutput}`);
-            }
-        });
-
-        child.on('error', (err) => {
-            activeChildProcess = null;
-            resolve(`ERROR: Failed to start command [${rawCommand}]: ${err.message}`);
-        });
+    child.on('error', (err) => {
+        if (isWin && usePowerShell && err.code === 'ENOENT') {
+            // PowerShell missing, retry with CMD
+            const cmdCommand = adjustWindowsCommand(rawCommand, false);
+            return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false);
+        }
+        activeChildProcess = null;
+        resolve(`ERROR: Failed to start command [${rawCommand}]: ${err.message}`);
     });
 };

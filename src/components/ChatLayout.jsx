@@ -12,7 +12,7 @@ const TOOL_LABELS = {
     'exec_command': 'ExecuteCommand',
     'web_search': 'WebSearch',
     'web_scrape': 'ReadSite',
-    'search_keyword': 'FindFiles',
+    'search_keyword': 'SearchKeyword',
     'write_pdf': 'CreatePDF',
     'write_docx': 'CreateDocument',
     'generate_image': 'GenerateImage',
@@ -418,25 +418,42 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
 const DiffLine = React.memo(({ line, columns = 80 }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
+
+    // Handle high-fidelity multi-patch separator
+    if (isContext && cleanLine.includes('═')) {
+        return (
+            <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+                <Text color="gray" dimColor>{'═'.repeat(Math.max(10, columns - 4))}</Text>
+            </Box>
+        );
+    }
+
     const isRemoval = cleanLine.startsWith('-');
     const isAddition = cleanLine.startsWith('+');
-    const parts = cleanLine.substring(1).split('|');
-    const lineNum = parts[0]?.trim() || '';
-    const content = parts.slice(1).join('|');
+
+    // Extract line number and content
+    // Format: " 123 |content" or "-123|content" or "+123|content"
+    const prefixChar = cleanLine[0];
+    const rest = cleanLine.substring(1);
+    const splitIdx = rest.indexOf('|');
+
+    const lineNum = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
+    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
 
     const bgColor = isRemoval ? '#3a0c0c' : isAddition ? '#0c3a1a' : '#1a1a1a';
-    const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : 'white';
+    const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : isContext ? 'gray' : 'white';
+    const numColor = isRemoval ? '#cf3a3a' : isAddition ? '#3acf65' : 'gray';
 
     return (
         <Box backgroundColor={bgColor} paddingX={1} width="100%">
             <Box width={5} flexShrink={0}>
-                <Text color={isRemoval ? '#cf3a3a' : isAddition ? '#3acf65' : 'gray'} dimColor>{lineNum}</Text>
+                <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
             </Box>
             <Box width={2} flexShrink={0} marginLeft={1}>
                 <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
             </Box>
             <Box flexGrow={1} marginLeft={1}>
-                <Text color={textColor}>{wrapText(content, columns - 10)}</Text>
+                <Text color={textColor} dimColor={isContext}>{wrapText(content, columns - 14)}</Text>
             </Box>
         </Box>
     );
@@ -448,10 +465,10 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const diffLines = diffBody.split('\n');
 
     return (
-        <Box flexDirection="column" width="100%" marginBottom={0}>
+        <Box flexDirection="column" width={columns - 3} marginBottom={0}>
             <Box flexDirection="column" backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} columns={columns} />
+                    <DiffLine key={i} line={line} columns={columns - 3} />
                 ))}
             </Box>
         </Box>
@@ -482,7 +499,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         const gutterWidth = String(codeLines.length).length;
 
         return (
-            <Box flexDirection="column" width="100%">
+            <Box flexDirection="column" width={columns - 3}>
                 <Box flexDirection="column" borderStyle="round" borderColor="#444" paddingX={1} width="100%">
                     <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
                         <Text backgroundColor="#444" color="white"> FILE SNAPSHOT </Text>
@@ -508,7 +525,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     if (text.includes('```')) {
         const parts = text.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
         return (
-            <Box flexDirection="column" width="100%">
+            <Box flexDirection="column" width={columns - 3}>
                 {parts.map((part, i) => {
                     if (part.startsWith('```')) {
                         const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
@@ -545,14 +562,14 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                         cleanPart = cleanPart.replace(/[\r\n]+$/, '');
                     }
                     if (!cleanPart) return null;
-                    return <MarkdownText key={i} text={cleanPart} columns={columns} />;
+                    return <MarkdownText key={i} text={cleanPart} columns={columns - 3} />;
                 })}
             </Box>
         );
     }
 
     // SCENARIO 4: Standard Markdown
-    return <MarkdownText text={text} columns={columns} />;
+    return <MarkdownText text={text} columns={columns - 3} />;
 });
 
 const formatThinkingDuration = (ms) => {
@@ -743,18 +760,21 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         );
     }
 
-    if (isTerminalRecord) {
-        const cmdMatch = msg.text.match(/COMMAND: (.*)\n/);
-        const outputMatch = msg.text.match(/OUTPUT: ([\s\S]*)$/);
+    if (msg.isTerminalRecord) {
+        const cmdMatch = msg.text.match(/COMMAND: (.*)/);
+        const ptyMatch = msg.text.match(/PTY: (true|false)/);
+        const outputMatch = msg.text.match(/OUTPUT: ([\s\S]*)/);
         const cmd = cmdMatch ? cmdMatch[1] : 'Unknown';
+        const isPty = ptyMatch ? ptyMatch[1] === 'true' : false;
         const outputList = outputMatch ? outputMatch[1] : '';
 
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} />
+                <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} isPty={isPty} />
             </Box>
         );
     }
+
 
     const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
     const content = React.useMemo(() => cleanSignals(msg.text), [msg.text]);

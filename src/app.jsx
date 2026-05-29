@@ -1,7 +1,6 @@
 import os from 'os';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput, useStdout } from 'ink';
-import Spinner from 'ink-spinner';
 import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
@@ -29,7 +28,7 @@ import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
-import { writeToActiveCommand, terminateActiveCommand } from './tools/exec_command.js';
+import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
 
@@ -44,6 +43,19 @@ const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const versionFluxflow = packageJson.version;
 const updatedOn = packageJson.date || '2026-05-20';
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+const StatusSpinner = () => {
+    const [tick, setTick] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTick(t => (t + 1) % 1000);
+        }, 33);
+        return () => clearInterval(interval);
+    }, []);
+    return <Text color="magenta">{SPINNER_FRAMES[Math.floor(tick / 3) % SPINNER_FRAMES.length]}</Text>;
+};
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
     <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
@@ -368,6 +380,7 @@ export default function App({ args = [] }) {
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
+    const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
 
     // [TIER AWARENESS] Auto-switch from Gemma if moving to Paid tier
     useEffect(() => {
@@ -535,13 +548,17 @@ export default function App({ args = [] }) {
             if (key.return) {
                 const isWin = process.platform === 'win32';
                 writeToActiveCommand(isWin ? '\r\n' : '\n');
-                setExecOutput(prev => prev + '\n');
+                if (!isActiveCommandPty) setExecOutput(prev => prev + '\n');
             } else if (key.backspace || key.delete) {
-                writeToActiveCommand('\b \b');
-                setExecOutput(prev => prev.slice(0, -1)); // Rudimentary backspace mirroring
+                if (isActiveCommandPty) {
+                    writeToActiveCommand('\x7f'); // ASCII DEL for backspace in many TTYs
+                } else {
+                    writeToActiveCommand('\b \b');
+                    setExecOutput(prev => prev.slice(0, -1)); // Rudimentary backspace mirroring
+                }
             } else if (inputText) {
                 writeToActiveCommand(inputText);
-                setExecOutput(prev => prev + inputText);
+                if (!isActiveCommandPty) setExecOutput(prev => prev + inputText);
             }
             return;
         }
@@ -594,19 +611,23 @@ export default function App({ args = [] }) {
                         } else if (nextCount === 2) {
                             if (escDoubleTimerRef.current) clearTimeout(escDoubleTimerRef.current);
                             setEscPressCount(0);
-                            RevertManager.getChatHistory(chatId).then(prompts => {
-                                if (prompts.length > 0) {
-                                    setRecentPrompts(prompts.reverse()); // latest first
-                                    setActiveView('revert');
-                                } else {
-                                    setMessages(prev => {
-                                        setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 No revert checkpoints found for this session.', isMeta: true }];
-                                    });
-                                }
-                            });
-                        }
-                        return nextCount;
+
+                            if (input.length > 0) {
+                                setInput('');
+                            } else {
+                                RevertManager.getChatHistory(chatId).then(prompts => {
+                                    if (prompts.length > 0) {
+                                        setRecentPrompts(prompts.reverse()); // latest first
+                                        setActiveView('revert');
+                                    } else {
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 No revert checkpoints found for this session.', isMeta: true }];
+                                        });
+                                    }
+                                });
+                            }
+                        }                        return nextCount;
                     });
                 }
             }
@@ -633,8 +654,14 @@ export default function App({ args = [] }) {
             // Tab is now ignored for suggestions to prevent [object Object] errors
         }
 
-        // 3. CTRL+C Exit Protocol (Shift + Ctrl + C for Instant Exit)
+        // 3. CTRL+C Protocol (Clear input OR Exit)
         if (key.ctrl && inputText === 'c' && activeView !== 'exit') {
+            if (input.length > 0) {
+                // If there's text, act as a "clear line" cancel
+                setInput('');
+                return;
+            }
+
             if (key.shift) {
                 // Instant bypass for power users
                 setActiveView('exit');
@@ -1551,6 +1578,8 @@ export default function App({ args = [] }) {
                             janitorModel,
                             sessionStats,
                             chatId,
+                            cols: terminalSize.columns - 6,
+                            rows: 30,
                             onExecStart: (cmd) => {
                                 setActiveCommand(cmd);
                                 setExecOutput('');
@@ -1563,6 +1592,7 @@ export default function App({ args = [] }) {
                                     if (!activeCommandRef.current) return prev;
                                     const finalStatus = `[TERMINAL_RECORD]
 COMMAND: ${activeCommandRef.current}
+PTY: ${isActiveCommandPty}
 OUTPUT: ${execOutputRef.current}`;
                                     return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
                                 });
@@ -2720,7 +2750,7 @@ OUTPUT: ${execOutputRef.current}`;
                             <Box>
                                 {statusText ? (
                                     <Box>
-                                        {isSpinnerActive && <Text color="magenta"><Spinner type="dots" /></Text>}
+                                        {isSpinnerActive && <StatusSpinner />}
                                         <Text color="magenta" bold italic>{isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
                                     </Box>
                                 ) : (
@@ -2785,7 +2815,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : escPressCount === 1 ? (
-                                                            <Text color="cyan" bold>  Press ESC again to revert codebase to checkpoint...</Text>
+                                                            <Text color="cyan" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
                                                             <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
@@ -2795,6 +2825,7 @@ OUTPUT: ${execOutputRef.current}`;
                                                     key={`input-${inputKey}`}
                                                     focus={!isTerminalFocused}
                                                     value={input}
+                                                    columns={terminalSize.columns}
                                                     onChange={(val) => {
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
                                                         setInput(cleanVal);
@@ -2837,7 +2868,7 @@ OUTPUT: ${execOutputRef.current}`;
                         />
                         {activeCommand && (
                             <Box marginTop={1}>
-                                <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} />
+                                <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} />
                             </Box>
                         )}
                     </Box>

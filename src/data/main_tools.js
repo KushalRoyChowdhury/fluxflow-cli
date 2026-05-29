@@ -1,3 +1,19 @@
+import { execSync } from 'child_process';
+
+let _isPsAvailable = null;
+export const isPsAvailable = () => {
+    if (process.platform !== 'win32') return false;
+    if (_isPsAvailable !== null) return _isPsAvailable;
+    try {
+        // Silent check for powershell availability
+        execSync('powershell.exe -NoProfile -Command "exit"', { stdio: 'ignore' });
+        _isPsAvailable = true;
+    } catch (e) {
+        _isPsAvailable = false;
+    }
+    return _isPsAvailable;
+};
+
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. To call a tool, MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
@@ -14,10 +30,10 @@ Suggest best options; don't ask for preferences
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
-3. [tool:functions.PatchFile(path="...", replaceContent="exact old content", newContent="new content")]. Surgical patching. Unsure replaceContent? ReadFile > guessing
+3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. Unsure? ReadFile > guessing. Multiple blocks same file? Use replaceContent2, newContent2 etc.
 4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >> WriteFile. Verify Imports
-5. [tool:functions.SearchKeyword(keyword="...")]. Global project search. Finds definitions/logic without reading every file
-6. [tool:functions.Run(command="...")]. Runs a ${osDetected === 'Windows' ? 'Windows CMD' : 'Bash'} command. Destructive/Irreversible ops -> Ask user
+5. [tool:functions.SearchKeyword(keyword="...", file="path/to/file")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
+6. [tool:functions.Run(command="...")]. Runs a ${osDetected === 'Windows' ? (isPsAvailable() ? 'Windows Powershell' : 'Windows CMD') : 'Bash'} command. Destructive/Irreversible ops -> Ask user
 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Usage: Mockups, PDF thumbnails, any visual content
 8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout (100vh/vw)
 9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document

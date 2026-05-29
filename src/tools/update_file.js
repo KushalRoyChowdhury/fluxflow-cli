@@ -10,18 +10,36 @@ import { RevertManager } from '../utils/revert.js';
 export const update_file = async (args) => {
     const parsed = parseArgs(args);
     const targetPath = parsed.path;
-    let content_to_replace = parsed.content_to_replace !== undefined ? parsed.content_to_replace : parsed.replaceContent;
-    let content_to_add = parsed.content_to_add !== undefined ? parsed.content_to_add : parsed.newContent;
 
     if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
-    if (content_to_replace === undefined) return 'ERROR: Missing "replaceContent" argument.';
-    if (content_to_add === undefined) return 'ERROR: Missing "newContent" argument.';
+
+    // Extract up to 10 pairs of replacements
+    const patchPairs = [];
+
+    // Legacy support for replaceContent/newContent (pair 1)
+    const legacyReplace = parsed.content_to_replace !== undefined ? parsed.content_to_replace : parsed.replaceContent;
+    const legacyNew = parsed.content_to_add !== undefined ? parsed.content_to_add : parsed.newContent;
+
+    if (legacyReplace !== undefined && legacyNew !== undefined) {
+        patchPairs.push({ replace: legacyReplace, new: legacyNew });
+    }
+
+    // Modern support for numbered pairs (1-10)
+    for (let i = 1; i <= 10; i++) {
+        const r = parsed[`replaceContent${i}`];
+        const n = parsed[`newContent${i}`];
+        // Don't duplicate if it was already caught by legacy (usually i=1)
+        if (r !== undefined && n !== undefined && r !== legacyReplace) {
+            patchPairs.push({ replace: r, new: n });
+        }
+    }
+
+    if (patchPairs.length === 0) {
+        return 'ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.';
+    }
 
     // Sanitization: Strip unintended markdown code blocks and normalize to LF
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-    content_to_replace = strip(content_to_replace);
-    content_to_add = strip(content_to_add);
 
     const absolutePath = path.resolve(process.cwd(), targetPath);
 
@@ -30,179 +48,191 @@ export const update_file = async (args) => {
             return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
         }
 
-        // Record file change for Reversion Time Travel
+        // Record file change for Reversion Time Travel (One record for the whole transaction)
         await RevertManager.recordFileChange(absolutePath);
 
-        // --- LF NORMALIZATION ARMISTICE ---
         let diskContent = fs.readFileSync(absolutePath, 'utf8');
-        // Strip BOM if present
-        if (diskContent.startsWith('\uFEFF')) {
-            diskContent = diskContent.slice(1);
-        }
+        if (diskContent.startsWith('\uFEFF')) diskContent = diskContent.slice(1);
+        let currentFileContent = diskContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-        const normalizedDisk = diskContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        if (diskContent !== normalizedDisk) {
-            fs.writeFileSync(absolutePath, normalizedDisk, 'utf8');
-            diskContent = normalizedDisk;
-        }
-        const currentContent = diskContent;
+        const results = [];
+        let totalInstances = 0;
 
-        // --- INDENTATION PRESERVATION ENGINE (v5: Precision Delta-Shift) ---
-        const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
-            if (!newText || originalMatch === undefined) return newText;
+        for (let i = 0; i < patchPairs.length; i++) {
+            const pair = patchPairs[i];
+            const content_to_replace = strip(pair.replace);
+            const content_to_add = strip(pair.new);
 
-            const getIndent = (line) => line.match(/^\s*/)[0];
+            // --- INDENTATION PRESERVATION ENGINE ---
+            const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
+                if (!newText || originalMatch === undefined) return newText;
+                const getIndent = (line) => line.match(/^\s*/)[0];
+                const getMinIndent = (text) => {
+                    const lines = text.split('\n').filter(l => l.trim() !== '');
+                    if (lines.length === 0) return '';
+                    let min = getIndent(lines[0]);
+                    for (const line of lines) {
+                        const indent = getIndent(line);
+                        if (indent.length < min.length) min = indent;
+                    }
+                    return min;
+                };
 
-            const getMinIndent = (text) => {
-                const lines = text.split('\n').filter(l => l.trim() !== '');
-                if (lines.length === 0) return '';
-                let min = getIndent(lines[0]);
-                for (const line of lines) {
-                    const indent = getIndent(line);
-                    if (indent.length < min.length) min = indent;
-                }
-                return min;
+                const matchBaseIndent = getMinIndent(originalMatch);
+                const targetBaseIndent = leadingContext.match(/^\s*/)[0] + matchBaseIndent;
+                const newBaseIndent = getMinIndent(newText);
+                const delta = targetBaseIndent.length - newBaseIndent.length;
+                const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
+
+                const newLines = newText.split('\n');
+                return newLines.map((line, i) => {
+                    if (line.trim() === '' && i !== 0) return '';
+                    const currentLineIndent = getIndent(line).length;
+                    const shiftedIndentLength = Math.max(0, currentLineIndent + delta);
+                    const prependedIndentLength = (i === 0) ? Math.max(0, shiftedIndentLength - leadingContext.length) : shiftedIndentLength;
+                    return indentChar.repeat(prependedIndentLength) + line.trimStart();
+                }).join('\n');
             };
 
-            const matchBaseIndent = getMinIndent(originalMatch);
-            const targetBaseIndent = leadingContext.match(/^\s*/)[0] + matchBaseIndent;
-            const newBaseIndent = getMinIndent(newText);
+            // --- MATCHER ---
+            const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let matchRegex = null;
 
-            // Calculate the delta shift (can be negative)
-            const delta = targetBaseIndent.length - newBaseIndent.length;
-            const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
-
-            const newLines = newText.split('\n');
-            return newLines.map((line, i) => {
-                if (line.trim() === '' && i !== 0) return '';
-
-                const currentLineIndent = getIndent(line).length;
-                const shiftedIndentLength = Math.max(0, currentLineIndent + delta);
-
-                // For the first line, we subtract the leadingContext already present in the file
-                const prependedIndentLength = (i === 0)
-                    ? Math.max(0, shiftedIndentLength - leadingContext.length)
-                    : shiftedIndentLength;
-
-                return indentChar.repeat(prependedIndentLength) + line.trimStart();
-            }).join('\n');
-        };
-
-        let instances = 0;
-        let startPos = -1;
-        let matchRegex = null;
-
-        // --- UNIFIED MATCHER (v6: High-Fidelity Fuzzy Logic) ---
-        const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-        if (content_to_replace !== '' && currentContent.includes(content_to_replace)) {
-            matchRegex = new RegExp(exactPattern, 'g');
-        } else {
-            // High-Res Fuzzy: Match each line's core content while ignoring indentation/whitespace drift
-            const fuzzyLines = content_to_replace
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0) // Skip empty lines for matching
-                .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
-
-            if (fuzzyLines.length > 0) {
-                // Construct a pattern that allows flexible indentation and whitespace between lines
-                // We use \s* to ensure we stay within the intended block
-                const fuzzyPattern = fuzzyLines.join('\\s*');
-                try {
-                    matchRegex = new RegExp(fuzzyPattern, 'g');
-                } catch (e) {
-                    matchRegex = new RegExp(exactPattern, 'g');
-                }
-            } else {
+            if (content_to_replace !== '' && currentFileContent.includes(content_to_replace)) {
                 matchRegex = new RegExp(exactPattern, 'g');
+            } else {
+                const fuzzyLines = content_to_replace.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+                    .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
+
+                if (fuzzyLines.length > 0) {
+                    const fuzzyPattern = fuzzyLines.join('\\s*');
+                    try { matchRegex = new RegExp(fuzzyPattern, 'g'); } catch (e) { matchRegex = new RegExp(exactPattern, 'g'); }
+                } else { matchRegex = new RegExp(exactPattern, 'g'); }
             }
+
+            const matches = [...currentFileContent.matchAll(matchRegex)];
+            if (matches.length === 0) {
+                results.push({ success: false, error: `Block ${i + 1}: Could not find match.` });
+                continue;
+            }
+            if (matches.length > 1) {
+                results.push({ success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique).` });
+                continue;
+            }
+
+            const startPos = matches[0].index;
+            const firstMatchContent = matches[0][0];
+            const lineStart = currentFileContent.lastIndexOf('\n', startPos) + 1;
+            const leadingContext = currentFileContent.substring(lineStart, startPos);
+
+            const finalReplacement = adjustIndentation(content_to_add, firstMatchContent, leadingContext);
+
+            // --- CONTEXT CALCULATOR (Block-Level) ---
+            const allOriginalLines = currentFileContent.split('\n');
+            const patchStartLine = currentFileContent.substring(0, startPos).split('\n').length;
+            const patchOldLines = firstMatchContent.split('\n');
+
+            // Capture 3 lines of context before
+            const contextBefore = [];
+            for (let j = Math.max(0, patchStartLine - 4); j < patchStartLine - 1; j++) {
+                contextBefore.push({ num: j + 1, text: allOriginalLines[j] });
+            }
+
+            // Capture 3 lines of context after
+            const contextAfter = [];
+            const patchEndLineIdx = patchStartLine + patchOldLines.length - 1;
+            for (let j = patchEndLineIdx; j < Math.min(allOriginalLines.length, patchEndLineIdx + 3); j++) {
+                contextAfter.push({ num: j + 1, text: allOriginalLines[j] });
+            }
+
+            // Record for diff generation
+            results.push({
+                success: true,
+                startPos,
+                oldContent: firstMatchContent,
+                newContent: finalReplacement,
+                originalStartLine: patchStartLine,
+                contextBefore,
+                contextAfter
+            });
+
+            // Apply immediately to currentFileContent for next pair matching
+            currentFileContent = currentFileContent.substring(0, startPos) + finalReplacement + currentFileContent.substring(startPos + firstMatchContent.length);
+            totalInstances++;
         }
 
-        const matches = matchRegex ? [...currentContent.matchAll(matchRegex)] : [];
-        instances = matches.length;
-
-        if (instances === 0) {
-            return `ERROR: Could not find match for "content_to_replace" in [${targetPath}]. Check for whitespace discrepancies or ReadFile to get exact content.`;
+        if (totalInstances === 0) {
+            return `ERROR: Failed to apply any patches to [${targetPath}].\n${results.map(r => r.error).join('\n')}`;
         }
 
-        if (instances > 1) {
-            return `ERROR: Unable to find unique match. [${instances}] instances of the specified "content_to_replace" were found in [${targetPath}]. Try providing more context (surrounding lines) to make the match unique.`;
-        }
+        fs.writeFileSync(absolutePath, currentFileContent, 'utf8');
 
-        // Use the first match as the anchor for positioning and diff display
-        startPos = matches[0].index;
-        const firstMatchContent = matches[0][0];
-
-        // --- PERFORM REPLACEMENT ---
-        const newFileContent = currentContent.replace(matchRegex, (match, offset) => {
-            const lineStart = currentContent.lastIndexOf('\n', offset) + 1;
-            const leadingContext = currentContent.substring(lineStart, offset);
-            return adjustIndentation(content_to_add, match, leadingContext);
-        });
-
-        // Sync for the diff generation based on the first match
-        const firstLineStart = currentContent.lastIndexOf('\n', startPos) + 1;
-        const firstLeadingContext = currentContent.substring(firstLineStart, startPos);
-
-        const finalContentToAdd = adjustIndentation(content_to_add, firstMatchContent, firstLeadingContext);
-        const finalContentToReplace = firstMatchContent;
-
-        fs.writeFileSync(absolutePath, newFileContent, 'utf8');
-
-        // Structured response for UI diffing
-        const allOriginalLines = currentContent.split(/\r?\n/);
-        const startLine = currentContent.substring(0, startPos).split(/\r?\n/).length;
-        const oldLines = content_to_replace.split(/\r?\n/);
-        const endLine = startLine + oldLines.length - 1;
-
-        let diffText = `SUCCESS: File [${targetPath}] updated. [${instances}] instances replaced.\n\n`;
+        // --- MULTI-DIFF GENERATION (With Smart Gaps) ---
+        let diffText = `SUCCESS: File [${targetPath}] updated. [${totalInstances}/${patchPairs.length}] blocks applied.\n\n`;
         diffText += `[DIFF_START]\n`;
 
-        // 1. Context Before (up to 15 lines)
-        const contextStart = Math.max(0, startLine - 16);
-        for (let i = contextStart; i < startLine - 1; i++) {
-            diffText += `[UI_CONTEXT]  ${i + 1}|${allOriginalLines[i]}\n`;
-        }
+        const terminalWidth = process.stdout.columns || 100;
+        const separatorLine = '═'.repeat(Math.max(20, terminalWidth - 12));
+        const allLinesFinal = currentFileContent.split('\n');
+        const successfulPatches = results.filter(r => r.success);
 
-        // 2. The Change (Full Line Diff for better UI indentation)
-        // Find the boundaries of the lines affected by the change
-        const lineStartPos = currentContent.lastIndexOf('\n', startPos) + 1;
-        const affectedEndPos = startPos + content_to_replace.length;
-        const lineEndPos = currentContent.indexOf('\n', affectedEndPos);
-        const actualEndPos = lineEndPos === -1 ? currentContent.length : lineEndPos;
+        successfulPatches.forEach((res, idx) => {
+            if (idx === 0) {
+                // First patch: Context Before
+                res.contextBefore.forEach(ctx => {
+                    diffText += `[UI_CONTEXT]  ${ctx.num} |${ctx.text}\n`;
+                });
+            } else {
+                const prev = successfulPatches[idx - 1];
+                const prevLinesCount = prev.newContent.split('\n').length;
+                const prevEndLine = prev.originalStartLine + prevLinesCount - 1;
+                const gap = res.originalStartLine - prevEndLine - 1;
 
-        // Original lines (fully indented)
-        const fullOldLines = currentContent.substring(lineStartPos, actualEndPos).split('\n');
+                // Threshold 12: If gap is small, show code. If large, show separator.
+                if (gap >= 1 && gap < 12) {
+                    // Small gap: Show actual lines from the final file state
+                    for (let j = prevEndLine; j < res.originalStartLine - 1; j++) {
+                        diffText += `[UI_CONTEXT]  ${j + 1} |${allLinesFinal[j]}\n`;
+                    }
+                } else if (gap >= 12) {
+                    // Large gap: Context jump with separator
+                    prev.contextAfter.forEach(ctx => {
+                        diffText += `[UI_CONTEXT]  ${ctx.num} |${ctx.text}\n`;
+                    });
+                    diffText += `[UI_CONTEXT] ${separatorLine}\n`;
+                    res.contextBefore.forEach(ctx => {
+                        diffText += `[UI_CONTEXT]  ${ctx.num} |${ctx.text}\n`;
+                    });
+                }
+            }
 
-        // Updated lines (fully indented)
-        // Calculate the corresponding range in the new content
-        const newAffectedEndPos = startPos + finalContentToAdd.length;
-        const newLineEndPos = newFileContent.indexOf('\n', newAffectedEndPos);
-        const actualNewEndPos = newLineEndPos === -1 ? newFileContent.length : newLineEndPos;
-        const fullNewLines = newFileContent.substring(lineStartPos, actualNewEndPos).split('\n');
+            // The Change
+            const oldLines = res.oldContent.split('\n');
+            const newLines = res.newContent.split('\n');
 
-        fullOldLines.forEach((line, i) => {
-            diffText += `-${startLine + i}|${line}\n`;
+            oldLines.forEach((line, i) => {
+                diffText += `-${res.originalStartLine + i}|${line}\n`;
+            });
+            newLines.forEach((line, i) => {
+                diffText += `+${res.originalStartLine + i}|${line}\n`;
+            });
+
+            if (idx === successfulPatches.length - 1) {
+                // Final patch: Context After
+                res.contextAfter.forEach(ctx => {
+                    diffText += `[UI_CONTEXT]  ${ctx.num} |${ctx.text}\n`;
+                });
+            }
         });
-
-        let currentNewLine = startLine;
-        fullNewLines.forEach((line) => {
-            diffText += `+${currentNewLine}|${line}\n`;
-            currentNewLine++;
-        });
-
-        // 3. Context After (up to 15 lines)
-        // Ensure we start context AFTER the full lines we replaced in the original content
-        const linesAffected = fullOldLines.length;
-        const originalContextIdx = startLine + linesAffected - 1;
-
-        for (let i = originalContextIdx; i < Math.min(allOriginalLines.length, originalContextIdx + 15); i++) {
-            diffText += `[UI_CONTEXT]  ${currentNewLine}|${allOriginalLines[i]}\n`;
-            currentNewLine++;
-        }
 
         diffText += `[DIFF_END]`;
+
+        // Add errors if any blocks failed
+        const errors = results.filter(r => !r.success);
+        if (errors.length > 0) {
+            diffText += `\n\n⚠️ WARNING: Some blocks failed:\n${errors.map(e => `  • ${e.error}`).join('\n')}`;
+        }
+
         return diffText;
     } catch (err) {
         return `ERROR: Failed to update file [${targetPath}]: ${err.message}`;

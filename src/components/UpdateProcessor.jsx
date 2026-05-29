@@ -1,12 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import Spinner from 'ink-spinner';
-import { exec } from 'child_process';
+import { spawn } from 'child_process';
+
+let pty = null;
+try {
+    const ptyModule = await import('node-pty');
+    pty = ptyModule.default || ptyModule;
+} catch (err) {}
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings, onSuccess }) => {
     const [status, setStatus] = useState('initializing'); // initializing, downloading, success, error
     const [log, setLog] = useState('');
     const [error, setError] = useState(null);
+    const [tick, setTick] = useState(0);
+
+    // Drive the custom spinner animation
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTick(t => (t + 1) % 1000);
+        }, 33);
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         let child;
@@ -29,20 +45,100 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
             setStatus('downloading');
             setLog(`Running: ${command}...`);
 
-            child = exec(command, (err, stdout, stderr) => {
-                if (err) {
-                    setError(stderr || err.message);
-                    setStatus('error');
-                    return;
+            const isWin = process.platform === 'win32';
+
+            const executeCommand = (usePowerShell) => {
+                return new Promise((resolve) => {
+                    const shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
+                    const shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+
+                    const handleOutput = (data) => {
+                        const str = data.toString();
+                        // Strip ANSI codes and carriage returns for clean log display
+                        const cleanStr = str.replace(/\x1B\[[0-?]*[ -/]*[@-~]|\x1B\][^\x07\x1B]*[\x07\x1B]|\b|\x07/g, '').replace(/\r/g, '').trim();
+                        if (cleanStr) {
+                            setLog(prev => (prev + '\n' + cleanStr).split('\n').slice(-5).join('\n'));
+                        }
+                    };
+
+                    if (pty) {
+                        try {
+                            const ptyProcess = pty.spawn(shell, shellArgs, {
+                                name: 'xterm-256color',
+                                cols: 80,
+                                rows: 30,
+                                cwd: process.cwd(),
+                                env: process.env
+                            });
+                            child = ptyProcess;
+
+                            ptyProcess.onData(handleOutput);
+
+                            ptyProcess.onExit(({ exitCode }) => {
+                                child = null;
+                                if (exitCode !== 0) {
+                                    resolve({ error: `Process exited with code ${exitCode}` });
+                                } else {
+                                    resolve({ success: true });
+                                }
+                            });
+                            return;
+                        } catch (err) {
+                            if (isWin && usePowerShell && err.code === 'ENOENT') {
+                                resolve({ retryCmd: true });
+                                return;
+                            }
+                            // Proceed to spawn fallback if pty fails
+                        }
+                    }
+
+                    // Fallback to standard spawn
+                    const cp = isWin
+                        ? spawn(shell, shellArgs, { cwd: process.cwd(), env: process.env })
+                        : spawn(command, { shell: true, cwd: process.cwd(), env: process.env });
+
+                    child = cp;
+
+                    cp.stdout.on('data', handleOutput);
+                    cp.stderr.on('data', handleOutput);
+
+                    cp.on('close', (code) => {
+                        child = null;
+                        if (code !== 0) {
+                            resolve({ error: `Process exited with code ${code}` });
+                        } else {
+                            resolve({ success: true });
+                        }
+                    });
+
+                    cp.on('error', (err) => {
+                        if (isWin && usePowerShell && err.code === 'ENOENT') {
+                            resolve({ retryCmd: true });
+                        } else {
+                            child = null;
+                            resolve({ error: err.message });
+                        }
+                    });
+                });
+            };
+
+            let result = {};
+            if (isWin) {
+                result = await executeCommand(true);
+                if (result.retryCmd) {
+                    result = await executeCommand(false);
                 }
+            } else {
+                result = await executeCommand(false);
+            }
+
+            if (result.error) {
+                setError(result.error);
+                setStatus('error');
+            } else if (result.success) {
                 setStatus('success');
                 if (onSuccess) onSuccess();
-            });
-
-            // Stream output for that professional feel
-            child.stdout.on('data', (data) => {
-                setLog(prev => (prev + '\n' + data).split('\n').slice(-5).join('\n'));
-            });
+            }
         };
 
         runUpdate();
@@ -50,17 +146,22 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
         return () => {
             if (child) {
                 try {
-                    child.kill();
+                    if (typeof child.destroy === 'function') {
+                        child.destroy();
+                    } else if (typeof child.kill === 'function') {
+                        child.kill();
+                    }
                 } catch (e) {}
             }
         };
     }, []);
 
     if (status === 'initializing' || status === 'downloading') {
+        const frame = SPINNER_FRAMES[Math.floor(tick / 3) % SPINNER_FRAMES.length];
         return (
             <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
                 <Box>
-                    <Text color="cyan"><Spinner type="dots" /></Text>
+                    <Text color="magenta">{frame}</Text>
                     <Text marginLeft={1} bold> Updating Flux Flow to v{latest}...</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="#333">

@@ -88,7 +88,7 @@ export const ControlledMultilineInput = ({
         };
       }
       return {
-        preCursor: [{ value: ' ', type: 'cursor' }],
+        preCursor: [{ value: showCursor && focus ? '│' : '', type: 'cursor' }],
         postCursor: []
       };
     }
@@ -110,7 +110,7 @@ export const ControlledMultilineInput = ({
         preCursor: [
           { value: formattedBefore.slice(0, lineStart) },
           { value: formattedBefore.slice(lineStart), type: 'highlight' },
-          { value: showCursor && focus ? ' ' : '', type: 'cursor' }
+          { value: showCursor && focus ? '│' : '', type: 'cursor' }
         ],
         postCursor: [
           { value: formattedAfter.slice(0, lineEnd), type: 'highlight' },
@@ -126,7 +126,7 @@ export const ControlledMultilineInput = ({
             type: 'highlight'
           },
           { value: formatText(textBefore.slice(highlight.end)) },
-          { value: ' ', type: 'cursor' }
+          { value: showCursor && focus ? '│' : '', type: 'cursor' }
         ],
         postCursor: [
           {
@@ -182,8 +182,10 @@ export const ControlledMultilineInput = ({
           return highlightStyle ?? textStyle;
         case 'cursor':
           return {
-            ...highlightStyle ?? textStyle,
-            inverse: showCursor && focus
+            ...textStyle,
+            color: 'cyan',
+            bold: true,
+            inverse: false
           };
         default:
           return textStyle;
@@ -224,6 +226,7 @@ export const MultilineInput = ({
   showCursor = true,
   highlightPastedText = false,
   focus = true,
+  columns = 80,
   useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
   ...controlledProps
 }) => {
@@ -235,6 +238,68 @@ export const MultilineInput = ({
       setCursorIndex(value.length);
     }
   }, [value, cursorIndex]);
+
+  // Helper to calculate visual mapping of cursor index to line/col
+  const getVisualPosition = useCallback((index) => {
+    const text = normalizeLineEndings(value);
+    const lines = text.split('\n');
+    const wrapWidth = Math.max(20, columns - 10); // Sync with App.jsx wrap logic
+
+    let visualLine = 0;
+    let visualCol = 0;
+    let currentIdx = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineLen = line.length;
+
+      // Check if the index is within this literal line (including newline)
+      if (index >= currentIdx && index <= currentIdx + lineLen) {
+        const offsetInLine = index - currentIdx;
+        visualLine += Math.floor(offsetInLine / wrapWidth);
+        visualCol = offsetInLine % wrapWidth;
+        return { visualLine, visualCol };
+      }
+
+      // If not, calculate how many visual lines this literal line took
+      const numVisualLines = Math.max(1, Math.ceil(lineLen / wrapWidth));
+      visualLine += numVisualLines;
+      currentIdx += lineLen + 1; // +1 for the \n
+    }
+
+    return { visualLine, visualCol };
+  }, [value, columns]);
+
+  // Helper to find cursor index from visual position
+  const getIndexFromVisual = useCallback((targetLine, targetCol) => {
+    const text = normalizeLineEndings(value);
+    const lines = text.split('\n');
+    const wrapWidth = Math.max(20, columns - 10);
+
+    let currentVisualLine = 0;
+    let currentIdx = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineLen = line.length;
+      const numVisualLines = Math.max(1, Math.ceil(lineLen / wrapWidth));
+
+      // Is the target visual line within this literal line?
+      if (targetLine >= currentVisualLine && targetLine < currentVisualLine + numVisualLines) {
+        const lineOffset = (targetLine - currentVisualLine) * wrapWidth;
+        const colInLine = Math.min(targetCol, lineLen - lineOffset);
+        
+        // Ensure we don't go past the current literal line's end
+        const finalCol = Math.max(0, colInLine);
+        return Math.min(currentIdx + lineOffset + finalCol, currentIdx + lineLen);
+      }
+
+      currentVisualLine += numVisualLines;
+      currentIdx += lineLen + 1;
+    }
+    
+    return value.length;
+  }, [value, columns]);
 
   useCustomInput((input, key) => {
     const submitKey = keyBindings?.submit ?? ((key2) => key2.return && key2.ctrl);
@@ -252,83 +317,27 @@ export const MultilineInput = ({
     if (key.tab || (key.shift && key.tab) || (key.ctrl && input === 'c')) {
       return;
     }
-    if (keyBindings?.newline?.(key)) {
-      const newValue = value.slice(0, cursorIndex) + '\n' + value.slice(cursorIndex);
-      onChange(newValue);
-      setCursorIndex(cursorIndex + 1);
-      setPasteLength(0);
-      return;
-    }
+    
     let nextPasteLength = 0;
     if (input.length > 1) {
       nextPasteLength = input.length;
     }
     if (key.upArrow) {
       if (showCursor) {
-        const lines = normalizeLineEndings(value).split('\n');
-        let currentLineIndex = 0;
-        let currentPos = 0;
-        let col = 0;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line === undefined) continue;
-          const lineLen = line.length;
-          const lineEnd = currentPos + lineLen;
-          if (cursorIndex >= currentPos && cursorIndex <= lineEnd) {
-            currentLineIndex = i;
-            col = cursorIndex - currentPos;
-            break;
-          }
-          currentPos = lineEnd + 1;
-        }
-        if (currentLineIndex > 0) {
-          const targetLineIndex = currentLineIndex - 1;
-          const targetLine = lines[targetLineIndex];
-          if (targetLine !== undefined) {
-            const targetLineLen = targetLine.length;
-            const newCol = Math.min(col, targetLineLen);
-            let newIndex = 0;
-            for (let i = 0; i < targetLineIndex; i++) {
-              newIndex += lines[i].length + 1;
-            }
-            newIndex += newCol;
-            setCursorIndex(newIndex);
-            setPasteLength(0);
-          }
+        const { visualLine, visualCol } = getVisualPosition(cursorIndex);
+        if (visualLine > 0) {
+          const newIndex = getIndexFromVisual(visualLine - 1, visualCol);
+          setCursorIndex(newIndex);
+          setPasteLength(0);
         }
       }
     } else if (key.downArrow) {
       if (showCursor) {
-        const lines = normalizeLineEndings(value).split('\n');
-        let currentLineIndex = 0;
-        let currentPos = 0;
-        let col = 0;
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line === undefined) continue;
-          const lineLen = line.length;
-          const lineEnd = currentPos + lineLen;
-          if (cursorIndex >= currentPos && cursorIndex <= lineEnd) {
-            currentLineIndex = i;
-            col = cursorIndex - currentPos;
-            break;
-          }
-          currentPos = lineEnd + 1;
-        }
-        if (currentLineIndex < lines.length - 1) {
-          const targetLineIndex = currentLineIndex + 1;
-          const targetLine = lines[targetLineIndex];
-          if (targetLine !== undefined) {
-            const targetLineLen = targetLine.length;
-            const newCol = Math.min(col, targetLineLen);
-            let newIndex = 0;
-            for (let i = 0; i < targetLineIndex; i++) {
-              newIndex += lines[i].length + 1;
-            }
-            newIndex += newCol;
-            setCursorIndex(newIndex);
-            setPasteLength(0);
-          }
+        const { visualLine, visualCol } = getVisualPosition(cursorIndex);
+        const newIndex = getIndexFromVisual(visualLine + 1, visualCol);
+        if (newIndex !== cursorIndex) {
+          setCursorIndex(newIndex);
+          setPasteLength(0);
         }
       }
     } else if (key.leftArrow) {
