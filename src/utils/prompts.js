@@ -82,8 +82,8 @@ ${projectContextBlock}
 - Tables: Max 4 cols
 - NO LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 
--- RESPONSE RULES --
-- End with [turn: continue] to continue or [turn: finish] when task done
+-- TURN RULES (PRIORITY: HIGH) --
+- End with [turn: continue] to continue or [turn: finish] to finish agent loop (MUST INCLUDE EVERY RESPONSE)
 - Tool Called? No post tool response until [turn: continue]
 - Task Complete? End loop with [turn: finish]
 - NEVER USE [turn: continue] [turn:finish] together

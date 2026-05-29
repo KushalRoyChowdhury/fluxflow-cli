@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { parseArgs } from '../utils/arg_parser.js';
+import { isPsAvailable } from '../data/main_tools.js';
 
 // Attempt to load node-pty for a more authentic terminal experience
 let pty = null;
@@ -146,9 +147,24 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
 
     // Post-process tokens to translate Unix '| tee' and '| cat >' to Windows '>' or '>>'
     // Also gracefully auto-corrects pipe typos '| file.txt' to '> file.txt'
+    let inMkdir = false;
     const translatedTokens = [];
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
+
+        if (token === 'mkdir' && usePowerShell && isPsAvailable()) {
+            inMkdir = true;
+        }
+
+        if (inMkdir) {
+            const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+            if (controlOperators.includes(token)) {
+                inMkdir = false;
+            } else if (token === '-p' || token === '--parents') {
+                translatedTokens.push('-Force');
+                continue;
+            }
+        }
 
         if (token === '|' && tokens[i + 1] === 'tee') {
             if (tokens[i + 2] === '-a') {
