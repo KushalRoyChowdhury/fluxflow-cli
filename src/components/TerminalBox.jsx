@@ -3,19 +3,21 @@ import { Box, Text } from 'ink';
 import { wrapText } from '../utils/text.js';
 
 export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false }) => {
-    // Clean output: handle complex node-pty line endings and ANSI noise
-    const processOutput = (text) => {
+    // A smart carriage return resolver that simulates terminal overwrites for Ink
+    const processPTY = (text) => {
         if (!text) return '';
-        // 1. Convert all combinations of CRLF, lone CR, and lone LF to standard LF
-        // 2. Preserve vertical space and leading indentation
-        return text
-            .split(/\r\n|\r|\n/)
-            .map(line => line.trimEnd())
-            .join('\n')
-            .replace(/^\n+|\n+$/g, ''); // Trim only excessive leading/trailing newlines
+        // 1. Strip trailing \r right before \n to prevent dropping lines ending in \r\n or \r\r\n
+        const noTrailingCr = text.replace(/\r+\n/g, '\n');
+        // 2. Resolve true inline \r (spinners/progress bars) by taking the last overwrite
+        return noTrailingCr.split('\n').map(line => {
+            const parts = line.split('\r');
+            return parts[parts.length - 1];
+        }).join('\n');
     };
 
-    const cleanOutput = processOutput(output);
+    // For standard spawn we do minor cleanup, but for PTY we use the smart resolver
+    const cleanOutput = isPty ? processPTY(output) : (output || '').replace(/\r\n/g, '\n');
+    
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
 

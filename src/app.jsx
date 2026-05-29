@@ -1590,10 +1590,22 @@ export default function App({ args = [] }) {
                             onExecEnd: () => {
                                 setMessages(prev => {
                                     if (!activeCommandRef.current) return prev;
+                                    // Normalize output for history/agent (resolve carriage returns to simulate terminal overwrite)
+                                    const rawOutput = execOutputRef.current || '';
+                                    let normalizedOutput = '';
+                                    if (isActiveCommandPty) {
+                                        const noTrailingCr = rawOutput.replace(/\r+\n/g, '\n');
+                                        normalizedOutput = noTrailingCr.split('\n').map(line => {
+                                            const parts = line.split('\r');
+                                            return parts[parts.length - 1];
+                                        }).join('\n');
+                                    } else {
+                                        normalizedOutput = rawOutput.replace(/\r\n/g, '\n');
+                                    }
                                     const finalStatus = `[TERMINAL_RECORD]
 COMMAND: ${activeCommandRef.current}
 PTY: ${isActiveCommandPty}
-OUTPUT: ${execOutputRef.current}`;
+OUTPUT: ${normalizedOutput}`;
                                     return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
                                 });
                                 setActiveCommand(null);

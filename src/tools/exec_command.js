@@ -272,7 +272,9 @@ export const exec_command = async (args, options = {}) => {
 
                     ptyProcess.onExit(({ exitCode }) => {
                         activeChildProcess = null;
-                        const finalOutput = output || 'Command executed with no output.';
+                        // Normalize output for the agent (convert all line breaks to \n)
+                        const normalizedOutput = (output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                        const finalOutput = normalizedOutput || 'Command executed with no output.';
                         if (exitCode !== 0) {
                             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
                         } else {
