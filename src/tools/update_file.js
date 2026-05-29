@@ -13,24 +13,35 @@ export const update_file = async (args) => {
 
     if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
 
-    // Extract up to 10 pairs of replacements
+    // Extract replacement pairs
     const patchPairs = [];
+    const indices = new Set();
 
-    // Legacy support for replaceContent/newContent (pair 1)
-    const legacyReplace = parsed.content_to_replace !== undefined ? parsed.content_to_replace : parsed.replaceContent;
-    const legacyNew = parsed.content_to_add !== undefined ? parsed.content_to_add : parsed.newContent;
+    // Identify all indices present in the arguments (e.g., replaceContent2, newContent2)
+    Object.keys(parsed).forEach(key => {
+        const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+        if (m) {
+            const index = m[2] ? parseInt(m[2]) : 1;
+            indices.add(index);
+        }
+    });
 
-    if (legacyReplace !== undefined && legacyNew !== undefined) {
-        patchPairs.push({ replace: legacyReplace, new: legacyNew });
-    }
+    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
 
-    // Modern support for numbered pairs (1-10)
-    for (let i = 1; i <= 10; i++) {
-        const r = parsed[`replaceContent${i}`];
-        const n = parsed[`newContent${i}`];
-        // Don't duplicate if it was already caught by legacy (usually i=1)
-        if (r !== undefined && n !== undefined && r !== legacyReplace) {
+    for (const i of sortedIndices) {
+        let r, n;
+        if (i === 1) {
+            r = parsed.replaceContent1 ?? (parsed.content_to_replace ?? parsed.replaceContent);
+            n = parsed.newContent1 ?? (parsed.content_to_add ?? parsed.newContent);
+        } else {
+            r = parsed[`replaceContent${i}`] ?? parsed[`content_to_replace${i}`];
+            n = parsed[`newContent${i}`] ?? parsed[`content_to_add${i}`];
+        }
+
+        if (r !== undefined && n !== undefined) {
             patchPairs.push({ replace: r, new: n });
+        } else if (r !== undefined || n !== undefined) {
+            return `ERROR: Mismatched replacement pair for index ${i}. Both replacement and new content must be provided.`;
         }
     }
 
