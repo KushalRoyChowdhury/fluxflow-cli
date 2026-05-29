@@ -147,23 +147,153 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
 
     // Post-process tokens to translate Unix '| tee' and '| cat >' to Windows '>' or '>>'
     // Also gracefully auto-corrects pipe typos '| file.txt' to '> file.txt'
-    let inMkdir = false;
     const translatedTokens = [];
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
 
         if (token === 'mkdir' && usePowerShell && isPsAvailable()) {
-            inMkdir = true;
+            const paths = [];
+            let j = i + 1;
+            while (j < tokens.length) {
+                const nextToken = tokens[j];
+                const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+                if (controlOperators.includes(nextToken)) {
+                    break;
+                }
+                if (nextToken !== '-p' && nextToken !== '--parents' && nextToken !== '-v' && nextToken !== '--verbose') {
+                    paths.push(nextToken);
+                }
+                j++;
+            }
+            if (paths.length > 0) {
+                const processedPaths = paths.map(p => {
+                    const unquoted = p.replace(/^['"]|['"]$/g, '');
+                    let newPath = p;
+                    if (looksLikePath(unquoted)) {
+                        newPath = p.replace(/\//g, '\\');
+                    }
+                    return newPath;
+                });
+                translatedTokens.push('New-Item', '-ItemType', 'Directory', '-Force', '-Path', processedPaths.join(','));
+            } else {
+                translatedTokens.push('New-Item', '-ItemType', 'Directory', '-Force');
+            }
+            i = j - 1;
+            continue;
         }
 
-        if (inMkdir) {
-            const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
-            if (controlOperators.includes(token)) {
-                inMkdir = false;
-            } else if (token === '-p' || token === '--parents') {
-                translatedTokens.push('-Force');
-                continue;
+        if (token === 'rm' && usePowerShell && isPsAvailable()) {
+            const paths = [];
+            let recurse = false;
+            let force = false;
+            let j = i + 1;
+            while (j < tokens.length) {
+                const nextToken = tokens[j];
+                const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+                if (controlOperators.includes(nextToken)) {
+                    break;
+                }
+                if (nextToken === '-rf' || nextToken === '-fr') {
+                    recurse = true;
+                    force = true;
+                } else if (nextToken === '-r' || nextToken === '-R' || nextToken === '--recursive') {
+                    recurse = true;
+                } else if (nextToken === '-f' || nextToken === '--force') {
+                    force = true;
+                } else {
+                    paths.push(nextToken);
+                }
+                j++;
             }
+            const args = ['Remove-Item'];
+            if (recurse) args.push('-Recurse');
+            if (force) args.push('-Force');
+            if (paths.length > 0) {
+                const processedPaths = paths.map(p => {
+                    const unquoted = p.replace(/^['"]|['"]$/g, '');
+                    let newPath = p;
+                    if (looksLikePath(unquoted)) {
+                        newPath = p.replace(/\//g, '\\');
+                    }
+                    return newPath;
+                });
+                args.push('-Path', processedPaths.join(','));
+            }
+            translatedTokens.push(...args);
+            i = j - 1;
+            continue;
+        }
+
+        if (token === 'cp' && usePowerShell && isPsAvailable()) {
+            const paths = [];
+            let recurse = false;
+            let force = false;
+            let j = i + 1;
+            while (j < tokens.length) {
+                const nextToken = tokens[j];
+                const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+                if (controlOperators.includes(nextToken)) {
+                    break;
+                }
+                if (nextToken === '-r' || nextToken === '-R' || nextToken === '--recursive') {
+                    recurse = true;
+                } else if (nextToken === '-f' || nextToken === '--force') {
+                    force = true;
+                } else {
+                    paths.push(nextToken);
+                }
+                j++;
+            }
+            const args = ['Copy-Item'];
+            if (recurse) args.push('-Recurse');
+            if (force) args.push('-Force');
+            if (paths.length > 0) {
+                const processedPaths = paths.map(p => {
+                    const unquoted = p.replace(/^['"]|['"]$/g, '');
+                    let newPath = p;
+                    if (looksLikePath(unquoted)) {
+                        newPath = p.replace(/\//g, '\\');
+                    }
+                    return newPath;
+                });
+                if (processedPaths.length > 1) {
+                    const dest = processedPaths.pop();
+                    args.push('-Path', processedPaths.join(','), '-Destination', dest);
+                } else {
+                    args.push('-Path', processedPaths[0]);
+                }
+            }
+            translatedTokens.push(...args);
+            i = j - 1;
+            continue;
+        }
+
+        if (token === 'touch' && usePowerShell && isPsAvailable()) {
+            const paths = [];
+            let j = i + 1;
+            while (j < tokens.length) {
+                const nextToken = tokens[j];
+                const controlOperators = ['>', '>>', '<', '&', '&&', '|', '||', ';'];
+                if (controlOperators.includes(nextToken)) {
+                    break;
+                }
+                paths.push(nextToken);
+                j++;
+            }
+            if (paths.length > 0) {
+                const processedPaths = paths.map(p => {
+                    const unquoted = p.replace(/^['"]|['"]$/g, '');
+                    let newPath = p;
+                    if (looksLikePath(unquoted)) {
+                        newPath = p.replace(/\//g, '\\');
+                    }
+                    return newPath;
+                });
+                const psTouch = `(${processedPaths.join(', ')}) | ForEach-Object { if (Test-Path $_) { (Get-Item $_).LastWriteTime = [System.DateTime]::Now } else { $null | Out-File -FilePath $_ } }`;
+                translatedTokens.push(psTouch);
+            }
+            i = j - 1;
+            continue;
         }
 
         if (token === '|' && tokens[i + 1] === 'tee') {
