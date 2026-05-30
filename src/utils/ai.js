@@ -716,12 +716,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             try {
                 const files = fs.readdirSync(dir);
                 const sep = path.sep;
-                if (files.length > 80) {
-                    return `${prefix}└── ${path.basename(dir)}${sep} ..80+ files...\n`;
+                if (files.length > 100) {
+                    return `${prefix}└── ${path.basename(dir)}${sep} ...100+ files...\n`;
                 }
 
                 let result = '';
-                const COLLAPSED_DIRS = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor'];
+                const COLLAPSED_DIRS = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle', '.terraform', 'target', 'coverage', '.vscode'];
 
                 const filtered = files.filter(f => !COLLAPSED_DIRS.includes(f));
                 const collapsedInDir = files.filter(f => COLLAPSED_DIRS.includes(f)).sort();
@@ -754,8 +754,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (stat.isDirectory()) {
                             const subFiles = fs.readdirSync(filePath);
                             // [CONTEXT PROTECTION] Limit depth to 7 levels OR 80+ files
-                            if (subFiles.length > 80 || depth >= 7) {
-                                result += `${prefix}${connector}${file}${sep} ..{depth exceeded}..\n`;
+                            if (subFiles.length > 80 || depth > 7) {
+                                result += `${prefix}${connector}${file}${sep} ...depth exceeded...\n`;
                             } else {
                                 result += `${prefix}${connector}${file}${sep}\n`;
                                 result += getDirTree(filePath, childPrefix, depth + 1);
