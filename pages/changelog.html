@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.17.6"]
+        const stableVersions = ["1.18.9"]
         const changelogData = {
+            "1.18.9": {
+                "note": "Context Management.",
+                "added": [],
+                "changed": [
+                    "Changed to Dynamic Recursion Depth to better handle larger projects."
+                ],
+                "fixes": [
+                    "Fixed Context \"Vaporization\" issue with Iteractive Terminal runs."
+                ]
+            },
             "1.18.0": {
                 "note": "Performance Tuning & Multi-Block Patching.",
                 "added": [
