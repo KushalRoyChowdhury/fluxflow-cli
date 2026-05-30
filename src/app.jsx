@@ -1437,17 +1437,29 @@ export default function App({ args = [] }) {
                     }
 
                     const fileContent = exportLines.join('\n');
-                    fs.writeFileSync(exportPath, fileContent, 'utf8');
+                    try {
+                        fs.writeFileSync(exportPath, fileContent, 'utf8');
 
-                    setMessages(prev => {
-                        setCompletedIndex(prev.length + 1);
-                        return [...prev, {
-                            id: Date.now(),
-                            role: 'system',
-                            text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`,
-                            isMeta: true
-                        }];
-                    });
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, {
+                                id: Date.now(),
+                                role: 'system',
+                                text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`,
+                                isMeta: true
+                            }];
+                        });
+                    } catch (err) {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, {
+                                id: Date.now(),
+                                role: 'system',
+                                text: `❌ [EXPORT ERROR] Failed to export chat: ${err.message}`,
+                                isMeta: true
+                            }];
+                        });
+                    }
                     break;
                 }
                 case '/chats': {
@@ -1530,11 +1542,18 @@ export default function App({ args = [] }) {
                                 return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: '❌ ERROR: FluxFlow.md already exists in this directory.', isMeta: true }];
                             });
                         } else {
-                            fs.writeFileSync(filePath, template);
-                            setMessages(prev => {
-                                setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '✅ [SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
-                            });
+                            try {
+                                fs.writeFileSync(filePath, template);
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '✅ [SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
+                                });
+                            } catch (err) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to initialize FluxFlow.md: ${err.message}`, isMeta: true }];
+                                });
+                            }
                         }
                     } else {
                         setMessages(prev => {

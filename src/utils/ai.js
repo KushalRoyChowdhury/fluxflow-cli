@@ -28,19 +28,19 @@ export const signalTermination = () => {
 };
 
 const TOOL_LABELS = {
-    'write_file': 'Writing File',
-    'update_file': 'Updating File',
-    'read_folder': 'Listing Directory',
-    'view_file': 'Reading File',
-    'exec_command': 'Running Command',
-    'web_search': 'Searching Web',
-    'web_scrape': 'Reading Site',
+    'write_file': 'Writing',
+    'update_file': 'Editing',
+    'read_folder': 'Reading',
+    'view_file': 'Reading',
+    'exec_command': 'Executing Command',
+    'web_search': 'Searching',
+    'web_scrape': 'Reading',
     'memory': 'Updating Memory',
-    'search_keyword': 'Finding Files',
-    'ask': 'Asking User',
-    'write_pdf': 'Creating PDF',
-    'write_docx': 'Creating Document',
-    'generate_image': 'Generating Image',
+    'search_keyword': 'Searching',
+    'ask': 'User Input',
+    'write_pdf': 'Creating',
+    'write_docx': 'Creating',
+    'generate_image': 'Generating',
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -815,7 +815,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         else if (totalFolders > 512) dynamicMaxDepth = 6;  // Medium-large projects
         else if (totalFolders > 256) dynamicMaxDepth = 7;  // Average projects
 
-        let dirStructure = totalFolders > 6144 ? `FileSystem Depth exceeded for indexing` : process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = totalFolders > 6144 ? `FileSystem length exceeded for indexing` : process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
@@ -1090,20 +1090,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (process.stdout.isTTY) {
                                         const TOOL_TITLES = {
-                                            'web_search': 'Searching Web',
-                                            'web_scrape': 'Reading Website',
-                                            'view_file': 'Reading File',
-                                            'read_folder': 'Listing Folder',
-                                            'list_files': 'Listing Folder',
-                                            'write_file': 'Writing File',
-                                            'update_file': 'Updating File',
-                                            'write_pdf': 'Creating PDF',
-                                            'write_docx': 'Creating Word Doc',
-                                            'search_keyword': 'Searching Keywords',
-                                            'exec_command': 'Running Command',
-                                            'ask': 'Asking User',
+                                            'web_search': 'Searching',
+                                            'web_scrape': 'Reading',
+                                            'view_file': 'Reading',
+                                            'read_folder': 'Reading',
+                                            'list_files': 'Reading',
+                                            'write_file': 'Writing',
+                                            'update_file': 'Editing',
+                                            'write_pdf': 'Creating',
+                                            'write_docx': 'Creating',
+                                            'search_keyword': 'Searching',
+                                            'exec_command': 'Executing',
+                                            'ask': 'User Input',
                                             'memory': 'Updating Memory',
-                                            'generate_image': 'Generating Image'
+                                            'generate_image': 'Generating'
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -1245,10 +1245,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'web_search') {
                                     const { query, limit = 10 } = parseArgs(toolCall.args);
-                                    label = `🔍 SEARCHED: "${query}" (${limit})`.toUpperCase();
+                                    label = `🔍 Searched: ${query}`;
                                 } else if (normToolName === 'web_scrape') {
                                     const url = parseArgs(toolCall.args).url || '...';
-                                    label = `📖 READ SITE: ${url}`.toUpperCase();
+                                    label = `📖 Visited: ${url}`;
                                 } else if (normToolName === 'view_file') {
                                     const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
 
@@ -1271,34 +1271,35 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } catch (e) { }
                                     const pathLower = targetPath.toLowerCase();
                                     const isPdf = pathLower.endsWith('.pdf');
+                                    const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
-                                    if (isPdf) {
-                                        label = `📄 ANALYZED PDF: ${targetPath}`.toUpperCase();
+                                    if (isPdf || isOfficeFile) {
+                                        label = `📄 Viewed: ${targetPath}`;
                                     } else if (isImage) {
-                                        label = `📸 ANALYZED IMAGE: ${targetPath}`.toUpperCase();
+                                        label = `📸 Viewed: ${targetPath}`;
                                     } else {
-                                        label = `📄 ANALYZED FILE: ${targetPath} | LINES: ${sLine}-${actualEndLine} OF ${totalLines}`.toUpperCase();
+                                        label = `📄 Read: ${targetPath} | ${sLine}-${actualEndLine} from ${totalLines} lines`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
-                                    const action = normToolName === 'list_files' ? 'LIST' : 'ANALYSED';
-                                    label = `📂 ${action} FOLDER: ${parseArgs(toolCall.args).path || '.'}`.toUpperCase();
+                                    const action = normToolName === 'list_files' ? 'List' : 'Viewed';
+                                    const path = parseArgs(toolCall.args).path;
+                                    label = `📂 ${action}: ${path === '.' ? './' : path}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                    const action = normToolName === 'write_file' ? 'WRITTEN' : 'PATCHED';
-                                    label = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                    const action = normToolName === 'write_file' ? 'Created' : 'Edited';
+                                    label = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `📑 PDF CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                    label = `📑 Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `📝 DOCX CREATED: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                    label = `📝 Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'search_keyword') {
-                                    const { keyword } = parseArgs(toolCall.args);
-                                    label = `🔎 KEYWORD SEARCHED: "${keyword}"`.toUpperCase();
+                                    label = '';
                                 } else if (normToolName === 'generate_image') {
                                     const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                                    label = `🎨 IMAGE GENERATED: ${argPath || outputPath || output || 'generated_image.png'}`.toUpperCase();
+                                    label = `🎨 Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
                                 } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                     label = '';
                                 } else {
-                                    label = `EXECUTED: ${toolCall.toolName}`.toUpperCase();
+                                    label = `Executed: ${toolCall.toolName}`;
                                 }
 
                                 // END VISUAL FEEDBACK
@@ -1343,8 +1344,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                                         if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                            const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
-                                            const deniedLabel = `💾 ${action}: ${parsedArgs.path || '...'}`.toUpperCase();
+                                            const action = normToolName === 'write_file' ? 'Write Canceled' : 'Edit Canceled';
+                                            const deniedLabel = `💾 ${action}: ${parsedArgs.path || '...'}`;
                                             const boxWidth = Math.min(deniedLabel.length + 4, 115);
                                             const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                             const boxMid = `│ ${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
@@ -1519,6 +1520,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (typeof result === 'object' && result.binaryPart) {
                                     binaryPart = result.binaryPart;
                                     result = result.text;
+                                }
+
+                                if (normToolName === 'search_keyword') {
+                                    const { keyword, file } = parseArgs(toolCall.args);
+                                    let matchCount = 0;
+                                    if (result) {
+                                        const m = result.match(/Found (\d+) matches/i);
+                                        if (m) {
+                                            matchCount = parseInt(m[1]);
+                                        }
+                                    }
+                                    const postLabel = `🔎 Searched: "${keyword}"${file ? ` in "${file}"` : ' ./'} -> ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const boxWidth = Math.min(postLabel.length + 4, 115);
+                                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                    const boxMid = `│ ${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                    yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                                 }
 
                                 if (normToolName === 'exec_command' && settings.onExecEnd) {
