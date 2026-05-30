@@ -71,7 +71,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
     const janitorContents = history.slice(0, -1)
-        .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
+        .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
         .slice(-14)
         .map(msg => {
             let processedText = stripAnsi(msg.text)
@@ -716,8 +716,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             try {
                 const files = fs.readdirSync(dir);
                 const sep = path.sep;
-                if (files.length > 70) {
-                    return `${prefix}└── ${path.basename(dir)}${sep}...\n`;
+                if (files.length > 80) {
+                    return `${prefix}└── ${path.basename(dir)}${sep} ..80+ files...\n`;
                 }
 
                 let result = '';
@@ -755,7 +755,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const subFiles = fs.readdirSync(filePath);
                             // [CONTEXT PROTECTION] Limit depth to 7 levels OR 80+ files
                             if (subFiles.length > 80 || depth >= 7) {
-                                result += `${prefix}${connector}${file}${sep}...\n`;
+                                result += `${prefix}${connector}${file}${sep} ..{depth exceeded}..\n`;
                             } else {
                                 result += `${prefix}${connector}${file}${sep}\n`;
                                 result += getDirTree(filePath, childPrefix, depth + 1);
@@ -863,7 +863,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                     const contents = modifiedHistory
-                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta)
+                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map(msg => {
                             const parts = [{ text: msg.text }];
                             if (msg.binaryPart) {
@@ -916,6 +916,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `<bos>\n<system>\n${currentSystemInstruction}\n\n<user>\n${firstUserMsg}\n<eos>`);
+                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     stream = await client.models.generateContentStream({
                         model: targetModel || "gemma-4-31b-it",
