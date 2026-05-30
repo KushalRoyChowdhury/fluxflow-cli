@@ -52,7 +52,11 @@ export const terminateActiveCommand = () => {
                 activeChildProcess.destroy();
             } else if (typeof activeChildProcess.kill === 'function') {
                 // Forcefully terminate the process and all its children
-                activeChildProcess.kill('SIGKILL');
+                if (process.platform === 'win32') {
+                    spawn('taskkill', ['/pid', activeChildProcess.pid, '/f', '/t']);
+                } else {
+                    activeChildProcess.kill('SIGKILL');
+                }
             }
         } catch (err) {
             // Process might already be dead

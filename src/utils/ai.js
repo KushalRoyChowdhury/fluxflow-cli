@@ -712,69 +712,110 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-        const getDirTree = (dir, prefix = '', depth = 1) => {
+        const COLLAPSED_DIRS_GLOBAL = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle', '.terraform', 'target', 'coverage', '.vscode'];
+
+        // Helper to safely read a directory with its file types directly (saves disk hits!)
+        const safeReaddirWithTypes = (dir) => {
             try {
-                const files = fs.readdirSync(dir);
-                const sep = path.sep;
-                if (files.length > 100) {
-                    return `${prefix}└── ${path.basename(dir)}${sep} ...100+ files...\n`;
-                }
-
-                let result = '';
-                const COLLAPSED_DIRS = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle', '.terraform', 'target', 'coverage', '.vscode'];
-
-                const filtered = files.filter(f => !COLLAPSED_DIRS.includes(f));
-                const collapsedInDir = files.filter(f => COLLAPSED_DIRS.includes(f)).sort();
-
-                const sorted = filtered.sort((a, b) => {
-                    try {
-                        const aStat = fs.statSync(path.join(dir, a));
-                        const bStat = fs.statSync(path.join(dir, b));
-                        if (aStat.isDirectory() && !bStat.isDirectory()) return -1;
-                        if (!aStat.isDirectory() && bStat.isDirectory()) return 1;
-                    } catch (e) { }
-                    return a.localeCompare(b);
-                });
-
-                sorted.push(...collapsedInDir);
-
-                sorted.forEach((file, index) => {
-                    const isLast = index === sorted.length - 1;
-                    const filePath = path.join(dir, file);
-                    const connector = isLast ? '└── ' : '├── ';
-                    const childPrefix = prefix + (isLast ? '    ' : '│   ');
-
-                    if (COLLAPSED_DIRS.includes(file)) {
-                        result += `${prefix}${connector}${file}${sep}...\n`;
-                        return;
-                    }
-
-                    try {
-                        const stat = fs.statSync(filePath);
-                        if (stat.isDirectory()) {
-                            const subFiles = fs.readdirSync(filePath);
-                            // [CONTEXT PROTECTION] Limit depth to 7 levels OR 80+ files
-                            if (subFiles.length > 80 || depth > 7) {
-                                result += `${prefix}${connector}${file}${sep} ...depth exceeded...\n`;
-                            } else {
-                                result += `${prefix}${connector}${file}${sep}\n`;
-                                result += getDirTree(filePath, childPrefix, depth + 1);
-                            }
-                        } else {
-                            result += `${prefix}${connector}${file}\n`;
-                        }
-                    } catch (e) {
-                        result += `${prefix}${connector}${file}\n`;
-                    }
-                });
-                return result;
+                return fs.readdirSync(dir, { withFileTypes: true });
             } catch (e) {
-                return '';
+                return [];
             }
         };
 
+        const countFolders = (dir, currentCount = { value: 0 }, depth = 1) => {
+            // 1. Scaled up limit to 6200, and bumped search depth to 7 for deep indexing!
+            if (currentCount.value > 6200 || depth > 7) return currentCount.value;
+
+            const entries = safeReaddirWithTypes(dir);
+            for (const entry of entries) {
+                if (currentCount.value > 6200) break;
+                if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
+
+                if (entry.isDirectory()) {
+                    currentCount.value++;
+                    countFolders(path.join(dir, entry.name), currentCount, depth + 1);
+                }
+            }
+            return currentCount.value;
+        };
+
+        const getDirTree = (dir, maxDepth, prefix = '', depth = 1) => {
+            const entries = safeReaddirWithTypes(dir);
+            const sep = path.sep;
+
+            if (entries.length > 100) {
+                return `${prefix}└── ${path.basename(dir)}${sep} ...100+ files...\n`;
+            }
+
+            let result = '';
+            const COLLAPSED_DIRS = COLLAPSED_DIRS_GLOBAL;
+
+            // Filter into categories using the entry types we already fetched
+            const filtered = entries.filter(e => !COLLAPSED_DIRS.includes(e.name));
+            const collapsedInDir = entries.filter(e => COLLAPSED_DIRS.includes(e.name))
+                                          .map(e => e.name)
+                                          .sort();
+
+            // 2. FIXED: Sorting is now super fast because we already know if it's a directory! No disk hits!
+            filtered.sort((a, b) => {
+                if (a.isDirectory() && !b.isDirectory()) return -1;
+                if (!a.isDirectory() && b.isDirectory()) return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            // Create our unified processing list
+            const finalItems = [
+                ...filtered.map(e => ({ name: e.name, isDir: e.isDirectory() })),
+                ...collapsedInDir.map(name => ({ name, isDir: true, isCollapsed: true }))
+            ];
+
+            finalItems.forEach((item, index) => {
+                const isLast = index === finalItems.length - 1;
+                const filePath = path.join(dir, item.name);
+                const connector = isLast ? '└── ' : '├── ';
+                const childPrefix = prefix + (isLast ? '    ' : '│   ');
+
+                if (item.isCollapsed) {
+                    result += `${prefix}${connector}${item.name}${sep}...\n`;
+                    return;
+                }
+
+                if (item.isDir) {
+                    // 3. FIXED: Instead of re-reading the directory here, we let the recursion handle it
+                    if (depth > maxDepth) {
+                        result += `${prefix}${connector}${item.name}${sep} ...depth exceeded...\n`;
+                    } else {
+                        // Check if sub-directory is overflowing before diving deep
+                        const subEntries = safeReaddirWithTypes(filePath);
+                        if (subEntries.length > 80) {
+                            result += `${prefix}${connector}${item.name}${sep} ...80+ files...\n`;
+                        } else {
+                            result += `${prefix}${connector}${item.name}${sep}\n`;
+                            result += getDirTree(filePath, maxDepth, childPrefix, depth + 1);
+                        }
+                    }
+                } else {
+                    result += `${prefix}${connector}${item.name}\n`;
+                }
+            });
+
+            return result;
+        };
+
         yield { type: 'status', content: 'Gathering Context...' };
-        let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd());
+        // Add a 500ms sleep to prevent the UI from flickering
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const totalFolders = countFolders(process.cwd());
+        let dynamicMaxDepth = 7;
+        if (totalFolders > 4096) dynamicMaxDepth = 1;      // Literal hard panic mode
+        else if (totalFolders > 3072) dynamicMaxDepth = 2; // Extremely dense enterprise scale
+        else if (totalFolders > 2048) dynamicMaxDepth = 3; // Large project ecosystems
+        else if (totalFolders > 1024) dynamicMaxDepth = 4; // Standard monorepos
+        else if (totalFolders > 512) dynamicMaxDepth = 6;  // Medium-large projects
+        else if (totalFolders > 256) dynamicMaxDepth = 7;  // Average projects
+
+        let dirStructure = totalFolders > 6144 ? `FileSystem Depth exceeded for indexing` : process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
