@@ -1278,7 +1278,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } else if (isImage) {
                                         label = `📸 Viewed: ${targetPath}`;
                                     } else {
-                                        label = `📄 Read: ${targetPath} | ${sLine}-${actualEndLine} from ${totalLines} lines`;
+                                        label = `📄 Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Viewed';
@@ -1531,7 +1531,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const postLabel = `🔎 Searched: "${keyword}"${file ? ` in "${file}"` : ' ./'} -> ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `🔎 Searched: "${keyword}"${file ? ` in "${file}"` : ' ./'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     const boxWidth = Math.min(postLabel.length + 4, 115);
                                     const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                     const boxMid = `│ ${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;

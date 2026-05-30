@@ -186,8 +186,9 @@ const InlineMarkdown = React.memo(({ text, color }) => {
 
                 // 🏷️ Fenced Code (Captured here to prevent single-backtick shadowing)
                 if (part.startsWith('```') && part.endsWith('```')) {
-                    // Pass to CodeRenderer for full block treatment
-                    return <CodeRenderer key={j} text={part} />;
+                    // Render as inline to prevent <Box> inside <Text> crashes
+                    const content = part.slice(3, -3);
+                    return <Text key={j} color="cyan" backgroundColor="#003333"> {content} </Text>;
                 }
 
                 // 🏷️ Recursive Bold

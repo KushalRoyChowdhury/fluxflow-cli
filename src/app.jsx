@@ -446,6 +446,8 @@ export default function App({ args = [] }) {
     const [resolutionData, setResolutionData] = useState(null);
     const [tempModelOverride, setTempModelOverride] = useState(null);
 
+    useEffect(() => setEscPressCount(0), [input]);
+
     const [messages, setMessages] = useState(() => {
         const logoMsg = { id: 'logo-' + Date.now(), role: 'system', text: FLUX_LOGO, isLogo: true, isMeta: true };
         const welcomeMsg = { id: 'welcome', role: 'system', text: '🌊⚡ Welcome to Flux Flow! Type /help for commands.', isMeta: true };
@@ -631,7 +633,7 @@ export default function App({ args = [] }) {
                         const nextCount = prev + 1;
                         if (nextCount === 1) {
                             if (escDoubleTimerRef.current) clearTimeout(escDoubleTimerRef.current);
-                            escDoubleTimerRef.current = setTimeout(() => setEscPressCount(0), 1000);
+                            escDoubleTimerRef.current = setTimeout(() => setEscPressCount(0), 2000);
                         } else if (nextCount === 2) {
                             if (escDoubleTimerRef.current) clearTimeout(escDoubleTimerRef.current);
                             setEscPressCount(0);
@@ -651,7 +653,8 @@ export default function App({ args = [] }) {
                                     }
                                 });
                             }
-                        }                        return nextCount;
+                        }
+                        return nextCount;
                     });
                 }
             }
@@ -2809,7 +2812,7 @@ OUTPUT: ${normalizedOutput}`;
                                         <Text color="magenta" bold italic>{isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
                                     </Box>
                                 ) : (
-                                    <Text color="cyan" dimColor italic>READY FOR COMMAND...</Text>
+                                    <Text color="cyan" dimColor italic> {input.length > 0 && escPressCount ? "Press ESC again to clear input" : "READY FOR COMMAND..."}</Text>
                                 )}
                             </Box>
                             <Box>
