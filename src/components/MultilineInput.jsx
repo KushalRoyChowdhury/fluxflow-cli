@@ -88,7 +88,7 @@ export const ControlledMultilineInput = ({
         };
       }
       return {
-        preCursor: [{ value: showCursor && focus ? '│' : '', type: 'cursor' }],
+        preCursor: [{ value: showCursor && focus ? ' ' : '', type: 'cursor' }],
         postCursor: []
       };
     }
@@ -110,7 +110,7 @@ export const ControlledMultilineInput = ({
         preCursor: [
           { value: formattedBefore.slice(0, lineStart) },
           { value: formattedBefore.slice(lineStart), type: 'highlight' },
-          { value: showCursor && focus ? '│' : '', type: 'cursor' }
+          { value: showCursor && focus ? ' ' : '', type: 'cursor' }
         ],
         postCursor: [
           { value: formattedAfter.slice(0, lineEnd), type: 'highlight' },
@@ -126,7 +126,7 @@ export const ControlledMultilineInput = ({
             type: 'highlight'
           },
           { value: formatText(textBefore.slice(highlight.end)) },
-          { value: showCursor && focus ? '│' : '', type: 'cursor' }
+          { value: showCursor && focus ? ' ' : '', type: 'cursor' }
         ],
         postCursor: [
           {
@@ -185,7 +185,7 @@ export const ControlledMultilineInput = ({
             ...textStyle,
             color: 'cyan',
             bold: true,
-            inverse: false
+            inverse: true
           };
         default:
           return textStyle;

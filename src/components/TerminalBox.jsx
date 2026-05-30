@@ -50,7 +50,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
 
             <Box justifyContent="space-between" marginTop={1}>
                 {!completed ? (
-                    <Text color="gray" dimColor italic>Double-press ESC to terminate if hanging.</Text>
+                    <Text color="gray" dimColor italic>{isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging."}</Text>
                 ) : <Box />}
                 <Text color={completed ? "#475569" : (isFocused ? "yellow" : "cyan")} bold>
                     {completed ? "● ARCHIVED" : (isFocused ? "▶ TERMINAL FOCUSED" : "● LIVE (Press TAB to focus)")}

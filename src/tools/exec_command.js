@@ -12,6 +12,14 @@ try {
     // Fallback to child_process.spawn will be used
 }
 
+export const isPtyAvailable = !!pty;
+
+const stripAnsi = (str) => {
+    if (typeof str !== 'string') return str;
+    // eslint-disable-next-line no-control-regex
+    return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+};
+
 /**
  * Execute Command Tool
  * Runs a terminal command and returns the output.
@@ -420,7 +428,7 @@ export const exec_command = async (args, options = {}) => {
                         activeChildProcess = null;
                         // Normalize output for the agent (convert all line breaks to \n)
                         const normalizedOutput = (output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                        const finalOutput = normalizedOutput || 'Command executed with no output.';
+                        const finalOutput = stripAnsi(normalizedOutput) || 'Command executed with no output.';
                         if (exitCode !== 0) {
                             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
                         } else {
@@ -506,7 +514,8 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
         if (stderr) result.push(`STDERR:\n${stderr}`);
         if (code !== 0) result.push(`EXIT CODE: ${code}`);
 
-        const finalOutput = result.join('\n\n') || 'Command executed with no output.';
+        const rawOutput = result.join('\n\n') || 'Command executed with no output.';
+        const finalOutput = stripAnsi(rawOutput);
 
         if (code !== 0) {
             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);

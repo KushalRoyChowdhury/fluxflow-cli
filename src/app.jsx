@@ -527,6 +527,13 @@ export default function App({ args = [] }) {
         };
     }, [messages, terminalSize.columns, terminalSize.rows]);
 
+    // Heuristic to detect if terminal is likely waiting for input (ends with ? or :)
+    const isTerminalWaitingForInput = useMemo(() => {
+        if (!activeCommand || !execOutput) return false;
+        const lastChunk = execOutput.trim();
+        return lastChunk.endsWith('?') || lastChunk.endsWith(':') || /\[[yYnN/]+\]\s*$/.test(lastChunk);
+    }, [activeCommand, execOutput]);
+
     // Calculate visual line count for the input buffer (used for Paste UI)
     const terminalWidth = stdout?.columns || 80;
     const wrapWidth = Math.max(20, terminalWidth - 10);
@@ -555,6 +562,23 @@ export default function App({ args = [] }) {
                 } else {
                     writeToActiveCommand('\b \b');
                     setExecOutput(prev => prev.slice(0, -1)); // Rudimentary backspace mirroring
+                }
+            } else if (key.upArrow) {
+                writeToActiveCommand(key.shift ? '\x1B[1;2A' : '\x1B[A');
+            } else if (key.downArrow) {
+                writeToActiveCommand(key.shift ? '\x1B[1;2B' : '\x1B[B');
+            } else if (key.rightArrow) {
+                writeToActiveCommand(key.shift ? '\x1B[1;2C' : '\x1B[C');
+            } else if (key.leftArrow) {
+                writeToActiveCommand(key.shift ? '\x1B[1;2D' : '\x1B[D');
+            } else if (key.escape) {
+                writeToActiveCommand('\x1B');
+            } else if (key.ctrl && inputText) {
+                const charCode = inputText.toLowerCase().charCodeAt(0);
+                if (charCode >= 97 && charCode <= 122) { // a-z
+                    writeToActiveCommand(String.fromCharCode(charCode - 96));
+                } else {
+                    writeToActiveCommand(inputText);
                 }
             } else if (inputText) {
                 writeToActiveCommand(inputText);
@@ -2823,7 +2847,7 @@ OUTPUT: ${normalizedOutput}`;
                                                 {input === '' && (
                                                     <Box position="absolute" paddingLeft={0}>
                                                         {activeCommand && !isTerminalFocused ? (
-                                                            <Text color="yellow">  Press TAB to interact with terminal...</Text>
+                                                            <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for USER input, Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : escPressCount === 1 ? (

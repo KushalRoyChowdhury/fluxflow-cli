@@ -17,6 +17,12 @@ let client = null;
 
 let TERMINATION_SIGNAL = false;
 
+const stripAnsi = (str) => {
+    if (typeof str !== 'string') return str;
+    // eslint-disable-next-line no-control-regex
+    return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+};
+
 export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
@@ -68,7 +74,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
         .slice(-14)
         .map(msg => {
-            let processedText = msg.text
+            let processedText = stripAnsi(msg.text)
                 .replace(/\[tool:functions\..*?\]/g, '')
                 .replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '')
                 .replace(/\[Prompted on:.*?\]/g, '')

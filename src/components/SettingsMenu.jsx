@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
+import { isPtyAvailable } from '../tools/exec_command.js';
 
 const CATEGORIES = [
     { id: 'memory', label: '🧠 Memory', desc: 'Manage system context & agent\'s memory' },
@@ -320,6 +321,8 @@ export default function SettingsMenu({
                                         }
                                         return 'yellow';
                                     }
+                                    if (item.status?.startsWith('✓')) return 'green';
+                                    if (item.status?.startsWith('⚠')) return 'yellow';
                                     return item.status === 'ON' ? 'green' : (item.status === 'OFF' ? 'red' : 'yellow');
                                 };
 
@@ -383,6 +386,16 @@ export default function SettingsMenu({
                                     </Box>
                                 );
                             });
+
+                            if (currentCatId === 'other') {
+                                elements.push(
+                                    <Box key="pty-notice" marginTop={4} paddingX={1}>
+                                        <Text color={isPtyAvailable ? "green" : "yellow"}>
+                                            {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
+                                        </Text>
+                                    </Box>
+                                );
+                            }
 
                             if (hasConflict) {
                                 elements.push(
