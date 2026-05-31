@@ -225,8 +225,16 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.18.9"]
+        const stableVersions = ["1.18.16"]
         const changelogData = {
+            "1.18.16": {
+                "note": "Critical Fix.",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Fixed a issue where agent fail to complete a file with nested escape sequences."
+                ]
+            },
             "1.18.9": {
                 "note": "Context Management.",
                 "added": [],
@@ -234,7 +242,7 @@
                     "Changed to Dynamic Recursion Depth to better handle larger projects."
                 ],
                 "fixes": [
-                    "Fixed Context \"Vaporization\" issue with Iteractive Terminal runs."
+                    "Fixed Context \"Vaporization\" issue with Iteractive Terminal."
                 ]
             },
             "1.18.0": {

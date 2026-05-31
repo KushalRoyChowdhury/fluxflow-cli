@@ -36,19 +36,36 @@ export const parseArgs = (argsString) => {
                 let qIdx = argsString.indexOf(quote, searchIndex);
                 if (qIdx === -1) break;
 
-                // Check if this quote is escaped
-                if (argsString[qIdx - 1] === '\\' && argsString[qIdx - 2] !== '\\') {
+                // Check if this quote is escaped: count backslashes preceding it
+                let backslashCount = 0;
+                for (let k = qIdx - 1; k >= 0 && argsString[k] === '\\'; k--) {
+                    backslashCount++;
+                }
+                if (backslashCount % 2 !== 0) {
                     searchIndex = qIdx + 1;
                     continue;
                 }
 
                 // CHECK BOUNDARY: Is this quote likely the END of the argument?
-                const after = argsString.substring(qIdx + 1).trim();
+                // We must be careful not to end prematurely if a newline happens to be followed by something that looks like a key
+                const afterRaw = argsString.substring(qIdx + 1);
+                const after = afterRaw.trim();
+                
                 const isLogicalEnd = 
                     after === '' ||                    // End of entire string
                     after.startsWith(',') ||           // Next argument separator
                     /^(\w+)\s*=/.test(after) ||        // Next argument key=
                     (after.startsWith(')') && (after.length === 1 || /^\)\s*([,\]\s]|tool:)/i.test(after))); // Robust Tool End
+
+                // ADDITIONAL CHECK: If there is a newline right after the quote, and the next line doesn't look like a NEW argument, it's probably NOT the end
+                if (isLogicalEnd && afterRaw.startsWith('\n')) {
+                   const nextLine = after.split('\n')[0];
+                   if (!nextLine.includes('=') && !nextLine.includes(')')) {
+                       // This was likely a quote inside a multi-line string, keep searching
+                       searchIndex = qIdx + 1;
+                       continue;
+                   }
+                }
 
                 if (isLogicalEnd) {
                     end = qIdx;
@@ -70,29 +87,20 @@ export const parseArgs = (argsString) => {
 
             // High-fidelity unescaping
             const isPathKey = key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase());
-            if (isPathKey) {
-                value = value
-                    .replace(/\\"/g, '"')
-                    .replace(/\\'/g, "'")
-                    .replace(/\\`/g, '`')
-                    .replace(/\\\\/g, '\\');
-            } else {
-                try {
-                    // Only use JSON.parse if it looks like it might have escapes
-                    if (value.includes('\\')) {
-                        // Surgical escape: Only escape quotes that are NOT already escaped
-                        const surgicalValue = value.replace(/(^|[^\\])"/g, '$1\\"');
-                        value = JSON.parse(`"${surgicalValue.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`);
-                    }
-                } catch (e) {
-                    value = value
-                        .replace(/\\"/g, '"')
-                        .replace(/\\'/g, "'")
-                        .replace(/\\`/g, '`')
-                        .replace(/\\\\/g, '\\')
-                        .replace(/\\n/g, '\n');
+            
+            // Standard unescaping logic for all strings:
+            // Uses a single-pass regex to avoid order-of-operation issues (e.g. \\n becoming \n)
+            value = value.replace(/\\(.)/g, (match, char) => {
+                switch (char) {
+                    case 'n': return '\n';
+                    case 'r': return '\r';
+                    case 't': return '\t';
+                    case '\\': return '\\';
+                    default:
+                        if (char === quote) return quote;
+                        return match; // Keep other escaped characters as-is if not recognized
                 }
-            }
+            });
         } else if (i < argsString.length && argsString[i] === '[') {
             // ARRAY LITERAL DETECTION
             let balance = 0;
@@ -102,10 +110,16 @@ export const parseArgs = (argsString) => {
 
             for (let j = i; j < argsString.length; j++) {
                 const char = argsString[j];
-                if (!inString && (char === '"' || char === "'" || char === '`')) {
+                if (inString && char === inString) {
+                    let backslashCount = 0;
+                    for (let k = j - 1; k >= 0 && argsString[k] === '\\'; k--) {
+                        backslashCount++;
+                    }
+                    if (backslashCount % 2 === 0) {
+                        inString = null;
+                    }
+                } else if (!inString && (char === '"' || char === "'" || char === '`')) {
                     inString = char;
-                } else if (inString && char === inString && argsString[j - 1] !== '\\') {
-                    inString = null;
                 }
 
                 if (!inString) {

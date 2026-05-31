@@ -365,32 +365,38 @@ const getContextSafeText = (text, stripThoughts = true) => {
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
-        let isEscaped = false;
         let endIdx = -1;
 
         for (let i = startIdx; i < text.length; i++) {
             const char = text[i];
-            if (!inString && (char === '"' || char === "'" || char === '`')) {
-                inString = char;
-                isEscaped = false;
-            } else if (inString && char === inString && !isEscaped) {
-                inString = null;
-            }
-            if (!inString) {
-                if (char === '(') balance++;
-                else if (char === ')') balance--;
-
-                if (balance === 0) {
-                    let j = i + 1;
-                    while (j < text.length && /\s/.test(text[j])) j++;
-                    if (j < text.length && text[j] === ']') {
-                        endIdx = j;
-                        break;
+            if (inString) {
+                if (char === inString) {
+                    // Check if escaped: count backslashes preceding this quote
+                    let backslashCount = 0;
+                    for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) {
+                        backslashCount++;
+                    }
+                    if (backslashCount % 2 === 0) {
+                        inString = null;
+                    }
+                }
+            } else {
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                } else if (char === '(') {
+                    balance++;
+                } else if (char === ')') {
+                    balance--;
+                    if (balance === 0) {
+                        let j = i + 1;
+                        while (j < text.length && /\s/.test(text[j])) j++;
+                        if (j < text.length && text[j] === ']') {
+                            endIdx = j;
+                            break;
+                        }
                     }
                 }
             }
-            if (char === '\\') isEscaped = !isEscaped;
-            else isEscaped = false;
         }
 
         if (endIdx !== -1) {
@@ -423,32 +429,38 @@ const contextSafeReplace = (text, regex, replacement) => {
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
-        let isEscaped = false;
         let endIdx = -1;
 
         for (let i = startIdx; i < text.length; i++) {
             const char = text[i];
-            if (!inString && (char === '"' || char === "'" || char === '`')) {
-                inString = char;
-                isEscaped = false;
-            } else if (inString && char === inString && !isEscaped) {
-                inString = null;
-            }
-            if (!inString) {
-                if (char === '(') balance++;
-                else if (char === ')') balance--;
-
-                if (balance === 0) {
-                    let j = i + 1;
-                    while (j < text.length && /\s/.test(text[j])) j++;
-                    if (j < text.length && text[j] === ']') {
-                        endIdx = j;
-                        break;
+            if (inString) {
+                if (char === inString) {
+                    // Check if escaped: count backslashes preceding this quote
+                    let backslashCount = 0;
+                    for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) {
+                        backslashCount++;
+                    }
+                    if (backslashCount % 2 === 0) {
+                        inString = null;
+                    }
+                }
+            } else {
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                } else if (char === '(') {
+                    balance++;
+                } else if (char === ')') {
+                    balance--;
+                    if (balance === 0) {
+                        let j = i + 1;
+                        while (j < text.length && /\s/.test(text[j])) j++;
+                        if (j < text.length && text[j] === ']') {
+                            endIdx = j;
+                            break;
+                        }
                     }
                 }
             }
-            if (char === '\\') isEscaped = !isEscaped;
-            else isEscaped = false;
         }
 
         if (endIdx !== -1) {
@@ -483,40 +495,40 @@ const detectToolCalls = (text) => {
 
         let balance = 0;
         let inString = null;
-        let isEscaped = false;
         let endIdx = -1;
         let closingParenIdx = -1;
 
         for (let i = startIdx; i < text.length; i++) {
             const char = text[i];
 
-            if (!inString && (char === '"' || char === "'" || char === '`')) {
-                inString = char;
-                isEscaped = false;
-            } else if (inString && char === inString && !isEscaped) {
-                inString = null;
-            }
-
-            if (!inString) {
-                if (char === '(') balance++;
-                else if (char === ')') balance--;
-
-                if (balance === 0) {
-                    closingParenIdx = i;
-                    let j = i + 1;
-                    while (j < text.length && /\s/.test(text[j])) j++;
-                    if (j < text.length && text[j] === ']') {
-                        endIdx = j;
-                        break;
+            if (inString) {
+                if (char === inString) {
+                    // Check if escaped: count backslashes preceding this quote
+                    let backslashCount = 0;
+                    for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) {
+                        backslashCount++;
+                    }
+                    if (backslashCount % 2 === 0) {
+                        inString = null;
                     }
                 }
-            }
-
-            // Toggle escape state
-            if (char === '\\') {
-                isEscaped = !isEscaped;
             } else {
-                isEscaped = false;
+                if (char === '"' || char === "'" || char === '`') {
+                    inString = char;
+                } else if (char === '(') {
+                    balance++;
+                } else if (char === ')') {
+                    balance--;
+                    if (balance === 0) {
+                        closingParenIdx = i;
+                        let j = i + 1;
+                        while (j < text.length && /\s/.test(text[j])) j++;
+                        if (j < text.length && text[j] === ']') {
+                            endIdx = j;
+                            break;
+                        }
+                    }
+                }
             }
         }
 
