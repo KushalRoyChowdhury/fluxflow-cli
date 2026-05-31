@@ -6,6 +6,7 @@ let pty = null;
 try {
     const ptyModule = await import('node-pty');
     pty = ptyModule.default || ptyModule;
+    pty = false;
 } catch (err) {}
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -165,7 +166,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                     <Text marginLeft={1} bold> Updating Flux Flow to v{latest}...</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="#333">
-                    <Text color="gray" dimColor italic>{log || 'Preparing environment...'}</Text>
+                    <Text color="gray" italic>{log || 'Preparing environment...'}</Text>
                 </Box>
                 <Text marginTop={1} dimColor>(Please do not close the terminal)</Text>
             </Box>
@@ -177,7 +178,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
             <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={2} paddingY={1}>
                 <Text color="green" bold>✅ UPDATE SUCCESSFUL!</Text>
                 <Text marginTop={1}>Flux Flow has been updated to <Text color="cyan">v{latest}</Text>.</Text>
-                <Text marginTop={1} color="yellow" bold>CRITICAL: Please restart your terminal session to apply changes.</Text>
+                <Text marginTop={1} color="yellow" bold>Please restart your terminal session to apply changes.</Text>
                 <Box marginTop={1}>
                     <Text dimColor>(Press ESC to return to chat)</Text>
                 </Box>

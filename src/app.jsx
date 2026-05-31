@@ -2820,13 +2820,13 @@ OUTPUT: ${normalizedOutput}`;
             default:
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
-                        {/* 🏗️ INPUT HEADER BAR */}
+                        {/* 🏗️ INPUT HEADER BAR (NO MODIFICATION HERE OR...) */}
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                             <Box>
                                 {statusText ? (
                                     <Box>
-                                        {isSpinnerActive && <StatusSpinner />}
-                                        <Text color="magenta" bold italic>{isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
+                                        {isSpinnerActive && !isSpinnerActive && <StatusSpinner />}
+                                        <Text color="magenta" bold italic>{isSpinnerActive && !isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
                                     </Box>
                                 ) : (
                                     <Text color="cyan" dimColor italic> {input.length > 0 && escPressCount ? "Press ESC again to clear input" : "READY FOR COMMAND..."}</Text>

@@ -712,7 +712,62 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
-        const COLLAPSED_DIRS_GLOBAL = ['.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out', '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle', '.terraform', 'target', 'coverage', '.vscode'];
+        const COLLAPSED_DIRS_GLOBAL = [
+            // --- The OG Clutter ---
+            '.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out',
+            '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle',
+            '.terraform', 'target', 'coverage', '.vscode',
+
+            // --- Version Control, Monorepos & CI/CD ---
+            '.svn', '.hg', '.fslckout', '.github', '.gitlab', '.circleci',
+            '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
+
+            // --- JS / TS / Web Dev Armageddon ---
+            '.npm', '.yarn', '.pnpm-store', '.expo', '.nuxt', '.svelte-kit',
+            '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
+            '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
+            '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
+
+            // --- Python & Data Science Brain Melting ---
+            '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', '.poetry',
+            'env', 'vhdl', '.ipynb_checkpoints', '.jupyter', '.conda', '.pdm-build',
+
+            // --- Ruby / PHP / Go / Rust / Java / C++ / C# ---
+            '.bundle', '.yardoc', '.metadata', 'App_Data', 'ClientBin',
+            '.cargo', '.rustc_info', '.go', 'Godeps', '_vendor', '.rake_tasks',
+            'CMakefiles', '.wakatime',
+
+            // --- Mobile Dev Madness (Android / iOS / Flutter) ---
+            '.dart_tool', '.fvm', '.cocoapods', 'Pods', '.pub-cache',
+            '.symlinks', 'DerivedData', '.xcworkspace',
+
+            // --- Containers, Cloud & Database Dumps ---
+            '.serverless', '.aws', '.gcloud', '.azure', '.kube',
+            '.vagrant', '.docker', 'postgres-data', 'redis-data', 'mongo-data',
+
+            // --- OS & System Trash (The Ultimate Sinners) ---
+            '.Spotlight-V100', '.Trashes', '$RECYCLE.BIN',
+            'System Volume Information', '.DocumentRevisions-V100', '.fseventsd',
+
+            // --- Windows AppData & System Clutter ---
+            'AppData', 'Application Data', 'Local', 'LocalLow', 'Roaming',
+            '$WinREAgent', '$WINDOWS.~BT', '$WINDOWS.~WS', 'scw', 'System32', 'SysWOW64',
+
+            // --- macOS Specific Garbage ---
+            '.AppleDouble', '.AppleDB', '.AppleDesktop', '_CodeSignature',
+            '.cmio', '.LSOverride', '.localized', '.TemporaryItems',
+
+            // --- Linux / Desktop Environment Junk ---
+            '.Trash', '.Trash-0', '.Trash-1000', '.gvfs', '.local', '.config',
+            '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
+            '.thumb', '.thumbnails',
+
+            // --- Dual-Boot / Bootloader Stuff ---
+            'EFI', 'boot', 'grub',
+
+            // --- Linters, Formatters, Logs & QA ---
+            'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache'
+        ];
 
         // Helper to safely read a directory with its file types directly (saves disk hits!)
         const safeReaddirWithTypes = (dir) => {
@@ -804,16 +859,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         };
 
         yield { type: 'status', content: 'Gathering Context...' };
-        // Add a 500ms sleep to prevent the UI from flickering
+        // Add a 500ms sleep for something
         await new Promise(resolve => setTimeout(resolve, 500));
         const totalFolders = countFolders(process.cwd());
-        let dynamicMaxDepth = 7;
-        if (totalFolders > 4096) dynamicMaxDepth = 1;      // Literal hard panic mode
-        else if (totalFolders > 3072) dynamicMaxDepth = 2; // Extremely dense enterprise scale
-        else if (totalFolders > 2048) dynamicMaxDepth = 3; // Large project ecosystems
-        else if (totalFolders > 1024) dynamicMaxDepth = 4; // Standard monorepos
-        else if (totalFolders > 512) dynamicMaxDepth = 6;  // Medium-large projects
-        else if (totalFolders > 256) dynamicMaxDepth = 7;  // Average projects
+        let dynamicMaxDepth = 12;
+        if (totalFolders > 4096) dynamicMaxDepth = 1;
+        else if (totalFolders > 3072) dynamicMaxDepth = 2;
+        else if (totalFolders > 2048) dynamicMaxDepth = 3;
+        else if (totalFolders > 1024) dynamicMaxDepth = 4;
+        else if (totalFolders > 512) dynamicMaxDepth = 6;
+        else if (totalFolders > 256) dynamicMaxDepth = 7;
+        else if (totalFolders > 128) dynamicMaxDepth = 8;
+        else if (totalFolders > 64) dynamicMaxDepth = 9;
+        else if (totalFolders > 32) dynamicMaxDepth = 10;
 
         let dirStructure = totalFolders > 6144 ? `FileSystem length exceeded for indexing` : process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
