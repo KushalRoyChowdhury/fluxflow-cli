@@ -18,7 +18,7 @@ export const isPsAvailable = () => {
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. To call a tool, MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
-STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}
+STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}\n- Use contexual BEST tools, no brute forcing
 
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish

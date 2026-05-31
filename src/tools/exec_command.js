@@ -443,7 +443,7 @@ export const exec_command = async (args, options = {}) => {
                         activeChildProcess = null;
                         // Normalize output for the agent (convert all line breaks to \n)
                         const normalizedOutput = (output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                        const finalOutput = stripAnsi(normalizedOutput) || 'Command executed with no output.';
+                        const finalOutput = stripAnsi(normalizedOutput).replace(/\n{3,}/g, '\n\n') || 'Command executed with no output.';
                         if (exitCode !== 0) {
                             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
                         } else {
@@ -543,7 +543,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
         if (code !== 0) result.push(`EXIT CODE: ${code}`);
 
         const rawOutput = result.join('\n\n') || 'Command executed with no output.';
-        const finalOutput = stripAnsi(rawOutput);
+        const finalOutput = stripAnsi(rawOutput).replace(/\n{3,}/g, '\n\n');
 
         if (code !== 0) {
             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].\n\n${finalOutput}`);

@@ -546,16 +546,8 @@ export default function App({ args = [] }) {
     const isTerminalWaitingForInput = useMemo(() => {
         if (!activeCommand || !execOutput) return false;
         const lastChunk = execOutput.trim();
-        return lastChunk.endsWith('?') || lastChunk.endsWith(':') || /\[[yYnN/]+\]\s*$/.test(lastChunk);
+        return lastChunk.endsWith('?') || lastChunk.endsWith(':') || /\[[yYnN/]+\]\s*$/.test(lastChunk) || /\([yYnN]\)\s*$/.test(lastChunk);
     }, [activeCommand, execOutput]);
-
-    // Calculate visual line count for the input buffer (used for Paste UI)
-    const terminalWidth = stdout?.columns || 80;
-    const wrapWidth = Math.max(20, terminalWidth - 10);
-    const wrappedLinesCount = input.split(/\r?\n/).reduce((acc, line) => {
-        return acc + Math.max(1, Math.ceil(line.length / wrapWidth));
-    }, 0);
-    const maxLines = Math.max(1, wrappedLinesCount);
 
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
@@ -600,18 +592,6 @@ export default function App({ args = [] }) {
                 if (!isActiveCommandPty) setExecOutput(prev => prev + inputText);
             }
             return;
-        }
-
-        // 0. Atomic Paste Expansion Logic
-        if (maxLines > 2 && !isExpanded && activeView === 'chat') {
-            if (key.backspace || key.delete) {
-                setInput('');
-                return;
-            }
-            if (key.return) {
-                setIsExpanded(true);
-                return;
-            }
         }
 
         // 1. ESC Logic
@@ -1657,7 +1637,16 @@ export default function App({ args = [] }) {
                                     const rawOutput = execOutputRef.current || '';
                                     let normalizedOutput = '';
                                     if (isActiveCommandPty) {
-                                        const noTrailingCr = rawOutput.replace(/\r+\n/g, '\n');
+                                        // 1. Handle Hard Clears: Discard everything before the last clear screen/home signal
+                                        const screenResetRegex = /\x1b\[H|\x1b\[2J|\x1b\[3J|\x1bc/g;
+                                        const resetMatches = [...rawOutput.matchAll(screenResetRegex)];
+                                        let workingText = rawOutput;
+                                        if (resetMatches.length > 0) {
+                                            const lastMatch = resetMatches[resetMatches.length - 1];
+                                            workingText = rawOutput.substring(lastMatch.index + lastMatch[0].length);
+                                        }
+
+                                        const noTrailingCr = workingText.replace(/\r+\n/g, '\n');
                                         normalizedOutput = noTrailingCr.split('\n').map(line => {
                                             const parts = line.split('\r');
                                             return parts[parts.length - 1];
@@ -1665,11 +1654,21 @@ export default function App({ args = [] }) {
                                     } else {
                                         normalizedOutput = rawOutput.replace(/\r\n/g, '\n');
                                     }
-                                    const finalStatus = `[TERMINAL_RECORD]
+                                    const finalStatusRaw = `[TERMINAL_RECORD]
 COMMAND: ${activeCommandRef.current}
 PTY: ${isActiveCommandPty}
-OUTPUT: ${normalizedOutput}`;
-                                    return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
+OUTPUT: ${rawOutput}`;
+                                    const finalStatusNormalized = `[TERMINAL_RECORD]
+COMMAND: ${activeCommandRef.current}
+PTY: ${isActiveCommandPty}
+OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
+                                    return [...prev, { 
+                                        id: 'term-' + Date.now(), 
+                                        role: 'system', 
+                                        text: finalStatusRaw, 
+                                        fullText: finalStatusNormalized, 
+                                        isTerminalRecord: true 
+                                    }];
                                 });
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
@@ -2848,75 +2847,45 @@ OUTPUT: ${normalizedOutput}`;
                             width="100%"
                         >
                             <Box flexDirection="column" width="100%">
-                                {maxLines > 2 && !isExpanded ? (
-                                    <Box flexDirection="row" width="100%" paddingY={0} height={1} overflow="hidden">
-                                        <Box flexShrink={0} width={4}>
-                                            <Text color="cyan" bold>💠 </Text>
-                                        </Box>
-                                        <Box flexGrow={1} flexDirection="row">
-                                            <Box flexShrink={0}>
-                                                <Text color="magenta" bold>[PASTED {maxLines} LINES]</Text>
-                                            </Box>
-                                            <Box flexGrow={1} marginLeft={1}>
-                                                <MultilineInput
-                                                    value=""
-                                                    placeholder=" (Backspace to delete / Enter to expand)"
-                                                    onChange={(val) => {
-                                                        if (val.length > 0) {
-                                                            setIsExpanded(true);
-                                                            setInput(input + val);
-                                                        }
-                                                    }}
-                                                    onSubmit={() => setIsExpanded(true)}
-                                                    keyBindings={{
-                                                        submit: (key) => key.return && !key.shift && !key.ctrl && !key.leftAlt && !key.rightAlt,
-                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl) || (key.return && key.leftAlt) || (key.return && key.rightAlt)
-                                                    }}
-                                                />
-                                            </Box>
+                                <Box flexDirection="row" width="100%" paddingY={0}>
+                                    <Box flexShrink={0} width={4}>
+                                        <Text color={isProcessing ? "magenta" : "cyan"} bold>{isProcessing ? "✦  " : "💠 "}</Text>
+                                    </Box>
+                                    <Box flexGrow={1}>
+                                        <Box flexGrow={1} position="relative">
+                                            {input === '' && (
+                                                <Box position="absolute" paddingLeft={0}>
+                                                    {activeCommand && !isTerminalFocused ? (
+                                                        <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
+                                                    ) : activeCommand && isTerminalFocused ? (
+                                                        <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
+                                                    ) : escPressCount === 1 ? (
+                                                        <Text color="cyan" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
+                                                    ) : (
+                                                        <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                    )}
+                                                </Box>
+                                            )}
+                                            <MultilineInput
+                                                key={`input-${inputKey}`}
+                                                focus={!isTerminalFocused}
+                                                value={input}
+                                                columns={terminalSize.columns}
+                                                onChange={(val) => {
+                                                    const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
+                                                    setInput(cleanVal);
+                                                    setIsFilePickerDismissed(false);
+                                                }}
+                                                onSubmit={handleSubmit}
+                                                maxRows={3}
+                                                keyBindings={{
+                                                    submit: (key) => key.return && !key.shift && !key.ctrl,
+                                                    newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
+                                                }}
+                                            />
                                         </Box>
                                     </Box>
-                                ) : (
-                                    <Box flexDirection="row" width="100%" paddingY={0}>
-                                        <Box flexShrink={0} width={4}>
-                                            <Text color={isProcessing ? "magenta" : "cyan"} bold>{isProcessing ? "✦  " : "💠 "}</Text>
-                                        </Box>
-                                        <Box flexGrow={1}>
-                                            <Box flexGrow={1} position="relative">
-                                                {input === '' && (
-                                                    <Box position="absolute" paddingLeft={0}>
-                                                        {activeCommand && !isTerminalFocused ? (
-                                                            <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
-                                                        ) : activeCommand && isTerminalFocused ? (
-                                                            <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
-                                                        ) : escPressCount === 1 ? (
-                                                            <Text color="cyan" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
-                                                        ) : (
-                                                            <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
-                                                        )}
-                                                    </Box>
-                                                )}
-                                                <MultilineInput
-                                                    key={`input-${inputKey}`}
-                                                    focus={!isTerminalFocused}
-                                                    value={input}
-                                                    columns={terminalSize.columns}
-                                                    onChange={(val) => {
-                                                        const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
-                                                        setInput(cleanVal);
-                                                        setIsFilePickerDismissed(false);
-                                                    }}
-                                                    onSubmit={handleSubmit}
-                                                    maxRows={3}
-                                                    keyBindings={{
-                                                        submit: (key) => key.return && !key.shift && !key.ctrl,
-                                                        newline: (key) => (key.return && key.shift) || (key.return && key.ctrl)
-                                                    }}
-                                                />
-                                            </Box>
-                                        </Box>
-                                    </Box>
-                                )}
+                                </Box>
                             </Box>
                         </Box>
                     </Box>

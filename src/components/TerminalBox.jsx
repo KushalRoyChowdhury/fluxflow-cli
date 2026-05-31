@@ -6,17 +6,28 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     // A smart carriage return resolver that simulates terminal overwrites for Ink
     const processPTY = (text) => {
         if (!text) return '';
-        // 1. Strip trailing \r right before \n to prevent dropping lines ending in \r\n or \r\r\n
-        const noTrailingCr = text.replace(/\r+\n/g, '\n');
-        // 2. Resolve true inline \r (spinners/progress bars) by taking the last overwrite
+
+        // 1. Handle Hard Clears: Discard everything before the last clear screen/home signal
+        const screenResetRegex = /\x1b\[H|\x1b\[2J|\x1b\[3J|\x1bc/g;
+        const resetMatches = [...text.matchAll(screenResetRegex)];
+        let workingText = text;
+        if (resetMatches.length > 0) {
+            const lastMatch = resetMatches[resetMatches.length - 1];
+            workingText = text.substring(lastMatch.index + lastMatch[0].length);
+        }
+
+        // 2. Normalize Newlines
+        const noTrailingCr = workingText.replace(/\r+\n/g, '\n');
+
+        // 3. Resolve Carriage Returns (Overwrites)
         return noTrailingCr.split('\n').map(line => {
             const parts = line.split('\r');
             return parts[parts.length - 1];
         }).join('\n');
     };
 
-    // For standard spawn we do minor cleanup, but for PTY we use the smart resolver
-    const cleanOutput = isPty ? processPTY(output) : (output || '').replace(/\r\n/g, '\n');
+    // For standard spawn we do minor cleanup, but for PTY we just pass through raw (letting OS/Terminal handle it)
+    const cleanOutput = isPty ? (output || '') : (output || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
 
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
