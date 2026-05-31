@@ -272,6 +272,19 @@ export default function App({ args = [] }) {
             } else if (arg === '--external-access' && args[i + 1]) {
                 parsed.externalAccess = args[i + 1].toLowerCase();
                 i++;
+            } else if (arg === '--thinking' && args[i + 1]) {
+                const val = args[i + 1];
+                const lower = val.toLowerCase();
+                if (['fast', 'low', 'medium', 'high', 'xhigh'].includes(lower)) {
+                    let mapped = 'Medium';
+                    if (lower === 'fast') mapped = 'Fast';
+                    else if (lower === 'low') mapped = 'Low';
+                    else if (lower === 'medium') mapped = 'Medium';
+                    else if (lower === 'high') mapped = 'High';
+                    else if (lower === 'xhigh') mapped = 'xHigh';
+                    parsed.thinking = mapped;
+                }
+                i++;
             }
         }
         return parsed;
@@ -732,7 +745,11 @@ export default function App({ args = [] }) {
             // 1. Load persisted settings
             const saved = await loadSettings();
             setMode(saved.mode);
-            setThinkingLevel(saved.thinkingLevel);
+            if (parsedArgs.thinking) {
+                setThinkingLevel(parsedArgs.thinking);
+            } else {
+                setThinkingLevel(saved.thinkingLevel);
+            }
 
             persistedModelRef.current = saved.activeModel;
             if (parsedArgs.model) {
@@ -2869,7 +2886,7 @@ OUTPUT: ${normalizedOutput}`;
                                                 {input === '' && (
                                                     <Box position="absolute" paddingLeft={0}>
                                                         {activeCommand && !isTerminalFocused ? (
-                                                            <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for USER input, Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
+                                                            <Text color="yellow">{isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal..."}</Text>
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : escPressCount === 1 ? (

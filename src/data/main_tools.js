@@ -1,4 +1,5 @@
 import { execSync } from 'child_process';
+import { isPtyAvailable } from '../tools/exec_command';
 
 let _isPsAvailable = null;
 export const isPsAvailable = () => {
@@ -30,10 +31,10 @@ Suggest best options; don't ask for preferences
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
-3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. Unsure? ReadFile > guessing. Multiple blocks same file? Use replaceContent2, newContent2 etc.
+3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. Unsure? ReadFile > guessing. Multiple patch same file? Use replaceContent2, newContent2 etc >>> tool spamming
 4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >> WriteFile. Verify Imports
-5. [tool:functions.SearchKeyword(keyword="...", file="path/to/file")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
-6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? 'WINDOWS POWERSHELL ONLY' : 'WINDOWS CMD') : 'Bash'} command. Destructive/Irreversible ops -> Ask user
+5. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
+6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user
 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Usage: Mockups, PDF thumbnails, any visual content
 8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout (100vh/vw)
 9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document

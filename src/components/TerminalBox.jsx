@@ -17,7 +17,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
 
     // For standard spawn we do minor cleanup, but for PTY we use the smart resolver
     const cleanOutput = isPty ? processPTY(output) : (output || '').replace(/\r\n/g, '\n');
-    
+
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
 
@@ -36,7 +36,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
                     </Box>
                 )}
             </Box>
-            
+
             {displayOutput ? (
                 <Box marginTop={completed ? 0 : 1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>
                     {/* Only apply green color if completed; let ANSI colors show during live execution */}

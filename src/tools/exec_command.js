@@ -423,12 +423,23 @@ export const exec_command = async (args, options = {}) => {
                     isActiveCommandPty = true;
                     let output = '';
 
+                    let isResolved = false;
+
                     ptyProcess.onData((data) => {
-                        output += data;
-                        if (onChunk) onChunk(data);
+                        if (!isResolved) {
+                            output += data;
+                            if (onChunk) onChunk(data);
+
+                            const cleanOut = stripAnsi(output);
+                            if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
+                                isResolved = true;
+                                setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.\n\n${cleanOut}`), 500);
+                            }
+                        }
                     });
 
                     ptyProcess.onExit(({ exitCode }) => {
+                        if (isResolved) return;
                         activeChildProcess = null;
                         // Normalize output for the agent (convert all line breaks to \n)
                         const normalizedOutput = (output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -499,19 +510,32 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
     let stdout = '';
     let stderr = '';
 
+    let isResolved = false;
+
     child.stdout.on('data', (data) => {
-        const chunk = data.toString();
-        stdout += chunk;
-        if (onChunk) onChunk(chunk);
+        if (!isResolved) {
+            const chunk = data.toString();
+            stdout += chunk;
+            if (onChunk) onChunk(chunk);
+
+            const cleanOut = stripAnsi(stdout);
+            if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
+                isResolved = true;
+                setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.\n\n${cleanOut}`), 500);
+            }
+        }
     });
 
     child.stderr.on('data', (data) => {
-        const chunk = data.toString();
-        stderr += chunk;
-        if (onChunk) onChunk(chunk);
+        if (!isResolved) {
+            const chunk = data.toString();
+            stderr += chunk;
+            if (onChunk) onChunk(chunk);
+        }
     });
 
     child.on('close', (code) => {
+        if (isResolved) return;
         activeChildProcess = null;
         const result = [];
         if (stdout) result.push(`STDOUT:\n${stdout}`);

@@ -98,6 +98,7 @@ fluxflow [options]
 - `--auto-del <1d|7d|30d>`: Set automated chat log deletion schedule.
 - `--auto-exec <on|off>`: Toggle autonomous command execution permission.
 - `--external-access <on|off>`: Toggle permission to let agent read files outside CWD.
+- `--thinking <Fast|Medium|High|xHigh>`: Override default thinking level.
 
 ---
 
