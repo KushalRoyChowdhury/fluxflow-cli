@@ -25,8 +25,8 @@ STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan ne
 Suggest best options; don't ask for preferences
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown topics${mode === 'Flux' ? ' or docs' : ''}
-2. [tool:functions.WebScrape(url="...")]. Visit URL
+1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown topics
+2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
