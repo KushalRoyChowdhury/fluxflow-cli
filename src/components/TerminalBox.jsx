@@ -26,8 +26,8 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         }).join('\n');
     };
 
-    // For standard spawn we do minor cleanup, but for PTY we just pass through raw (letting OS/Terminal handle it)
-    const cleanOutput = isPty ? (output || '') : (output || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+    // For standard spawn we do minor cleanup, but for PTY we use the smart resolver
+    const cleanOutput = (isPty ? processPTY(output) : (output || '').replace(/\r\n/g, '\n')).replace(/\n{3,}/g, '\n\n');
 
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');

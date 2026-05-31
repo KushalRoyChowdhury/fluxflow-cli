@@ -51,10 +51,13 @@ export const parseArgs = (argsString) => {
                 const afterRaw = argsString.substring(qIdx + 1);
                 const after = afterRaw.trim();
                 
+                // STRICTER LOGICAL END: 
+                // A quote is ONLY a logical end if it's followed by:
+                // 1. A comma AND then another key= (e.g. "path", content=)
+                // 2. A closing parenthesis that marks the end of the tool call (e.g. "path") ] )
                 const isLogicalEnd = 
                     after === '' ||                    // End of entire string
-                    after.startsWith(',') ||           // Next argument separator
-                    /^(\w+)\s*=/.test(after) ||        // Next argument key=
+                    /^,\s*\w+\s*=/.test(after) ||       // Next argument separator (comma followed by key=)
                     (after.startsWith(')') && (after.length === 1 || /^\)\s*([,\]\s]|tool:)/i.test(after))); // Robust Tool End
 
                 // ADDITIONAL CHECK: If there is a newline right after the quote, and the next line doesn't look like a NEW argument, it's probably NOT the end

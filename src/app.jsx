@@ -995,17 +995,17 @@ export default function App({ args = [] }) {
                 ? [
                     {
                         cmd: 'gemma-4-31b-it',
-                        desc: 'Standard Default   (Free, Recommended)'
+                        desc: 'Standard Default'
                     }
                 ]
                 : [
                     {
                         cmd: 'gemini-3-flash-preview',
-                        desc: 'Fast & Lightweight (Paid, Limited Free quota)'
+                        desc: 'Fast & Lightweight'
                     },
                     {
                         cmd: 'gemini-3.5-flash',
-                        desc: 'New                (Paid, Limited Free quota)'
+                        desc: 'Latest'
                     }
                 ]
         },
@@ -1679,22 +1679,11 @@ export default function App({ args = [] }) {
                                     } else {
                                         normalizedOutput = rawOutput.replace(/\r\n/g, '\n');
                                     }
-                                    const finalStatusRaw = `[TERMINAL_RECORD]
-COMMAND: ${activeCommandRef.current}
-PTY: ${isActiveCommandPty}
-OUTPUT: ${rawOutput}`;
-                                    const finalStatusNormalized = `[TERMINAL_RECORD]
-COMMAND: ${activeCommandRef.current}
-PTY: ${isActiveCommandPty}
-OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
-                                    return [...prev, {
-                                        id: 'term-' + Date.now(),
-                                        role: 'system',
-                                        text: finalStatusRaw,
-                                        fullText: finalStatusNormalized,
-                                        isTerminalRecord: true
-                                    }];
-                                });
+                                    const finalStatus = `[TERMINAL_RECORD]
+                                    COMMAND: ${activeCommandRef.current}
+                                    PTY: ${isActiveCommandPty}
+                                    OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
+                                    return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];                                });
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
                                 setExecOutput('');
