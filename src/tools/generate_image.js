@@ -157,7 +157,7 @@ export const generate_image = async (args) => {
         // 4. Construct URL and send request with hardcoded generic negative prompt
         const seed = Math.floor(Math.random() * 10000000);
         const negativePrompt = "deformed, distorted, disfigured, poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, disconnected limbs, mutation, mutated hands and fingers, blurry, low quality, low resolution, extra fingers, censored, watermarks, signatures";
-        
+
         const url = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}?model=${selectedModel}&width=${width}&height=${height}&seed=${seed}&enhance=true&reasoning=high&quality=high&negative=${encodeURIComponent(negativePrompt)}`;
         const response = await fetch(url, {
             method: 'GET',
@@ -211,7 +211,7 @@ export const generate_image = async (args) => {
 
         const absolutePath = path.resolve(process.cwd(), outputPath);
         await fs.ensureDir(path.dirname(absolutePath));
-        
+
         // Record file change for Reversion Time Travel
         await RevertManager.recordFileChange(absolutePath);
 
@@ -220,7 +220,24 @@ export const generate_image = async (args) => {
         // 7. Update usage logs with successful transaction cost
         await recordImageGeneration(settings);
 
-        return `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}].`;
+        const ext = path.extname(outputPath).toLowerCase();
+        const mimeMap = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.webp': 'image/webp'
+        };
+        const mimeType = mimeMap[ext] || 'image/png';
+
+        return {
+            text: `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}]. Output attached to multimodal part`,
+            binaryPart: {
+                inlineData: {
+                    data: finalBuffer.toString('base64'),
+                    mimeType: mimeType
+                }
+            }
+        };
     } catch (err) {
         return `ERROR: Failed during image generation: ${err.message}`;
     }

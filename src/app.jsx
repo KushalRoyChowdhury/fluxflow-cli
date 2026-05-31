@@ -397,19 +397,31 @@ export default function App({ args = [] }) {
 
     // [TIER AWARENESS] Auto-switch from Gemma if moving to Paid tier
     useEffect(() => {
-        if (apiTier !== 'Free' && activeModel === 'gemma-4-31b-it') {
+        const s = emojiSpace(2);
+        if (apiTier === 'Free') {
+            setActiveModel('gemma-4-31b-it');
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'tier-switch-' + Date.now(),
+                    role: 'system',
+                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemma (Free default).`,
+                    isMeta: true
+                }];
+            });
+        } else {
             setActiveModel('gemini-3-flash-preview');
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, {
                     id: 'tier-switch-' + Date.now(),
                     role: 'system',
-                    text: `⚠️ **[TIER LIMIT]** Gemma is only available on Free API tier. Auto-switched to Gemini 3 Flash Preview.`,
+                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemini 3 Flash Preview.`,
                     isMeta: true
                 }];
             });
         }
-    }, [apiTier, activeModel]);
+    }, [apiTier]); // Look, only apiTier matters now!
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
@@ -977,12 +989,25 @@ export default function App({ args = [] }) {
             ]
         },
         {
-            cmd: '/model', desc: 'Switch AI model', subs: [
-                { cmd: 'gemma-4-31b-it', desc: apiTier === 'Free' ? 'Standard Default   (Free, Recommended)' : 'Standard Default   (Free, Recommended) - Use Free API Key to use this model ' },
-                { cmd: 'gemini-3.1-pro-preview', desc: 'Most Capable       (Paid)' },
-                { cmd: 'gemini-3-flash-preview', desc: 'Fast & Lightweight (Paid, Limited Free quota)' },
-                { cmd: 'gemini-3.5-flash', desc: 'New                (Paid, Limited Free quota)' },
-            ]
+            cmd: '/model',
+            desc: 'Switch AI model',
+            subs: apiTier === 'Free'
+                ? [
+                    {
+                        cmd: 'gemma-4-31b-it',
+                        desc: 'Standard Default   (Free, Recommended)'
+                    }
+                ]
+                : [
+                    {
+                        cmd: 'gemini-3-flash-preview',
+                        desc: 'Fast & Lightweight (Paid, Limited Free quota)'
+                    },
+                    {
+                        cmd: 'gemini-3.5-flash',
+                        desc: 'New                (Paid, Limited Free quota)'
+                    }
+                ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
@@ -1662,12 +1687,12 @@ OUTPUT: ${rawOutput}`;
 COMMAND: ${activeCommandRef.current}
 PTY: ${isActiveCommandPty}
 OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
-                                    return [...prev, { 
-                                        id: 'term-' + Date.now(), 
-                                        role: 'system', 
-                                        text: finalStatusRaw, 
-                                        fullText: finalStatusNormalized, 
-                                        isTerminalRecord: true 
+                                    return [...prev, {
+                                        id: 'term-' + Date.now(),
+                                        role: 'system',
+                                        text: finalStatusRaw,
+                                        fullText: finalStatusNormalized,
+                                        isTerminalRecord: true
                                     }];
                                 });
                                 setActiveCommand(null);

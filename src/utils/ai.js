@@ -975,10 +975,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                     const contents = modifiedHistory
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
-                        .map(msg => {
+                        .map((msg, idx, arr) => {
                             const parts = [{ text: msg.text }];
                             if (msg.binaryPart) {
-                                parts.push(msg.binaryPart);
+                                // 4-Turn Freshness Check: Only include binary data if it appeared within the last 4 physical user turns
+                                const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
+                                if (physicalUserTurnsAfter <= 4) {
+                                    parts.push(msg.binaryPart);
+                                }
                             }
                             return {
                                 role: (msg.role === 'user' || msg.role === 'system') ? 'user' : 'model',
@@ -987,7 +991,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         });
                     // Quota Check
                     if (!(await checkQuota('agent', settings))) {
-                        throw new Error("Error: Daily Quota Exausted for Agent");
+                        throw new Error("Error: Quota Exausted for Agent");
                     }
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
@@ -1043,7 +1047,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                 { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                             ],
-                            thinkingConfig: { includeThoughts: false, thinkingLevel: targetModel.includes('pro') ? ThinkingLevel.HIGH : ThinkingLevel.MINIMAL },
+                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Optimized for Gemma 4.
                         },
                     });
 
