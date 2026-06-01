@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { parseArgs } from '../utils/arg_parser.js';
+import path from 'path';
 
 /**
  * Search Keyword Tool
@@ -17,7 +18,7 @@ export const search_keyword = async (args) => {
     if (file) {
         // Targeted search in a specific file
         if (isWindows) {
-            command = `powershell -Command "if (Test-Path '${file}') { Select-String -Path '${file}' -Pattern '${keyword}' | Select-Object -First 150 | ForEach-Object { $rel = Resolve-Path $_.Path -Relative; '{0}:{1}:' -f $rel, $_.LineNumber } } else { Write-Error 'File not found: ${file}' }"`;
+            command = `powershell -NoProfile -Command "if (Test-Path '${file}') { Select-String -Path '${file}' -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber } } else { Write-Error 'File not found: ${file}' }"`;
         } else {
             command = `grep -HnI "${keyword}" "${file}" | head -n 150`;
         }
@@ -25,7 +26,7 @@ export const search_keyword = async (args) => {
         // Global project search
         if (isWindows) {
             const excludePattern = excludes.join('|').replace(/\./g, '\\.');
-            command = `powershell -Command "Get-ChildItem -Path . -Recurse -File | Where-Object { $_.FullName -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' | Select-Object -First 150 | ForEach-Object { $rel = Resolve-Path $_.Path -Relative; '{0}:{1}:' -f $rel, $_.LineNumber }"`;
+            command = `powershell -NoProfile -Command "Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber }"`;
         } else {
             const excludeDirArgs = excludes.map(d => `--exclude-dir="${d}"`).join(' ');
             command = `grep -rnI ${excludeDirArgs} "${keyword}" . | head -n 150`;
@@ -63,17 +64,45 @@ export const search_keyword = async (args) => {
             if (filteredLines.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ''}`);
 
             const matches = filteredLines.slice(0, 150).map(line => {
-                // Format: path:line:content (standard for both grep and findstr)
-                const firstColon = line.indexOf(':');
-                const secondColon = line.indexOf(':', firstColon + 1);
+                if (line.includes('|')) {
+                    // Our custom PowerShell format: path|lineNum
+                    const parts = line.split('|');
+                    let rawPath = parts[0];
+                    if (path.isAbsolute(rawPath)) {
+                        rawPath = path.relative(process.cwd(), rawPath);
+                    }
+                    const filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
+                    const lineNum = parts[1];
+                    return `${filePath} ${lineNum}`;
+                } else {
+                    // Grep format: path:line:content
+                    let rawPath, lineNum;
+                    const driveMatch = line.match(/^([a-zA-Z]:)/);
+                    if (driveMatch) {
+                        const startSearch = 2;
+                        const nextColon = line.indexOf(':', startSearch);
+                        const thirdColon = line.indexOf(':', nextColon + 1);
+                        if (nextColon !== -1 && thirdColon !== -1) {
+                            rawPath = line.substring(0, nextColon);
+                            lineNum = line.substring(nextColon + 1, thirdColon);
+                        }
+                    } else {
+                        const firstColon = line.indexOf(':');
+                        const secondColon = line.indexOf(':', firstColon + 1);
+                        if (firstColon !== -1 && secondColon !== -1) {
+                            rawPath = line.substring(0, firstColon);
+                            lineNum = line.substring(firstColon + 1, secondColon);
+                        }
+                    }
 
-                if (firstColon === -1 || secondColon === -1) return null;
+                    if (!rawPath || !lineNum) return null;
 
-                const filePath = line.substring(0, firstColon).replace(/^(\.\/|\.\\)/, '');
-                const lineNum = line.substring(firstColon + 1, secondColon);
-
-                // Return exactly as requested: relative_path line_num
-                return `${filePath} ${lineNum}`;
+                    if (path.isAbsolute(rawPath)) {
+                        rawPath = path.relative(process.cwd(), rawPath);
+                    }
+                    const filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
+                    return `${filePath} ${lineNum}`;
+                }
             }).filter(Boolean);
 
             let output = `Found ${filteredLines.length} matches:\n\n`;
