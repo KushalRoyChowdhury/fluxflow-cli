@@ -1612,7 +1612,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const postLabel = `🔎 Searched: "${keyword}"${file ? ` in "${file}"` : ' ./'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `🔎 Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     const boxWidth = Math.min(postLabel.length + 4, 115);
                                     const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                     const boxMid = `│ ${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
