@@ -12,6 +12,7 @@ export const search_keyword = async (args) => {
 
     const isWindows = process.platform === 'win32';
     const excludes = ['node_modules', '.git', 'dist', '.next', '.gemini'];
+    const currentFolder = path.basename(process.cwd());
 
     // Command construction
     let command = '';
@@ -26,7 +27,8 @@ export const search_keyword = async (args) => {
         // Global project search
         if (isWindows) {
             const excludePattern = excludes.join('|').replace(/\./g, '\\.');
-            command = `powershell -NoProfile -Command "Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { ($_.FullName -replace [regex]::Escape($pwd.Path), '') -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber }"`;
+            // Anchor the exclusion regex to only match inside the current folder scope
+            command = `powershell -NoProfile -Command "Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '${currentFolder}.*\\\\(${excludePattern})' } | Select-String -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber }"`;
         } else {
             const excludeDirArgs = excludes.map(d => `--exclude-dir="${d}"`).join(' ');
             command = `grep -rnI ${excludeDirArgs} "${keyword}" . | head -n 150`;
@@ -94,9 +96,17 @@ export const search_keyword = async (args) => {
 
                 if (!filePath || !lineNum) return null;
 
-                // High-fidelity safeguard filter: only exclude if the relative path itself contains the noise dirs
-                const lowerPath = filePath.toLowerCase();
-                const isNoise = excludes.some(ex => lowerPath.split('/').includes(ex.toLowerCase()));
+                // Absolute path resolution to thoroughly isolate project-level noise from parent global directories
+                const absoluteFilePath = path.resolve(process.cwd(), filePath).toLowerCase().replace(/\\/g, '/');
+                const pathSegments = absoluteFilePath.split('/');
+
+                const currentFolderLower = currentFolder.toLowerCase();
+                const folderIndex = pathSegments.lastIndexOf(currentFolderLower);
+
+                // Extract only the segments inside your actual workspace folder
+                const relativeSegments = folderIndex !== -1 ? pathSegments.slice(folderIndex + 1) : pathSegments;
+
+                const isNoise = excludes.some(ex => relativeSegments.includes(ex.toLowerCase()));
                 if (isNoise) return null;
 
                 return `${filePath} ${lineNum}`;
@@ -106,7 +116,7 @@ export const search_keyword = async (args) => {
 
             let output = `Found ${matches.length} matches:\n\n`;
             output += matches.join('\n');
-            if (matches.length > 150) {
+            if (matches.length >= 150) {
                 output += '\n\n... (Truncated to first 150 matches)';
             }
 
