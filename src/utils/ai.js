@@ -885,7 +885,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         else if (totalFolders > 64) dynamicMaxDepth = 9;
         else if (totalFolders > 32) dynamicMaxDepth = 10;
 
-        let dirStructure = totalFolders > 6144 ? `FileSystem length exceeded for indexing` : process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
@@ -1040,7 +1040,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             systemInstruction: currentSystemInstruction,
                             temperature: mode === 'Flux' ? 1.0 : 1.4,
                             maxOutputTokens: 32768,
-                            mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+                            mediaResolution: 'MEDIA_RESOLUTION_HIGH',
                             safetySettings: [
                                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                 { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },

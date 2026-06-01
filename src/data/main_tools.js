@@ -17,8 +17,8 @@ export const isPsAvailable = () => {
 
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
-Access to internal tools. To call a tool, MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
-STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}\n- Use contexual BEST tools, no brute forcing
+Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
+STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}\n- Use contextually BEST tool, no brute force, no spamming\n- Use multiple search & replace on patch tool if same file/path
 
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
@@ -31,8 +31,8 @@ Suggest best options; don't ask for preferences
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
-3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. Unsure? ReadFile > guessing. Multiple patch same file? Use replaceContent2, newContent2 etc >>> tool spamming
-4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >> WriteFile. Verify Imports
+3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile > guessing.
+4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >>> WriteFile. Verify Imports
 5. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
 6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user
 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Usage: Mockups, PDF thumbnails, any visual content
