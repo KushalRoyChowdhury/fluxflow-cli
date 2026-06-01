@@ -26,7 +26,7 @@ export const search_keyword = async (args) => {
         // Global project search
         if (isWindows) {
             const excludePattern = excludes.join('|').replace(/\./g, '\\.');
-            command = `powershell -NoProfile -Command "Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber }"`;
+            command = `powershell -NoProfile -Command "Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | Where-Object { ($_.FullName -replace [regex]::Escape($pwd.Path), '') -notmatch '${excludePattern}' } | Select-String -Pattern '${keyword}' -ErrorAction SilentlyContinue | Select-Object -First 150 | ForEach-Object { '{0}|{1}' -f $_.Path, $_.LineNumber }"`;
         } else {
             const excludeDirArgs = excludes.map(d => `--exclude-dir="${d}"`).join(' ');
             command = `grep -rnI ${excludeDirArgs} "${keyword}" . | head -n 150`;
@@ -51,19 +51,8 @@ export const search_keyword = async (args) => {
             const rawLines = stdout.trim().split('\n').filter(l => l.trim() !== '');
             if (rawLines.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ''}`);
 
-            // Filter out common noise directories to keep results high-fidelity
-            const filteredLines = rawLines.filter(line => {
-                const lower = line.toLowerCase();
-                return !lower.includes('node_modules') &&
-                       !lower.includes('.git') &&
-                       !lower.includes('dist') &&
-                       !lower.includes('.next') &&
-                       !lower.includes('.gemini');
-            });
-
-            if (filteredLines.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ''}`);
-
-            const matches = filteredLines.slice(0, 150).map(line => {
+            const matches = rawLines.slice(0, 150).map(line => {
+                let filePath, lineNum;
                 if (line.includes('|')) {
                     // Our custom PowerShell format: path|lineNum
                     const parts = line.split('|');
@@ -71,12 +60,11 @@ export const search_keyword = async (args) => {
                     if (path.isAbsolute(rawPath)) {
                         rawPath = path.relative(process.cwd(), rawPath);
                     }
-                    const filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
-                    const lineNum = parts[1];
-                    return `${filePath} ${lineNum}`;
+                    filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
+                    lineNum = parts[1];
                 } else {
                     // Grep format: path:line:content
-                    let rawPath, lineNum;
+                    let rawPath;
                     const driveMatch = line.match(/^([a-zA-Z]:)/);
                     if (driveMatch) {
                         const startSearch = 2;
@@ -100,14 +88,25 @@ export const search_keyword = async (args) => {
                     if (path.isAbsolute(rawPath)) {
                         rawPath = path.relative(process.cwd(), rawPath);
                     }
-                    const filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
-                    return `${filePath} ${lineNum}`;
+                    filePath = rawPath.replace(/^(\.\/|\.\\)/, '').replace(/\\/g, '/');
+                    lineNum = lineNum;
                 }
+
+                if (!filePath || !lineNum) return null;
+
+                // High-fidelity safeguard filter: only exclude if the relative path itself contains the noise dirs
+                const lowerPath = filePath.toLowerCase();
+                const isNoise = excludes.some(ex => lowerPath.split('/').includes(ex.toLowerCase()));
+                if (isNoise) return null;
+
+                return `${filePath} ${lineNum}`;
             }).filter(Boolean);
 
-            let output = `Found ${filteredLines.length} matches:\n\n`;
+            if (matches.length === 0) return resolve(`Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ''}`);
+
+            let output = `Found ${matches.length} matches:\n\n`;
             output += matches.join('\n');
-            if (filteredLines.length > 150) {
+            if (matches.length > 150) {
                 output += '\n\n... (Truncated to first 150 matches)';
             }
 
