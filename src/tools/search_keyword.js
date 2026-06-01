@@ -10,7 +10,13 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
     if (depth > 12) return [];
 
     let results = [];
-    const list = await fs.readdir(dir, { withFileTypes: true });
+    let list;
+
+    try {
+        list = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+        return []; // Gracefully skip unreadable or restricted directories
+    }
 
     for (const file of list) {
         const fullPath = path.join(dir, file.name);
@@ -37,12 +43,15 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
  * Searches for a specific keyword in the current workspace natively without shell commands.
  */
 export const search_keyword = async (args) => {
+    // ✨ Uses your main app's argument parser again!
     const { keyword, file } = parseArgs(args);
     if (!keyword) return 'ERROR: Missing "keyword" argument.';
 
-    const excludes = ['node_modules', '.git', 'dist', '.next', '.gemini'];
+    const excludes = [
+        'node_modules', '.git', 'dist', '.next', '.gemini',
+        '.exe', '.dll', '.png', '.jpg', '.jpeg', '.gif', '.zip', '.tgz'
+    ];
     const maxMatches = 150;
-    let matches = [];
 
     try {
         let filesToSearch = [];
@@ -62,45 +71,37 @@ export const search_keyword = async (args) => {
             filesToSearch = await getFilesRecursively(rootDir, excludes);
         }
 
-        // Loop through files and check line-by-line
-        for (const fileObj of filesToSearch) {
-            if (matches.length >= maxMatches) break;
+        // Parallel processing of files for massive asynchronous performance boosts! ⚡
+        const searchPromises = filesToSearch.map(async (fileObj) => {
+            try {
+                const content = await fs.readFile(fileObj.fullPath, 'utf-8');
 
-            // fs.readFile opens and closes the file descriptor automatically safely! 🔒
-            let content = await fs.readFile(fileObj.fullPath, 'utf-8');
+                if (content.includes('\u0000')) return [];
 
-            if (content.includes('\u0000')) {
-                content = null; // Instantly free up memory if it's binary
-                continue;
-            }
+                const lines = content.split(/\r?\n/);
+                const fileMatches = [];
 
-            const lines = content.split(/\r?\n/);
-            content = null; // ✨ Free up the massive raw file string immediately!
-
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].includes(keyword)) {
-                    const displayPath = fileObj.relativePath.replace(/\\/g, '/');
-                    matches.push(`${displayPath} → ${i + 1}`);
-
-                    if (matches.length >= maxMatches) break;
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].includes(keyword)) {
+                        const displayPath = fileObj.relativePath.replace(/\\/g, '/');
+                        fileMatches.push(`${displayPath} → ${i + 1}`);
+                    }
                 }
+                return fileMatches;
+            } catch {
+                return []; // Skip if file is strictly locked by the OS
             }
+        });
 
-            // Explicitly clear references for V8 engine optimization
-            lines.length = 0;
-        }
+        const settledResults = await Promise.all(searchPromises);
+        const matches = settledResults.flat().slice(0, maxMatches);
 
-        // Clean up the main file list references
-        filesToSearch = null;
-
-        // 🧼 Manual Garbage Collection Hint (Optional)
-        // This will run if you execute node with the `--expose-gc` flag!
         if (typeof global.gc === 'function') {
             global.gc();
         }
 
         if (matches.length === 0) {
-            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ''}`;
+            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'}`;
         }
 
         let output = `Found ${matches.length} matches:\n\n`;
