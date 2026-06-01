@@ -64,6 +64,14 @@ const TOOL_MAP = {
  * @returns {Promise<string>} The result of the tool execution.
  */
 export const dispatchTool = async (toolName, args, context = {}) => {
+    if (context.mode && context.mode.toLowerCase() === 'flow') {
+        const normalized = toolName.toLowerCase();
+        const isWebOrAsk = normalized.startsWith('web') || normalized.startsWith('ask');
+        if (!isWebOrAsk) {
+            return `ERROR: Tool [${toolName}] is restricted in Flow mode.`;
+        }
+    }
+
     const tool = TOOL_MAP[toolName];
 
     if (!tool) {

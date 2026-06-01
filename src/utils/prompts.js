@@ -71,6 +71,7 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "
 
 SYSTEM PRIORITY: [SYSTEM], [TOOL RESULT]
 HIGH PRIORITY: [STEERING HINT]
+USER PRIORITY: [USER]
 
 -- THINKING RULES --
 ${thinkingConfig}

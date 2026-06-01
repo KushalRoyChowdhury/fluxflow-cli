@@ -272,7 +272,18 @@ export default function App({ args = [] }) {
             } else if (arg === '--external-access' && args[i + 1]) {
                 parsed.externalAccess = args[i + 1].toLowerCase();
                 i++;
-            } else if (arg === '--thinking' && args[i + 1]) {
+            } else if (arg === '--mode' && args[i + 1]) {
+                const val = args[i + 1];
+                const lower = val.toLowerCase();
+                if (['flux', 'flow'].includes(lower)) {
+                    let mapped = 'Flux';
+                    if (lower === 'flux') mapped = 'Flux';
+                    else if (lower === 'flow') mapped = 'Flow';
+                    parsed.mode = mapped;
+                }
+                i++;
+            }
+            else if (arg === '--thinking' && args[i + 1]) {
                 const val = args[i + 1];
                 const lower = val.toLowerCase();
                 if (['fast', 'low', 'medium', 'high', 'xhigh'].includes(lower)) {
@@ -736,7 +747,11 @@ export default function App({ args = [] }) {
 
             // 1. Load persisted settings
             const saved = await loadSettings();
-            setMode(saved.mode);
+            if (parsedArgs.mode) {
+                setMode(parsedArgs.mode);
+            } else {
+                setMode(saved.mode);
+            }
             if (parsedArgs.thinking) {
                 setThinkingLevel(parsedArgs.thinking);
             } else {
@@ -1683,7 +1698,8 @@ export default function App({ args = [] }) {
                                     COMMAND: ${activeCommandRef.current}
                                     PTY: ${isActiveCommandPty}
                                     OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
-                                    return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];                                });
+                                    return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
+                                });
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
                                 setExecOutput('');

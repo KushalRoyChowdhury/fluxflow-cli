@@ -18,8 +18,10 @@ export const isPsAvailable = () => {
 export const TOOL_PROTOCOL = (mode, osDetected) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
-STRICT POLICY\n- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**${mode === "Flux" ? "\n- **File Tools >> Code in chat**" : ""}\n- Use contextually BEST tool, no brute force, no spamming\n- Use multiple search & replace on patch tool if same file/path
-
+MANDATORY TOOL POLICY:
+- **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
+${mode === '' ? "- Prefer multiple search & replace on patch tool if same file/path\n" : ""}- Use contextually BEST tool, no brute force, no spamming
+${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
 Suggest best options; don't ask for preferences

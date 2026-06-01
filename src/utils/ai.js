@@ -10,7 +10,7 @@ import path from 'path';
 import fs from 'fs';
 import { emojiSpace } from './terminal.js';
 
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
 
 let client = null;
@@ -821,8 +821,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // Filter into categories using the entry types we already fetched
             const filtered = entries.filter(e => !COLLAPSED_DIRS.includes(e.name));
             const collapsedInDir = entries.filter(e => COLLAPSED_DIRS.includes(e.name))
-                                          .map(e => e.name)
-                                          .sort();
+                .map(e => e.name)
+                .sort();
 
             // 2. FIXED: Sorting is now super fast because we already know if it's a directory! No disk hits!
             filtered.sort((a, b) => {
@@ -885,9 +885,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         else if (totalFolders > 64) dynamicMaxDepth = 9;
         else if (totalFolders > 32) dynamicMaxDepth = 10;
 
+        const chatPaths = readEncryptedJson(PATHS_FILE, {});
+        const lastCwd = chatPaths[chatId];
+        const cwdMismatch = lastCwd ? lastCwd !== process.cwd() : false;
+        chatPaths[chatId] = process.cwd();
+        writeEncryptedJson(PATHS_FILE, chatPaths);
+
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -1576,7 +1582,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 yield { type: 'spinner', content: false };
                                 let result = await dispatchTool(normToolName, toolCall.args, {
                                     chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
-                                    systemSettings: settings.systemSettings
+                                    systemSettings: settings.systemSettings,
+                                    mode
                                 });
                                 yield { type: 'spinner', content: true };
 

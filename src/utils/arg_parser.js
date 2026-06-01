@@ -156,11 +156,16 @@ export const parseArgs = (argsString) => {
                 i = argsString.length;
             }
         } else {
-            // Unquoted value
-            let endMatch = argsString.substring(i).match(/([^,\s\)]+)/);
-            if (endMatch) {
-                value = endMatch[1];
-                i += value.length;
+            // Unquoted value: capture everything until the next logical key= boundary or closing bracket
+            let rest = argsString.substring(i);
+            let boundaryMatch = rest.match(/,\s*\w+\s*=|(?:\s*\)\s*(?:$|\]))/);
+            if (boundaryMatch) {
+                let boundaryIndex = boundaryMatch.index;
+                value = rest.substring(0, boundaryIndex).trim();
+                i += boundaryIndex;
+            } else {
+                value = rest.trim();
+                i = argsString.length;
             }
         }
 
