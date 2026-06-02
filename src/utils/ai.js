@@ -558,6 +558,7 @@ export const initAI = (apiKey) => {
 
 /**
  * Detects past chats with substantial turn-level memories, batch-summarizes/merges them
+
  * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
  */
 const consolidatePastMemories = async (currentChatId, settings) => {
@@ -964,6 +965,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let dedupeBuffer = '';
             let isDedupeActive = false;
 
+            let targetModel = modelName;
+            let currentSystemInstruction = '';
+
             while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
                 let inThinkingState = false;
                 try {
@@ -1002,7 +1006,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
-                    let targetModel = modelName;
+                    targetModel = modelName;
                     if (retryCount === MAX_RETRIES - 1) {
                         targetModel = 'gemini-3-flash-preview';
                         yield { type: 'model_update', content: 'Trying with fallback model' };
@@ -1018,7 +1022,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    const currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
+                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT ${(targetModel || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**` : ''}`;
@@ -1040,9 +1044,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `<bos>\n<system>\n${currentSystemInstruction}\n\n<user>\n${firstUserMsg}\n<eos>`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
+                    let activeContents = contents;
+                    let cachedContentName = null;
+
+                    if (settings.apiTier !== 'Free' && (sessionStats?.tokens || 0) > 16384) {
+                        // Standard implicit tracking - No manual cache resource needed for modern Gemini models
+                        if (lastUsage?.cachedContentTokenCount > 0) {
+                             fs.appendFileSync('status_check.txt', `[${new Date().toLocaleString()}] IMPLICIT CACHE HIT: ${lastUsage.cachedContentTokenCount} tokens\n`);
+                        }
+                    }
+
                     stream = await client.models.generateContentStream({
                         model: targetModel || "gemma-4-31b-it",
-                        contents,
+                        contents: activeContents,
                         config: {
                             systemInstruction: currentSystemInstruction,
                             temperature: mode === 'Flux' ? 1.0 : 1.4,
@@ -1927,7 +1941,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
 
             if (lastUsage) {
-                await addToUsage('tokens', lastUsage.totalTokenCount || 0);
+                const total = lastUsage.totalTokenCount || 0;
+                const cached = lastUsage.cachedContentTokenCount || 0;
+
+                await addToUsage('tokens', total);
+                if (cached > 0) {
+                    await addToUsage('cachedTokens', cached);
+                }
+
                 yield { type: 'usage', content: lastUsage };
             }
 
@@ -1981,10 +2002,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else {
                     modifiedHistory.push({ role: 'agent', text: finalWithTime });
                 }
-            }
+                }
 
-            if (isActuallyFinished) break;
-
+                if (isActuallyFinished) break;
             // SDK PROTECTION: Ensure agent response is never empty before next turn
             const nextAgentMsg = cleanedTurnText.trim() || '*Working...*';
             modifiedHistory.push({ role: 'agent', text: nextAgentMsg });

@@ -392,6 +392,7 @@ export default function App({ args = [] }) {
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
+    const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState(0);
     const [sessionToolSuccess, setSessionToolSuccess] = useState(0);
     const [sessionToolFailure, setSessionToolFailure] = useState(0);
     const [sessionToolDenied, setSessionToolDenied] = useState(0);
@@ -1877,6 +1878,18 @@ export default function App({ args = [] }) {
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
                             hasFiredJanitor = true;
+                            
+                            // [CACHE SYNC] Update messages with augmented text (stored in fullText to keep UI clean)
+                            setMessages(prev => {
+                                const aiHistory = packet.data.history;
+                                return prev.map((msg, idx) => {
+                                    if (aiHistory[idx]) {
+                                        return { ...msg, fullText: aiHistory[idx].text };
+                                    }
+                                    return msg;
+                                });
+                            });
+
                             runJanitorTask(
                                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats },
                                 packet.data.agentText,
@@ -1911,8 +1924,12 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'usage') {
                             const total = packet.content.totalTokenCount || 0;
+                            const cached = packet.content.cachedContentTokenCount || 0;
                             setSessionStats({ tokens: total });
                             setSessionTotalTokens(prev => prev + total);
+                            if (cached > 0) {
+                                setSessionTotalCachedTokens(prev => prev + cached);
+                            }
                             setSessionAgentCalls(prev => prev + 1);
                             continue;
                         }
@@ -2035,7 +2052,7 @@ export default function App({ args = [] }) {
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
-                        if (chunkLower.includes('</think>') || chunkLower.includes('</thought>')) {
+                        if ((chunkLower.includes('</think>') || chunkLower.includes('</thought>')) && currentThinkId) {
                             const parts = chunkText.split(/<\/(think|thought)>/gi);
                             const thinkPart = parts[0] || '';
                             // Parts indices: 0: text before </think>, 1: 'think' or 'thought', 2+: rest
@@ -2043,7 +2060,7 @@ export default function App({ args = [] }) {
 
                             setMessages(prev => {
                                 const newMsgs = prev.map(m => {
-                                    if (m.id === currentThinkId) {
+                                    if (m.id === currentThinkId && typeof m.id === 'string') {
                                         const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
                                         const duration = Date.now() - startTime;
                                         return { ...m, text: m.text + thinkPart, isStreaming: false, duration };
@@ -2398,14 +2415,24 @@ export default function App({ args = [] }) {
                                 <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
                                 <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                             </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Images Made:</Text></Box>
-                                <Text color="white">{sessionImageCount || 0}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Image Credits:</Text></Box>
-                                <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
-                            </Box>
+                            {sessionTotalCachedTokens > 0 && (
+                                <Box>
+                                    <Box width={25}><Text color="blue">Cached Tokens:</Text></Box>
+                                    <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                </Box>
+                            )}
+                            {sessionImageCount > 0 && (
+                                <>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Images Made:</Text></Box>
+                                        <Text color="white">{sessionImageCount}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Image Credits:</Text></Box>
+                                        <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                    </Box>
+                                </>
+                            )}
                             <Box>
                                 <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
                                 <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
@@ -2440,14 +2467,24 @@ export default function App({ args = [] }) {
                                 <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
                                 <Text color="white">{formatTokens(dailyUsage?.tokens || 0)}</Text>
                             </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Images Made Today:</Text></Box>
-                                <Text color="white">{dailyUsage?.imageCalls?.length || 0}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
-                                <Text color="white">{Number(((dailyUsage?.imageCalls?.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
-                            </Box>
+                            {(dailyUsage?.cachedTokens || 0) > 0 && (
+                                <Box>
+                                    <Box width={25}><Text color="blue">Saved (cached):</Text></Box>
+                                    <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
+                                </Box>
+                            )}
+                            {(dailyUsage?.imageCalls?.length || 0) > 0 && (
+                                <>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Images Made Today:</Text></Box>
+                                        <Text color="white">{dailyUsage.imageCalls.length}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
+                                        <Text color="white">{Number(((dailyUsage.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
+                                    </Box>
+                                </>
+                            )}
                             <Box>
                                 <Box width={25}><Text color="blue">Code Changes Today:</Text></Box>
                                 <Text color="white"><Text color="green">+{dailyUsage?.linesAdded || 0}</Text> <Text color="red">-{dailyUsage?.linesRemoved || 0}</Text></Text>
@@ -3078,14 +3115,24 @@ export default function App({ args = [] }) {
                                     <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
                                     <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                                 </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Images Made:</Text></Box>
-                                    <Text color="white">{sessionImageCount || 0}</Text>
-                                </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Image Credits:</Text></Box>
-                                    <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
-                                </Box>
+                                {sessionTotalCachedTokens > 0 && (
+                                    <Box>
+                                        <Box width={20}><Text color="blue">Cached Tokens:</Text></Box>
+                                        <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                    </Box>
+                                )}
+                                {sessionImageCount > 0 && (
+                                    <>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Images Made:</Text></Box>
+                                            <Text color="white">{sessionImageCount}</Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Image Credits:</Text></Box>
+                                            <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                        </Box>
+                                    </>
+                                )}
                             </Box>
 
                             <Box flexDirection="column" marginTop={1}>
