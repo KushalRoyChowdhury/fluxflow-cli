@@ -31,7 +31,7 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
             width="100%"
         >
             <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
-                <Text color="magenta" bold>🔧 {title.toUpperCase()}</Text>
+                <Text color="magenta" bold>🔧 {typeof title === 'string' ? title.toUpperCase() : title}</Text>
             </Box>
 
             {subtitle && (

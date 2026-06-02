@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { formatTokens, truncatePath } from '../utils/text.js';
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free' }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
 
@@ -52,6 +52,9 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
                 <Box marginLeft={1}>
                     <Text>🆔</Text><Text color="gray" dimColor italic> {chatId}</Text>
+                    {(apiTier === 'Custom' || apiTier === 'Paid') && (
+                        <Text color="gray" dimColor> | <Text color="green" bold>PAID</Text></Text>
+                    )}
                 </Box>
             </Box>
         </Box>

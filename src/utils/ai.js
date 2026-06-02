@@ -136,7 +136,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     let finalSynthesis = '';
     let attempts = 0;
-    const MAX_JANITOR_RETRIES = 12; // Total Retries = 13
+    const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
 
     while (attempts <= MAX_JANITOR_RETRIES) {
         if (process.stdout.isTTY) {
@@ -296,7 +296,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
         if (attempts >= MAX_JANITOR_RETRIES) {
             if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
+                process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
             }
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
@@ -720,7 +720,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
         const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
 
-        const isContext32k = (sessionStats?.tokens || 0) >= 32000;
+        const isContext32k = (sessionStats?.tokens || 0) >= 24000;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -893,7 +893,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT ${(modelName || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**\n` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -936,7 +936,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? '[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n' : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT ${(modelName || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**\n` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -965,6 +965,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let isDedupeActive = false;
 
             while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
+                let inThinkingState = false;
                 try {
                     turnText = ''; // [CRITICAL STATE SYNC] - Reset turnText at start of every attempt
                     if (isInitialAttempt) {
@@ -1017,10 +1018,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    const currentSystemInstruction = getSystemInstruction(profile, thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
+                    const currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                    const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? '. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**' : ''}`;
+                    const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT ${(targetModel || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**` : ''}`;
                     const lastUserMsg = contents[contents.length - 1];
                     let addedMarker = false;
                     if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
@@ -1053,7 +1054,43 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                 { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                             ],
-                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }, // Optimized for Gemma 4.
+                            thinkingConfig: (() => {
+                                const modelLower = (targetModel || "").toLowerCase();
+                                const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
+                                const isGemini3 = modelLower.includes('gemini-3');
+
+                                if (isGemma4 || isGemini3) {
+                                    if (isGemma4) {
+                                        return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                    }
+                                    return {
+                                        includeThoughts: true,
+                                        thinkingLevel: {
+                                            'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                                            'Low': ThinkingLevel.LOW,
+                                            'Medium': ThinkingLevel.MEDIUM,
+                                            'High': ThinkingLevel.HIGH,
+                                            'xHigh': ThinkingLevel.HIGH
+                                        }[thinkingLevel] || ThinkingLevel.MEDIUM
+                                    };
+                                } else {
+                                    const budget = {
+                                        'Fast': -1,
+                                        'Low': 512,
+                                        'Medium': 2048,
+                                        'High': 16384,
+                                        'xHigh': 24576
+                                    }[thinkingLevel] || 2048;
+
+                                    if (budget === -1) {
+                                        return { includeThoughts: false };
+                                    }
+                                    return {
+                                        includeThoughts: true,
+                                        thinkingBudget: budget
+                                    };
+                                }
+                            })(),
                         },
                     });
 
@@ -1080,12 +1117,42 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (TERMINATION_SIGNAL) {
                             yield { type: 'status', content: 'Termination Signal Received.' };
                             // wait 3s
-                            await new Promise(resolve => setTimeout(resolve, 3000));
+                            await new Promise(resolve => setTimeout(resolve, 1500));
                             break;
                         }
-                        if (chunk.text) {
+
+                        let chunkText = '';
+                        const parts = chunk.candidates?.[0]?.content?.parts;
+                        if (parts && parts.length > 0) {
+                            for (const part of parts) {
+                                if (part.thought) {
+                                    if (part.text) {
+                                        if (!inThinkingState) {
+                                            chunkText += '<think>';
+                                            inThinkingState = true;
+                                        }
+                                        chunkText += part.text;
+                                    }
+                                } else if (part.text) {
+                                    if (inThinkingState) {
+                                        chunkText += '</think>';
+                                        inThinkingState = false;
+                                    }
+                                    chunkText += part.text;
+                                }
+                            }
+                        } else {
+                            const t = chunk.text || '';
+                            if (t && inThinkingState) {
+                                chunkText += '</think>';
+                                inThinkingState = false;
+                            }
+                            chunkText += t;
+                        }
+
+                        if (chunkText) {
                             if (isDedupeActive) {
-                                dedupeBuffer += chunk.text;
+                                dedupeBuffer += chunkText;
                                 // Wait for a small window to find a reliable overlap
                                 if (dedupeBuffer.length >= 30) {
                                     let overlapLen = 0;
@@ -1117,8 +1184,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 continue;
                             }
                             else {
-                                turnText += chunk.text;
-                                yield { type: 'text', content: chunk.text };
+                                turnText += chunkText;
+                                yield { type: 'text', content: chunkText };
                             }
 
                             // [SYSTEM SIGNAL FILTER] - Ignore thoughts and unclosed tools for signal detection
@@ -1208,19 +1275,22 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             let repetitionThresholdThinking = 0.4;
                             let repetitionThresholdResponse = 0.6;
 
-                            // Dynamic Thinking Cap based on tier
-                            const thinkingCaps = {
-                                'low': 256,
-                                'medium': 768,
-                                'high': 2048,
-                                'max': 4096,
-                                'xhigh': 4096,
-                            };
-                            const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
-                            let isOverVerboseThinking = wordCount > cap;
+                            // Dynamic Thinking Cap based on tier (Only applicable for Gemma)
+                            let isOverVerboseThinking = false;
+                            if ((targetModel || "").toLowerCase().startsWith('gemma')) {
+                                const thinkingCaps = {
+                                    'low': 256,
+                                    'medium': 768,
+                                    'high': 2048,
+                                    'max': 4096,
+                                    'xhigh': 4096,
+                                };
+                                const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
+                                isOverVerboseThinking = wordCount > cap;
+                            }
 
                             if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
-                                const reason = repetitionRatio > repetitionThresholdThinking ? 'Thinking Loop Detected' : 'Thinking Budget Exceeded';
+                                const reason = repetitionRatio > repetitionThresholdThinking ? 'Reasoning Loop Detected' : 'Thinking Budget Exceeded';
                                 yield { type: 'status', content: `${reason}. Re-centering...` };
                                 isThinkingLoop = true;
                                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -1657,8 +1727,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
                         }
                         lastUsage = chunk.usageMetadata;
+                        // fs.writeFileSync('token_usage.txt', JSON.stringify(chunk.usageMetadata, null, 2));
                         if (lastUsage) {
                             yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
+                        }
+                    }
+
+                    if (inThinkingState) {
+                        inThinkingState = false;
+                        if (isDedupeActive) {
+                            dedupeBuffer += '</think>';
+                        } else {
+                            turnText += '</think>';
+                            yield { type: 'text', content: '</think>' };
                         }
                     }
 
@@ -1712,10 +1793,28 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     await incrementUsage('agent');
                 } catch (err) {
                     if (String(err).includes('Incomplete JSON segment at the end')) {
+                        if (inThinkingState) {
+                            inThinkingState = false;
+                            if (isDedupeActive) {
+                                dedupeBuffer += '</think>';
+                            } else {
+                                turnText += '</think>';
+                                yield { type: 'text', content: '</think>' };
+                            }
+                        }
                         // Swallow/suppress SDK stream-end JSON chunk parsing bug
                         success = true;
                         await incrementUsage('agent');
                         break;
+                    }
+
+                    if (inThinkingState) {
+                        inThinkingState = false;
+                        if (isDedupeActive) {
+                            dedupeBuffer += '</think>';
+                        } else {
+                            turnText += '</think>';
+                        }
                     }
 
                     // [FLUSH DEDUPE ON ERROR] - If stream cut off, flush any remaining buffered text

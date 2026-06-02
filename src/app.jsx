@@ -383,7 +383,7 @@ export default function App({ args = [] }) {
 
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [apiTier, setApiTier] = useState('Free');
-    const [quotas, setQuotas] = useState({ agentLimit: 1500, backgroundLimit: 1500, searchLimit: 100, customModelId: '', customLimit: 0 });
+    const [quotas, setQuotas] = useState({ agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
     const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
@@ -405,12 +405,27 @@ export default function App({ args = [] }) {
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
     const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
+    const isFirstRender = useRef(true);
+    const isSecondRender = useRef(true);
 
     // [TIER AWARENESS] Auto-switch from Gemma if moving to Paid tier
     useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            setTimeout(() => {
+                isSecondRender.current = false;
+            }, 2000);
+            return;
+        }
+
+        if (isSecondRender.current) {
+            return;
+        }
+
         const s = emojiSpace(2);
         if (apiTier === 'Free') {
             setActiveModel('gemma-4-31b-it');
+            saveSettings({ apiTier: 'Free', activeModel: 'gemma-4-31b-it' });
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, {
@@ -422,12 +437,13 @@ export default function App({ args = [] }) {
             });
         } else {
             setActiveModel('gemini-3-flash-preview');
+            saveSettings({ apiTier: 'Paid', activeModel: 'gemini-3-flash-preview' });
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, {
                     id: 'tier-switch-' + Date.now(),
                     role: 'system',
-                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemini 3 Flash Preview.`,
+                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemini 3 Flash.`,
                     isMeta: true
                 }];
             });
@@ -767,7 +783,7 @@ export default function App({ args = [] }) {
 
             setShowFullThinking(saved.showFullThinking);
             setApiTier(saved.apiTier || 'Free');
-            setQuotas(saved.quotas || { agentLimit: 1500, searchLimit: 100, customModelId: '', customLimit: 0 });
+            setQuotas(saved.quotas || { agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
             const freshSettings = {
                 memory: true,
                 compression: 0.0,
@@ -893,10 +909,11 @@ export default function App({ args = [] }) {
                 showFullThinking,
                 systemSettings,
                 profileData,
-                imageSettings
+                imageSettings,
+                apiTier
             });
         }
-    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs]);
+    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
 
     const handleSetup = async (val) => {
         const key = val.trim();
@@ -1005,23 +1022,40 @@ export default function App({ args = [] }) {
         },
         {
             cmd: '/model',
-            desc: 'Switch AI model',
+            desc: 'Switch Model for Agent',
             subs: apiTier === 'Free'
                 ? [
                     {
                         cmd: 'gemma-4-31b-it',
                         desc: 'Standard Default'
+                    },
+                    {
+                        cmd: 'gemini-3-flash-preview',
+                        desc: 'Fast & Lightweight (Limited Free Quota)'
+                    },
+                    {
+                        cmd: 'gemini-3.5-flash',
+                        desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
                     }
                 ]
                 : [
                     {
+                        cmd: 'gemini-3.1-flash-lite',
+                        desc: 'Ultra-Fast & Lite'
+                    },
+                    {
                         cmd: 'gemini-3-flash-preview',
-                        desc: 'Fast & Lightweight'
+                        desc: 'Default, Fast & Lightweight'
                     },
                     {
                         cmd: 'gemini-3.5-flash',
-                        desc: 'Latest'
-                    }
+                        desc: 'Flash Latest  [Instability Issues]'
+                    },
+                    {
+                        cmd: 'gemini-3.1-pro-preview',
+                        desc: 'Pro Reasoning'
+                    },
+
                 ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -2213,10 +2247,14 @@ export default function App({ args = [] }) {
             case 'apiTier':
                 return (
                     <CommandMenu
-                        title={`API Tier: ${apiTier}`}
+                        title={
+                            <Text>
+                                SELECT YOUR CURRENT API TIER BASED ON <Text color="cyan" underline bold>{"\u001b]8;;https://aistudio.google.com/projects\u0007AI STUDIO\u001b]8;;\u0007"}</Text>. (CURRENT: {apiTier.toUpperCase()})
+                            </Text>
+                        }
                         items={[
-                            { label: 'Free Tier (Gemini API Free Tier - Optimized for Gemma 4 Model)', value: 'Free' },
-                            { label: `Custom    (for using Paid API)`, value: 'Custom' },
+                            { label: 'Free Tier (Gemini API Free Tier)', value: 'Free' },
+                            { label: `Paid Tier (API with Billing Account)`, value: 'Paid' },
                             { label: 'Back', value: 'settings' }
                         ]}
                         onSelect={(item) => {
@@ -2228,9 +2266,9 @@ export default function App({ args = [] }) {
                             const newTier = item.value;
                             setApiTier(newTier);
 
-                            if (newTier === 'Custom') {
+                            if (newTier === 'Paid') {
                                 setInputConfig({
-                                    label: "Enter Agent daily limit (requests made):",
+                                    label: "Enter Agent daily budget (requests made):",
                                     key: 'quotas',
                                     subKey: 'agentLimit',
                                     value: String(quotas.agentLimit),
@@ -2998,6 +3036,7 @@ export default function App({ args = [] }) {
                         tokensTotal={sessionStats.tokens}
                         chatId={chatId}
                         isMemoryEnabled={systemSettings.memory}
+                        apiTier={apiTier}
                     />
                 </Box>
 
@@ -3092,11 +3131,15 @@ export default function App({ args = [] }) {
                                 <Text color="gray" bold dimColor>
                                     {suggestions[0]?.cmd?.startsWith('@') ? "📁 FILE SUGGESTIONS" : "🔍 COMMAND SUGGESTIONS"}
                                 </Text>
-                                {suggestions[0]?.cmd?.startsWith('@') && (
+                                {suggestions[0]?.cmd?.startsWith('@') ? (
                                     <Text color="gray" dimColor italic>
                                         (Use '#Lstart-Lend' to specify line numbers)
                                     </Text>
-                                )}
+                                ) : (input.startsWith('/model') && apiTier === 'Free') ? (
+                                    <Text color="gray" dimColor italic>
+                                            Paid API has more models. Configure <Text color="cyan" underline>{"\u001b]8;;https://aistudio.google.com/billing\u0007billing\u001b]8;;\u0007"}</Text> & /settings
+                                    </Text>
+                                ) : null}
                             </Box>
 
                             {visible.map((s, i) => {

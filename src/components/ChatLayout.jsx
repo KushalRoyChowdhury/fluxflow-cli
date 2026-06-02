@@ -137,8 +137,8 @@ const formatThinkText = (cleaned, columns = 80) => {
 
     return (
         <Box width="100%">
-            <Text italic color="gray">
-                {wrapped}
+            <Text italic>
+                <InlineMarkdown text={wrapped} color="gray" />
             </Text>
         </Box>
     );
@@ -154,7 +154,8 @@ const parseMathSymbols = (content) => {
         .replace(/\\leq/g, '≤')
         .replace(/\\geq/g, '≥')
         .replace(/\\neq/g, '≠')
-        .replace(/\\sqrt\{?(.*?)\}?/g, (_, p1) => `√(${p1})`)
+        .replace(/\\sqrt\s*\{([^}]+)\}/g, '√($1)')
+        .replace(/\\sqrt\s*(\w+|\d+)/g, '√($1)')
         .replace(/\\alpha/g, 'α')
         .replace(/\\beta/g, 'β')
         .replace(/\\theta/g, 'θ')
@@ -165,12 +166,50 @@ const parseMathSymbols = (content) => {
         .replace(/\\sum/g, 'Σ')
         .replace(/\\prod/g, 'Π')
         .replace(/\\rightarrow|\\to/g, '→')
-        .replace(/\\leftarrow/g, '←')
-        .replace(/\\leftrightarrow/g, '↔')
+        .replace(/\\left\b|\\right\b/g, '') // strip lone left/right
         .replace(/\\left\(|\\right\)/g, match => match.includes('left') ? '(' : ')')
         .replace(/\\left\[|\\right\]/g, match => match.includes('left') ? '[' : ']')
         .replace(/\\\{|\\\}/g, match => match.includes('{') ? '{' : '}')
-        .replace(/\\text\{?(.*?)\}?/g, '$1');
+        .replace(/\\text\s*\{([^}]+)\}/g, '$1')
+        .replace(/\\text\s+(\w+)/g, '$1')
+        .replace(/\\%/g, '%');
+};
+
+const renderLatexText = (content, key) => {
+    if (!content) return null;
+
+    // Handle fractions: \frac{a}{b} -> (a/b)
+    let formatted = content.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1/$2)');
+
+    // Replace math symbols
+    formatted = parseMathSymbols(formatted);
+
+    // Split by styling commands: \mathbf{...}, \textbf{...}, \textit{...}, \underline{...}, \texttt{...}
+    const parts = formatted.split(/(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g);
+
+    return (
+        <React.Fragment key={key}>
+            {parts.map((p, idx) => {
+                if (p.startsWith('\\')) {
+                    const match = p.match(/\\(\w+)\{([^{}]*)\}/);
+                    if (match) {
+                        const cmd = match[1];
+                        const inner = match[2];
+                        const isBold = cmd === 'mathbf' || cmd === 'textbf';
+                        const isItalic = cmd === 'textit';
+                        const isUnderline = cmd === 'underline';
+                        const isMono = cmd === 'texttt';
+                        return (
+                            <Text key={idx} bold={isBold} italic={isItalic} underline={isUnderline} color={isMono ? 'cyan' : undefined}>
+                                {inner}
+                            </Text>
+                        );
+                    }
+                }
+                return p;
+            })}
+        </React.Fragment>
+    );
 };
 
 const InlineMarkdown = React.memo(({ text, color }) => {
@@ -219,32 +258,9 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 // 📐 Advanced LaTeX support
                 if (part.startsWith('$') && part.endsWith('$')) {
                     const content = part.slice(1, -1);
-                    const latexParts = content.split(/(\\(?:mathbf|textbf|textit|underline|text|mathrm|textsf|texttt)\{.*?\})/g);
-
                     return (
                         <Text key={j} color="yellow">
-                            {latexParts.map((lp, lpi) => {
-                                if (lp.startsWith('\\')) {
-                                    const match = lp.match(/\\(\w+)\{(.*?)\}/);
-                                    if (match) {
-                                        const cmd = match[1];
-                                        const inner = match[2];
-                                        const isBold = cmd === 'mathbf' || cmd === 'textbf';
-                                        const isItalic = cmd === 'textit';
-                                        const isUnderline = cmd === 'underline';
-                                        const isMono = cmd === 'texttt';
-
-                                        return (
-                                            <Text key={lpi} bold={isBold} italic={isItalic} underline={isUnderline} color={isMono ? 'cyan' : undefined}>
-                                                {parseMathSymbols(inner)}
-                                            </Text>
-                                        );
-                                    }
-                                }
-                                return (
-                                    <Text key={lpi}>{parseMathSymbols(lp)}</Text>
-                                );
-                            })}
+                            {renderLatexText(content, j)}
                         </Text>
                     );
                 }
@@ -272,7 +288,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     return <Text key={j} color="cyan" underline italic>{part}</Text>;
                 }
 
-                return part;
+                return renderLatexText(part, j);
             })}
         </Text>
     );

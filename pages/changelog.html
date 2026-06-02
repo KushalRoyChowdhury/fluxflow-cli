@@ -225,8 +225,21 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.18.16"]
+        const stableVersions = ["1.19.0"]
         const changelogData = {
+            "1.19.0": {
+                "note": "Multi Model support.",
+                "added": [
+                    "Added native support for other Gemini 3 & 2.5 models (`Gemini 3.5 Flash` might face occational instablity with web tools)."
+                ],
+                "changed": [
+                    "Rearchitected `SearchKeyword` tool for better reliability and performance."
+                ],
+                "fixes": [
+                    "Occasional failures of rendering LaTeX.",
+                    "Extended Markdown Support."
+                ]
+            },
             "1.18.16": {
                 "note": "Critical Fix.",
                 "added": [],

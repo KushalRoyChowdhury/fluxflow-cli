@@ -315,14 +315,14 @@ export const checkQuota = async (key, settings) => {
 
     if (tier === 'Free') {
         if (key === 'agent' || key === 'background') {
-            return (usage.agent + usage.background) < 1500;
+            return (usage.agent + usage.background) < 999999;
         }
         if (key === 'search') return true;
     }
 
     if (tier === 'Paid' || tier === 'Custom') {
-        if (key === 'agent') return usage.agent < (quotas.agentLimit || 1500);
-        if (key === 'background') return usage.background < (quotas.backgroundLimit || 1500);
+        if (key === 'agent') return usage.agent < (quotas.agentLimit || 999999);
+        if (key === 'background') return usage.background < (quotas.backgroundLimit || 999999);
         if (key === 'search') return usage.search < (quotas.searchLimit || 100);
     }
 

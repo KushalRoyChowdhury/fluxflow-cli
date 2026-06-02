@@ -10,8 +10,8 @@ const DEFAULT_SETTINGS = {
     showFullThinking: true,
     apiTier: 'Free',
     quotas: {
-        agentLimit: 1500,
-        backgroundLimit: 1500,
+        agentLimit: 999999,
+        backgroundLimit: 999999,
         searchLimit: 100,
         customModelId: '',
         customLimit: 0

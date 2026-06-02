@@ -16,11 +16,14 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true) => {
-    let levelKey = thinkingLevel;
-    if (thinkingLevel === 'Fast') levelKey = 'Off';
-    if (thinkingLevel === 'Low') levelKey = 'Minimal';
-    if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'xHigh';
-    const thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
+    let thinkingConfig = '';
+    if (thinkingLevel !== 'GEM') {
+        let levelKey = thinkingLevel;
+        if (thinkingLevel === 'Fast') levelKey = 'Off';
+        if (thinkingLevel === 'Low') levelKey = 'Minimal';
+        if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'xHigh';
+        thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
+    }
 
     // fs.writeFileSync('level.txt', thinkingLevel);
 
@@ -72,11 +75,10 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "
 SYSTEM PRIORITY: [SYSTEM], [TOOL RESULT]
 HIGH PRIORITY: [STEERING HINT]
 USER PRIORITY: [USER]
-
--- THINKING RULES --
+${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
 ${thinkingConfig}
 ${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n` : ''}
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n` : ''}` : ''}
 ${TOOL_PROTOCOL(mode, osDetected)}
 ${projectContextBlock}
 -- MEMORY RULES --
