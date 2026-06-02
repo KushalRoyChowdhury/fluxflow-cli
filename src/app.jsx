@@ -2997,7 +2997,7 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box paddingX={1} flexDirection="column">
-                            <Text>Please enter your Gemini API Key to initialize the agent.</Text>
+                            <Text>Please enter your Gemini API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
                             <Box marginTop={1}>
                                 <Text color="cyan" bold>💠 </Text>
                                 <TextInput
@@ -3137,7 +3137,7 @@ export default function App({ args = [] }) {
                                     </Text>
                                 ) : (input.startsWith('/model') && apiTier === 'Free') ? (
                                     <Text color="gray" dimColor italic>
-                                            Paid API has more models. Configure <Text color="cyan" underline>{"\u001b]8;;https://aistudio.google.com/billing\u0007billing\u001b]8;;\u0007"}</Text> & /settings
+                                        Paid API has more models. Configure <Text color="cyan" underline>{"\u001b]8;;https://aistudio.google.com/billing\u0007billing\u001b]8;;\u0007"}</Text> & /settings
                                     </Text>
                                 ) : null}
                             </Box>
