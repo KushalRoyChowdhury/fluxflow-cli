@@ -894,7 +894,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT ${(modelName || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**\n` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -937,7 +937,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT ${(modelName || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**\n` : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -1025,20 +1025,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                    const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT ${(targetModel || 'gemma').toLowerCase().startsWith('gemma') ? '<think> ... </think>' : 'THINKING'}**` : ''}`;
-                    const lastUserMsg = contents[contents.length - 1];
+                    const isGemma = modelName && modelName.toLowerCase().startsWith('gemma');
+                    let jitInstruction = '';
                     let addedMarker = false;
-                    if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
-                        lastUserMsg.parts[0].text += jitInstruction;
-                        addedMarker = true;
+                    const lastUserMsg = contents[contents.length - 1];
+
+                    if (isGemma) {
+                        jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
+                        if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
+                            lastUserMsg.parts[0].text += jitInstruction;
+                            addedMarker = true;
+                        }
                     }
 
                     // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 98% for Flux
                     // Keeps prompts fully cached and static for the vast majority of runs!
-                    const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
-                    const currentStep = loop + 1;
-                    if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                        lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
+                    if (isGemma) {
+                        const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
+                        const currentStep = loop + 1;
+                        if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
+                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
+                        }
                     }
 
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `<bos>\n<system>\n${currentSystemInstruction}\n\n<user>\n${firstUserMsg}\n<eos>`);

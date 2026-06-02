@@ -1,0 +1,28 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: 3/6/2026, 04:44 am | v1.19.0\nCWD: D:\\PROJECTS\\Flux-Flow\n**DIRECTORY STRUCTURE**\nD:\\PROJECTS\\Flux-Flow\n├── pages\\\n│   └── changelog.html\n├── src\\\n│   ├── components\\\n│   │   ├── AskUserModal.jsx\n│   │   ├── ChatLayout.jsx\n│   │   ├── CommandMenu.jsx\n│   │   ├── MemoryModal.jsx\n│   │   ├── MultilineInput.jsx\n│   │   ├── ProfileForm.jsx\n│   │   ├── ResumeModal.jsx\n│   │   ├── RevertModal.jsx\n│   │   ├── SettingsMenu.jsx\n│   │   ├── StatusBar.jsx\n│   │   ├── TerminalBox.jsx\n│   │   └── UpdateProcessor.jsx\n│   ├── data\\\n│   │   ├── janitor_tools.js\n│   │   ├── main_tools.js\n│   │   ├── thinking_prompts_deprecated.json\n│   │   └── thinking_prompts.json\n│   ├── tools\\\n│   │   ├── addMemScore.js\n│   │   ├── ask_user.js\n│   │   ├── chat.js\n│   │   ├── exec_command.js\n│   │   ├── generate_image.js\n│   │   ├── memory.js\n│   │   ├── read_folder.js\n│   │   ├── saveSummary.js\n│   │   ├── search_keyword.js\n│   │   ├── update_file.js\n│   │   ├── view_file.js\n│   │   ├── web_scrape.js\n│   │   ├── web_search.js\n│   │   ├── write_docx.js\n│   │   ├── write_file.js\n│   │   └── write_pdf.js\n│   ├── utils\\\n│   │   ├── ai.js\n│   │   ├── arg_parser.js\n│   │   ├── crypto.js\n│   │   ├── fallback_key.js\n│   │   ├── history.js\n│   │   ├── paths.js\n│   │   ├── prompts.js\n│   │   ├── revert.js\n│   │   ├── secrets.js\n│   │   ├── settings.js\n│   │   ├── setup.js\n│   │   ├── terminal.js\n│   │   ├── text.js\n│   │   ├── tools.js\n│   │   └── usage.js\n│   ├── app.jsx\n│   └── cli.jsx\n├── .gitignore\n├── .puppeteerrc.cjs\n├── ARCHITECTURE.md\n├── contents_context.json\n├── flux-flow.cjs\n├── fluxflow.png\n├── LICENSE\n├── package.json\n├── README-git.md\n├── README.md\n├── TOOLS.md\n├── UI_FEATURES.md\n├── .git\\...\n├── dist\\...\n└── node_modules\\...\n\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n[USER] Hii"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "*Taps keyboard aggressively* ⌨️\n\n**Flux Flow online.** 🚀\n\nHii! I'm awake, indexed, and ready to tear through some code. What's the move? You looking to build something legendary, or are we just cleaning up some technical debt today? 💅\n\nStanding by for commands. [turn: finish]"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: 3/6/2026, 04:45 am | v1.19.0\nCWD: D:\\PROJECTS\\Flux-Flow\n**DIRECTORY STRUCTURE**\nD:\\PROJECTS\\Flux-Flow\n├── pages\\\n│   └── changelog.html\n├── src\\\n│   ├── components\\\n│   │   ├── AskUserModal.jsx\n│   │   ├── ChatLayout.jsx\n│   │   ├── CommandMenu.jsx\n│   │   ├── MemoryModal.jsx\n│   │   ├── MultilineInput.jsx\n│   │   ├── ProfileForm.jsx\n│   │   ├── ResumeModal.jsx\n│   │   ├── RevertModal.jsx\n│   │   ├── SettingsMenu.jsx\n│   │   ├── StatusBar.jsx\n│   │   ├── TerminalBox.jsx\n│   │   └── UpdateProcessor.jsx\n│   ├── data\\\n│   │   ├── janitor_tools.js\n│   │   ├── main_tools.js\n│   │   ├── thinking_prompts_deprecated.json\n│   │   └── thinking_prompts.json\n│   ├── tools\\\n│   │   ├── addMemScore.js\n│   │   ├── ask_user.js\n│   │   ├── chat.js\n│   │   ├── exec_command.js\n│   │   ├── generate_image.js\n│   │   ├── memory.js\n│   │   ├── read_folder.js\n│   │   ├── saveSummary.js\n│   │   ├── search_keyword.js\n│   │   ├── update_file.js\n│   │   ├── view_file.js\n│   │   ├── web_scrape.js\n│   │   ├── web_search.js\n│   │   ├── write_docx.js\n│   │   ├── write_file.js\n│   │   └── write_pdf.js\n│   ├── utils\\\n│   │   ├── ai.js\n│   │   ├── arg_parser.js\n│   │   ├── crypto.js\n│   │   ├── fallback_key.js\n│   │   ├── history.js\n│   │   ├── paths.js\n│   │   ├── prompts.js\n│   │   ├── revert.js\n│   │   ├── secrets.js\n│   │   ├── settings.js\n│   │   ├── setup.js\n│   │   ├── terminal.js\n│   │   ├── text.js\n│   │   ├── tools.js\n│   │   └── usage.js\n│   ├── app.jsx\n│   └── cli.jsx\n├── .gitignore\n├── .puppeteerrc.cjs\n├── ARCHITECTURE.md\n├── contents_context.json\n├── flux-flow.cjs\n├── fluxflow.png\n├── LICENSE\n├── package.json\n├── README-git.md\n├── README.md\n├── TOOLS.md\n├── UI_FEATURES.md\n├── .git\\...\n├── dist\\...\n└── node_modules\\...\n\n\n[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n[USER] Hello again"
+        }
+      ]
+    }
+  ]
+}
