@@ -1878,7 +1878,7 @@ export default function App({ args = [] }) {
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
                             hasFiredJanitor = true;
-                            
+
                             // [CACHE SYNC] Update messages with augmented text (stored in fullText to keep UI clean)
                             setMessages(prev => {
                                 const aiHistory = packet.data.history;
@@ -2469,7 +2469,7 @@ export default function App({ args = [] }) {
                             </Box>
                             {(dailyUsage?.cachedTokens || 0) > 0 && (
                                 <Box>
-                                    <Box width={25}><Text color="blue">Saved (cached):</Text></Box>
+                                    <Box width={25}><Text color="blue">Served from Cache:</Text></Box>
                                     <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
                                 </Box>
                             )}
