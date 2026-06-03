@@ -4,6 +4,8 @@ logs/
 secret/
 settings.json
 readme-npm.md
+contents_context.json
+token_usage.txt
 readme-git.md
 dist/
 src/utils/fallback_key.js
