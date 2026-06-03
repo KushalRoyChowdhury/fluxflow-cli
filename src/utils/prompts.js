@@ -3,6 +3,8 @@ import { JANITOR_TOOLS_PROTOCOL } from '../data/janitor_tools.js';
 import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' };
 import fs from 'fs';
 
+let cachedProjectContextBlock = null;
+
 /**
  * Generates a prompt block for memories to be prepended to the user message.
  */
@@ -15,7 +17,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     return parts.length > 0 ? `[SYSTEM CONTEXT]\n${parts.join('\n\n')}\n` : '';
 };
 
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false) => {
     let thinkingConfig = '';
     if (thinkingLevel !== 'GEM') {
         let levelKey = thinkingLevel;
@@ -57,11 +59,14 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         { name: 'architecture.md', desc: 'System Structure' }
     ];
 
-    const foundFiles = projectContextFiles.filter(f => fs.existsSync(f.name));
-    const projectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
+    if (isFirstPrompt || cachedProjectContextBlock === null) {
+        const foundFiles = projectContextFiles.filter(f => fs.existsSync(f.name));
+        cachedProjectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
 -- PROJECT CONTEXT (Source of Truth) --
 ${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
 Check these first; These Files > Training Data. Safety rules apply\n` : '';
+    }
+    const projectContextBlock = cachedProjectContextBlock;
 
     return `${nameStr}${nicknameStr}${userInstrStr}[SYSTEM]
 Identity: Flux Flow (by Kushal Roy Chowdhury). Conversational, Sassy${mode === 'Flux' ? ', Respectful' : ', Friendly, Humorous, Sarcastic' }, CLI Agent
@@ -71,6 +76,10 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "
 - **MANDATORY: MUST END WITH [turn: continue] to CONTINUE loop OR [turn: finish] to END loop**
 - Tool Called? No post tool chat until [turn: continue]
 - NEVER USE [turn: continue] [turn:finish] together
+
+-- MARKERS --
+- TOOL SYSTEM: [TOOL RESULT] (system priority)
+- SYSTEM NOTIFICATION: [SYSTEM], [METADATA] in user turn
 ${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
 ${thinkingConfig}
 ${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY
@@ -86,7 +95,6 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- Tables: Max 4 cols
 - NO LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 [/SYSTEM]`.trim();
 };

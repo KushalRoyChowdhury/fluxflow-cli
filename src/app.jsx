@@ -1684,16 +1684,38 @@ export default function App({ args = [] }) {
                 let apiStart = Date.now();
                 let isFirstPacket = true;
                 try {
-                    const cleanHistoryForAI = [...messages, userMessage]
+                    const rawHistory = [...messages, userMessage]
                         .filter(m =>
                             m.role !== 'think' &&
                             !m.isVisualFeedback &&
                             !String(m.id).startsWith('welcome')
-                        )
-                        .map(m => ({
+                        );
+
+                    const cleanHistoryForAI = [];
+                    rawHistory.forEach((m, idx) => {
+                        let text = m.fullText || m.text;
+                        // Strip metadata from older user messages
+                        if (m.role === 'user' && idx < rawHistory.length - 1) {
+                            const userIndex = text.lastIndexOf('[USER]');
+                            if (userIndex !== -1) {
+                                text = text.substring(userIndex + 6).trim();
+                            }
+                        }
+
+                        // Group consecutive tool results
+                        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
+                            const prev = cleanHistoryForAI[cleanHistoryForAI.length - 1];
+                            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
+                                prev.text += '\n\n' + text;
+                                return;
+                            }
+                        }
+
+                        cleanHistoryForAI.push({
                             ...m,
-                            text: m.fullText || m.text
-                        }));
+                            text
+                        });
+                    });
                     const stream = getAIStream(
                         activeModel,
                         cleanHistoryForAI,
@@ -1887,17 +1909,6 @@ export default function App({ args = [] }) {
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
                             hasFiredJanitor = true;
-
-                            // [CACHE SYNC] Update messages with augmented text (stored in fullText to keep UI clean)
-                            setMessages(prev => {
-                                const aiHistory = packet.data.history;
-                                return prev.map((msg, idx) => {
-                                    if (aiHistory[idx]) {
-                                        return { ...msg, fullText: aiHistory[idx].text };
-                                    }
-                                    return msg;
-                                });
-                            });
 
                             runJanitorTask(
                                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats },

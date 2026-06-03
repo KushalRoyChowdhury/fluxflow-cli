@@ -894,7 +894,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -937,7 +937,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -1022,7 +1022,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, MAX_LOOPS, loop + 1);
+                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const isGemma = modelName && modelName.toLowerCase().startsWith('gemma');
@@ -1934,7 +1934,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             if (lastUsage) {
                 const total = lastUsage.totalTokenCount || 0;
                 const cached = lastUsage.cachedContentTokenCount || 0;
-                const candidates = lastUsage.candidatesTokenCount || 0;
+                const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
 
                 await addToUsage('tokens', total);
                 if (cached > 0) {
@@ -1960,6 +1960,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
             const signalSafeText = getSanitizedText(turnText);
             const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
+            const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
             yield { type: 'status', content: 'Working...' };
@@ -1968,10 +1969,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 .trim();
 
             // [STRICT PROTOCOL ENFORCEMENT]
-            // The loop now breaks ONLY if the model explicitly emits the [turn: finish] signal.
-            // This ensures the agent never "gives up" or stops prematurely if the model forgets
-            // to signal the end of its work or is interrupted.
-            let isActuallyFinished = hasFinish && !shouldContinue;
+            // The loop breaks if the model explicitly emits [turn: finish],
+            // OR if it finished streaming, did not call any tools, and did not emit [turn: continue].
+            let isActuallyFinished = (hasFinish && !shouldContinue) || (!shouldContinue && !hasContinue);
 
 
             if (isActuallyFinished) {
@@ -1988,14 +1988,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 };
 
-                const timestamp = `Responded on ${new Date().toLocaleString()}`;
-                const finalWithTime = `${cleanedFullResponse}\n\n${timestamp}`;
-
                 // Replace the last (potentially messy) agent message with the final response
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'agent') {
-                    modifiedHistory[modifiedHistory.length - 1].text = finalWithTime;
+                    modifiedHistory[modifiedHistory.length - 1].text = cleanedFullResponse;
                 } else {
-                    modifiedHistory.push({ role: 'agent', text: finalWithTime });
+                    modifiedHistory.push({ role: 'agent', text: cleanedFullResponse });
                 }
                 }
 
@@ -2007,7 +2004,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // If the model hasn't finished, we must provide a user turn to keep the loop going.
             // If there are no tool results, we send a 'continue' signal to prompt the model.
             if (toolResults.length > 0 || anyToolExecutedInThisTurn) {
-                toolResults.forEach(tr => modifiedHistory.push(tr));
+                if (toolResults.length > 0) {
+                    const combinedText = toolResults.map(tr => tr.text).join('\n\n');
+                    const binaryPart = toolResults.find(tr => tr.binaryPart)?.binaryPart || null;
+                    modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });
+                }
             } else {
                 if (wasToolCalledInLastLoop) {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] System failed to verify tool execution, Verify tool syntax, proper escaping and try again if failed` });

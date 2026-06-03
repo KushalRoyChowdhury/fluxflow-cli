@@ -48,5 +48,5 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
 - File structure: Real newlines for code formatting`.trim() : `
 - FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user,\` /mode flux\` if needed)`.trim()}
 
-- Results: Passed as [TOOL RESULT] (system priority)
+- Results: Passed as [TOOL RESULT]
 - MAX Tool call stack: STRICTLY 3 per turn`.trim();
