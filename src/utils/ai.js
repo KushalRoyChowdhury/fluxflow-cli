@@ -1026,15 +1026,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const isGemma = modelName && modelName.toLowerCase().startsWith('gemma');
-                    let jitInstruction = '';
-                    let addedMarker = false;
                     const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
-                        jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
+                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
-                            addedMarker = true;
                         }
                     }
 
@@ -1114,11 +1111,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             })(),
                         },
                     });
-
-                    // [JIT CLEANUP] - Remove the marker from the local contents object after sending
-                    if (addedMarker && contents[contents.length - 1]?.parts?.[0]) {
-                        contents[contents.length - 1].parts[0].text = contents[contents.length - 1].parts[0].text.replace(jitInstruction, '').trim();
-                    }
 
                     // Reset turn state for this specific retry attempt
                     turnText = '';
@@ -2032,6 +2024,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
+
+        // [JIT CLEANUP] - Clean up JIT instruction injection markers from the persistent history
+        if (modelName && modelName.toLowerCase().startsWith('gemma')) {
+            modifiedHistory.forEach(msg => {
+                if (msg.role === 'user' && msg.text && msg.text.startsWith('[TOOL RESULT]')) {
+                    const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn`;
+                    const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**`;
+                    msg.text = msg.text.replace(jitInstructionThinking, '').replace(jitInstructionFast, '').trim();
+                }
+            });
+        }
+        
     } finally {
         await RevertManager.commitTransaction();
     }

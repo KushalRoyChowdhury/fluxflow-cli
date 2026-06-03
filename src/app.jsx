@@ -1031,6 +1031,10 @@ export default function App({ args = [] }) {
                         desc: 'Standard Default'
                     },
                     {
+                        cmd: 'gemini-2.5-flash',
+                        desc: 'Fast & Reliable (Limited Free Quota)'
+                    },
+                    {
                         cmd: 'gemini-3-flash-preview',
                         desc: 'Fast & Lightweight (Limited Free Quota)'
                     },
@@ -1040,6 +1044,10 @@ export default function App({ args = [] }) {
                     }
                 ]
                 : [
+                    {
+                        cmd: 'gemini-2.5-flash',
+                        desc: 'Fast & Reliable'
+                    },
                     {
                         cmd: 'gemini-3.1-flash-lite',
                         desc: 'Ultra-Fast & Lite'
