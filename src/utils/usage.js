@@ -35,6 +35,7 @@ const defaultStats = {
     duration: 0,
     tokens: 0,
     cachedTokens: 0,
+    candidateTokens: 0,
     linesAdded: 0,
     linesRemoved: 0,
     imageCalls: []

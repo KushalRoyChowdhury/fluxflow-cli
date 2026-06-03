@@ -894,7 +894,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC)] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -989,9 +989,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         .map((msg, idx, arr) => {
                             const parts = [{ text: msg.text }];
                             if (msg.binaryPart) {
-                                // 4-Turn Freshness Check: Only include binary data if it appeared within the last 4 physical user turns
+                                // 2-Turn Freshness Check: Only include binary data if it appeared within the last 2 physical user turns
                                 const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
-                                if (physicalUserTurnsAfter <= 4) {
+                                if (physicalUserTurnsAfter <= 2) {
                                     parts.push(msg.binaryPart);
                                 }
                             }
@@ -1049,14 +1049,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     let activeContents = contents;
-                    let cachedContentName = null;
-
-                    if (settings.apiTier !== 'Free' && (sessionStats?.tokens || 0) > 16384) {
-                        // Standard implicit tracking - No manual cache resource needed for modern Gemini models
-                        if (lastUsage?.cachedContentTokenCount > 0) {
-                             fs.appendFileSync('status_check.txt', `[${new Date().toLocaleString()}] IMPLICIT CACHE HIT: ${lastUsage.cachedContentTokenCount} tokens\n`);
-                        }
-                    }
 
                     stream = await client.models.generateContentStream({
                         model: targetModel || "gemma-4-31b-it",
@@ -1065,7 +1057,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             systemInstruction: currentSystemInstruction,
                             temperature: mode === 'Flux' ? 1.0 : 1.4,
                             maxOutputTokens: 32768,
-                            mediaResolution: 'MEDIA_RESOLUTION_HIGH',
+                            mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                             safetySettings: [
                                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                 { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
@@ -1942,10 +1934,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             if (lastUsage) {
                 const total = lastUsage.totalTokenCount || 0;
                 const cached = lastUsage.cachedContentTokenCount || 0;
+                const candidates = lastUsage.candidatesTokenCount || 0;
 
                 await addToUsage('tokens', total);
                 if (cached > 0) {
                     await addToUsage('cachedTokens', cached);
+                }
+                if (candidates > 0) {
+                    await addToUsage('candidateTokens', candidates);
                 }
 
                 yield { type: 'usage', content: lastUsage };
@@ -2014,7 +2010,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 toolResults.forEach(tr => modifiedHistory.push(tr));
             } else {
                 if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] System executed the tool with no explicit result, continue with your task or use  [turn: finish] if completed.` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] System failed to verify tool execution, Verify tool syntax, proper escaping and try again if failed` });
                 } else {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
                 }
@@ -2035,7 +2031,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             });
         }
-        
+
     } finally {
         await RevertManager.commitTransaction();
     }

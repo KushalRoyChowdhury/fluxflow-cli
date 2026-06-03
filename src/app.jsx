@@ -393,6 +393,7 @@ export default function App({ args = [] }) {
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
     const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState(0);
+    const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState(0);
     const [sessionToolSuccess, setSessionToolSuccess] = useState(0);
     const [sessionToolFailure, setSessionToolFailure] = useState(0);
     const [sessionToolDenied, setSessionToolDenied] = useState(0);
@@ -1933,10 +1934,14 @@ export default function App({ args = [] }) {
                         if (packet.type === 'usage') {
                             const total = packet.content.totalTokenCount || 0;
                             const cached = packet.content.cachedContentTokenCount || 0;
+                            const candidates = packet.content.candidatesTokenCount || 0;
                             setSessionStats({ tokens: total });
                             setSessionTotalTokens(prev => prev + total);
                             if (cached > 0) {
                                 setSessionTotalCachedTokens(prev => prev + cached);
+                            }
+                            if (candidates > 0) {
+                                setSessionTotalCandidateTokens(prev => prev + candidates);
                             }
                             setSessionAgentCalls(prev => prev + 1);
                             continue;
@@ -2423,11 +2428,25 @@ export default function App({ args = [] }) {
                                 <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
                                 <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                             </Box>
-                            {sessionTotalCachedTokens > 0 && (
-                                <Box>
-                                    <Box width={25}><Text color="blue">Cached Tokens:</Text></Box>
-                                    <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
-                                </Box>
+                            {sessionTotalTokens > 0 && (
+                                <>
+                                    <Box marginLeft={2}>
+                                        <Box width={23}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                        <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                    </Box>
+                                    {sessionTotalCachedTokens > 0 && (
+                                        <Box marginLeft={4}>
+                                            <Box width={21}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                            <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                        </Box>
+                                    )}
+                                    {sessionTotalCandidateTokens > 0 && (
+                                        <Box marginLeft={2}>
+                                            <Box width={23}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                            <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                        </Box>
+                                    )}
+                                </>
                             )}
                             {sessionImageCount > 0 && (
                                 <>
@@ -2475,11 +2494,25 @@ export default function App({ args = [] }) {
                                 <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
                                 <Text color="white">{formatTokens(dailyUsage?.tokens || 0)}</Text>
                             </Box>
-                            {(dailyUsage?.cachedTokens || 0) > 0 && (
-                                <Box>
-                                    <Box width={25}><Text color="blue">Served from Cache:</Text></Box>
-                                    <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
-                                </Box>
+                            {(dailyUsage?.tokens || 0) > 0 && (
+                                <>
+                                    <Box marginLeft={2}>
+                                        <Box width={23}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                        <Text color="white">{formatTokens((dailyUsage?.tokens || 0) - (dailyUsage?.candidateTokens || 0))}</Text>
+                                    </Box>
+                                    {(dailyUsage?.cachedTokens || 0) > 0 && (
+                                        <Box marginLeft={4}>
+                                            <Box width={21}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                            <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
+                                        </Box>
+                                    )}
+                                    {(dailyUsage?.candidateTokens || 0) > 0 && (
+                                        <Box marginLeft={2}>
+                                            <Box width={23}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                            <Text color="white">{formatTokens(dailyUsage.candidateTokens)}</Text>
+                                        </Box>
+                                    )}
+                                </>
                             )}
                             {(dailyUsage?.imageCalls?.length || 0) > 0 && (
                                 <>
@@ -3123,11 +3156,25 @@ export default function App({ args = [] }) {
                                     <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
                                     <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
                                 </Box>
-                                {sessionTotalCachedTokens > 0 && (
-                                    <Box>
-                                        <Box width={20}><Text color="blue">Cached Tokens:</Text></Box>
-                                        <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
-                                    </Box>
+                                {sessionTotalTokens > 0 && (
+                                    <>
+                                        <Box marginLeft={2}>
+                                            <Box width={18}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                            <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                        </Box>
+                                        {sessionTotalCachedTokens > 0 && (
+                                            <Box marginLeft={4}>
+                                                <Box width={16}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                                <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                            </Box>
+                                        )}
+                                        {sessionTotalCandidateTokens > 0 && (
+                                            <Box marginLeft={2}>
+                                                <Box width={18}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                                <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                            </Box>
+                                        )}
+                                    </>
                                 )}
                                 {sessionImageCount > 0 && (
                                     <>
