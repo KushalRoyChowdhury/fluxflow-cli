@@ -10,7 +10,7 @@ import path from 'path';
 import fs from 'fs';
 import { emojiSpace } from './terminal.js';
 
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
 
 let client = null;
@@ -688,8 +688,121 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     try {
         let modifiedHistory = [...history.slice(0, -1)];
 
-        // Truncation Logic (Compression 0.0)
+        // Revert check & cleanup
+        const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+        let summaries = readEncryptedJson(summariesFile, {});
+        let chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
+        if (typeof chatDataObj === 'string') {
+            chatDataObj = { summary: chatDataObj, historyLength: 0 };
+        }
+        const incomingCleanLength = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+        if (incomingCleanLength < chatDataObj.historyLength) {
+            delete summaries[chatId];
+            writeEncryptedJson(summariesFile, summaries);
+            chatDataObj = { summary: '', historyLength: 0 };
+        }
+
+        // Truncation & Condensation Logic (Compression 0.0)
         if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
+            yield { type: 'status', content: 'Condensing session context...' };
+
+            const flattenContext = (hist) => {
+                return hist
+                    .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta)
+                    .map(m => {
+                        const role = m.text?.startsWith('[TOOL RESULT]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
+                        return `[${role}]: ${m.text}`;
+                    })
+                    .join('\n\n');
+            };
+
+            const runCondenser = async (flattenedText, oldSummary) => {
+                const systemInstruction = `You are an expert context condenser. Summarize the provided chat history (which may include previous summaries, user instructions, agent outputs, and tool results) into a detailed, coherent, and highly technical summary of 1000 to 1500 words. Focus on preserving the architectural decisions made, current system state, task progress, and critical code details. Under no circumstances exceed MAX 2000 words.`;
+                const prompt = oldSummary
+                    ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
+                    : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
+
+                try {
+                    const response = await client.models.generateContent({
+                        model: 'gemini-3.1-flash-lite',
+                        contents: prompt,
+                        config: {
+                            systemInstruction,
+                            maxOutputTokens: 2048,
+                            temperature: 0.3,
+                            safetySettings: [
+                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                            ],
+                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MEDIUM }
+                        }
+                    });
+                    return response.text || '';
+                } catch (err) {
+                    try {
+                        const response = await client.models.generateContent({
+                            model: 'gemini-2.5-flash',
+                            contents: prompt,
+                            config: {
+                                systemInstruction,
+                                maxOutputTokens: 2048,
+                                temperature: 0.3,
+                                safetySettings: [
+                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                ],
+                                thinkingConfig: { includeThoughts: false, thinkingBudget: 8192 }
+                            }
+                        });
+                        return response.text || '';
+                    } catch (e) {
+                        try {
+                            const response = await client.models.generateContent({
+                                model: 'gemini-2.5-flash-lite',
+                                contents: prompt,
+                                config: {
+                                    systemInstruction,
+                                    maxOutputTokens: 2048,
+                                    temperature: 0.3,
+                                    safetySettings: [
+                                        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    ],
+                                    thinkingConfig: { includeThoughts: false, thinkingBudget: 8192 }
+                                }
+                            });
+                            return response.text || '';
+                        } catch (e2) {
+                            return '';
+                        }
+                    }
+                }
+            };
+
+            const flattenedText = flattenContext(modifiedHistory);
+            summaries = readEncryptedJson(summariesFile, {});
+            let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
+            if (typeof chatData === 'string') {
+                chatData = { summary: chatData, historyLength: 0 };
+            }
+            const oldSummary = chatData.summary || '';
+
+            const newSummary = await runCondenser(flattenedText, oldSummary);
+            if (newSummary) {
+                chatData.summary = newSummary;
+                summaries[chatId] = chatData;
+                writeEncryptedJson(summariesFile, summaries);
+                modifiedHistory = [];
+            }
+        }
+
+        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 255000) {
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
         }
 
@@ -892,9 +1005,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         chatPaths[chatId] = process.cwd();
         writeEncryptedJson(PATHS_FILE, chatPaths);
 
+        summaries = readEncryptedJson(summariesFile, {});
+        chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
+        if (typeof chatDataObj === 'string') {
+            chatDataObj = { summary: chatDataObj, historyLength: 0 };
+        }
+        const currentSummary = typeof chatDataObj === 'object' ? (chatDataObj.summary || '') : (chatDataObj || '');
+        const summaryBlock = currentSummary ? `\n\n--- CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH) ---\n${currentSummary}\n\n` : '';
+
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -1994,7 +2115,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else {
                     modifiedHistory.push({ role: 'agent', text: cleanedFullResponse });
                 }
+
+                // Update History Length Baseline in chat-summaries.json
+                try {
+                    const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+                    const summaries = readEncryptedJson(summariesFile, {});
+                    let existing = summaries[chatId] || { summary: '', historyLength: 0 };
+                    if (typeof existing === 'string') {
+                        existing = { summary: existing, historyLength: 0 };
+                    }
+                    const cleanLen = modifiedHistory.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+                    existing.historyLength = cleanLen;
+                    summaries[chatId] = existing;
+                    writeEncryptedJson(summariesFile, summaries);
+                } catch (e) {
+                    // Silently ignore storage errors to avoid breaking stream
                 }
+            }
 
                 if (isActuallyFinished) break;
             // SDK PROTECTION: Ensure agent response is never empty before next turn
