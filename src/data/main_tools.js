@@ -20,11 +20,10 @@ export const TOOL_PROTOCOL = (mode, osDetected) => `
 Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
 MANDATORY TOOL POLICY:
 - **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
-${mode === '' ? "- Prefer multiple search & replace on patch tool if same file/path\n" : ""}- Use contextually BEST tool, no brute force, no spamming
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many edits\n" : ""}- Use contextually BEST tool, no brute force, no spamming
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish
-Suggest best options; don't ask for preferences
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
 
 - WEB TOOLS -
 1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown topics

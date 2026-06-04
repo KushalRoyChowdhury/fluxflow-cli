@@ -673,6 +673,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
+    const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+    let wasCompressedInStream = false;
 
     // Detection for Chat Title generation
     const isFirstPrompt = history.filter(m => m.role === 'user').length === 1;
@@ -688,22 +690,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     try {
         let modifiedHistory = [...history.slice(0, -1)];
 
-        // Revert check & cleanup
-        const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
-        let summaries = readEncryptedJson(summariesFile, {});
-        let chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
-        if (typeof chatDataObj === 'string') {
-            chatDataObj = { summary: chatDataObj, historyLength: 0 };
-        }
-        const incomingCleanLength = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-        if (incomingCleanLength < chatDataObj.historyLength) {
-            delete summaries[chatId];
-            writeEncryptedJson(summariesFile, summaries);
-            chatDataObj = { summary: '', historyLength: 0 };
-        }
-
         // Truncation & Condensation Logic (Compression 0.0)
-        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
+        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 244000) {
             yield { type: 'status', content: 'Condensing session context...' };
 
             const flattenContext = (hist) => {
@@ -728,7 +716,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         contents: prompt,
                         config: {
                             systemInstruction,
-                            maxOutputTokens: 2048,
+                            maxOutputTokens: 4096,
                             temperature: 0.3,
                             safetySettings: [
                                 { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -747,7 +735,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             contents: prompt,
                             config: {
                                 systemInstruction,
-                                maxOutputTokens: 2048,
+                                maxOutputTokens: 4096,
                                 temperature: 0.3,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -766,7 +754,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 contents: prompt,
                                 config: {
                                     systemInstruction,
-                                    maxOutputTokens: 2048,
+                                    maxOutputTokens: 4096,
                                     temperature: 0.3,
                                     safetySettings: [
                                         { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -786,10 +774,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             };
 
             const flattenedText = flattenContext(modifiedHistory);
-            summaries = readEncryptedJson(summariesFile, {});
+            const summaries = readEncryptedJson(summariesFile, {});
             let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
             if (typeof chatData === 'string') {
                 chatData = { summary: chatData, historyLength: 0 };
+            }
+            const currentCleanLen = modifiedHistory.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+            if (chatData.historyLength && currentCleanLen < chatData.historyLength) {
+                chatData.summary = '';
+                chatData.historyLength = 0;
+                summaries[chatId] = chatData;
+                writeEncryptedJson(summariesFile, summaries);
             }
             const oldSummary = chatData.summary || '';
 
@@ -799,10 +794,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 summaries[chatId] = chatData;
                 writeEncryptedJson(summariesFile, summaries);
                 modifiedHistory = [];
+                wasCompressedInStream = true;
             }
         }
 
-        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 255000) {
+        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
         }
 
@@ -1005,17 +1001,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         chatPaths[chatId] = process.cwd();
         writeEncryptedJson(PATHS_FILE, chatPaths);
 
-        summaries = readEncryptedJson(summariesFile, {});
-        chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
+        const summaries = readEncryptedJson(summariesFile, {});
+        let chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
         if (typeof chatDataObj === 'string') {
             chatDataObj = { summary: chatDataObj, historyLength: 0 };
+        }
+        const currentCleanLen = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+        if (chatDataObj.historyLength && currentCleanLen < chatDataObj.historyLength) {
+            chatDataObj.summary = '';
+            chatDataObj.historyLength = 0;
+            summaries[chatId] = chatDataObj;
+            writeEncryptedJson(summariesFile, summaries);
         }
         const currentSummary = typeof chatDataObj === 'object' ? (chatDataObj.summary || '') : (chatDataObj || '');
         const summaryBlock = currentSummary ? `\n\n--- CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH) ---\n${currentSummary}\n\n` : '';
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -2118,14 +2121,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                 // Update History Length Baseline in chat-summaries.json
                 try {
-                    const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
                     const summaries = readEncryptedJson(summariesFile, {});
                     let existing = summaries[chatId] || { summary: '', historyLength: 0 };
                     if (typeof existing === 'string') {
                         existing = { summary: existing, historyLength: 0 };
                     }
                     const cleanLen = modifiedHistory.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-                    existing.historyLength = cleanLen;
+                    if (wasCompressedInStream) {
+                        existing.historyLength = (existing.historyLength || 0) + cleanLen;
+                    } else {
+                        existing.historyLength = cleanLen;
+                    }
                     summaries[chatId] = existing;
                     writeEncryptedJson(summariesFile, summaries);
                 } catch (e) {
