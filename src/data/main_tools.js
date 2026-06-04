@@ -29,7 +29,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown topics
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
-${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD) -
+${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile > guessing.
