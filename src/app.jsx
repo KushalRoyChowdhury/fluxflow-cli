@@ -14,7 +14,7 @@ import SettingsMenu from './components/SettingsMenu.jsx';
 import ProfileForm from './components/ProfileForm.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
-import { getAPIKey, saveAPIKey, removeAPIKey } from './utils/secrets.js';
+import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
 import { initAI, getAIStream, signalTermination, runJanitorTask } from './utils/ai.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs } from './utils/history.js';
@@ -860,10 +860,11 @@ export default function App({ args = [] }) {
             setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
 
             // 2. Load API key
-            const key = await getAPIKey();
+            const startupProvider = saved.aiProvider || 'Google';
+            const key = await getProviderAPIKey(startupProvider);
             if (key) {
                 setApiKey(key);
-                initAI(key); // Initialize Gemini SDK
+                initAI(key); // Initialize SDK
             }
 
             // 3. Clean up old history and logs (older than 7 days)
@@ -957,7 +958,7 @@ export default function App({ args = [] }) {
         if (aiProvider === 'DeepSeek') minLength = 20;
 
         if (key.length >= minLength) {
-            await saveAPIKey(key);
+            await saveProviderAPIKey(aiProvider, key);
             setApiKey(key);
             initAI(key); // Initialize SDK
 
@@ -1066,13 +1067,28 @@ export default function App({ args = [] }) {
                     { cmd: 'Standard', desc: 'Standard Reasoning' },
                     { cmd: 'xHigh', desc: 'Extended Reasoning' }
                 ]
-                : [
-                    { cmd: 'Fast', desc: 'Fastest' },
-                    { cmd: 'Low', desc: 'Quick Reasoning' },
-                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                    { cmd: 'High', desc: 'Deep Reasoning' },
-                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
-                ]
+                : aiProvider === 'OpenRouter'
+                    ? [
+                        { cmd: 'Fast', desc: 'Fastest' },
+                        { cmd: 'Low', desc: 'Quick Reasoning' },
+                        { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                        { cmd: 'High', desc: 'Deep Reasoning' },
+                        { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                    ]
+                    : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                        ? [
+                            { cmd: 'Fast', desc: 'Fastest' },
+                            { cmd: 'Low', desc: 'Quick Reasoning' },
+                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                            { cmd: 'High', desc: 'Deep Reasoning' }
+                        ]
+                        : [ // Google General / Gemma
+                            { cmd: 'Fast', desc: 'Fastest' },
+                            { cmd: 'Low', desc: 'Quick Reasoning' },
+                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                            { cmd: 'High', desc: 'Deep Reasoning' },
+                            { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                        ]
         },
         {
             cmd: '/model',
@@ -2434,6 +2450,62 @@ export default function App({ args = [] }) {
                     />
                 );
 
+            case 'selectProvider':
+                return (
+                    <CommandMenu
+                        title="SELECT AI PROVIDER"
+                        items={[
+                            { label: 'Google (Free/Paid)', value: 'Google' },
+                            { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                            { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                            { label: 'Back', value: 'settings' }
+                        ]}
+                        onSelect={async (item) => {
+                            if (item.value === 'settings' || item.value === 'Back') {
+                                setActiveView('settings');
+                                return;
+                            }
+
+                            const selectedProvider = item.value;
+                            const key = await getProviderAPIKey(selectedProvider);
+
+                            if (key) {
+                                setAiProvider(selectedProvider);
+                                setApiKey(key);
+                                initAI(key);
+                                
+                                let defaultModel = 'gemma-4-31b-it';
+                                if (selectedProvider === 'OpenRouter') {
+                                    defaultModel = 'google/gemma-4-31b-it:free';
+                                } else if (selectedProvider === 'DeepSeek') {
+                                    defaultModel = 'deepseek-v4-flash';
+                                }
+                                setActiveModel(defaultModel);
+                                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier, quotas });
+                                setMessages(prev => [
+                                    ...prev,
+                                    {
+                                        role: 'system',
+                                        text: `✅ Switched to ${selectedProvider}! Key loaded from Vault. Model set to ${defaultModel}.`,
+                                        isMeta: true
+                                    }
+                                ]);
+                                setActiveView('settings');
+                            } else {
+                                setInputConfig({
+                                    label: `Enter ${selectedProvider} API Key:`,
+                                    key: 'providerKey',
+                                    provider: selectedProvider,
+                                    value: '',
+                                    returnView: 'settings'
+                                });
+                                setActiveView('input');
+                            }
+                        }}
+                        onClose={() => setActiveView('settings')}
+                    />
+                );
+
             case 'apiTier':
                 return (
                     <CommandMenu
@@ -2493,7 +2565,7 @@ export default function App({ args = [] }) {
                             <TextInput
                                 value={inputConfig?.value || ''}
                                 onChange={(val) => setInputConfig(prev => ({ ...prev, value: val }))}
-                                onSubmit={(val) => {
+                                onSubmit={async (val) => {
                                     const { key, subKey, next } = inputConfig;
 
                                     let newQuotas = { ...quotas };
@@ -2537,6 +2609,28 @@ export default function App({ args = [] }) {
                                                 return [...prev, { id: Date.now(), role: 'system', text: `❌ [IMAGE KEY ERROR] API key must start with sk_. Key strategy reset to Default.`, isMeta: true }];
                                             });
                                         }
+                                    } else if (key === 'providerKey') {
+                                        const keyInput = val.trim();
+                                        const prov = inputConfig.provider;
+                                        await saveProviderAPIKey(prov, keyInput);
+                                        setAiProvider(prov);
+                                        setApiKey(keyInput);
+                                        initAI(keyInput);
+
+                                        let defaultModel = 'gemma-4-31b-it';
+                                        if (prov === 'OpenRouter') {
+                                            defaultModel = 'google/gemma-4-31b-it:free';
+                                        } else if (prov === 'DeepSeek') {
+                                            defaultModel = 'deepseek-v4-flash';
+                                        }
+                                        setActiveModel(defaultModel);
+                                        newSettings.aiProvider = prov;
+                                        newSettings.activeModel = defaultModel;
+
+                                        setMessages(prev => {
+                                            setCompletedIndex(prev.length + 1);
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✅ ${prov} API Key saved successfully! Model set to ${defaultModel}.`, isMeta: true }];
+                                        });
                                     }
 
                                     if (next) {

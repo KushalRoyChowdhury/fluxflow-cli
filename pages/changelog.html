@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.21.0"]
+        const stableVersions = ["1.21.1"]
         const changelogData = {
+            "1.21.1": {
+                "note": "⚙️ Settings flow refinement.",
+                "added": [
+                    "**1-Click Provider Switching:** Instantly switch between AI providers in settings. Cached credentials are automatically vaulted in `secrets.json`, and pressing Enter on 'Current Provider' allows quick selection."
+                ],
+                "changed": [],
+                "fixes": [
+                    "Experimental Fix for stream jittering and tool stability with OpenRouter."
+                ]
+            },
             "1.21.0": {
                 "note": "⭐ [STABLE] DeepSeek Integration.",
                 "added": [

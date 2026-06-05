@@ -223,6 +223,8 @@ export default function SettingsMenu({
             setEditValue(systemSettings.autoDisallowCommands || '');
         } else if (item.value === 'apiTier') {
             setActiveView('apiTier');
+        } else if (item.value === 'aiProvider') {
+            setActiveView('selectProvider');
         } else if (item.value === 'autoDelete') {
             const options = ['1d', '7d', '30d'];
             const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || '30d');

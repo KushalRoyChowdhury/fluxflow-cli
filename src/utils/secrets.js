@@ -21,6 +21,27 @@ export const getAPIKey = async () => {
     return null; // Triggers CLI Prompt
 };
 
+export const getProviderAPIKey = async (provider) => {
+    try {
+        const secrets = readEncryptedJson(SECRET_FILE, {});
+        if (provider === 'Google') return secrets.GOOGLE_API_KEY || secrets.API_KEY || null;
+        if (provider === 'DeepSeek') return secrets.DEEPSEEK_API_KEY || null;
+        if (provider === 'OpenRouter') return secrets.OPENROUTER_API_KEY || null;
+    } catch (e) {}
+    return null;
+};
+
+export const saveProviderAPIKey = async (provider, key) => {
+    if (provider === 'Google') {
+        await saveSecret('GOOGLE_API_KEY', key);
+        await saveSecret('API_KEY', key);
+    } else if (provider === 'DeepSeek') {
+        await saveSecret('DEEPSEEK_API_KEY', key);
+    } else if (provider === 'OpenRouter') {
+        await saveSecret('OPENROUTER_API_KEY', key);
+    }
+};
+
 /**
  * Load a specific secret key
  */

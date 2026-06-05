@@ -177,7 +177,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
             } catch (e) {}
         }
 
-        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+        if (Date.now() - lastFlushTime >= 100 && hasNewData) {
             yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -335,7 +335,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
             }
         }
 
-        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+        if (Date.now() - lastFlushTime >= 100 && hasNewData) {
             yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -1613,6 +1613,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     dedupeBuffer = '';
                     isDedupeActive = accumulatedContext.length > 0;
 
+                    let pendingGoogleText = '';
+                    let lastGoogleFlushTime = Date.now();
+
                     for await (const chunk of stream) {
                         if (TERMINATION_SIGNAL) {
                             yield { type: 'status', content: 'Termination Signal Received.' };
@@ -1675,7 +1678,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
                                         if (dedupeClean) {
                                             turnText += dedupeClean;
-                                            yield { type: 'text', content: dedupeClean };
+                                            if (aiProvider === 'Google') {
+                                                pendingGoogleText += dedupeClean;
+                                            } else {
+                                                yield { type: 'text', content: dedupeClean };
+                                            }
                                         }
                                     }
                                     isDedupeActive = false;
@@ -1685,7 +1692,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
                             else {
                                 turnText += chunkText;
-                                yield { type: 'text', content: chunkText };
+                                if (aiProvider === 'Google') {
+                                    pendingGoogleText += chunkText;
+                                } else {
+                                    yield { type: 'text', content: chunkText };
+                                }
                             }
 
                             // [SYSTEM SIGNAL FILTER] - Ignore thoughts and unclosed tools for signal detection
@@ -2225,6 +2236,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 toolCallPointer++;
                             }
+                            if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 100)) {
+                                yield { type: 'text', content: pendingGoogleText };
+                                pendingGoogleText = '';
+                                lastGoogleFlushTime = Date.now();
+                            }
                         }
                         if (chunk.usageMetadata) {
                             lastUsage = chunk.usageMetadata;
@@ -2241,7 +2257,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             dedupeBuffer += '</think>';
                         } else {
                             turnText += '</think>';
-                            yield { type: 'text', content: '</think>' };
+                            if (aiProvider === 'Google') {
+                                pendingGoogleText += '</think>';
+                            } else {
+                                yield { type: 'text', content: '</think>' };
+                            }
                         }
                     }
 
@@ -2263,11 +2283,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 : cleanText.replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])\s*/gi, '').replace(/^\s*(?:<(think|thought)>|\[(think|thought)\])\s*/gi, '');
                             if (dedupeClean) {
                                 turnText += dedupeClean;
-                                yield { type: 'text', content: dedupeClean };
+                                if (aiProvider === 'Google') {
+                                    pendingGoogleText += dedupeClean;
+                                } else {
+                                    yield { type: 'text', content: dedupeClean };
+                                }
                             }
                         }
                         isDedupeActive = false;
                         dedupeBuffer = '';
+                    }
+
+                    if (aiProvider === 'Google' && pendingGoogleText) {
+                        yield { type: 'text', content: pendingGoogleText };
+                        pendingGoogleText = '';
                     }
 
                     if (TERMINATION_SIGNAL) break;
