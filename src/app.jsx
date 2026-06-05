@@ -411,13 +411,19 @@ export default function App({ args = [] }) {
     const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
     const isFirstRender = useRef(true);
     const isSecondRender = useRef(true);
+    const isThirdRender = useRef(true);
 
-    // [TIER AWARENESS] Auto-switch from Gemma if moving to Paid tier
+    // [TIER AWARENESS] Auto-switch models if moving between Free and Paid tiers
     useEffect(() => {
+        if (!apiKey) return;
+
         if (isFirstRender.current) {
             isFirstRender.current = false;
             setTimeout(() => {
                 isSecondRender.current = false;
+                setTimeout(() => {
+                    isThirdRender.current = false;
+                }, 1000);
             }, 2000);
             return;
         }
@@ -426,33 +432,50 @@ export default function App({ args = [] }) {
             return;
         }
 
-        const s = emojiSpace(2);
-        if (apiTier === 'Free') {
-            setActiveModel('gemma-4-31b-it');
-            saveSettings({ apiTier: 'Free', activeModel: 'gemma-4-31b-it' });
-            setMessages(prev => {
-                setCompletedIndex(prev.length + 1);
-                return [...prev, {
-                    id: 'tier-switch-' + Date.now(),
-                    role: 'system',
-                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemma (Free default).`,
-                    isMeta: true
-                }];
-            });
-        } else {
-            setActiveModel('gemini-3-flash-preview');
-            saveSettings({ apiTier: 'Paid', activeModel: 'gemini-3-flash-preview' });
-            setMessages(prev => {
-                setCompletedIndex(prev.length + 1);
-                return [...prev, {
-                    id: 'tier-switch-' + Date.now(),
-                    role: 'system',
-                    text: `⚠️${s}**[TIER LIMIT]** Auto-switched to Gemini 3 Flash.`,
-                    isMeta: true
-                }];
-            });
+        if (isThirdRender.current) {
+            return;
         }
-    }, [apiTier]); // Look, only apiTier matters now!
+
+        const s = emojiSpace(2);
+        let defaultModel = '';
+        let modelDisplayName = '';
+
+        if (apiTier === 'Free') {
+            if (aiProvider === 'Google') {
+                defaultModel = 'gemma-4-31b-it';
+                modelDisplayName = 'Gemma 4 (Free default)';
+            } else if (aiProvider === 'DeepSeek') {
+                defaultModel = 'deepseek-v4-flash';
+                modelDisplayName = 'DeepSeek Flash (Free default)';
+            } else { // OpenRouter
+                defaultModel = 'google/gemma-4-31b-it:free';
+                modelDisplayName = 'Gemma 4 (Free default)';
+            }
+        } else {
+            if (aiProvider === 'Google') {
+                defaultModel = 'gemini-3-flash-preview';
+                modelDisplayName = 'Gemini 3 Flash';
+            } else if (aiProvider === 'DeepSeek') {
+                defaultModel = 'deepseek-v4-flash';
+                modelDisplayName = 'DeepSeek Flash';
+            } else { // OpenRouter
+                defaultModel = 'deepseek/deepseek-v4-flash';
+                modelDisplayName = 'DeepSeek Flash';
+            }
+        }
+
+        setActiveModel(defaultModel);
+        saveSettings({ apiTier, activeModel: defaultModel });
+        setMessages(prev => {
+            setCompletedIndex(prev.length + 1);
+            return [...prev, {
+                id: 'tier-switch-' + Date.now(),
+                role: 'system',
+                text: `⚠️${s}**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+                isMeta: true
+            }];
+        });
+    }, [apiTier, aiProvider, apiKey]); // Synchronize with both apiTier, aiProvider, and apiKey
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
@@ -929,13 +952,24 @@ export default function App({ args = [] }) {
 
     const handleSetup = async (val) => {
         const key = val.trim();
-        const minLength = aiProvider === 'OpenRouter' ? 10 : 30;
+        let minLength = 30;
+        if (aiProvider === 'OpenRouter') minLength = 10;
+        if (aiProvider === 'DeepSeek') minLength = 20;
 
         if (key.length >= minLength) {
             await saveAPIKey(key);
             setApiKey(key);
             initAI(key); // Initialize SDK
-            setMessages(prev => [...prev, { role: 'system', text: `✅ ${aiProvider} API Key saved successfully! Initialization complete.`, isMeta: true }]);
+
+            let defaultModel = 'gemma-4-31b-it';
+            if (aiProvider === 'OpenRouter') {
+                defaultModel = 'google/gemma-4-31b-it:free';
+            } else if (aiProvider === 'DeepSeek') {
+                defaultModel = 'deepseek-v4-flash';
+            }
+            setActiveModel(defaultModel);
+
+            setMessages(prev => [...prev, { role: 'system', text: `✅ ${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
         } else {
             setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
             setTempKey('');
@@ -1026,13 +1060,19 @@ export default function App({ args = [] }) {
             ]
         },
         {
-            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: [
-                { cmd: 'Fast', desc: 'No Reasoning        (Fastest)' },
-                { cmd: 'Low', desc: 'Quick Reasoning     (Answers Quickly)' },
-                { cmd: 'Medium', desc: 'Balanced Reasoning  (Decent Depth)' },
-                { cmd: 'High', desc: 'Deep Reasoning      (Complex Problems)' },
-                { cmd: 'xHigh', desc: 'Extended Reasoning  (Advanced Logic & Code)' }
-            ]
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'DeepSeek'
+                ? [
+                    { cmd: 'Fast', desc: 'Fastest' },
+                    { cmd: 'Standard', desc: 'Standard Reasoning' },
+                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                ]
+                : [
+                    { cmd: 'Fast', desc: 'Fastest' },
+                    { cmd: 'Low', desc: 'Quick Reasoning' },
+                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                    { cmd: 'High', desc: 'Deep Reasoning' },
+                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                ]
         },
         {
             cmd: '/model',
@@ -1115,48 +1155,59 @@ export default function App({ args = [] }) {
                             desc: 'Multimodal'
                         },
                     ])
-                : (apiTier === 'Free'
+                : aiProvider === 'DeepSeek'
                     ? [
                         {
-                            cmd: 'gemma-4-31b-it',
-                            desc: 'Standard Default'
+                            cmd: 'deepseek-v4-flash',
+                            desc: 'Fast & Efficient'
                         },
                         {
-                            cmd: 'gemini-2.5-flash',
-                            desc: 'Fast & Reliable (Limited Free Quota)'
-                        },
-                        {
-                            cmd: 'gemini-3-flash-preview',
-                            desc: 'Fast & Lightweight (Limited Free Quota)'
-                        },
-                        {
-                            cmd: 'gemini-3.5-flash',
-                            desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                            cmd: 'deepseek-v4-pro',
+                            desc: 'High-Intelligence Reasoning'
                         }
                     ]
-                    : [
-                        {
-                            cmd: 'gemini-2.5-flash',
-                            desc: 'Fast & Reliable'
-                        },
-                        {
-                            cmd: 'gemini-3.1-flash-lite',
-                            desc: 'Ultra-Fast & Lite'
-                        },
-                        {
-                            cmd: 'gemini-3-flash-preview',
-                            desc: 'Default, Fast & Lightweight'
-                        },
-                        {
-                            cmd: 'gemini-3.5-flash',
-                            desc: 'Flash Latest  [Instability Issues]'
-                        },
-                        {
-                            cmd: 'gemini-3.1-pro-preview',
-                            desc: 'Pro Reasoning'
-                        },
+                    : (apiTier === 'Free'
+                        ? [
+                            {
+                                cmd: 'gemma-4-31b-it',
+                                desc: 'Standard Default'
+                            },
+                            {
+                                cmd: 'gemini-2.5-flash',
+                                desc: 'Fast & Reliable (Limited Free Quota)'
+                            },
+                            {
+                                cmd: 'gemini-3-flash-preview',
+                                desc: 'Fast & Lightweight (Limited Free Quota)'
+                            },
+                            {
+                                cmd: 'gemini-3.5-flash',
+                                desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                            }
+                        ]
+                        : [
+                            {
+                                cmd: 'gemini-2.5-flash',
+                                desc: 'Fast & Reliable'
+                            },
+                            {
+                                cmd: 'gemini-3.1-flash-lite',
+                                desc: 'Ultra-Fast & Lite'
+                            },
+                            {
+                                cmd: 'gemini-3-flash-preview',
+                                desc: 'Default, Fast & Lightweight'
+                            },
+                            {
+                                cmd: 'gemini-3.5-flash',
+                                desc: 'Flash Latest  [Instability Issues]'
+                            },
+                            {
+                                cmd: 'gemini-3.1-pro-preview',
+                                desc: 'Pro Reasoning'
+                            },
 
-                    ])
+                        ])
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
@@ -2379,6 +2430,7 @@ export default function App({ args = [] }) {
                         saveSettings={saveSettings}
                         quotas={quotas}
                         setMessages={setMessages}
+                        aiProvider={aiProvider}
                     />
                 );
 
@@ -3189,8 +3241,9 @@ export default function App({ args = [] }) {
                                     <Box marginTop={1}>
                                         <CommandMenu
                                             items={[
-                                                { label: 'Google (Daily Free Quota)', value: 'Google' },
-                                                { label: 'OpenRouter (Daily Free Quota) [EXPERIMENTAL & UNSTABLE]', value: 'OpenRouter' }
+                                                { label: 'Google (Free/Paid)', value: 'Google' },
+                                                { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                                                { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' }
                                             ]}
                                             onSelect={(item) => {
                                                 setAiProvider(item.value);

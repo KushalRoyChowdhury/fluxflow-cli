@@ -225,8 +225,18 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["1.19.3"]
+        const stableVersions = ["1.21.0"]
         const changelogData = {
+            "1.21.0": {
+                "note": "⭐ [STABLE] DeepSeek Integration.",
+                "added": [
+                    "**Native DeepSeek Integration:** Full support for DeepSeek API (including deepseek-v4-flash and deepseek-v4-pro models) with configurable reasoning/thinking parameters."
+                ],
+                "changed": [
+                    "Refined agent loop completion protocol to ensure cleaner finishes when no active tools are pending."
+                ],
+                "fixes": []
+            },
             "1.20.0": {
                 "note": "🚀 [EXPERIMENTAL] OpenRouter Integration & Multi-Provider Architecture.",
                 "added": [

@@ -37,6 +37,158 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     return fetch(url, options);
 };
 
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
+    const messages = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+
+    for (const content of contents) {
+        const role = content.role === 'user' ? 'user' : 'assistant';
+        const msgContent = [];
+
+        if (Array.isArray(content.parts)) {
+            for (const part of content.parts) {
+                if (part.text) {
+                    msgContent.push({ type: 'text', text: part.text });
+                } else if (part.inlineData && isMultiModal) {
+                    const mimeType = part.inlineData.mimeType;
+                    const data = part.inlineData.data;
+                    const isImage = mimeType.startsWith('image/');
+
+                    if (isImage) {
+                        msgContent.push({
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${data}`
+                            }
+                        });
+                    }
+                    // DeepSeek standard OpenAI doesn't support 'file' type usually,
+                    // but we map it if they follow OpenRouter-like patterns.
+                    // For now, we skip non-image binary for DeepSeek unless confirmed.
+                }
+            }
+        } else {
+            const text = content.text || '';
+            if (text) msgContent.push({ type: 'text', text });
+        }
+
+        messages.push({
+            role,
+            content: (msgContent.length === 1 && msgContent[0].type === 'text') ? msgContent[0].text : msgContent
+        });
+    }
+
+    const requestPayload = {
+        model: model,
+        messages: messages,
+        stream: true,
+        stream_options: { include_usage: true },
+        temperature: mode === 'Flux' ? 1.0 : 1.4,
+    };
+
+    // DeepSeek Specific Reasoning
+    if (thinkingLevel !== 'Fast') {
+        const reasoningEffortMap = {
+            'Low': 'high',
+            'Medium': 'high',
+            'High': 'high',
+            'xHigh': 'max'
+        };
+        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
+        requestPayload.extra_body = { thinking: { type: "enabled" } };
+    } else {
+        requestPayload.extra_body = { thinking: { type: "disabled" } };
+    }
+
+    const response = await fetchWithBackoff('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`DeepSeek Error (${response.status}): ${errData.error?.message || response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    let pendingParts = [];
+    let latestUsageMetadata = null;
+    let lastFlushTime = Date.now();
+    let hasNewData = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+            }
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+            if (cleanLine === 'data: [DONE]') break;
+
+            try {
+                const json = JSON.parse(cleanLine.substring(6));
+                const delta = json.choices?.[0]?.delta;
+                const usage = json.usage;
+
+                if (usage) {
+                    latestUsageMetadata = {
+                        totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                        promptTokenCount: usage.prompt_tokens || 0,
+                        candidatesTokenCount: usage.completion_tokens || 0,
+                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                        thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                    };
+                    hasNewData = true;
+                }
+
+                if (delta) {
+                    // DeepSeek uses reasoning_content
+                    const thought = delta.reasoning_content || null;
+                    if (thought) {
+                        pendingParts.push({ text: thought, thought: true });
+                        hasNewData = true;
+                    }
+                    if (delta.content) {
+                        pendingParts.push({ text: delta.content });
+                        hasNewData = true;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+            yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+        }
+    }
+};
+
 const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
     const messages = [];
     if (systemInstruction) {
@@ -125,9 +277,22 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
     const decoder = new TextDecoder();
     let buffer = '';
 
+    let pendingParts = [];
+    let latestUsageMetadata = null;
+    let lastFlushTime = Date.now();
+    let hasNewData = false;
+
     while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+            if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+            }
+            break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -143,38 +308,41 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
                 const delta = json.choices?.[0]?.delta;
                 const usage = json.usage;
 
-                let usageMetadata = null;
                 if (usage) {
-                    usageMetadata = {
+                    latestUsageMetadata = {
                         totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
                         promptTokenCount: usage.prompt_tokens || 0,
                         candidatesTokenCount: usage.completion_tokens || 0,
                         cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
                         thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
                     };
+                    hasNewData = true;
                 }
 
                 if (delta) {
                     const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map(d => d.text).join('') : null);
-                    const parts = [];
-                    if (thought) parts.push({ text: thought, thought: true });
-                    if (delta.content) parts.push({ text: delta.content });
-
-                    if (parts.length > 0 || usageMetadata) {
-                        yield {
-                            candidates: parts.length > 0 ? [{ content: { parts } }] : [],
-                            usageMetadata
-                        };
+                    if (thought) {
+                        pendingParts.push({ text: thought, thought: true });
+                        hasNewData = true;
                     }
-                } else if (usageMetadata) {
-                    yield {
-                        candidates: [],
-                        usageMetadata
-                    };
+                    if (delta.content) {
+                        pendingParts.push({ text: delta.content });
+                        hasNewData = true;
+                    }
                 }
             } catch (e) {
                 // Ignore parse errors for partial chunks
             }
+        }
+
+        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+            yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
         }
     }
 };
@@ -321,6 +489,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             janitorPrompt,
                             'Fast', // Janitor always minimal
                             mode
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else if (aiProvider === 'DeepSeek') {
+                        const stream = getDeepSeekStream(
+                            apiKey,
+                            'deepseek-chat',
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast', // Janitor always minimal
+                            mode,
+                            false
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -728,12 +909,52 @@ export const initAI = (apiKey) => {
 };
 
 /**
+ * Generic helper to generate non-streaming content from any provider
+ */
+const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast') => {
+    const { aiProvider = 'Google', apiKey, mode } = settings;
+    let fullText = '';
+    let usageMetadata = null;
+
+    let stream;
+    if (aiProvider === 'OpenRouter') {
+        stream = getOpenRouterStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+    } else if (aiProvider === 'DeepSeek') {
+        stream = getDeepSeekStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+    } else {
+        const genStream = await client.models.generateContentStream({
+            model: model,
+            contents: contents,
+            config: {
+                systemInstruction: systemInstruction,
+                maxOutputTokens: 2048,
+                temperature: 0.3,
+                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+            }
+        });
+        stream = genStream;
+    }
+
+    for await (const chunk of stream) {
+        if (chunk.candidates?.[0]?.content?.parts) {
+            for (const part of chunk.candidates[0].content.parts) {
+                if (part.text && !part.thought) fullText += part.text;
+            }
+        }
+        if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+    }
+
+    return { text: fullText, usageMetadata };
+};
+
+/**
  * Detects past chats with substantial turn-level memories, batch-summarizes/merges them
 
  * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
  */
 const consolidatePastMemories = async (currentChatId, settings) => {
     try {
+        const { aiProvider = 'Google' } = settings;
         const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
 
         // 1. Calculate total memories across all chats in L1
@@ -785,23 +1006,14 @@ Chats to process:
         const maxAttempts = 3;
         let success = false;
 
+        let targetModel = 'gemini-3.1-flash-lite';
+        if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
+        if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
+
         while (attempts < maxAttempts && !success) {
             attempts++;
             try {
-                const response = await client.models.generateContent({
-                    model: 'gemini-3.1-flash-lite',
-                    contents: prompt,
-                    config: {
-                        temperature: 0.3,
-                        safetySettings: [
-                            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                        ],
-                        thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.LOW }
-                    }
-                });
+                const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast');
 
                 const responseText = response.text || '';
                 const janitorToolCalls = detectToolCalls(responseText);
@@ -816,6 +1028,11 @@ Chats to process:
                         await dispatchTool(toolName, janitorToolCall.args, { chatId: currentChatId });
                     }
                 }
+
+                if (response.usageMetadata) {
+                    await addToUsage('tokens', response.usageMetadata.totalTokenCount || 0);
+                }
+
                 success = true;
             } catch (err) {
                 if (attempts >= maxAttempts) {
@@ -881,66 +1098,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
                     : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
 
+                let targetModel = 'gemini-3.1-flash-lite';
+                if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
+                if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
+
                 try {
-                    const response = await client.models.generateContent({
-                        model: 'gemini-3.1-flash-lite',
-                        contents: prompt,
-                        config: {
-                            systemInstruction,
-                            maxOutputTokens: 4096,
-                            temperature: 0.3,
-                            safetySettings: [
-                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                            ],
-                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MEDIUM }
-                        }
-                    });
+                    const response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
                     return response.text || '';
                 } catch (err) {
-                    try {
-                        const response = await client.models.generateContent({
-                            model: 'gemini-2.5-flash',
-                            contents: prompt,
-                            config: {
-                                systemInstruction,
-                                maxOutputTokens: 4096,
-                                temperature: 0.3,
-                                safetySettings: [
-                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                ],
-                                thinkingConfig: { includeThoughts: false, thinkingBudget: 8192 }
-                            }
-                        });
-                        return response.text || '';
-                    } catch (e) {
+                    // Fallback spectrum for Google if first attempt fails
+                    if (aiProvider === 'Google') {
                         try {
-                            const response = await client.models.generateContent({
-                                model: 'gemini-2.5-flash-lite',
-                                contents: prompt,
-                                config: {
-                                    systemInstruction,
-                                    maxOutputTokens: 4096,
-                                    temperature: 0.3,
-                                    safetySettings: [
-                                        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                    ],
-                                    thinkingConfig: { includeThoughts: false, thinkingBudget: 8192 }
-                                }
-                            });
-                            return response.text || '';
-                        } catch (e2) {
+                            const fallback = await generateSimpleContent(settings, 'gemini-2.5-flash', prompt, systemInstruction, 'Fast');
+                            return fallback.text || '';
+                        } catch (e) {
                             return '';
                         }
                     }
+                    return '';
                 }
             };
 
@@ -1302,11 +1477,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
                     targetModel = modelName;
+                    if (aiProvider === 'DeepSeek' && thinkingLevel === 'Fast') {
+                        targetModel = 'deepseek-chat';
+                    }
                     if (retryCount === MAX_RETRIES - 1) {
-                        targetModel = 'gemini-3-flash-preview';
+                        targetModel = aiProvider === 'DeepSeek' ? 'deepseek-v4-flash' : 'gemini-3-flash-preview';
                         yield { type: 'model_update', content: 'Trying with fallback model' };
                     } else if (retryCount === MAX_RETRIES) {
-                        targetModel = 'gemini-3.5-flash';
+                        targetModel = aiProvider === 'DeepSeek' ? 'deepseek-v4-pro' : 'gemini-3.5-flash';
                         yield { type: 'model_update', content: 'Trying with fallback model' };
                     } else if (retryCount > 12 && retryCount < MAX_RETRIES - 2 && settings.apiKey !== "custom") {
                         targetModel = 'gemma-4-31b-it';
@@ -1347,6 +1525,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     if (aiProvider === 'OpenRouter') {
                         stream = getOpenRouterStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal
+                        );
+                    } else if (aiProvider === 'DeepSeek') {
+                        stream = getDeepSeekStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2278,9 +2466,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 .trim();
 
             // [STRICT PROTOCOL ENFORCEMENT]
-            // The loop breaks if the model explicitly emits [turn: finish],
-            // OR if it finished streaming, did not call any tools, and did not emit [turn: continue].
-            let isActuallyFinished = (hasFinish && !shouldContinue) || (!shouldContinue && !hasContinue);
+            // If the model explicitly finished or if there are no pending tool results to execute and send back,
+            // we finish the agent loop immediately.
+            let isActuallyFinished = hasFinish || !shouldContinue;
 
 
             if (isActuallyFinished) {

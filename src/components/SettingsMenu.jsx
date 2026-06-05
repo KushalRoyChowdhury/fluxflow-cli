@@ -63,14 +63,15 @@ export default function SettingsMenu({
     setInputConfig,
     saveSettings,
     quotas,
-    setMessages
+    setMessages,
+    aiProvider
 }) {
     const [activeColumn, setActiveColumn] = useState('categories'); // 'categories' or 'items'
     const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState('');
-
+ 
     // Get items for current category
     const getCategoryItems = (catId) => {
         switch (catId) {
@@ -99,6 +100,7 @@ export default function SettingsMenu({
                 ];
             case 'other':
                 return [
+                    { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
                     { label: 'API Tier', value: 'apiTier', status: apiTier }
                 ];
             default:
@@ -355,7 +357,7 @@ export default function SettingsMenu({
                                                 <>
                                                     <Text color="gray" dimColor>{dots}</Text>
                                                     <Text color={getStatusColor(item)} bold>
-                                                        [ {item.status} ]
+                                                        {item.value === 'aiProvider' ? item.status : `[ ${item.status} ]`}
                                                     </Text>
                                                 </>
                                             )}

@@ -19,6 +19,8 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
+- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively (with stream buffering for smooth UI rendering), and **OpenRouter** (Experimental) to connect to hundreds of LLMs.
+
 - **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using [Pollinations AI](https://pollinations.ai). Use the `/image` command or ask the agent to create visuals. Features:
   - **Customizable Presets**: Supports models like Flux, ZImage, Qwen, and Nanobanana-Pro, custom aspect ratios, and randomized seeds.
   - **Budget Telemetry**: Real-time credits tracker displayed in sleek high-contrast Ink terminal boxes.
@@ -110,7 +112,7 @@ Flux Flow runs entirely locally on your machine.
 - **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`. Sensitive data is encrypted.
 - **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
 - **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
-- **API Keys**: You supply your own Gemini/Google AI Studio API keys.
+- **API Keys**: You supply your own API keys for your preferred provider: Google GenAI, DeepSeek, or OpenRouter (Experimental).
 
 ## 🛠️ Built With
 
