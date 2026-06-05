@@ -6,6 +6,7 @@ import { readAesEncryptedJson, writeAesEncryptedJson } from './crypto.js';
 const DEFAULT_SETTINGS = {
     mode: 'Flux',
     thinkingLevel: 'Medium',
+    aiProvider: 'Google',
     activeModel: 'gemma-4-31b-it',
     showFullThinking: true,
     apiTier: 'Free',

@@ -17,7 +17,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     return parts.length > 0 ? `[SYSTEM CONTEXT]\n${parts.join('\n\n')}\n` : '';
 };
 
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false) => {
     let thinkingConfig = '';
     if (thinkingLevel !== 'GEM') {
         let levelKey = thinkingLevel;
@@ -80,11 +80,11 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT] (system priority)
 - SYSTEM NOTIFICATION: [SYSTEM], [METADATA] in user turn
-${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
+${aiProvider === 'Google' ? `${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
 ${thinkingConfig}
 ${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n` : ''}` : ''}
-${TOOL_PROTOCOL(mode, osDetected)}
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n` : ''}` : ''}` : ``}
+${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider)}
 ${projectContextBlock}
 -- MEMORY RULES --
 - Memory: ${isMemoryEnabled ? 'Subtly Personalize. Auto Saves' : 'OFF. Decline Remembering Memories'}

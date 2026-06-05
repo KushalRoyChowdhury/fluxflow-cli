@@ -373,6 +373,8 @@ export default function App({ args = [] }) {
 
     // ... (rest of the component logic)
     const [thinkingLevel, setThinkingLevel] = useState('Medium');
+    const [aiProvider, setAiProvider] = useState('Google');
+    const [setupStep, setSetupStep] = useState(0);
     const [latestVer, setLatestVer] = useState(null);
     const [showFullThinking, setShowFullThinking] = useState(false);
     const [activeModel, setActiveModel] = useState('gemma-4-31b-it');
@@ -663,6 +665,11 @@ export default function App({ args = [] }) {
                 } else if (activeView !== 'chat' && activeView !== 'settings') {
                     setActiveView('chat');
                 } else {
+                    if (!apiKey && setupStep === 1) {
+                        setSetupStep(0);
+                        setTempKey('');
+                        return;
+                    }
                     setEscPressCount(prev => {
                         const nextCount = prev + 1;
                         if (nextCount === 1) {
@@ -775,6 +782,8 @@ export default function App({ args = [] }) {
             } else {
                 setThinkingLevel(saved.thinkingLevel);
             }
+
+            setAiProvider(saved.aiProvider || 'Google');
 
             persistedModelRef.current = saved.activeModel;
             if (parsedArgs.model) {
@@ -907,6 +916,7 @@ export default function App({ args = [] }) {
             saveSettings({
                 mode,
                 thinkingLevel,
+                aiProvider,
                 activeModel: modelToSave || activeModel,
                 showFullThinking,
                 systemSettings,
@@ -915,17 +925,19 @@ export default function App({ args = [] }) {
                 apiTier
             });
         }
-    }, [mode, thinkingLevel, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
+    }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
 
     const handleSetup = async (val) => {
         const key = val.trim();
-        if (key.length >= 30) {
+        const minLength = aiProvider === 'OpenRouter' ? 10 : 30;
+
+        if (key.length >= minLength) {
             await saveAPIKey(key);
             setApiKey(key);
-            initAI(key); // Initialize Gemini SDK
-            setMessages(prev => [...prev, { role: 'system', text: '✅ API Key saved successfully! Initialization complete.', isMeta: true }]);
+            initAI(key); // Initialize SDK
+            setMessages(prev => [...prev, { role: 'system', text: `✅ ${aiProvider} API Key saved successfully! Initialization complete.`, isMeta: true }]);
         } else {
-            setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: Gemini API keys must be at least 30 characters.`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
             setTempKey('');
         }
     };
@@ -1025,48 +1037,126 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Switch Model for Agent',
-            subs: apiTier === 'Free'
-                ? [
-                    {
-                        cmd: 'gemma-4-31b-it',
-                        desc: 'Standard Default'
-                    },
-                    {
-                        cmd: 'gemini-2.5-flash',
-                        desc: 'Fast & Reliable (Limited Free Quota)'
-                    },
-                    {
-                        cmd: 'gemini-3-flash-preview',
-                        desc: 'Fast & Lightweight (Limited Free Quota)'
-                    },
-                    {
-                        cmd: 'gemini-3.5-flash',
-                        desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
-                    }
-                ]
-                : [
-                    {
-                        cmd: 'gemini-2.5-flash',
-                        desc: 'Fast & Reliable'
-                    },
-                    {
-                        cmd: 'gemini-3.1-flash-lite',
-                        desc: 'Ultra-Fast & Lite'
-                    },
-                    {
-                        cmd: 'gemini-3-flash-preview',
-                        desc: 'Default, Fast & Lightweight'
-                    },
-                    {
-                        cmd: 'gemini-3.5-flash',
-                        desc: 'Flash Latest  [Instability Issues]'
-                    },
-                    {
-                        cmd: 'gemini-3.1-pro-preview',
-                        desc: 'Pro Reasoning'
-                    },
+            subs: aiProvider === 'OpenRouter'
+                ? (apiTier === 'Free'
+                    ? [
+                        {
+                            cmd: 'google/gemma-4-31b-it:free',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'moonshotai/kimi-k2.6:free',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'qwen/qwen3-coder:free',
+                            desc: ''
+                        },
+                        {
+                            cmd: 'z-ai/glm-4.5-air:free',
+                            desc: ''
+                        },
+                    ]
+                    : [
+                        {
+                            cmd: 'google/gemini-3.5-flash',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'qwen/qwen3.7-plus',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'minimax/minimax-m3',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'anthropic/claude-sonnet-4.5',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'anthropic/claude-opus-4.6',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'anthropic/claude-opus-4.8',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'deepseek/deepseek-v4-pro',
+                            desc: ''
+                        },
+                        {
+                            cmd: 'deepseek/deepseek-v4-flash',
+                            desc: ''
+                        },
+                        {
+                            cmd: 'xiaomi/mimo-v2.5-pro',
+                            desc: ''
+                        },
+                        {
+                            cmd: 'z-ai/glm-5',
+                            desc: ''
+                        },
+                        {
+                            cmd: 'openai/gpt-5.2-codex',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'openai/gpt-5.2-pro',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'openai/gpt-5.5-pro',
+                            desc: 'Multimodal'
+                        },
+                        {
+                            cmd: 'moonshotai/kimi-k2.6',
+                            desc: 'Multimodal'
+                        },
+                    ])
+                : (apiTier === 'Free'
+                    ? [
+                        {
+                            cmd: 'gemma-4-31b-it',
+                            desc: 'Standard Default'
+                        },
+                        {
+                            cmd: 'gemini-2.5-flash',
+                            desc: 'Fast & Reliable (Limited Free Quota)'
+                        },
+                        {
+                            cmd: 'gemini-3-flash-preview',
+                            desc: 'Fast & Lightweight (Limited Free Quota)'
+                        },
+                        {
+                            cmd: 'gemini-3.5-flash',
+                            desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                        }
+                    ]
+                    : [
+                        {
+                            cmd: 'gemini-2.5-flash',
+                            desc: 'Fast & Reliable'
+                        },
+                        {
+                            cmd: 'gemini-3.1-flash-lite',
+                            desc: 'Ultra-Fast & Lite'
+                        },
+                        {
+                            cmd: 'gemini-3-flash-preview',
+                            desc: 'Default, Fast & Lightweight'
+                        },
+                        {
+                            cmd: 'gemini-3.5-flash',
+                            desc: 'Flash Latest  [Instability Issues]'
+                        },
+                        {
+                            cmd: 'gemini-3.1-pro-preview',
+                            desc: 'Pro Reasoning'
+                        },
 
-                ]
+                    ])
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
@@ -1405,7 +1495,7 @@ export default function App({ args = [] }) {
                 case '/model': {
                     if (parts[1]) {
                         const mod = parts.slice(1).join(' ');
-                        if (mod === 'gemma-4-31b-it' && apiTier !== 'Free') {
+                        if (mod === 'gemma-4-31b-it' && apiTier !== 'Free' && aiProvider === 'Google') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, {
@@ -1716,6 +1806,10 @@ export default function App({ args = [] }) {
                             text
                         });
                     });
+                    const modelCmd = COMMANDS.find(c => c.cmd === '/model');
+                    const currentModelObj = modelCmd?.subs?.find(s => s.cmd === activeModel);
+                    const isMultiModal = currentModelObj?.desc?.toLowerCase().includes('multimodal');
+
                     const stream = getAIStream(
                         activeModel,
                         cleanHistoryForAI,
@@ -1727,6 +1821,9 @@ export default function App({ args = [] }) {
                             janitorModel,
                             sessionStats,
                             chatId,
+                            isMultiModal,
+                            aiProvider,
+                            apiKey,
                             cols: terminalSize.columns - 6,
                             rows: 30,
                             onExecStart: (cmd) => {
@@ -1911,7 +2008,7 @@ export default function App({ args = [] }) {
                             hasFiredJanitor = true;
 
                             runJanitorTask(
-                                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats },
+                                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
                                 packet.data.agentText,
                                 packet.data.fullAgentTextRaw,
                                 packet.data.history,
@@ -3086,20 +3183,43 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box paddingX={1} flexDirection="column">
-                            <Text>Please enter your Gemini API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
-                            <Box marginTop={1}>
-                                <Text color="cyan" bold>💠 </Text>
-                                <TextInput
-                                    value={tempKey}
-                                    onChange={setTempKey}
-                                    onSubmit={handleSetup}
-                                    mask="*"
-                                />
-                            </Box>
+                            {setupStep === 0 ? (
+                                <>
+                                    <Text>Select your Preferred Provider:</Text>
+                                    <Box marginTop={1}>
+                                        <CommandMenu
+                                            items={[
+                                                { label: 'Google (Daily Free Quota)', value: 'Google' },
+                                                { label: 'OpenRouter (Daily Free Quota) [EXPERIMENTAL & UNSTABLE]', value: 'OpenRouter' }
+                                            ]}
+                                            onSelect={(item) => {
+                                                setAiProvider(item.value);
+                                                setSetupStep(1);
+                                            }}
+                                        />
+                                    </Box>
+                                </>
+                            ) : (
+                                <>
+                                    <Text>Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
+                                    <Box marginTop={1}>
+                                        <Text color="cyan" bold>💠 </Text>
+                                        <TextInput
+                                            value={tempKey}
+                                            onChange={setTempKey}
+                                            onSubmit={handleSetup}
+                                            mask="*"
+                                        />
+                                    </Box>
+                                    <Box marginTop={1}>
+                                        <Text color="gray" italic>(Press ESC to go back to provider selection)</Text>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
 
                         <Box paddingX={1} marginTop={1}>
-                            <Text color="gray" dimColor italic>(Press Enter to confirm and initialize)</Text>
+                            <Text color="gray" dimColor italic>{setupStep === 0 ? '(Use arrows to select and Enter to confirm)' : '(Press Enter to confirm and initialize)'}</Text>
                         </Box>
                     </Box>
                 ) : (
@@ -3270,7 +3390,7 @@ export default function App({ args = [] }) {
                                         <Box width={3}>
                                             <Text color={isActive ? "cyan" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
                                         </Box>
-                                        <Box width={32}>
+                                        <Box width={55}>
                                             <Text
                                                 color={isGemmaDisabled ? "gray" : (isActive ? "yellow" : "white")}
                                                 bold={isActive}

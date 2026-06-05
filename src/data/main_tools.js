@@ -15,7 +15,7 @@ export const isPsAvailable = () => {
     return _isPsAvailable;
 };
 
-export const TOOL_PROTOCOL = (mode, osDetected) => `
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
 MANDATORY TOOL POLICY:
@@ -30,7 +30,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. Supports images/docs. User gives image/doc: VIEW FIRST
+1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile > guessing.
 4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >>> WriteFile. Verify Imports

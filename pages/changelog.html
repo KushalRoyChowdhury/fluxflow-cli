@@ -227,6 +227,19 @@
         // ==========================================
         const stableVersions = ["1.19.3"]
         const changelogData = {
+            "1.20.0": {
+                "note": "🚀 [EXPERIMENTAL] OpenRouter Integration & Multi-Provider Architecture.",
+                "added": [
+                    "**OpenRouter Integration:** Connect to hundreds of models via OpenRouter SDK integration.",
+                    "**Multi-Provider Setup:** New 2-step initialization flow allowing users to choose between Google and OpenRouter as their primary AI provider.",
+                    "**Multimodal OpenRouter Support:** Native handling of Images and Documents (PDF) for OpenRouter models supporting multimodal input.",
+                ],
+                "changed": [
+                    "**[STABILITY WARNING]**: OpenRouter integration is currently **EXPERIMENTAL** and may exhibit [UNSTABLE] behavior, API timeouts, or unexpected formatting quirks depending on the chosen provider model.",
+                    "Updated the `/model` command to dynamically branch its list based on the active AI provider.",
+                ],
+                "fixes": []
+            },
             "1.19.3": {
                 "note": "Detailed Token stats",
                 "added": [

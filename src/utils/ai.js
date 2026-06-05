@@ -23,6 +23,162 @@ const stripAnsi = (str) => {
     return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 };
 
+const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok) return response;
+            if (response.status !== 429 && response.status < 500) return response;
+        } catch (e) {
+            if (i === retries - 1) throw e;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+    }
+    return fetch(url, options);
+};
+
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
+    const messages = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+
+    for (const content of contents) {
+        const role = content.role === 'user' ? 'user' : 'assistant';
+        const msgContent = [];
+
+        if (Array.isArray(content.parts)) {
+            for (const part of content.parts) {
+                if (part.text) {
+                    msgContent.push({ type: 'text', text: part.text });
+                } else if (part.inlineData && isMultiModal) {
+                    const mimeType = part.inlineData.mimeType;
+                    const data = part.inlineData.data;
+                    const isImage = mimeType.startsWith('image/');
+
+                    if (isImage) {
+                        msgContent.push({
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${data}`
+                            }
+                        });
+                    } else {
+                        msgContent.push({
+                            type: 'file',
+                            file: {
+                                filename: part.filename || 'file',
+                                file_data: `data:${mimeType};base64,${data}`
+                            }
+                        });
+                    }
+                }
+            }
+        } else {
+            const text = content.text || '';
+            if (text) msgContent.push({ type: 'text', text });
+        }
+
+        // Use simple string if it's only text, otherwise use array format
+        messages.push({
+            role,
+            content: (msgContent.length === 1 && msgContent[0].type === 'text') ? msgContent[0].text : msgContent
+        });
+    }
+
+    const reasoningEffortMap = {
+        'Low': 'low',
+        'Medium': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
+
+    const requestPayload = {
+        model: model,
+        messages: messages,
+        stream: true,
+        temperature: mode === 'Flux' ? 1.0 : 1.4,
+    };
+
+    const effort = reasoningEffortMap[thinkingLevel];
+    if (effort && thinkingLevel !== 'Fast') {
+        requestPayload.reasoning_effort = effort;
+    }
+
+    const response = await fetchWithBackoff('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'X-Title': 'FluxFlow CLI',
+            'X-Cache': 'true',
+        },
+        body: JSON.stringify(requestPayload),
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`OpenRouter Error (${response.status}): ${errData.error?.message || response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+            if (cleanLine === 'data: [DONE]') break;
+
+            try {
+                const json = JSON.parse(cleanLine.substring(6));
+                const delta = json.choices?.[0]?.delta;
+                const usage = json.usage;
+
+                let usageMetadata = null;
+                if (usage) {
+                    usageMetadata = {
+                        totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                        promptTokenCount: usage.prompt_tokens || 0,
+                        candidatesTokenCount: usage.completion_tokens || 0,
+                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                        thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                    };
+                }
+
+                if (delta) {
+                    const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map(d => d.text).join('') : null);
+                    const parts = [];
+                    if (thought) parts.push({ text: thought, thought: true });
+                    if (delta.content) parts.push({ text: delta.content });
+
+                    if (parts.length > 0 || usageMetadata) {
+                        yield {
+                            candidates: parts.length > 0 ? [{ content: { parts } }] : [],
+                            usageMetadata
+                        };
+                    }
+                } else if (usageMetadata) {
+                    yield {
+                        candidates: [],
+                        usageMetadata
+                    };
+                }
+            } catch (e) {
+                // Ignore parse errors for partial chunks
+            }
+        }
+    }
+};
+
 export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
@@ -63,7 +219,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
-    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
+    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
@@ -156,25 +312,40 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 );
 
                 const streamPromise = (async () => {
-                    const stream = await client.models.generateContentStream({
-                        model: janitorModel || 'gemma-4-26b-a4b-it',
-                        contents: janitorContents,
-                        config: {
-                            systemInstruction: janitorPrompt,
-                            maxOutputTokens: 512,
-                            temperature: 0.3,
-                            safetySettings: [
-                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                            ],
-                            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
-                        }
-                    });
-                    const iterator = stream[Symbol.asyncIterator]();
-                    const firstResult = await iterator.next();
-                    return { iterator, firstResult };
+                    if (aiProvider === 'OpenRouter') {
+                        const janitorOpenRouterModel = 'google/gemma-4-26b-a4b-it:free';
+                        const stream = getOpenRouterStream(
+                            apiKey,
+                            janitorOpenRouterModel,
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast', // Janitor always minimal
+                            mode
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else {
+                        const stream = await client.models.generateContentStream({
+                            model: janitorModel || 'gemma-4-26b-a4b-it',
+                            contents: janitorContents,
+                            config: {
+                                systemInstruction: janitorPrompt,
+                                maxOutputTokens: 512,
+                                temperature: 0.3,
+                                safetySettings: [
+                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                ],
+                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                            }
+                        });
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    }
                 })();
 
                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
@@ -668,9 +839,9 @@ Chats to process:
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
-    if (!client) throw new Error('AI not initialized');
+    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', isMultiModal } = settings;
+    if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
-    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats } = settings;
     const isMemoryEnabled = systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
@@ -1018,7 +1189,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -1061,7 +1232,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -1146,14 +1317,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt);
+                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const isGemma = modelName && modelName.toLowerCase().startsWith('gemma');
                     const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
+                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
@@ -1174,59 +1345,71 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     let activeContents = contents;
 
-                    stream = await client.models.generateContentStream({
-                        model: targetModel || "gemma-4-31b-it",
-                        contents: activeContents,
-                        config: {
-                            systemInstruction: currentSystemInstruction,
-                            temperature: mode === 'Flux' ? 1.0 : 1.4,
-                            maxOutputTokens: 32768,
-                            mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
-                            safetySettings: [
-                                { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
-                                { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
-                                { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-                                { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
-                            ],
-                            thinkingConfig: (() => {
-                                const modelLower = (targetModel || "").toLowerCase();
-                                const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
-                                const isGemini3 = modelLower.includes('gemini-3');
+                    if (aiProvider === 'OpenRouter') {
+                        stream = getOpenRouterStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal
+                        );
+                    } else {
+                        stream = await client.models.generateContentStream({
+                            model: targetModel || "gemma-4-31b-it",
+                            contents: activeContents,
+                            config: {
+                                systemInstruction: currentSystemInstruction,
+                                temperature: mode === 'Flux' ? 1.0 : 1.4,
+                                maxOutputTokens: 32768,
+                                mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+                                safetySettings: [
+                                    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
+                                    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
+                                    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+                                    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
+                                ],
+                                thinkingConfig: (() => {
+                                    const modelLower = (targetModel || "").toLowerCase();
+                                    const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
+                                    const isGemini3 = modelLower.includes('gemini-3');
 
-                                if (isGemma4 || isGemini3) {
-                                    if (isGemma4) {
-                                        return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
-                                    }
-                                    return {
-                                        includeThoughts: true,
-                                        thinkingLevel: {
-                                            'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
-                                            'Low': ThinkingLevel.LOW,
-                                            'Medium': ThinkingLevel.MEDIUM,
-                                            'High': ThinkingLevel.HIGH,
-                                            'xHigh': ThinkingLevel.HIGH
-                                        }[thinkingLevel] || ThinkingLevel.MEDIUM
-                                    };
-                                } else {
-                                    const budget = {
-                                        'Fast': -1,
-                                        'Low': 512,
-                                        'Medium': 2048,
-                                        'High': 16384,
-                                        'xHigh': 24576
-                                    }[thinkingLevel] || 2048;
+                                    if (isGemma4 || isGemini3) {
+                                        if (isGemma4) {
+                                            return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                        }
+                                        return {
+                                            includeThoughts: true,
+                                            thinkingLevel: {
+                                                'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                                                'Low': ThinkingLevel.LOW,
+                                                'Medium': ThinkingLevel.MEDIUM,
+                                                'High': ThinkingLevel.HIGH,
+                                                'xHigh': ThinkingLevel.HIGH
+                                            }[thinkingLevel] || ThinkingLevel.MEDIUM
+                                        };
+                                    } else {
+                                        const budget = {
+                                            'Fast': 0,
+                                            'Low': 512,
+                                            'Medium': 2048,
+                                            'High': 16384,
+                                            'xHigh': 24576
+                                        }[thinkingLevel] || 2048;
 
-                                    if (budget === -1) {
-                                        return { includeThoughts: false };
+                                        if (budget === 0) {
+                                            return { includeThoughts: false };
+                                        }
+                                        return {
+                                            includeThoughts: true,
+                                            thinkingBudget: budget
+                                        };
                                     }
-                                    return {
-                                        includeThoughts: true,
-                                        thinkingBudget: budget
-                                    };
-                                }
-                            })(),
-                        },
-                    });
+                                })(),
+                            },
+                        });
+                    }
 
                     // Reset turn state for this specific retry attempt
                     turnText = '';
@@ -1855,7 +2038,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 toolCallPointer++;
                             }
                         }
-                        lastUsage = chunk.usageMetadata;
+                        if (chunk.usageMetadata) {
+                            lastUsage = chunk.usageMetadata;
+                        }
                         // fs.writeFileSync('token_usage.txt', JSON.stringify(chunk.usageMetadata, null, 2));
                         if (lastUsage) {
                             yield { type: 'liveTokens', content: lastUsage.totalTokenCount };
