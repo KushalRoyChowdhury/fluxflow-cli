@@ -2,7 +2,7 @@
 ![Flux Flow Hero](./fluxflow.png)
 
 <p align="left">
-  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v1.19.0-blue?style=plastic" alt="FluxFlow Version"></a>
+  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v1.21-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://deepmind.google"><img src="https://img.shields.io/badge/Engine-Gemma%204-red?style=plastic" alt="Engine Gemma 4"></a>
   <a href="https://pollinations.ai"><img src="https://img.shields.io/badge/Built%20With-pollinations.ai-cyan?style=plastic" alt="Built With pollinations.ai"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
@@ -19,15 +19,15 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
-- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively (with stream buffering for smooth UI rendering), and **OpenRouter** (Experimental) to connect to hundreds of LLMs.
+- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively, and **OpenRouter** (Experimental) to connect to hundreds of LLMs.
 
 - **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using [Pollinations AI](https://pollinations.ai). Use the `/image` command or ask the agent to create visuals. Features:
   - **Customizable Presets**: Supports models like Flux, ZImage, Qwen, and Nanobanana-Pro, custom aspect ratios, and randomized seeds.
   - **Budget Telemetry**: Real-time credits tracker displayed in sleek high-contrast Ink terminal boxes.
   - **PNG Metadata Embedding**: Autonomously injects custom `tEXt` metadata chunks (Title, Software, Author, Seed, Model, and exact Prompt details) straight into the output image headers.
 
-- **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `view_file` tool with high-fidelity context retention.
-- **Document Engineering Suite**: Generate professional, branded PDF, DOCX, and PPTX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
+- **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `ReadFile` tool with high-fidelity context retention (Only on supported models).
+- **Document Engineering Suite**: Generate professional, branded PDF, DOCX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
 - **Codebase Time Travel (Git-less Reversion)**: Refactor and build with absolute fearlessness. Flux Flow maintains transaction-based secure snapshots of files before they are generated or edited:
   - **Instant Rollback**: Revert your workspace files (source code, generated documents, images) to their exact state prior to any selected prompt in the history.
   - **Double-ESC Shortcut**: Press `ESC` twice while idle to pop open a sleek selection modal.
@@ -39,7 +39,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops (up to 45 iterations) to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
-- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX/PPTX).
+- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
 - **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.
@@ -120,7 +120,6 @@ Flux Flow runs entirely locally on your machine.
 - **[@google/genai](https://www.npmjs.com/package/@google/genai)**: The core AI SDK powering the agent's intelligence.
 - **[chalk](https://www.npmjs.com/package/chalk) & [gradient-string](https://www.npmjs.com/package/gradient-string)**: For terminal styling and aesthetics.
 - **[fs-extra](https://www.npmjs.com/package/fs-extra)**: For robust file system operations.
-- **[pptxgenjs](https://www.npmjs.com/package/pptxgenjs) & [html-to-docx](https://www.npmjs.com/package/html-to-docx)**: For native Office document generation.
 
 ---
 *Created as a demonstration of highly capable AI tooling.*

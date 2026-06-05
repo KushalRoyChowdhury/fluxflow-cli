@@ -6,7 +6,7 @@ import { parseArgs } from '../utils/arg_parser.js';
  * View File Tool
  * Reads a file, optionally within a specific line range.
  */
-export const view_file = async (args) => {
+export const view_file = async (args, context = {}) => {
     let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args);
 
     // Normalize argument names and apply dynamic 800-line paging logic
@@ -49,12 +49,16 @@ export const view_file = async (args) => {
         };
 
         if (mimeMap[ext]) {
+            const isMultiModal = context.isMultiModal !== false;
+            if (!isMultiModal) {
+                return `ERROR: Multimodality is not supported for the current model. Unable to load [${targetPath}].`;
+            }
             const buffer = fs.readFileSync(absolutePath);
             const base64 = buffer.toString('base64');
             const mimeType = mimeMap[ext];
 
             return {
-                text: `[BINARY_FILE]: ${targetPath} (${mimeType}) - Loaded as multimodal part.`,
+                text: `[BINARY FILE]: ${targetPath} (${mimeType}) - Loaded as multimodal part.`,
                 binaryPart: {
                     inlineData: {
                         data: base64,

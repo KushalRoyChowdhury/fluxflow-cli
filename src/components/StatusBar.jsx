@@ -2,9 +2,14 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { formatTokens, truncatePath } from '../utils/text.js';
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free' }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google' }) => {
     const modeColor = mode === 'Flux' ? 'yellow' : 'cyan';
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
+
+    let maxLimit = 256000;
+    if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+        maxLimit = 400000;
+    }
 
     return (
         <Box
@@ -45,7 +50,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color="gray" dimColor>┃ </Text>
 
                 <Box marginX={1}>
-                    <Text>✨</Text><Text color="blue"> {formatTokens(tokensTotal)} <Text dimColor>({((tokens / 254000) * 100).toFixed(0)}%)</Text></Text>
+                    <Text>✨</Text><Text color="blue"> {formatTokens(tokensTotal)} <Text dimColor>({((tokens / maxLimit) * 100).toFixed(0)}%)</Text></Text>
                 </Box>
 
                 <Text color="gray" dimColor>┃ </Text>

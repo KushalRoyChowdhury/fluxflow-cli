@@ -17,6 +17,36 @@ let client = null;
 
 let TERMINATION_SIGNAL = false;
 
+const MULTIMODAL_MODELS = [
+    // OpenRouter models
+    'google/gemma-4-31b-it:free',
+    'moonshotai/kimi-k2.6:free',
+    'google/gemini-3.5-flash',
+    'qwen/qwen3.7-plus',
+    'minimax/minimax-m3',
+    'anthropic/claude-sonnet-4.5',
+    'anthropic/claude-opus-4.6',
+    'anthropic/claude-opus-4.8',
+    'openai/gpt-5.2-codex',
+    'openai/gpt-5.2-pro',
+    'openai/gpt-5.5-pro',
+    'moonshotai/kimi-k2.6',
+    // Google models
+    'gemma-4-31b-it',
+    'gemini-2.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.1-pro-preview'
+];
+
+export const isModelMultimodal = (model) => {
+    if (!model) return false;
+    const lower = model.toLowerCase();
+    if (lower.startsWith('gemini-') || lower.startsWith('gemma-')) return true;
+    return MULTIMODAL_MODELS.some(m => m.toLowerCase() === lower);
+};
+
 const stripAnsi = (str) => {
     if (typeof str !== 'string') return str;
     // eslint-disable-next-line no-control-regex
@@ -1001,16 +1031,16 @@ Chats to process:
             }
         }
 
-        // 4. Send the batch request to Gemini 3.1 Flash Lite with a programmatic retry loop (max 3 attempts)
+        // 4. Send the batch request with a programmatic retry loop (max 3 attempts)
         let attempts = 0;
-        const maxAttempts = 3;
+        const maxAttempts = 5;
         let success = false;
 
-        let targetModel = 'gemini-3.1-flash-lite';
+        let targetModel = 'gemma-4-26b-a4b-it';
         if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
         if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
 
-        while (attempts < maxAttempts && !success) {
+        while (attempts <= maxAttempts && !success) {
             attempts++;
             try {
                 const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast');
@@ -1056,7 +1086,8 @@ Chats to process:
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
-    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', isMultiModal } = settings;
+    const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiTier } = settings;
+    const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
     const isMemoryEnabled = systemSettings?.memory !== false;
@@ -1079,8 +1110,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let modifiedHistory = [...history.slice(0, -1)];
 
         // Truncation & Condensation Logic (Compression 0.0)
-        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 244000) {
-            yield { type: 'status', content: 'Condensing session context...' };
+        let contextCompressionCount = 252000;
+        let contextTruncationCount = 254000;
+
+        if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+            contextCompressionCount = 396000;
+            contextTruncationCount = 400000;
+        }
+
+        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextCompressionCount) {
+            yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
 
             const flattenContext = (hist) => {
                 return hist
@@ -1098,25 +1137,34 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
                     : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
 
-                let targetModel = 'gemini-3.1-flash-lite';
+                let targetModel = 'gemma-4-26b-a4b-it';
                 if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
                 if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
 
-                try {
-                    const response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
-                    return response.text || '';
-                } catch (err) {
-                    // Fallback spectrum for Google if first attempt fails
-                    if (aiProvider === 'Google') {
-                        try {
-                            const fallback = await generateSimpleContent(settings, 'gemini-2.5-flash', prompt, systemInstruction, 'Fast');
-                            return fallback.text || '';
-                        } catch (e) {
+                let attempts = 0;
+                let success = false;
+                let response = null;
+                while (attempts <= 3 && !success) {
+                    attempts++;
+                    try {
+                        response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
+                        success = true;
+                    } catch (err) {
+                        if (attempts > 3) {
+                            // Fallback spectrum for Google if all retry attempts fail
+                            if (aiProvider === 'Google') {
+                                try {
+                                    const fallback = await generateSimpleContent(settings, 'gemini-3.1-flash-lite', prompt, systemInstruction, 'Fast');
+                                    return fallback.text || '';
+                                } catch (e) {
+                                    return '';
+                                }
+                            }
                             return '';
                         }
                     }
-                    return '';
                 }
+                return response ? (response.text || '') : '';
             };
 
             const flattenedText = flattenContext(modifiedHistory);
@@ -1144,9 +1192,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
-        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > 254000) {
-            modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
-        }
+
 
         // --- PAST CHATS SUMMARIZATION ON NEW CHAT START ---
         if (isFirstPrompt && isMemoryEnabled) {
@@ -1389,6 +1435,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+            if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
+                modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
+            }
             if (loop > 0) {
                 yield { type: 'status', content: 'Processed. Reconnecting...' };
             }
@@ -1458,7 +1507,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
                             const parts = [{ text: msg.text }];
-                            if (msg.binaryPart) {
+                            if (msg.binaryPart && isModelMultimodal(targetModel)) {
                                 // 2-Turn Freshness Check: Only include binary data if it appeared within the last 2 physical user turns
                                 const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
                                 if (physicalUserTurnsAfter <= 2) {
@@ -2164,7 +2213,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let result = await dispatchTool(normToolName, toolCall.args, {
                                     chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
                                     systemSettings: settings.systemSettings,
-                                    mode
+                                    mode,
+                                    isMultiModal: isModelMultimodal(targetModel)
                                 });
                                 yield { type: 'spinner', content: true };
 

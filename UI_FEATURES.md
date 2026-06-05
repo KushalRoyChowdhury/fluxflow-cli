@@ -6,8 +6,8 @@ Flux Flow is designed to be a high-performance terminal application. Beyond basi
 
 You can control the application using `/` commands directly in the chat input:
 
-- **/mode [flux|flow]**: Quickly switch between **Flux** (Dev) and **Flow** (Chat) modes. Using it without arguments opens the selection menu.
-- **/thinking [low|medium|high|max|show|hide]**: Adjust reasoning depth or toggle visibility of the thinking process. Using it without arguments opens the selection menu.
+- **/mode [flux|flow]**: Quickly switch between **Flux** (Dev) and **Flow** (Chat) modes.
+- **/thinking [fast|low|medium|high|max]**: Adjust reasoning depth.
 - **/model [name]**: Choose which AI model to use for the main interaction.
 - **/key**: Open the API Key management view to update or remove your credentials.
 - **/settings**: Access the system configuration menu.
@@ -26,23 +26,11 @@ Flux Flow allows you to "Anchor" your data outside of the default user directory
 - **Portability**: Once set, the application will synchronously "pivot" all data operations to your specified `externalDataPath` upon startup.
 - **Privacy**: Keeps sensitive data off your primary system drive.
 
-
-### Command Shortcuts
-
-For power users, several commands support direct arguments to skip the menus:
-- ` /mode flux ` or ` /mode flow `
-- ` /thinking low ` / ` /thinking medium ` / ` /thinking high ` / ` /thinking max `
-- ` /thinking show ` / ` /thinking hide ` (Toggles thinking process visibility)
-- ` /model gemini-3.1-pro-preview ` (Switches model directly)
-- ` /update check ` (Checks for updates)
-
 ## 🧠 Thinking Levels & Visualization
 
 Flux Flow separates the model's "internal monologue" (reasoning) from its final response using `<think>` tags.
 
 - **Thinking Levels**: Depending on the mode, you can choose from **Fast**, **Low**, **Medium**, **High**, or **xHigh**. Higher levels allow the agent more "space" to reason through complex architecture or debugging problems.
-- **Show/Hide Thinking**: You can toggle the visibility of the thinking process using `/thinking show/hide`.
-  - When **Hidden**, the agent doesn't just disappear; it provides a "minimalist" view showing only the core **Headings** and **Action Steps** (bolded lines) from its reasoning. This keeps you informed of its current "step" without cluttering the screen with detailed internal monologue.
 
 ## ⚡ Interactive Sub-Terminal
 
@@ -73,6 +61,8 @@ By default, the agent **cannot** execute dangerous actions without your consent.
 For power users, **Auto-Exec** can be enabled in `/settings`.
 - **⚠️ Warning**: This allows the agent to run any tool and execute any command autonomously.
 - **External Access**: You can also toggle whether the agent is allowed to access files outside of its current working directory.
+- **Manual Commad Control**: Specify which commands you want the agent to auto-execute, manually approve or auto-deny.
+- **Network Sandboxing**: Turn off network access in integrated terminal.
 
 ## 🔄 Steering & Resolution
 

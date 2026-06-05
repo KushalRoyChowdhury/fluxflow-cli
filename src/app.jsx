@@ -1845,6 +1845,7 @@ export default function App({ args = [] }) {
                         .filter(m =>
                             m.role !== 'think' &&
                             !m.isVisualFeedback &&
+                            !m.isMeta &&
                             !String(m.id).startsWith('welcome')
                         );
 
@@ -1873,10 +1874,6 @@ export default function App({ args = [] }) {
                             text
                         });
                     });
-                    const modelCmd = COMMANDS.find(c => c.cmd === '/model');
-                    const currentModelObj = modelCmd?.subs?.find(s => s.cmd === activeModel);
-                    const isMultiModal = currentModelObj?.desc?.toLowerCase().includes('multimodal');
-
                     const stream = getAIStream(
                         activeModel,
                         cleanHistoryForAI,
@@ -1888,9 +1885,9 @@ export default function App({ args = [] }) {
                             janitorModel,
                             sessionStats,
                             chatId,
-                            isMultiModal,
                             aiProvider,
                             apiKey,
+                            apiTier,
                             cols: terminalSize.columns - 6,
                             rows: 30,
                             onExecStart: (cmd) => {
@@ -2050,6 +2047,11 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'status') {
                             setStatusText(packet.content);
+                            continue;
+                        }
+                        if (packet.type === 'status_history') {
+                            setStatusText(packet.content);
+                            setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `⚙️ [SYSTEM] ${packet.content}`, isMeta: true }]);
                             continue;
                         }
                         if (packet.type === 'spinner') {
@@ -2473,7 +2475,7 @@ export default function App({ args = [] }) {
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
                                 initAI(key);
-                                
+
                                 let defaultModel = 'gemma-4-31b-it';
                                 if (selectedProvider === 'OpenRouter') {
                                     defaultModel = 'google/gemma-4-31b-it:free';
@@ -3393,6 +3395,7 @@ export default function App({ args = [] }) {
                         chatId={chatId}
                         isMemoryEnabled={systemSettings.memory}
                         apiTier={apiTier}
+                        aiProvider={aiProvider}
                     />
                 </Box>
 

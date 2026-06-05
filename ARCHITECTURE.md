@@ -15,7 +15,7 @@ The core intelligence of Flux Flow resides in `src/utils/ai.js`. It does not rel
 
 The execution flow of a single user prompt follows this loop:
 
-1. **Context Assembly**: The user's prompt is combined with the system instructions, temporary session context, persistent user memories, and the current chat history. If the history gets too large (e.g., >254k tokens) and compression is disabled, it is gracefully truncated.
+1. **Context Assembly**: The user's prompt is combined with the system instructions, temporary session context, persistent user memories, and the current chat history. If the history gets too large (e.g., >256k tokens) and compression is disabled, it is gracefully truncated. Some models/modes can go upto 400k context.
 2. **Stream Processing**: The main loop initiates a streaming request to the Gemini API (`client.models.generateContentStream`). It yields chunks of text and status updates directly back to the React UI as they arrive.
 3. **Detection & Tool Execution**: Once the stream completes for a given turn, the entire response is scanned for tool calls using a custom regex and bracket-balancing parser (looking for `tool:functions.tool_name(args...)`).
    - If tools are found, the loop pauses.
@@ -26,12 +26,12 @@ The execution flow of a single user prompt follows this loop:
    - If tools were called or `[turn: continue]` is present, the loop increments and re-prompts the model with the newly gathered `[TOOL RESULT]` data.
    - If `[turn: finish]` is detected and no further tools were called, the main loop terminates, passing the final synthesized context to the background Janitor process.
 6. **Loop Limits & Resilience**: To prevent infinite loops or excessive API usage, **Flux mode** is capped at 70 iterations per user prompt, while **Flow mode** is capped at 7.
-   - **Multi-Stage Failover**: The loop features a sophisticated 8-attempt retry engine with random backoff (800ms - 2s).
-   - **Critical Fallback Pivot**: If the primary model fails 13 consecutive times, the agent surgically pivots to a lighter, high-concurrency fallback model (`gemini-3.1-flash-lite`) for the final 3 attempts to ensure session navigation through API congestion.
+   - **Multi-Stage Failover**: The loop features a sophisticated 16-attempt retry engine with exponential backoff (1s - 32s).
+   - **Critical Fallback Pivot**: If the primary model fails 14 consecutive times, the agent surgically pivots to a lighter, high-concurrency fallback model (`gemini-3.1-flash-lite`) for the final 3 attempts to ensure session navigation through API congestion.
 
 ## Multimodal Pipeline
 
-Flux Flow implements a native multimodal processing engine in `src/tools/view_file.js`. This allows the agent to move beyond text-based reasoning and analyze visual assets directly.
+Flux Flow implements a native multimodal processing engine in `src/tools/view_file.js`. This allows the agent to move beyond text-based reasoning and analyze visual assets directly (Only on supported models).
 
 - **Binary Detection**: The pipeline uses `is-binary-path` to distinguish between text and binary files.
 - **Visual Encoding**: If an image or PDF is detected, the engine reads the raw bytes and converts them into base64-encoded `InlineData` objects.

@@ -81,7 +81,7 @@ const injectPngMetadata = (buffer, metadata = {}) => {
  * Image Generation Tool using Pollinations API
  * Generates an image based on the provided prompt and active quality/key settings.
  */
-export const generate_image = async (args) => {
+export const generate_image = async (args, context = {}) => {
     const parsed = parseArgs(args);
     const prompt = parsed.prompt || parsed.text;
     const outputPath = parsed.path || parsed.outputPath || parsed.output || 'generated_image.png';
@@ -228,6 +228,11 @@ export const generate_image = async (args) => {
             '.webp': 'image/webp'
         };
         const mimeType = mimeMap[ext] || 'image/png';
+
+        const isMultiModal = context.isMultiModal !== false;
+        if (!isMultiModal) {
+            return `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}].`;
+        }
 
         return {
             text: `SUCCESS: Image successfully generated from prompt [${prompt}] and saved to [${outputPath}]. Output attached to multimodal part`,

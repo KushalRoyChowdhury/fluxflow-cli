@@ -11,7 +11,6 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | **Generate Image** | ✅ | ❌ |
 | **Write PDF** | ✅ | ❌ |
 | **Write DOCX** | ✅ | ❌ |
-| **Write PPTX** | ✅ | ❌ |
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
@@ -22,37 +21,33 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 ## Core Tools
 
 ### 🌐 Web & Research
-- **`web_search`**: Uses DuckDuckGo to find up-to-date information on the internet. Crucial for answering questions about recent events or unlearned documentation.
-- **`web_scrape`**: Extracts the detailed text content from a specific URL, allowing the agent to read documentation or articles.
+- **`WebSearch`**: Uses DuckDuckGo to find up-to-date information on the internet. Crucial for answering questions about recent events or unlearned documentation.
+- **`WebScrape`**: Extracts the detailed text content from a specific URL, allowing the agent to read documentation or articles.
 
 ### 📄 Document Engineering (The Office Suite)
-- **`write_pdf`**: Generates high-fidelity, branded PDF documents from HTML/CSS. Features automatic watermarking and page-aware layout management.
-- **`write_docx`**: Generates professional Word documents (.docx) from HTML. Supports multi-page layouts, automatic page numbering, and native styling.
-- **`write_pptx`**: Generates high-fidelity, native PowerPoint presentations (.pptx) from HTML.
-  - **Native Translation**: Uses `html2pptxgenjs` to translate HTML tags (`<h1>`, `<ul>`, `<b>`) directly into selectable PowerPoint text objects.
-  - **Rich Styling**: Supports CSS-like properties (color, font-size, text-align) for professional slide design.
-  - **Flat Protocol**: Optimized for AI stability using a flat HTML string interface.
+- **`WritePDF`**: Generates high-fidelity, branded PDF documents from HTML/CSS. Features automatic watermarking and page-aware layout management.
+- **`WriteDOCX`**: Generates professional Word documents (.docx) from HTML. Supports multi-page layouts, automatic page numbering, and native styling.
 
 ### 🎨 Creative & Visual
-- **`generate_image`**: Generates high-fidelity images using Pollinations AI.
+- **`GenerateImage`**: Generates high-fidelity images using Pollinations AI.
   - **Customization**: Supports customizable models (Flux, ZImage, Qwen, Nanobanana-Pro, etc.), aspect ratios, custom prompt generation, and random seeds.
   - **Telemetry**: Tracks hourly credit usage (Low, Medium, Ultra, Premium tiers) with built-in daily limit checks and interactive dashboard displays.
 
 ### 📁 File System Operations
-- **`list_files`**: Lists the contents of a directory to help the agent understand the project structure.
-- **`read_folder`**: Provides detailed statistics and metadata about a directory's contents.
-- **`view_file`**: Reads the content of a file.
+- **`ListFiles`**: Lists the contents of a directory to help the agent understand the project structure.
+- **`ReadFolder`**: Provides detailed statistics and metadata about a directory's contents.
+- **`ViewFile`**: Reads the content of a file.
   - **Native Multimodality**: Supports analyzing images (JPG, PNG, WEBP) and PDF documents. The tool automatically detects binary formats and encodes them for AI analysis.
   - **Text Reading**: Supports specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
-- **`search_keyword`**: Performs a global project search for a specific string or keyword. Returns file paths and line numbers where matches are found, making it essential for navigation and impact analysis.
+- **`SearchKeyword`**: Performs a global project search for a specific string or keyword. Returns file paths and line numbers where matches are found, making it essential for navigation and impact analysis.
 
 ### ✍️ Code Editing
-- **`write_file`**: Creates a new file or completely overwrites an existing one with new content.
-- **`update_file` (Smart Patching)**: Surgically replaces a specific block of text within a file.
+- **`WriteFile`**: Creates a new file or completely overwrites an existing one with new content.
+- **`UpdateFile` (Smart Patching)**: Surgically replaces a specific block of text within a file.
   - *Diff Generation*: It returns a high-fidelity visual diff (Red/Green changes with context lines) to the UI, allowing the user to see exactly what the agent modified.
 
 ### 💻 Terminal Execution
-- **`exec_command`**: Runs a shell command directly in the terminal using Node's `child_process.spawn`.
+- **`Run`**: Runs a shell command directly in the terminal using Node's `child_process.spawn` or `node-pty` when available.
   - *Context Aware*: Runs in the current working directory.
   - *Cross-Platform*: Uses `shell: true` to handle Windows `.cmd`/`.bat` files natively.
 
