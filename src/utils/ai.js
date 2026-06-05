@@ -177,7 +177,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
             } catch (e) {}
         }
 
-        if (Date.now() - lastFlushTime >= 100 && hasNewData) {
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
             yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -335,7 +335,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
             }
         }
 
-        if (Date.now() - lastFlushTime >= 100 && hasNewData) {
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
             yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -1882,7 +1882,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             // [REAL-TIME TOOL EXECUTION]
                             // We use a version that only strips thoughts but preserves full tool arguments
-                            const toolActionableText = turnText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '');
+                            const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
                             const allToolsFound = detectToolCalls(toolActionableText);
                             while (allToolsFound.length > toolCallPointer) {
                                 const toolCall = allToolsFound[toolCallPointer];
@@ -2236,7 +2236,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 toolCallPointer++;
                             }
-                            if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 100)) {
+                            if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 150)) {
                                 yield { type: 'text', content: pendingGoogleText };
                                 pendingGoogleText = '';
                                 lastGoogleFlushTime = Date.now();
