@@ -3098,17 +3098,52 @@ export default function App({ args = [] }) {
                             <Text color="gray">--- PROPOSED CONTENT / DIFF ---</Text>
                             {(() => {
                                 const args = parseArgs(pendingApproval?.args || '{}');
-                                const oldVal = args.TargetContent || args.content_to_replace || args.replaceContent || null;
-                                const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
+                                
+                                // Collect all patch pairs
+                                const patchPairs = [];
+                                const indices = new Set();
+                                Object.keys(args).forEach(key => {
+                                    const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
+                                    if (m) {
+                                        const index = m[2] ? parseInt(m[2]) : 1;
+                                        indices.add(index);
+                                    }
+                                });
+                                
+                                const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+                                sortedIndices.forEach(i => {
+                                    let r, n;
+                                    if (i === 1) {
+                                        r = args.replaceContent1 ?? args.content_to_replace1 ?? args.replaceContent ?? args.content_to_replace ?? args.TargetContent ?? null;
+                                        n = args.newContent1 ?? args.content_to_add1 ?? args.newContent ?? args.content_to_add ?? args.ReplacementContent ?? args.replacementContent ?? null;
+                                    } else {
+                                        r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`] ?? null;
+                                        n = args[`newContent${i}`] ?? args[`content_to_add${i}`] ?? null;
+                                    }
+                                    if (r !== null || n !== null) {
+                                        patchPairs.push({ replace: r, new: n });
+                                    }
+                                });
 
-                                if (oldVal && newVal) {
+                                if (patchPairs.length > 0) {
                                     return (
                                         <Box flexDirection="column" marginTop={1}>
-                                            <Box><Text color="red" wrap="anywhere" bold>- {oldVal}</Text></Box>
-                                            <Box marginTop={1}><Text color="green" wrap="anywhere" bold>+ {newVal.replace(/\[\/n\]?/g, '\\n')}</Text></Box>
+                                            {patchPairs.map((pair, idx) => {
+                                                const hasOld = pair.replace !== null;
+                                                const hasNew = pair.new !== null;
+                                                return (
+                                                    <Box key={idx} flexDirection="column" marginTop={idx > 0 ? 1 : 0}>
+                                                        {patchPairs.length > 1 && <Text color="gray">Block {idx + 1}:</Text>}
+                                                        {hasOld && <Box><Text color="red" wrap="anywhere" bold>- {pair.replace}</Text></Box>}
+                                                        {hasNew && <Box marginTop={hasOld ? 1 : 0}><Text color="green" wrap="anywhere" bold>+ {pair.new.replace(/\[\/n\]?/g, '\\n')}</Text></Box>}
+                                                    </Box>
+                                                );
+                                            })}
                                         </Box>
                                     );
                                 }
+                                
+                                const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
                                 return <Text color="white" wrap="anywhere">{(newVal ? newVal.replace(/\[\/n\]?/g, '\\n') : null) || 'Updating file content...'}</Text>;
                             })()}
                         </Box>
