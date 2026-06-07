@@ -5,6 +5,7 @@ import * as fs from 'fs';
 
 let wss: WebSocketServer | undefined;
 let lastDiffTimestamp = 0;
+let lastCursorLine = 0;
 const activeDecs: vscode.TextEditorDecorationType[] = [];
 let statusBarItem: vscode.StatusBarItem;
 let isCliConnected = false;
@@ -170,7 +171,12 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(updateErrorContext));
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateErrorContext));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
+        updateErrorContext();
+        if (editor) {
+            lastCursorLine = editor.selection.active.line + 1;
+        }
+    }));
     updateErrorContext();
 
     // Code Action Provider (The Lightbulb)
@@ -285,6 +291,11 @@ export function activate(context: vscode.ExtensionContext) {
         });
     };
 
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(e => {
+        if (e.selections.length > 0) {
+            lastCursorLine = e.selections[0].active.line + 1;
+        }
+    }));
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(cleanup));
     context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(cleanup));
 
@@ -368,7 +379,7 @@ async function getIDEContext() {
     }
 
     let context: any = {
-        cursor_line: 0,
+        cursor_line: lastCursorLine,
         selected: 0,
         manual_edits: "",
         full_content: "",
@@ -380,7 +391,8 @@ async function getIDEContext() {
 
     if (activeEditor) {
         const selection = activeEditor.selection;
-        context.cursor_line = selection.active.line + 1;
+        lastCursorLine = selection.active.line + 1;
+        context.cursor_line = lastCursorLine;
         if (!selection.isEmpty) {
             context.selected = activeEditor.document.getText(selection);
         }
