@@ -34,18 +34,37 @@ import { formatTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 
 const getIDEName = () => {
-    const envStr = JSON.stringify(process.env).toLowerCase();
-    if (envStr.includes('antigravity')) return 'Antigravity';
-    if (process.env.CURSOR_SETTINGS_DIR || process.env.TERM_PROGRAM === 'cursor' || envStr.includes('cursor')) return 'Cursor';
-    if (process.env.TERM_PROGRAM === 'windsurf' || envStr.includes('windsurf')) return 'Windsurf';
-    if (process.env.TERM_PROGRAM === 'codium' || envStr.includes('codium') || envStr.includes('vscode-oss')) return 'VSCodium';
-    if (envStr.includes('trae')) return 'Trae';
-    if (envStr.includes('positron')) return 'Positron';
-    if (process.env.TERM_PROGRAM === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || envStr.includes('vscode')) return 'VS Code';
-    if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || envStr.includes('intellij')) return 'JetBrains';
-    return 'IDE';
-};
+    const termProgram = (process.env.TERM_PROGRAM || '').toLowerCase();
 
+    // 1. Direct high-priority terminal check
+    if (process.env.WT_SESSION) return 'Windows Terminal';
+
+    // 2. Helper for safer string searching (ignores paths/noisy keys)
+    const inEnvVars = (target) => {
+        const query = target.toLowerCase();
+        for (const [key, val] of Object.entries(process.env)) {
+            if (['PATH', 'PWD', 'CWD', 'PS1', 'LS_COLORS', 'PROMPT'].includes(key)) continue;
+            if (String(val).toLowerCase().includes(query)) return true;
+        }
+        return false;
+    };
+
+    // 3. IDE Forks (Must check BEFORE generic 'vscode')
+    if (termProgram === 'cursor' || process.env.CURSOR_SETTINGS_DIR || inEnvVars('cursor')) return 'Cursor';
+    if (termProgram === 'windsurf' || inEnvVars('windsurf')) return 'Windsurf';
+    if (inEnvVars('antigravity')) return 'Antigravity';
+    if (termProgram === 'trae' || inEnvVars('trae')) return 'Trae';
+    if (termProgram === 'codium' || inEnvVars('codium') || inEnvVars('vscode-oss')) return 'VSCodium';
+    if (inEnvVars('positron')) return 'Positron';
+
+    // 4. Standard VS Code
+    if (termProgram === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || inEnvVars('vscode')) return 'VS Code';
+
+    // 5. Other
+    if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || inEnvVars('intellij')) return 'JetBrains';
+
+    return 'Terminal';
+};
 
 const getPromoOptions = (ideName) => {
     const isStandardVSCode = ideName === 'VS Code';
@@ -319,7 +338,8 @@ export default function App({ args = [] }) {
     const [promoSelectedIndex, setPromoSelectedIndex] = useState(0);
     const persistedModelRef = useRef(null);
     useEffect(() => {
-        const isIDE = getIDEName() !== 'IDE' || !!process.env.VSC_TERMINAL_URL;
+        const ideName = getIDEName();
+        const isIDE = !['Terminal', 'Windows Terminal'].includes(ideName) || !!process.env.VSC_TERMINAL_URL;
 
         // Wait 500ms before showing promo to allow WebSocket to connect
         const graceTimer = setTimeout(() => {
@@ -587,7 +607,8 @@ export default function App({ args = [] }) {
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
-        const isIDE = getIDEName() !== 'IDE' || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
+        const ideName = getIDEName();
+        const isIDE = !['Terminal', 'Windows Terminal'].includes(ideName) || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
         return {
             isIDE,
             shortcut: isIDE ? 'Shift + Enter' : 'Ctrl + Enter'
