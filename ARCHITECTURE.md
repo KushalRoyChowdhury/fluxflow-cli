@@ -31,7 +31,7 @@ The execution flow of a single user prompt follows this loop:
 
 ## The IDE Bridge (Companion Extension)
 
-Flux Flow includes an optional but powerful **IDE Bridge** (the `fluxflow+` extension) that establishes a real-time link between your code editor (VS Code and forks) and the CLI agent.
+Flux Flow includes an optional but powerful **IDE Companion** that establishes a real-time link between your code editor (VS Code and forks) and the CLI agent.
 
 - **Sidecar Communication**: The extension starts a WebSocket server on a dedicated local port (`56832`). The CLI agent acts as a client, automatically connecting upon startup.
 - **Bi-Directional Context**:

@@ -2,7 +2,7 @@
 ![Flux Flow Hero](./fluxflow.png)
 
 <p align="left">
-  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v1.21-blue?style=plastic" alt="FluxFlow Version"></a>
+  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v2-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://deepmind.google"><img src="https://img.shields.io/badge/Engine-Gemma%204-red?style=plastic" alt="Engine Gemma 4"></a>
   <a href="https://pollinations.ai"><img src="https://img.shields.io/badge/Built%20With-pollinations.ai-cyan?style=plastic" alt="Built With pollinations.ai"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
@@ -25,6 +25,12 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **Customizable Presets**: Supports models like Flux, ZImage, Qwen, and Nanobanana-Pro, custom aspect ratios, and randomized seeds.
   - **Budget Telemetry**: Real-time credits tracker displayed in sleek high-contrast Ink terminal boxes.
   - **PNG Metadata Embedding**: Autonomously injects custom `tEXt` metadata chunks (Title, Software, Author, Seed, Model, and exact Prompt details) straight into the output image headers.
+
+- **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
+  - **Live Context Awareness**: The agent knows exactly which file you are looking at and where your cursor is.
+  - **Selection-Driven Reasoning**: Select a block of code in your IDE and ask "What does this do?"—the agent receives your selection instantly.
+  - **Native Edit Highlights**: AI code changes appear in real-time as diff viewer inside your editor.
+  - **Universal Compatibility**: Works flawlessly with VS Code, Cursor, VSCodium, and Antigravity.
 
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `ReadFile` tool with high-fidelity context retention (Only on supported models).
 - **Document Engineering Suite**: Generate professional, branded PDF, DOCX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
@@ -98,7 +104,7 @@ fluxflow [options]
 - `--update <check|latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
 - `--package <npm|pnpm|yarn|bun>`: Override default package manager to run core application updates.
 - `--auto-del <1d|7d|30d>`: Set automated chat log deletion schedule.
-- `--auto-exec <on|off>`: Toggle autonomous command execution permission.
+- `--yolo <on|off>`: Toggle autonomous command execution permission.
 - `--external-access <on|off>`: Toggle permission to let agent read files outside CWD.
 - `--thinking <Fast|Medium|High|xHigh>`: Override default thinking level.
 
