@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'path';
+import * as fs from 'fs';
 
 let wss: WebSocketServer | undefined;
 let lastDiffTimestamp = 0;
@@ -10,6 +11,7 @@ let isCliConnected = false;
 
 const lastKnownStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
+const newFilesCreatedByBridge = new Set<string>();
 
 class FluxFlowDiffProvider implements vscode.TextDocumentContentProvider {
     provideTextDocumentContent(uri: vscode.Uri): string {
@@ -22,24 +24,24 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('fluxflow-diff', diffProvider));
 
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-    statusBarItem.command = 'fluxflow-editorex.startBridge';
+    statusBarItem.command = 'fluxflow-editorex.startCompanion';
     context.subscriptions.push(statusBarItem);
     updateStatusBar();
     statusBarItem.show();
 
     // Register command to launch CLI
     context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorx.run', () => {
-        const terminal = vscode.window.createTerminal('Flux-Flow');
+        const terminal = vscode.window.createTerminal('FluxFlow');
         terminal.show();
-        terminal.sendText('pnpm start');
+        terminal.sendText('fluxflow');
     }));
 
-    // Register command so clicking the status bar doesn't error
-    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.startBridge', () => {
+    // Register command so clicking the status bar doesn't errort
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.startCompanion', () => {
         if (isCliConnected) {
-            vscode.window.showInformationMessage('FluxFlow Bridge is connected and active.');
+            vscode.window.showInformationMessage('FluxFlow Companion is connected and active.');
         } else {
-            vscode.window.showWarningMessage('FluxFlow CLI is not running. Start it in your terminal to enable bridge features.');
+            vscode.window.showWarningMessage('Start FluxFlow CLI in your terminal to enable IDE features.');
         }
     }));
 
@@ -56,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const ctx = await getIDEContext();
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
                 } else {
-                    await handleMessage(message);
+                    await handleMessage(message, ws);
                 }
             } catch (err) {
                 console.error('Error:', err);
@@ -166,76 +168,113 @@ async function getIDEContext() {
     return context;
 }
 
-async function handleMessage(message: any) {
-    const { command, filePath, addedLines, originalContent, modifiedContent, result } = message;
-    if (!filePath) return;
-    const uri = vscode.Uri.file(path.isAbsolute(filePath) ? filePath : path.join(vscode.workspace.workspaceFolders?.[0].uri.fsPath || '', filePath));
+async function handleMessage(message: any, ws?: WebSocket) {
+    const { command, version, filePath, addedLines, originalContent, modifiedContent, result } = message;
 
-    if (command === 'open') {
-        const doc = await vscode.workspace.openTextDocument(uri);
-        await vscode.window.showTextDocument(doc, { preview: false });
-        lastKnownStates.set(doc.fileName, doc.getText());
-    } 
-    else if (command === 'diff') {
-        // Highlighting disabled in favor of Native Diff Viewer
-        lastDiffTimestamp = Date.now();
-        const doc = await vscode.workspace.openTextDocument(uri);
-        await vscode.window.showTextDocument(doc, { preview: false });
-    }
-    else if (command === 'showDiff') {
-        const doc = await vscode.workspace.openTextDocument(uri);
-        const editor = await vscode.window.showTextDocument(doc, { preview: false });
-        
-        // Setup virtual document for the left side (Original)
-        const virtualUri = vscode.Uri.parse(`fluxflow-diff://original/${path.basename(filePath)}?${Date.now()}`);
-        virtualDocs.set(virtualUri.toString(), originalContent || doc.getText());
-
-        // Apply modified content to the REAL document buffer (unsaved)
-        if (modifiedContent !== undefined) {
-            await editor.edit(editBuilder => {
-                const fullRange = new vscode.Range(
-                    doc.positionAt(0),
-                    doc.positionAt(doc.getText().length)
-                );
-                editBuilder.replace(fullRange, modifiedContent);
-            });
+    if (command === 'version') {
+        const majorVersion = parseInt(version?.split('.')[0] || '0');
+        if (majorVersion < 2) {
+            vscode.window.showErrorMessage(`FluxFlow Companion Error: CLI version ${version} is not supported. Please update FluxFlow CLI to 2.0.0 or later.`);
+            ws?.close();
+            return;
         }
-
-        // Open side-by-side diff
-        // Left: Virtual Original, Right: Actual File Buffer (Editable)
-        await vscode.commands.executeCommand('vscode.diff', 
-            virtualUri, 
-            uri, 
-            `${path.basename(filePath)} (Original) ↔ Modified (AI)`
-        );
+        return;
     }
-    else if (command === 'closeDiff') {
-        const tabGroups = vscode.window.tabGroups.all;
-        const targetPath = uri.fsPath.toLowerCase();
 
-        for (const group of tabGroups) {
-            for (const tab of group.tabs) {
-                if (tab.input instanceof vscode.TabInputTextDiff && 
-                    tab.input.original.scheme === 'fluxflow-diff') {
-                    
-                    const tabPath = tab.input.modified.fsPath.toLowerCase();
-                    if (tabPath === targetPath) {
-                        if (result === 'deny') {
-                            try {
-                                await vscode.commands.executeCommand('workbench.action.files.revert', tab.input.modified);
-                            } catch (e) {}
-                        } else if (result === 'allow') {
-                            try {
-                                const doc = await vscode.workspace.openTextDocument(tab.input.modified);
-                                await doc.save();
-                            } catch (e) {}
+    if (!filePath) return;
+
+    // Use absolute path
+    const uri = vscode.Uri.file(filePath);
+
+    try {
+        if (command === 'open') {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc, { preview: false });
+            lastKnownStates.set(doc.fileName, doc.getText());
+        }
+        else if (command === 'diff') {
+            lastDiffTimestamp = Date.now();
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc, { preview: false });
+        }
+        else if (command === 'showDiff') {
+            // Handle new file creation placeholder
+            if (!fs.existsSync(uri.fsPath)) {
+                const parentDir = path.dirname(uri.fsPath);
+                if (!fs.existsSync(parentDir)) {
+                    fs.mkdirSync(parentDir, { recursive: true });
+                }
+                fs.writeFileSync(uri.fsPath, '');
+                newFilesCreatedByBridge.add(uri.fsPath.toLowerCase());
+            }
+
+            const doc = await vscode.workspace.openTextDocument(uri);
+            // Open doc with preserveFocus: true
+            const editor = await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
+
+            // Setup virtual document for the left side (Original)
+            const virtualUri = vscode.Uri.parse(`fluxflow-diff://original/${path.basename(filePath)}?${Date.now()}`);
+            virtualDocs.set(virtualUri.toString(), originalContent !== undefined ? originalContent : doc.getText());
+
+            // Apply modified content to the REAL document buffer (unsaved)
+            if (modifiedContent !== undefined) {
+                await editor.edit(editBuilder => {
+                    const fullRange = new vscode.Range(
+                        doc.positionAt(0),
+                        doc.positionAt(doc.getText().length)
+                    );
+                    editBuilder.replace(fullRange, modifiedContent);
+                });
+            }
+
+            // Open side-by-side diff with preserveFocus: true
+            await vscode.commands.executeCommand('vscode.diff',
+                virtualUri,
+                uri,
+                `${path.basename(filePath)} (Original) ↔ Modified (AI)`,
+                { preserveFocus: true }
+            );
+        }
+        else if (command === 'save') {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await doc.save();
+        }
+        else if (command === 'closeDiff') {
+            const tabGroups = vscode.window.tabGroups.all;
+            const targetPath = uri.fsPath.toLowerCase();
+
+            for (const group of tabGroups) {
+                for (const tab of group.tabs) {
+                    if (tab.input instanceof vscode.TabInputTextDiff &&
+                        tab.input.original.scheme === 'fluxflow-diff') {
+
+                        const tabPath = tab.input.modified.fsPath.toLowerCase();
+                        if (tabPath === targetPath) {
+                            if (result === 'deny') {
+                                try {
+                                    await vscode.commands.executeCommand('workbench.action.files.revert', tab.input.modified);
+                                    // If it was a new file created by us, delete it from disk
+                                    if (newFilesCreatedByBridge.has(targetPath)) {
+                                        await vscode.workspace.fs.delete(tab.input.modified, { recursive: false });
+                                    }
+                                } catch (e) {}
+                            } else if (result === 'allow') {
+                                try {
+                                    const doc = await vscode.workspace.openTextDocument(tab.input.modified);
+                                    await doc.save();
+                                } catch (e) {}
+                            }
+
+                            newFilesCreatedByBridge.delete(targetPath);
+                            await vscode.window.tabGroups.close(tab);
                         }
-
-                        await vscode.window.tabGroups.close(tab);
                     }
                 }
             }
         }
+    } catch (err: any) {
+        vscode.window.showErrorMessage(`FluxFlow Companion Error [${command}]: ${err.message}`);
+        console.error(`FluxFlow Companion Error [${command}]:`, err);
     }
 }
 

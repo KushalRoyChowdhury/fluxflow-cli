@@ -25,7 +25,7 @@ export const RevertManager = {
     /**
      * Records a file change under the active prompt transaction.
      */
-    async recordFileChange(absolutePath) {
+    async recordFileChange(absolutePath, forcedContent = null) {
         if (!currentTransaction) return;
 
         // Prevent redundant backups of the same file in the same prompt execution
@@ -33,10 +33,13 @@ export const RevertManager = {
         if (alreadyBackedUp) return;
 
         const fileExists = await fs.pathExists(absolutePath);
-        let type = 'create';
+        let type = (fileExists && !forcedContent) ? 'update' : (forcedContent ? 'update' : 'create');
+        // If file doesn't exist on disk but we have forcedContent, it's still an update (to the placeholder)
+        if (!fileExists && !forcedContent) type = 'create';
+        
         let backupFile = null;
 
-        if (fileExists) {
+        if (fileExists || forcedContent) {
             type = 'update';
             const fileName = path.basename(absolutePath);
             backupFile = `${currentTransaction.id}_${fileName}.bak`;
@@ -47,8 +50,8 @@ export const RevertManager = {
 
             const backupPath = path.join(chatBackupDir, backupFile);
 
-            // Read content, securely AES-256-CBC encrypt it, and write it to backup path
-            const content = await fs.readFile(absolutePath, 'utf8');
+            // Use forcedContent if provided, otherwise read from disk
+            const content = (forcedContent !== null) ? forcedContent : await fs.readFile(absolutePath, 'utf8');
             const encrypted = encryptAes(content);
             await fs.writeFile(backupPath, encrypted, 'utf8');
         }

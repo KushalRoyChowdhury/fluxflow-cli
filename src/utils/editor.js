@@ -6,6 +6,13 @@ const BRIDGE_URL = 'ws://localhost:56832';
 const messageQueue = [];
 let contextResolver = null;
 
+let cliVersion = '2.0.0'; // Default fallback
+
+export const initBridge = (version) => {
+    cliVersion = version;
+    connect();
+};
+
 const connect = () => {
     if (ws || isConnecting) return;
     isConnecting = true;
@@ -13,6 +20,10 @@ const connect = () => {
     socket.on('open', () => {
         ws = socket;
         isConnecting = false;
+        
+        // Handshake: Send current CLI version
+        ws.send(JSON.stringify({ command: 'version', version: cliVersion }));
+
         while (messageQueue.length > 0) {
             ws.send(JSON.stringify(messageQueue.shift()));
         }
@@ -107,5 +118,3 @@ export const highlightDiffInEditor = (filePath, diffText) => {
         });
     }
 };
-
-connect();

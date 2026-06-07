@@ -225,27 +225,22 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.0.0", "1.21.1"]
+        const stableVersions = ["2.0.0"]
         const changelogData = {
             "2.0.0": {
-                "note": "🚀 [MAJOR] The IDE Bridge Revolution.",
+                "note": "🚀 [MAJOR] IDE Integration.",
                 "added": [
-                    "**High-Fidelity IDE Bridge:** Launched the `fluxflow+` extension for VS Code and forks (Cursor, Antigravity, etc.).",
+                    "**High-Fidelity IDE Connectivity:** Launched the `FluxFlow-CLI Companion` extension for VS Code and forks (Cursor, Antigravity, etc.).",
                     "**Live Context Awareness:** The agent now tracks your active file, cursor position, and opened tabs in real-time.",
-                    "**Selection-Driven Reasoning:** Select code in your editor and ask the agent about it—it sees exactly what you see.",
-                    "**Native Edit Highlights:** AI code changes now appear as beautiful green highlights directly inside your editor.",
-                    "**Command Palette Integration:** Launch Flux-Flow directly from the IDE using the `Flux-Flow: Run` command."
+                    "**Selection-Driven Reasoning:** Select code in your editor and ask the agent about it, it sees exactly what you see.",
+                    "**Native Edit Highlights:** AI code changes now appear as diff view directly inside your editor.",
+                    "**Command Palette Integration:** Launch Flux-Flow directly from the IDE using the `FluxFlow: Run` command."
                 ],
                 "changed": [
-                    "**Redesigned Startup Flow:** Introduced a full-screen centered Bridge Intro for IDE users.",
-                    "**Updated Protocol:** Switched bridge communication to port `56832` for zero-conflict connectivity.",
-                    "**Version Milestone:** Bumping project to v2.0.0 to mark the shift from CLI-only to Editor-Integrated."
+                    "Renamed 'Auto Execute' to 'YOLO Mode'.",
+                    "Changed CLI startup argument for `--auto-exec` to `--yolo`."
                 ],
-                "fixes": [
-                    "Resolved 'Orange Blob' rendering issue in VS Code forks.",
-                    "Improved multiline highlight accuracy for large code blocks.",
-                    "Eliminated startup flickering in the terminal UI."
-                ]
+                "fixes": []
             },
             "1.21.1": {
                 "note": "⚙️ Settings flow refinement.",

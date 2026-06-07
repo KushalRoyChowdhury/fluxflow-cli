@@ -2,7 +2,7 @@
   "name": "fluxflow-cli-companion",
   "displayName": "FluxFlow-CLI Companion",
   "publisher": "fluxflow-cli",
-  "icon": "fluxflow-companion.png",
+  "icon": "fluxflow-cli-companion.png",
   "description": "Enable FluxFlow CLI with direct access to your IDE workspace (More Features coming).",
   "version": "1.1.0",
 
@@ -14,20 +14,28 @@
   ],
   "activationEvents": [
     "*",
-    "onCommand:fluxflow-editorex.startBridge"
+    "onCommand:fluxflow-editorex.startCompanion"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "fluxflow-editorx.run",
-        "title": "Flux-Flow: Run"
+        "title": "FluxFlow: Run"
       },
       {
-        "command": "fluxflow-editorex.startBridge",
-        "title": "Flux-Flow: Start Bridge"
+        "command": "fluxflow-editorex.startCompanion",
+        "title": "FluxFlow: Start Companion"
       }
-    ]
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "fluxflow-editorex.startCompanion",
+          "when": "false"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

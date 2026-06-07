@@ -183,9 +183,9 @@ export const ControlledMultilineInput = ({
         case 'cursor':
           return {
             ...textStyle,
-            color: 'cyan',
-            bold: true,
-            inverse: true
+            color: (showCursor && focus) ? 'cyan' : undefined,
+            bold: showCursor && focus,
+            inverse: showCursor && focus
           };
         default:
           return textStyle;
@@ -226,6 +226,7 @@ export const MultilineInput = ({
   showCursor = true,
   highlightPastedText = false,
   focus = true,
+  lastFocusEventTime = 0,
   columns = 80,
   useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
   ...controlledProps
@@ -302,6 +303,11 @@ export const MultilineInput = ({
   }, [value, columns]);
 
   useCustomInput((input, key) => {
+    // Aggressively swallow focus reporting artifacts ([I, [O)
+    if (input === '\x1b[I' || input === '\x1b[O' || input === '[I' || input === '[O') {
+      return;
+    }
+
     const submitKey = keyBindings?.submit ?? ((key2) => key2.return && key2.ctrl);
     const newlineKey = keyBindings?.newline ?? ((key2) => key2.return);
     if (submitKey(key)) {

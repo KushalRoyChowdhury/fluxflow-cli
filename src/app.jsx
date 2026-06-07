@@ -31,7 +31,7 @@ import { emojiSpace } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
-import { isBridgeConnected } from './utils/editor.js';
+import { isBridgeConnected, initBridge } from './utils/editor.js';
 
 const getIDEName = () => {
     const envStr = JSON.stringify(process.env).toLowerCase();
@@ -365,6 +365,9 @@ export default function App({ args = [] }) {
                     parsed.autoDel = del;
                 }
                 i++;
+            } else if (arg === '--auto-exec' && args[i + 1]) {
+                parsed.autoExec = args[i + 1].toLowerCase();
+                i++;
             } else if (arg === '--yolo' && args[i + 1]) {
                 parsed.autoExec = args[i + 1].toLowerCase();
                 i++;
@@ -479,6 +482,8 @@ export default function App({ args = [] }) {
     const [activeModel, setActiveModel] = useState('gemma-4-31b-it');
     const [janitorModel, setJanitorModel] = useState('gemma-4-26b-a4b-it');
     const [isInitializing, setIsInitializing] = useState(true);
+    const [isAppFocused, setIsAppFocused] = useState(true);
+    const lastFocusEventTime = useRef(0);
     const [apiKey, setApiKey] = useState(null);
     const [tempKey, setTempKey] = useState('');
 
@@ -716,6 +721,11 @@ export default function App({ args = [] }) {
 
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
+        // Aggressively swallow focus reporting artifacts
+        if (inputText === '\x1b[I' || inputText === '\x1b[O' || inputText === '[I' || inputText === '[O') {
+            return;
+        }
+
         if (showBridgePromo) {
             const ideName = getIDEName();
             const options = getPromoOptions(ideName);
@@ -894,7 +904,39 @@ export default function App({ args = [] }) {
     });
 
     useEffect(() => {
+        // Enable Focus Reporting (DEC mode 1004)
+        process.stdout.write('\x1b[?1004h');
+
+        const onData = (data) => {
+            const str = data.toString();
+            if (str.includes('\x1b[I')) {
+                setIsAppFocused(true);
+                lastFocusEventTime.current = Date.now();
+            } else if (str.includes('\x1b[O')) {
+                setIsAppFocused(false);
+                lastFocusEventTime.current = Date.now();
+            }
+        };
+
+        process.stdin.on('data', onData);
+
+        return () => {
+            // Disable Focus Reporting on exit
+            process.stdout.write('\x1b[?1004l');
+            process.stdin.off('data', onData);
+        };
+    }, []);
+
+    useEffect(() => {
         async function init() {
+            // 0. Initialize IDE Bridge with dynamic version
+            try {
+                const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+                initBridge(versionFluxflow || pkg.version || '2.0.0');
+            } catch (e) {
+                initBridge('2.0.0');
+            }
+
             // Set custom terminal tab title
             if (process.stdout.isTTY) {
                 process.stdout.write(`\u001b]0;FluxFlow | Ready\u0007`);
@@ -3214,59 +3256,65 @@ export default function App({ args = [] }) {
                         <Text color="yellow" bold underline>🔐 SECURITY GATE: FILE WRITE PERMISSION</Text>
                         <Text marginTop={1}>The agent is attempting to modify: <Text color="cyan">{parseArgs(pendingApproval?.args || '{}').path || 'Unknown File'}</Text></Text>
 
-                        <Box marginTop={1} borderStyle="single" borderColor="#333" paddingX={1} flexDirection="column">
-                            <Text color="gray">--- PROPOSED CONTENT / DIFF ---</Text>
-                            {(() => {
-                                const args = parseArgs(pendingApproval?.args || '{}');
+                        {!isBridgeConnected() ? (
+                            <Box marginTop={1} borderStyle="single" borderColor="#333" paddingX={1} flexDirection="column">
+                                <Text color="gray">--- PROPOSED CONTENT / DIFF ---</Text>
+                                {(() => {
+                                    const args = parseArgs(pendingApproval?.args || '{}');
 
-                                // Collect all patch pairs
-                                const patchPairs = [];
-                                const indices = new Set();
-                                Object.keys(args).forEach(key => {
-                                    const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
-                                    if (m) {
-                                        const index = m[2] ? parseInt(m[2]) : 1;
-                                        indices.add(index);
+                                    // Collect all patch pairs
+                                    const patchPairs = [];
+                                    const indices = new Set();
+                                    Object.keys(args).forEach(key => {
+                                        const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
+                                        if (m) {
+                                            const index = m[2] ? parseInt(m[2]) : 1;
+                                            indices.add(index);
+                                        }
+                                    });
+
+                                    const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+                                    sortedIndices.forEach(i => {
+                                        let r, n;
+                                        if (i === 1) {
+                                            r = args.replaceContent1 ?? args.content_to_replace1 ?? args.replaceContent ?? args.content_to_replace ?? args.TargetContent ?? null;
+                                            n = args.newContent1 ?? args.content_to_add1 ?? args.newContent ?? args.content_to_add ?? args.ReplacementContent ?? args.replacementContent ?? null;
+                                        } else {
+                                            r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`] ?? null;
+                                            n = args[`newContent${i}`] ?? args[`content_to_add${i}`] ?? null;
+                                        }
+                                        if (r !== null || n !== null) {
+                                            patchPairs.push({ replace: r, new: n });
+                                        }
+                                    });
+
+                                    if (patchPairs.length > 0) {
+                                        return (
+                                            <Box flexDirection="column" marginTop={1}>
+                                                {patchPairs.map((pair, idx) => {
+                                                    const hasOld = pair.replace !== null;
+                                                    const hasNew = pair.new !== null;
+                                                    return (
+                                                        <Box key={idx} flexDirection="column" marginTop={idx > 0 ? 1 : 0}>
+                                                            {patchPairs.length > 1 && <Text color="gray">Block {idx + 1}:</Text>}
+                                                            {hasOld && <Box><Text color="red" wrap="anywhere" bold>- {pair.replace}</Text></Box>}
+                                                            {hasNew && <Box marginTop={hasOld ? 1 : 0}><Text color="green" wrap="anywhere" bold>+ {pair.new.replace(/\[\/n\]?/g, '\\n')}</Text></Box>}
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        );
                                     }
-                                });
 
-                                const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-                                sortedIndices.forEach(i => {
-                                    let r, n;
-                                    if (i === 1) {
-                                        r = args.replaceContent1 ?? args.content_to_replace1 ?? args.replaceContent ?? args.content_to_replace ?? args.TargetContent ?? null;
-                                        n = args.newContent1 ?? args.content_to_add1 ?? args.newContent ?? args.content_to_add ?? args.ReplacementContent ?? args.replacementContent ?? null;
-                                    } else {
-                                        r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`] ?? null;
-                                        n = args[`newContent${i}`] ?? args[`content_to_add${i}`] ?? null;
-                                    }
-                                    if (r !== null || n !== null) {
-                                        patchPairs.push({ replace: r, new: n });
-                                    }
-                                });
-
-                                if (patchPairs.length > 0) {
-                                    return (
-                                        <Box flexDirection="column" marginTop={1}>
-                                            {patchPairs.map((pair, idx) => {
-                                                const hasOld = pair.replace !== null;
-                                                const hasNew = pair.new !== null;
-                                                return (
-                                                    <Box key={idx} flexDirection="column" marginTop={idx > 0 ? 1 : 0}>
-                                                        {patchPairs.length > 1 && <Text color="gray">Block {idx + 1}:</Text>}
-                                                        {hasOld && <Box><Text color="red" wrap="anywhere" bold>- {pair.replace}</Text></Box>}
-                                                        {hasNew && <Box marginTop={hasOld ? 1 : 0}><Text color="green" wrap="anywhere" bold>+ {pair.new.replace(/\[\/n\]?/g, '\\n')}</Text></Box>}
-                                                    </Box>
-                                                );
-                                            })}
-                                        </Box>
-                                    );
-                                }
-
-                                const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
-                                return <Text color="white" wrap="anywhere">{(newVal ? newVal.replace(/\[\/n\]?/g, '\\n') : null) || 'Updating file content...'}</Text>;
-                            })()}
-                        </Box>
+                                    const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
+                                    return <Text color="white" wrap="anywhere">{(newVal ? newVal.replace(/\[\/n\]?/g, '\\n') : null) || 'Updating file content...'}</Text>;
+                                })()}
+                            </Box>
+                        ) : (
+                            <Box marginTop={1} paddingX={1}>
+                                <Text color="cyan" italic>⚡️ FluxFlow Companion is active. Review the changes in your editor.</Text>
+                            </Box>
+                        )}
 
                         <Box marginTop={1}>
                             <CommandMenu
@@ -3419,13 +3467,15 @@ export default function App({ args = [] }) {
                                                     ) : escPressCount === 1 ? (
                                                         <Text color="cyan" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                     ) : (
-                                                        <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                        <Text color="gray">{escPressed ? "  Press ESC again to cancel the request." : !isProcessing ? `  Send message or /cmd ... (${terminalEnv.shortcut} for newline), @file` : "  Enter a prompt to steer the agent."}</Text>
                                                     )}
                                                 </Box>
                                             )}
                                             <MultilineInput
                                                 key={`input-${inputKey}`}
                                                 focus={!isTerminalFocused}
+                                                showCursor={isAppFocused}
+                                                lastFocusEventTime={lastFocusEventTime.current}
                                                 value={input}
                                                 columns={terminalSize.columns}
                                                 onChange={(val) => {

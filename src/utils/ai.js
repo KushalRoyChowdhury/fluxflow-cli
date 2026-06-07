@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import { emojiSpace } from './terminal.js';
-import { applyPatches } from './text.js';
+import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
@@ -1416,7 +1416,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let ideBlock = "";
         if (ideCtx.file_focused !== "none") {
             const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
-            const relOpened = (ideCtx.opened_editors || []).map(p => path.relative(process.cwd(), p));
+            const relOpened = (ideCtx.opened_editors || []).map(p => {
+                const rel = path.relative(process.cwd(), p);
+                return rel.startsWith('..') ? `[External] ${path.basename(p)}` : rel;
+            });
 
             ideBlock = `**IDE CONTEXT**\nFocused File: ${relFocused}\nCursor Line: ${ideCtx.cursor_line}\n`;
             if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
@@ -1432,7 +1435,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (edits.length > CHAR_LIMIT) {
                     edits = edits.substring(0, CHAR_LIMIT) + `\n... (Character limit reached, truncated)`;
                 }
-                
+
                 ideBlock += `Recent Manual Edits:\n${edits}\n`;
             }
             if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
@@ -2178,6 +2181,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
 
                                         let diffOpened = false;
+                                        let originalContentForReporting = "";
+                                        let patchResults = [];
+                                        let requestedPatchCount = 0;
+
                                         if (!approval) {
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 try {
@@ -2185,13 +2192,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     const { path: filePath } = toolArgs;
                                                     if (filePath) {
                                                         const absPath = path.resolve(process.cwd(), filePath);
-                                                        const normAbsPath = absPath.toLowerCase().replace(/^[a-z]:/, m => m.toUpperCase());
+                                                        // Ultra-robust normalization for comparison
+                                                        const normalize = (p) => p ? p.toLowerCase().replace(/\\/g, '/').replace(/^[a-z]:/, m => m.toUpperCase()) : "";
+                                                        const normAbsPath = normalize(absPath);
 
                                                         // CRITICAL: Get the absolute most recent content from the IDE if bridge is active
                                                         let originalContent = "";
                                                         let hasOriginal = false;
                                                         const currentIDE = await getIDEContext();
-                                                        const normFocused = currentIDE?.file_focused?.toLowerCase().replace(/^[a-z]:/, m => m.toUpperCase());
+                                                        const normFocused = normalize(currentIDE?.file_focused);
 
                                                         if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                                             originalContent = currentIDE.full_content;
@@ -2201,58 +2210,78 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             hasOriginal = true;
                                                         }
 
+                                                        originalContentForReporting = originalContent;
+
+                                                        // CRITICAL: Record the snapshot BEFORE showing the diff or making any changes
+                                                        await RevertManager.recordFileChange(absPath, originalContent);
+
                                                         if (hasOriginal) {
                                                             let modifiedContent = originalContent;
-                                                            // ... (patch simulation)
+                                                            // simulation logic
                                                             if (normToolName === 'write_file') {
                                                                 modifiedContent = toolArgs.content || toolArgs.newContent || '';
                                                             } else {
-                                                                const patches = [];
-                                                                const indices = new Set();
-                                                                Object.keys(toolArgs).forEach(key => {
-                                                                    const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
-                                                                    if (m) {
-                                                                        const index = m[2] ? parseInt(m[2]) : 1;
-                                                                        indices.add(index);
-                                                                    }
-                                                                });
-                                                                const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-                                                                for (const i of sortedIndices) {
-                                                                    let r, n;
-                                                                    if (i === 1) {
-                                                                        r = toolArgs.replaceContent1 ?? (toolArgs.content_to_replace ?? toolArgs.replaceContent);
-                                                                        n = toolArgs.newContent1 ?? (toolArgs.content_to_add ?? toolArgs.newContent);
-                                                                    } else {
-                                                                        r = toolArgs[`replaceContent${i}`] ?? toolArgs[`content_to_replace${i}`];
-                                                                        n = toolArgs[`newContent${i}`] ?? toolArgs[`content_to_add${i}`];
-                                                                    }
-                                                                    if (r !== undefined && n !== undefined) {
-                                                                        patches.push({ replace: r, new: n });
-                                                                    }
+                                                                const { patchPairs: patches, error: parseError } = parsePatchPairs(toolArgs);
+                                                                if (parseError) {
+                                                                    const errorMsg = `[TOOL RESULT]: ERROR: ${parseError}`;
+                                                                    toolResults.push({ role: 'user', text: errorMsg });
+                                                                    yield { type: 'tool_result', content: errorMsg, toolName: normToolName };
+                                                                    toolCallPointer++;
+                                                                    continue;
                                                                 }
-                                                                modifiedContent = applyPatches(originalContent, patches);
+
+                                                                requestedPatchCount = patches.length;
+                                                                const sim = applyPatches(originalContent, patches);
+                                                                modifiedContent = sim.content;
+                                                                patchResults = sim.results;
+                                                                // STRICT MATCHING ENFORCEMENT:
+                                                                // If ANY block failed in the simulation, we do not show the IDE diff.
+                                                                // Instead, we report the error immediately.
+                                                                const failures = patchResults.filter(r => !r.success);
+                                                                if (failures.length > 0) {
+                                                                    const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\\n${failures.map(f => `  • ${f.error}`).join('\\n')}`;
+
+                                                                    // Visual Feedback
+                                                                    const errorLabel = `💾 Edited: ${path.basename(absPath)}`.toUpperCase();
+                                                                    const boxWidth = Math.min(errorLabel.length + 4, 115);
+                                                                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                                                    const boxMid = `│ ${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                                                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                                                    yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+
+                                                                    toolResults.push({ role: 'user', text: errorMsg });
+                                                                    yield { type: 'tool_result', content: errorMsg, toolName: normToolName };
+
+                                                                    toolCallPointer++;
+                                                                    continue; // Skip approval and execution
+                                                                }
                                                             }
 
-                                                            if (isBridgeConnected()) {
-                                                                showDiffInIDE(filePath, originalContent, modifiedContent);
-                                                                diffOpened = true;
-                                                            }
+                                                            yield { type: 'status', content: `Opening Diff in IDE: ${path.basename(absPath)}...` };
+                                                            showDiffInIDE(absPath, originalContent, modifiedContent);
+                                                            diffOpened = true;
+                                                            await new Promise(r => setTimeout(r, 50)); // Beat delay
                                                         } else if (normToolName === 'write_file') {
                                                             const modifiedContent = toolArgs.content || toolArgs.newContent || '';
-                                                            if (isBridgeConnected()) {
-                                                                showDiffInIDE(filePath, '', modifiedContent);
-                                                                diffOpened = true;
-                                                            }
+                                                            yield { type: 'status', content: `Opening New File Diff in IDE: ${path.basename(absPath)}...` };
+                                                            showDiffInIDE(absPath, '', modifiedContent);
+                                                            diffOpened = true;
+                                                            await new Promise(r => setTimeout(r, 50)); // Beat delay
                                                         }
                                                     }
-                                                } catch (e) {}
+                                                } catch (e) {
+                                                    console.error("Simulation/Diff Error:", e);
+                                                }
                                             }
 
                                             approval = await settings.onToolApproval(normToolName, toolCall.args);
-                                            
+
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const { path: filePath } = parseArgs(toolCall.args);
-                                                if (filePath) closeDiffInIDE(filePath, approval);
+                                                if (filePath) {
+                                                    const absPath = path.resolve(process.cwd(), filePath);
+                                                    closeDiffInIDE(absPath, approval);
+                                                }
                                             }
 
                                             if (approval === 'deny') {
@@ -2262,21 +2291,86 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (approval === 'allow' && diffOpened && isBridgeConnected()) {
                                             // SUCCESS: The changes are already in the IDE buffer and we told it to save.
-                                            // We don't need to run the tool again (which would fail due to mismatch).
                                             const { path: filePath } = parseArgs(toolCall.args);
-                                            const result = `SUCCESS: File [${filePath}] updated and saved via IDE bridge (including any manual tweaks).`;
-                                            
+                                            const absPath = path.resolve(process.cwd(), filePath);
+
+                                            // Get the FINAL content from IDE (after user tweaks and save)
+                                            const finalIDE = await getIDEContext();
+                                            let finalContent = "";
+                                            if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
+                                                finalContent = finalIDE.full_content;
+                                            } else if (fs.existsSync(absPath)) {
+                                                finalContent = fs.readFileSync(absPath, 'utf8');
+                                            }
+
+                                            // Prepare Reporting (Match write_file.js style)
+                                            const verifiedLines = finalContent.split(/\r?\n/);
+                                            const verifiedLineCount = verifiedLines.length;
+                                            const verifiedSize = Buffer.byteLength(finalContent, 'utf8');
+
+                                            let ancestry = '';
+                                            if (originalContentForReporting) {
+                                                const oldLines = originalContentForReporting.split(/\r?\n/);
+                                                ancestry = `Old File contents:\n${oldLines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+                                            }
+
+                                            let snippet = '';
+                                            if (verifiedLineCount <= 200) {
+                                                snippet = verifiedLines.join('\n');
+                                            } else {
+                                                const head = verifiedLines.slice(0, 100).join('\n');
+                                                const tail = verifiedLines.slice(-100).join('\n');
+                                                snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated for history stability] ...\n\n${tail}`;
+                                            }
+
+                                            let result = "";
+                                            if (normToolName === 'update_file') {
+                                                const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12);
+                                                result = `SUCCESS: File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.\n\n${diffReport}`;
+                                            } else {
+                                                // write_file reporting style
+                                                const verifiedLines = finalContent.split(/\r?\n/);
+                                                const verifiedLineCount = verifiedLines.length;
+                                                const verifiedSize = Buffer.byteLength(finalContent, 'utf8');
+
+                                                let ancestry = '';
+                                                if (originalContentForReporting) {
+                                                    const oldLines = originalContentForReporting.split(/\r?\n/);
+                                                    ancestry = `Old File contents:\n${oldLines.map((l, i) => `${i + 1} | ${l}`).join('\n')}\n\n`;
+                                                }
+
+                                                let snippet = '';
+                                                if (verifiedLineCount <= 200) {
+                                                    snippet = verifiedLines.join('\n');
+                                                } else {
+                                                    const head = verifiedLines.slice(0, 100).join('\n');
+                                                    const tail = verifiedLines.slice(-100).join('\n');
+                                                    snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
+                                                }
+
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize/1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
+                                            }
+
+                                            // Restore UI feedback
+                                            const action = normToolName === 'write_file' ? 'Written' : 'Edited';
+                                            const feedbackLabel = `💾 ${action}: ${filePath || '...'}`;
+                                            const boxWidth = Math.min(feedbackLabel.length + 4, 115);
+                                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                            const boxMid = `│ ${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
+                                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+
                                             const toolEnd = Date.now();
                                             lastToolFinishedAt = toolEnd;
                                             yield { type: 'tool_time', content: toolEnd - executionStart };
-                                            
+
                                             const aiContent = `[TOOL RESULT]: ${result}`;
                                             toolResults.push({ role: 'user', text: aiContent });
                                             anyToolExecutedInThisTurn = true;
                                             yield { type: 'tool_result', content: result, aiContent: aiContent, toolName: normToolName };
-                                            
+
                                             toolCallPointer++;
-                                            continue; 
+                                            continue;
                                         }
 
                                         if (approval === 'deny') {
