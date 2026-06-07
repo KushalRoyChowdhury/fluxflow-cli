@@ -45,8 +45,14 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     console.warn = (...args) => !isNoise(args) && originalWarn(...args);
     console.error = (...args) => !isNoise(args) && originalError(...args);
 
-    // 3. CLEAN SLATE
-    process.stdout.write('\x1Bc');
+    // 3. CLEAN SLATE (Non-destructive clear to preserve scrollback and title)
+    process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
+
+    // 4. SET TERMINAL TITLE (Standard + VS Code/Antigravity specific)
+    if (process.stdout.isTTY) {
+        process.stdout.write('\x1b]0;FluxFlow\x07');
+        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow\x07');
+    }
 
     render(<App args={process.argv.slice(2)} />, { exitOnCtrlC: false });
 }

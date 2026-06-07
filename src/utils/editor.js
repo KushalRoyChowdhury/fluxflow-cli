@@ -21,8 +21,13 @@ const connect = () => {
         ws = socket;
         isConnecting = false;
         
-        // Handshake: Send current CLI version
-        ws.send(JSON.stringify({ command: 'version', version: cliVersion }));
+        // Handshake: Send current CLI version, PID, and PPID
+        ws.send(JSON.stringify({ 
+            command: 'version', 
+            version: cliVersion,
+            pid: process.pid,
+            ppid: process.ppid 
+        }));
 
         while (messageQueue.length > 0) {
             ws.send(JSON.stringify(messageQueue.shift()));

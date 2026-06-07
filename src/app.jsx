@@ -459,8 +459,8 @@ export default function App({ args = [] }) {
 
     useEffect(() => {
         const handleResize = () => {
-            // Force a HARD terminal reset (powerful for Windows) to prevent background spill
-            stdout.write('\x1Bc');
+            // Use a non-destructive clear to prevent title/mode reset
+            stdout.write('\x1b[2J\x1b[3J\x1b[H');
             setTerminalSize({
                 columns: stdout.columns,
                 rows: stdout.rows
@@ -937,9 +937,10 @@ export default function App({ args = [] }) {
                 initBridge('2.0.0');
             }
 
-            // Set custom terminal tab title
+            // Set custom terminal tab title (Standard + VS Code specific)
             if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;FluxFlow | Ready\u0007`);
+                process.stdout.write('\x1b]0;FluxFlow\x07');
+                process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow\x07');
             }
 
             // 0. System Integrity Check (Build-in Chromium)
@@ -2488,7 +2489,8 @@ export default function App({ args = [] }) {
 
                     if (!hasFiredJanitor) {
                         if (process.stdout.isTTY) {
-                            process.stdout.write(`\u001b]0;FluxFlow | Idle\u0007`);
+                            process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+                            process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
                         }
                     }
 

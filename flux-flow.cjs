@@ -6,9 +6,9 @@ const path = require('path');
 const CLI_PATH = path.join(__dirname, 'src', 'cli.jsx');
 const TSX_PATH = path.join(__dirname, 'node_modules', '.bin', 'tsx' + (process.platform === 'win32' ? '.cmd' : ''));
 
-const flux = spawn(TSX_PATH, [CLI_PATH], { 
+const flux = spawn(TSX_PATH, [CLI_PATH], {
     stdio: 'inherit',
-    shell: true 
+    shell: true
 });
 
 flux.on('exit', (code) => {

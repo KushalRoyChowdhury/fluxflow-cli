@@ -4,7 +4,7 @@
   "publisher": "fluxflow-cli",
   "icon": "fluxflow-cli-companion.png",
   "description": "Enable FluxFlow CLI with direct access to your IDE workspace (More Features coming).",
-  "version": "1.1.0",
+  "version": "1.2.0",
 
   "engines": {
     "vscode": "^1.90.0"
@@ -26,6 +26,27 @@
       {
         "command": "fluxflow-editorex.startCompanion",
         "title": "FluxFlow: Start Companion"
+      },
+      {
+        "command": "fluxflow-editorex.chat",
+        "title": "Chat"
+      },
+      {
+        "command": "fluxflow-editorex.fixErrors",
+        "title": "Fix Errors",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "fluxflow-editorex.fixWarnings",
+        "title": "Fix Warnings/Lint",
+        "icon": "$(info)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "fluxflow.submenu",
+        "label": "FluxFlow",
+        "icon": "$(zap)"
       }
     ],
     "menus": {
@@ -33,6 +54,52 @@
         {
           "command": "fluxflow-editorex.startCompanion",
           "when": "false"
+        },
+        {
+          "command": "fluxflow-editorex.chat",
+          "when": "true"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "fluxflow.submenu",
+          "group": "navigation",
+          "when": "editorTextFocus"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "submenu": "fluxflow.submenu",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "submenu": "fluxflow.submenu",
+          "group": "navigation"
+        }
+      ],
+      "fluxflow.submenu": [
+        {
+          "command": "fluxflow-editorex.chat",
+          "group": "1_main"
+        },
+        {
+          "command": "fluxflow-editorex.fixErrors",
+          "group": "2_fix",
+          "when": "fluxflow.hasErrors"
+        },
+        {
+          "command": "fluxflow-editorex.fixWarnings",
+          "group": "2_fix",
+          "when": "fluxflow.activeFileHasWarnings"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "fluxflow-editorex.fixErrors",
+          "group": "navigation",
+          "when": "fluxflow.hasErrors"
         }
       ]
     }

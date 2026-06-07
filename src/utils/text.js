@@ -152,19 +152,51 @@ export const applyPatches = (content, patches) => {
 
     const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
         if (!newText || originalMatch === undefined) return newText;
-        const matchBaseIndent = getMinIndent(originalMatch);
-        const targetBaseIndent = (leadingContext.match(/^\s*/) || [''])[0] + matchBaseIndent;
-        const newBaseIndent = getMinIndent(newText);
-        const delta = targetBaseIndent.length - newBaseIndent.length;
-        const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
+
+        const getIndentStyle = (text) => {
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            if (lines.length === 0) return { char: ' ', size: 4 };
+            
+            const firstIndent = lines[0].match(/^\s*/)[0];
+            if (firstIndent.includes('\t')) return { char: '\t', size: 1 };
+            
+            // Detect space step
+            const indents = lines.map(l => l.match(/^\s*/)[0].length).filter(l => l > 0);
+            if (indents.length === 0) return { char: ' ', size: firstIndent.length || 4 };
+            
+            // Find greatest common divisor of indents to guess step
+            const gcd = (a, b) => b ? gcd(b, a % b) : a;
+            const step = indents.reduce((a, b) => gcd(a, b));
+            return { char: ' ', size: step || 4 };
+        };
+
+        const fileStyle = getIndentStyle(originalMatch);
+        const modelStyle = getIndentStyle(newText);
+
+        const matchMinIndent = getMinIndent(originalMatch).length;
+        const leadingIndent = (leadingContext.match(/^\s*/) || [''])[0].length;
+        const targetBaseIndentRaw = leadingIndent + matchMinIndent;
+        
+        // Convert physical lengths to logical units
+        const targetUnits = targetBaseIndentRaw / fileStyle.size;
+        const modelBaseUnits = getMinIndent(newText).length / modelStyle.size;
+        const deltaUnits = targetUnits - modelBaseUnits;
 
         const newLines = newText.split('\n');
         return newLines.map((line, i) => {
             if (line.trim() === '' && i !== 0) return '';
-            const currentLineIndent = getIndent(line).length;
-            const shiftedIndentLength = Math.max(0, currentLineIndent + delta);
-            const prependedIndentLength = (i === 0) ? Math.max(0, shiftedIndentLength - leadingContext.length) : shiftedIndentLength;
-            return indentChar.repeat(prependedIndentLength) + line.trimStart();
+            
+            const currentLineUnits = line.match(/^\s*/)[0].length / modelStyle.size;
+            const finalUnits = Math.max(0, currentLineUnits + deltaUnits);
+            
+            // Re-calculate for first line if it's already partially indented by leadingContext
+            let unitCount = finalUnits;
+            if (i === 0) {
+                const leadingUnits = leadingIndent / fileStyle.size;
+                unitCount = Math.max(0, finalUnits - leadingUnits);
+            }
+
+            return fileStyle.char.repeat(unitCount * fileStyle.size) + line.trimStart();
         }).join('\n');
     };
 

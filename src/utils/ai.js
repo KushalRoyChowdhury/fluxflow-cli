@@ -412,7 +412,8 @@ const getToolDetail = (toolName, argsStr) => {
 
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
     if (process.stdout.isTTY) {
-        process.stdout.write(`\u001b]0;Finalizing...\u0007`);
+        process.stdout.write(`\x1b]0;Finalizing...\x07`);
+        process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
     }
 
     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
@@ -496,7 +497,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     while (attempts <= MAX_JANITOR_RETRIES) {
         if (process.stdout.isTTY) {
-            process.stdout.write(`\u001b]0;Retrying Finalizing... (${attempts + 1})...\u0007`);
+            process.stdout.write(`\x1b]0;Retrying Finalizing... (${attempts + 1})...\x07`);
+            process.stdout.write(`\x1b]633;P;TerminalTitle=Retrying Finalizing... (${attempts + 1})...\x07`);
         }
         try {
             if (!(await checkQuota('background', settings))) {
@@ -624,7 +626,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     if (isUserAction && !result.startsWith("ERROR")) {
                         if (onMemoryUpdated) onMemoryUpdated();
                         if (process.stdout.isTTY) {
-                            process.stdout.write(`\u001b]0;Memory Updated\u0007`);
+                            process.stdout.write(`\x1b]0;Memory Updated\x07`);
+                            process.stdout.write(`\x1b]633;P;TerminalTitle=Memory Updated\x07`);
                         }
                         await new Promise(resolve => setTimeout(resolve, 3000));
                     }
@@ -688,7 +691,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     // Restore title to Idle when janitor finishes
     if (process.stdout.isTTY) {
-        process.stdout.write(`\u001b]0;FluxFlow | Idle\u0007`);
+        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
     }
 };
 
@@ -1439,6 +1443,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 ideBlock += `Recent Manual Edits:\n${edits}\n`;
             }
             if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
+            
+            // Always inject errors if they exist
+            if (ideCtx.diagnostics) ideBlock += `\n**FILE DIAGNOSTICS (Active Errors):**\n${ideCtx.diagnostics}\n`;
+            
+            // Only inject warnings if the user specifically asked about lint/warnings
+            const isLintRequest = agentText.toLowerCase().includes('lint') || agentText.toLowerCase().includes('warning');
+            if (isLintRequest && ideCtx.warnings) {
+                ideBlock += `\n**FILE WARNINGS (Linting):**\n${ideCtx.warnings}\n`;
+            }
         }
 
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${ideBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
@@ -2787,7 +2800,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // If the model explicitly finished or if there are no pending tool results to execute and send back,
             // we finish the agent loop immediately.
             // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
-            let isActuallyFinished = !hasContinue && (hasFinish || !shouldContinue) && toolResults.length === 0;
+            // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
+            let isActuallyFinished = !hasContinue && (hasFinish || !shouldContinue) && toolResults.length === 0 && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
 
 
             if (isActuallyFinished) {

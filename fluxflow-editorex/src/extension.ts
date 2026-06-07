@@ -8,6 +8,7 @@ let lastDiffTimestamp = 0;
 const activeDecs: vscode.TextEditorDecorationType[] = [];
 let statusBarItem: vscode.StatusBarItem;
 let isCliConnected = false;
+let fluxFlowTerminal: vscode.Terminal | undefined;
 
 const lastKnownStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
@@ -32,9 +33,163 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command to launch CLI
     context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorx.run', () => {
         const terminal = vscode.window.createTerminal('FluxFlow');
+        fluxFlowTerminal = terminal;
         terminal.show();
         terminal.sendText('fluxflow');
     }));
+
+    // Register command to focus the FluxFlow terminal
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.chat', async () => {
+        if (fluxFlowTerminal) {
+            fluxFlowTerminal.show(false);
+        } else {
+            // Fallback: try finding by name if PID link wasn't established
+            const terminal = vscode.window.terminals.find(t => t.name === 'FluxFlow');
+            if (terminal) {
+                fluxFlowTerminal = terminal;
+                terminal.show(false);
+            } else {
+                const newTerminal = vscode.window.createTerminal('FluxFlow');
+                fluxFlowTerminal = newTerminal;
+                newTerminal.show(false);
+                await newTerminal.processId;
+                newTerminal.sendText('fluxflow');
+            }
+        }
+    }));
+
+    // Register command to fix errors
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.fixErrors', async () => {
+        const editor = vscode.window.activeTextEditor;
+        const allDiags = vscode.languages.getDiagnostics();
+        const brokenFiles = allDiags.filter(([uri, diags]) => diags.some(d => d.severity === vscode.DiagnosticSeverity.Error));
+        
+        let command = "";
+        if (brokenFiles.length === 1) {
+            const fileName = path.basename(brokenFiles[0][0].fsPath);
+            command = `Fix the errors in ${fileName}`;
+        } else if (brokenFiles.length > 1) {
+            command = `Fix the errors in the workspace (${brokenFiles.length} files broken)`;
+        } else if (editor) {
+            const fileName = path.basename(editor.document.fileName);
+            command = `Fix the errors in ${fileName}`;
+        } else {
+            command = "Fix the errors in the workspace";
+        }
+
+        if (!fluxFlowTerminal) {
+            const terminal = vscode.window.terminals.find(t => t.name === 'FluxFlow');
+            if (terminal) {
+                fluxFlowTerminal = terminal;
+            } else {
+                fluxFlowTerminal = vscode.window.createTerminal('FluxFlow');
+                fluxFlowTerminal.show(false);
+                await fluxFlowTerminal.processId;
+                fluxFlowTerminal.sendText('fluxflow');
+                await new Promise(r => setTimeout(r, 2500));
+            }
+        }
+
+        fluxFlowTerminal.show(false);
+        await fluxFlowTerminal.processId;
+        setTimeout(() => {
+            fluxFlowTerminal?.sendText(command, true);
+        }, 500);
+    }));
+
+    // Register command to fix warnings
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.fixWarnings', async () => {
+        const editor = vscode.window.activeTextEditor;
+        const allDiags = vscode.languages.getDiagnostics();
+        const warningFiles = allDiags.filter(([uri, diags]) => diags.some(d => d.severity === vscode.DiagnosticSeverity.Warning));
+        
+        let command = "";
+        if (warningFiles.length === 1) {
+            const fileName = path.basename(warningFiles[0][0].fsPath);
+            command = `Fix the lint warnings in ${fileName}`;
+        } else if (warningFiles.length > 1) {
+            command = `Fix the lint warnings in the workspace (${warningFiles.length} files with warnings)`;
+        } else if (editor) {
+            const fileName = path.basename(editor.document.fileName);
+            command = `Fix the lint warnings in ${fileName}`;
+        } else {
+            command = "Fix the lint warnings in the workspace";
+        }
+
+        if (!fluxFlowTerminal) {
+            const terminal = vscode.window.terminals.find(t => t.name === 'FluxFlow');
+            if (terminal) {
+                fluxFlowTerminal = terminal;
+            } else {
+                fluxFlowTerminal = vscode.window.createTerminal('FluxFlow');
+                fluxFlowTerminal.show(false);
+                await fluxFlowTerminal.processId;
+                fluxFlowTerminal.sendText('fluxflow');
+                await new Promise(r => setTimeout(r, 2500));
+            }
+        }
+
+        fluxFlowTerminal.show(false);
+        await fluxFlowTerminal.processId;
+        setTimeout(() => {
+            fluxFlowTerminal?.sendText(command, true);
+        }, 500);
+    }));
+
+    // Cleanup reference if terminal is closed manually
+    context.subscriptions.push(vscode.window.onDidCloseTerminal((terminal) => {
+        if (terminal === fluxFlowTerminal) {
+            fluxFlowTerminal = undefined;
+        }
+    }));
+
+    // Background Diagnostic Scanner
+    const updateErrorContext = () => {
+        const allDiags = vscode.languages.getDiagnostics();
+        let hasErrors = false;
+        let hasWarnings = false;
+        let activeFileHasWarnings = false;
+
+        const activeEditor = vscode.window.activeTextEditor;
+
+        for (const [uri, diags] of allDiags) {
+            const fileHasErrors = diags.some(d => d.severity === vscode.DiagnosticSeverity.Error);
+            const fileHasWarnings = diags.some(d => d.severity === vscode.DiagnosticSeverity.Warning);
+
+            if (fileHasErrors) hasErrors = true;
+            if (fileHasWarnings) hasWarnings = true;
+
+            if (activeEditor && uri.fsPath === activeEditor.document.uri.fsPath) {
+                if (fileHasWarnings) activeFileHasWarnings = true;
+            }
+        }
+
+        vscode.commands.executeCommand('setContext', 'fluxflow.hasErrors', hasErrors);
+        vscode.commands.executeCommand('setContext', 'fluxflow.hasWarnings', hasWarnings);
+        vscode.commands.executeCommand('setContext', 'fluxflow.activeFileHasWarnings', activeFileHasWarnings);
+    };
+
+    context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(updateErrorContext));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateErrorContext));
+    updateErrorContext();
+
+    // Code Action Provider (The Lightbulb)
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider('*', {
+            provideCodeActions(document, range, context) {
+                const diagnostics = context.diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+                if (diagnostics.length === 0) return [];
+
+                const action = new vscode.CodeAction('Fix with FluxFlow', vscode.CodeActionKind.QuickFix);
+                action.command = {
+                    command: 'fluxflow-editorex.fixErrors',
+                    title: 'Fix with FluxFlow'
+                };
+                action.isPreferred = true;
+                return [action];
+            }
+        })
+    );
 
     // Register command so clicking the status bar doesn't errort
     context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.startCompanion', () => {
@@ -51,12 +206,41 @@ export function activate(context: vscode.ExtensionContext) {
     wss.on('connection', (ws: WebSocket) => {
         isCliConnected = true;
         updateStatusBar();
+
         ws.on('message', async (data: string) => {
             try {
                 const message = JSON.parse(data.toString());
+                
+                // When receiving PID, find and link the terminal
+                if (message.pid) {
+                    let found = false;
+                    for (const t of vscode.window.terminals) {
+                        const tpid = await t.processId;
+                        // Match if shell PID is either the CLI PID or the CLI Parent PID
+                        if (tpid === message.pid || tpid === message.ppid) {
+                            fluxFlowTerminal = t;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // If still not found and there's an active terminal, 
+                    // assume it's the one that just connected (high probability)
+                    if (!found && vscode.window.activeTerminal) {
+                        fluxFlowTerminal = vscode.window.activeTerminal;
+                    }
+                }
+
                 if (message.command === 'requestContext') {
                     const ctx = await getIDEContext();
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
+                } else if (message.command === 'version') {
+                    const majorVersion = parseInt(message.version?.split('.')[0] || '0');
+                    if (majorVersion < 2) {
+                        vscode.window.showErrorMessage(`FluxFlow Companion Error: CLI version ${message.version} is not supported. Please update FluxFlow CLI to 2.0.0 or later.`);
+                        ws?.close();
+                        return;
+                    }
                 } else {
                     await handleMessage(message, ws);
                 }
@@ -66,6 +250,9 @@ export function activate(context: vscode.ExtensionContext) {
         });
         ws.on('close', () => {
             isCliConnected = (wss?.clients.size || 0) > 0;
+            if (!isCliConnected) {
+                fluxFlowTerminal = undefined;
+            }
             updateStatusBar();
         });
     });
@@ -136,7 +323,9 @@ async function getIDEContext() {
         manual_edits: "",
         full_content: "",
         file_focused: activeEditor ? activeEditor.document.fileName : "none",
-        opened_editors: [...new Set(openedEditors)]
+        opened_editors: [...new Set(openedEditors)],
+        diagnostics: "",
+        warnings: ""
     };
 
     if (activeEditor) {
@@ -147,6 +336,49 @@ async function getIDEContext() {
         }
 
         const filePath = activeEditor.document.fileName;
+        
+        // Aggregated Workspace Diagnostics (Errors & Warnings)
+        const allDiags = vscode.languages.getDiagnostics();
+        const workspaceErrors: string[] = [];
+        const workspaceWarnings: string[] = [];
+        let errorFileCount = 0;
+        let warningFileCount = 0;
+
+        for (const [uri, diags] of allDiags) {
+            const relPath = vscode.workspace.asRelativePath(uri);
+            
+            // Collect Errors
+            if (errorFileCount < 10) {
+                const errors = diags
+                    .filter(d => d.severity === vscode.DiagnosticSeverity.Error)
+                    .map(d => `  Line ${d.range.start.line + 1}: ${d.message}`);
+                
+                if (errors.length > 0) {
+                    workspaceErrors.push(`File: ${relPath}\n${errors.join('\n')}`);
+                    errorFileCount++;
+                }
+            }
+
+            // Collect Warnings
+            if (warningFileCount < 10) {
+                const warnings = diags
+                    .filter(d => d.severity === vscode.DiagnosticSeverity.Warning)
+                    .map(d => `  Line ${d.range.start.line + 1}: ${d.message}`);
+                
+                if (warnings.length > 0) {
+                    workspaceWarnings.push(`File: ${relPath}\n${warnings.join('\n')}`);
+                    warningFileCount++;
+                }
+            }
+        }
+
+        if (workspaceErrors.length > 0) {
+            context.diagnostics = `[WORKSPACE ERRORS]:\n${workspaceErrors.join('\n\n')}`;
+        }
+        if (workspaceWarnings.length > 0) {
+            context.warnings = `[WORKSPACE WARNINGS/LINT]:\n${workspaceWarnings.join('\n\n')}`;
+        }
+
         const currentContent = activeEditor.document.getText();
         context.full_content = currentContent;
         const lastContent = lastKnownStates.get(filePath);
