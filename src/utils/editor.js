@@ -59,6 +59,13 @@ export const isBridgeConnected = () => {
     return ws !== null && ws.readyState === WebSocket.OPEN;
 };
 
+export const sendStatus = (status) => {
+    send({
+        command: 'status',
+        status: status
+    });
+};
+
 export const getIDEContext = () => {
     return new Promise((resolve) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {

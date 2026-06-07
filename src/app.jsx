@@ -31,7 +31,7 @@ import { emojiSpace } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
-import { isBridgeConnected, initBridge } from './utils/editor.js';
+import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 
 const getIDEName = () => {
     const envStr = JSON.stringify(process.env).toLowerCase();
@@ -80,12 +80,16 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
             <Box flexDirection="column" borderStyle="double" borderColor="cyan" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
                 <Text bold color="cyan" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
                 <Box marginY={1} flexDirection="column" alignItems="left">
-                    <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="magenta">Flux-Flow Companion</Text> is inactive.</Text>
+                    <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="magenta">FluxFlow-CLI Companion</Text> is not installed.</Text>
                     <Box flexDirection="column" marginY={1}>
                         <Text color="gray">  ✅ Real-time file & cursor tracking</Text>
                         <Text color="gray">  ✅ Auto-open files created by agent</Text>
-                        <Text color="gray">  ✅ Native green highlights for AI edits</Text>
+                        <Text color="gray">  ✅ Native DIFF viewer for AI edits</Text>
                         <Text color="gray">  ✅ Direct IDE context sharing</Text>
+                        <Text color="gray">  ✅ Surgical Diagnostic Sync</Text>
+                        <Text color="gray">  ✅ Native Right-Click ❯ Chat integration</Text>
+                        <Text color="gray">  ✅ Live Status in IDE</Text>
+                        <Text color="gray">  ✅ Clickable terminal-to-code links</Text>
                     </Box>
                 </Box>
 
@@ -2210,10 +2214,16 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'status') {
                             setStatusText(packet.content);
+                            if (isBridgeConnected()) {
+                                sendStatus(packet.content);
+                            }
                             continue;
                         }
                         if (packet.type === 'status_history') {
                             setStatusText(packet.content);
+                            if (isBridgeConnected()) {
+                                sendStatus(packet.content);
+                            }
                             setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `⚙️ [SYSTEM] ${packet.content}`, isMeta: true }]);
                             continue;
                         }
@@ -2237,6 +2247,9 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
+                            if (isBridgeConnected()) {
+                                sendStatus(null);
+                            }
                             hasFiredJanitor = true;
 
                             runJanitorTask(
@@ -3620,7 +3633,7 @@ export default function App({ args = [] }) {
                     const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
 
                     return (
-                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={1}>
+                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
                             <Box marginBottom={1}>
                                 <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
                             </Box>
@@ -3728,11 +3741,22 @@ export default function App({ args = [] }) {
                                     <Text color="gray" dimColor italic>
                                         (Use '#Lstart-Lend' to specify line numbers)
                                     </Text>
-                                ) : (input.startsWith('/model') && apiTier === 'Free') ? (
-                                    <Text color="gray" dimColor italic>
-                                        Paid API has more models. Configure <Text color="cyan" underline>{"\u001b]8;;https://aistudio.google.com/billing\u0007billing\u001b]8;;\u0007"}</Text> & /settings
-                                    </Text>
-                                ) : null}
+                                ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
+                                    let url = "https://aistudio.google.com/billing";
+                                    let label = "billing";
+                                    if (aiProvider === 'DeepSeek') {
+                                        url = "https://platform.deepseek.com/usage";
+                                        label = "billing";
+                                    } else if (aiProvider === 'OpenRouter') {
+                                        url = "https://openrouter.ai/settings/profile";
+                                        label = "profile";
+                                    }
+                                    return (
+                                        <Text color="gray" dimColor italic>
+                                            Paid API has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
+                                        </Text>
+                                    );
+                                })() : null}
                             </Box>
 
                             {visible.map((s, i) => {

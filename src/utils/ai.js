@@ -1125,7 +1125,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextCompressionCount) {
-            yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
+                        yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
 
             const flattenContext = (hist) => {
                 return hist
@@ -1701,7 +1701,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // Success - Reset model name display for final chunks
                     yield { type: 'model_update', content: null };
-                    yield { type: 'status', content: 'Working...' };
+                                yield { type: 'status', content: 'Working...' };
 
                     dedupeBuffer = '';
                     isDedupeActive = accumulatedContext.length > 0;
@@ -1726,7 +1726,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!inThinkingState) {
                                             chunkText += '<think>';
                                             inThinkingState = true;
-                                        }
+                                                                                    }
                                         chunkText += part.text;
                                     }
                                 } else if (part.text) {
@@ -2791,7 +2791,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-            yield { type: 'status', content: 'Working...' };
+                        yield { type: 'status', content: 'Working...' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
                 .trim();
@@ -2808,7 +2808,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
                 const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
 
-                yield {
+                                yield {
                     type: 'interactive_turn_finished',
                     data: {
                         agentText,

@@ -225,8 +225,24 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.0.0"]
+        const stableVersions = ["2.1.0"]
         const changelogData = {
+            "2.1.0": {
+                "note": "Native IDE Depth Integration.",
+                "added": [
+                    "**Surgical Diagnostic Sync:** Introduced background scanning for workspace errors. A 'Magic Wand' icon now appears in the IDE for instant AI fixes when code breaks.",
+                    "**Live Status Heartbeat:** The VS Code Status Bar now acts as a real-time telemetry feed, showing exactly what the agent is doing (*Thinking*, *Patching*, *Reading*, etc.).",
+                    "**Clickable Terminal Links:** All file paths and line numbers printed in the terminal are now live links that jump straight to your code.",
+                    "**Indentation Intelligence:** Upgraded the patching engine to handle proportional Tab/Space conversion and automatic style detection for minimal tool errors.",
+                    "**Right-Click UI Overhaul:** Consolidated all actions into a clean 'FluxFlow >' sub-menu available in the Editor, Explorer, and Tab contexts."
+                ],
+                "changed": [
+                    "Enhanced terminal focus logic in IDE.",
+                ],
+                "fixes": [
+                    "Resilved a bug where Agent would cut response pre-maturely."
+                ]
+            },
             "2.0.0": {
                 "note": "🚀 [MAJOR] IDE Integration.",
                 "added": [

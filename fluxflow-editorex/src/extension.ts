@@ -234,6 +234,8 @@ export function activate(context: vscode.ExtensionContext) {
                 if (message.command === 'requestContext') {
                     const ctx = await getIDEContext();
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
+                } else if (message.command === 'status') {
+                    updateStatusBar(message.status);
                 } else if (message.command === 'version') {
                     const majorVersion = parseInt(message.version?.split('.')[0] || '0');
                     if (majorVersion < 2) {
@@ -285,12 +287,60 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(cleanup));
     context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(cleanup));
+
+    // Terminal Link Provider (Clickable File Paths)
+    context.subscriptions.push(vscode.window.registerTerminalLinkProvider({
+        provideTerminalLinks: (context: vscode.TerminalLinkContext, token: vscode.CancellationToken) => {
+            const links: (vscode.TerminalLink & { path: string, line?: number })[] = [];
+            
+            // Match paths like src/app.js:42 or D:\path\file.ts:10
+            // Also matches simple paths like src/app.js
+            const regex = /((?:[a-zA-Z]:\\|[./\\])[^ \n\r\t:"']+\.[a-zA-Z0-9]+)(?::(\d+))?/g;
+            
+            let match;
+            while ((match = regex.exec(context.line)) !== null) {
+                const fullPath = match[1];
+                const lineNumber = match[2] ? parseInt(match[2]) : undefined;
+                
+                links.push({
+                    startIndex: match.index,
+                    length: match[0].length,
+                    tooltip: `Open ${path.basename(fullPath)}${lineNumber ? ` at line ${lineNumber}` : ''}`,
+                    path: fullPath,
+                    line: lineNumber
+                });
+            }
+            return links;
+        },
+        handleTerminalLink: async (link: any) => {
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            let absolutePath = link.path;
+            
+            if (!path.isAbsolute(absolutePath) && workspaceFolders) {
+                absolutePath = path.resolve(workspaceFolders[0].uri.fsPath, absolutePath);
+            }
+
+            if (fs.existsSync(absolutePath)) {
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absolutePath));
+                const editor = await vscode.window.showTextDocument(doc);
+                
+                if (link.line) {
+                    const pos = new vscode.Position(link.line - 1, 0);
+                    editor.selection = new vscode.Selection(pos, pos);
+                    editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+                }
+            } else {
+                vscode.window.showErrorMessage(`Could not find file: ${link.path}`);
+            }
+        }
+    }));
+
     context.subscriptions.push({ dispose: () => wss?.close() });
 }
 
-function updateStatusBar() {
+function updateStatusBar(status?: string) {
     if (isCliConnected) {
-        statusBarItem.text = `$(zap) FluxFlow: Connected`;
+        statusBarItem.text = `$(zap) FluxFlow: ${status || 'Connected'}`;
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.prominentBackground');
     } else {
         statusBarItem.text = `$(circle-slash) FluxFlow: Not Running`;

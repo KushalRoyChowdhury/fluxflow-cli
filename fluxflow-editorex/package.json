@@ -3,7 +3,7 @@
   "displayName": "FluxFlow-CLI Companion",
   "publisher": "fluxflow-cli",
   "icon": "fluxflow-cli-companion.png",
-  "description": "Enable FluxFlow CLI with direct access to your IDE workspace (More Features coming).",
+  "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
   "version": "1.2.0",
 
   "engines": {
