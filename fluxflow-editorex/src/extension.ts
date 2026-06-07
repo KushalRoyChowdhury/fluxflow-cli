@@ -173,6 +173,8 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(updateErrorContext));
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(editor => {
         updateErrorContext();
+        // Clear cache first when file changes/closes
+        lastCursorLine = 0;
         if (editor) {
             lastCursorLine = editor.selection.active.line + 1;
         }

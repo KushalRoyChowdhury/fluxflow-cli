@@ -4,7 +4,7 @@
   "publisher": "fluxflow-cli",
   "icon": "fluxflow-cli-companion.png",
   "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
-  "version": "1.2.1",
+  "version": "1.2.2",
 
   "engines": {
     "vscode": "^1.90.0"
