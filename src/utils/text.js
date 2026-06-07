@@ -99,3 +99,74 @@ export const truncatePath = (p, maxLength = 40) => {
     const half = Math.floor((maxLength - 3) / 2);
     return p.substring(0, half) + '...' + p.substring(p.length - half);
 };
+
+export const applyPatches = (content, patches) => {
+    let currentFileContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (const pair of patches) {
+        const content_to_replace = strip(pair.replace || '');
+        const content_to_add = strip(pair.new || '');
+
+        if (content_to_replace === '' && content_to_add === '') continue;
+
+        // --- INDENTATION PRESERVATION ENGINE ---
+        const getIndent = (line) => line.match(/^\s*/)[0];
+        const getMinIndent = (text) => {
+            const lines = text.split('\n').filter(l => l.trim() !== '');
+            if (lines.length === 0) return '';
+            let min = getIndent(lines[0]);
+            for (const line of lines) {
+                const indent = getIndent(line);
+                if (indent.length < min.length) min = indent;
+            }
+            return min;
+        };
+
+        const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
+            if (!newText || originalMatch === undefined) return newText;
+            const matchBaseIndent = getMinIndent(originalMatch);
+            const targetBaseIndent = (leadingContext.match(/^\s*/) || [''])[0] + matchBaseIndent;
+            const newBaseIndent = getMinIndent(newText);
+            const delta = targetBaseIndent.length - newBaseIndent.length;
+            const indentChar = (targetBaseIndent.match(/\s/) || originalMatch.match(/\s/) || [' '])[0];
+
+            const newLines = newText.split('\n');
+            return newLines.map((line, i) => {
+                if (line.trim() === '' && i !== 0) return '';
+                const currentLineIndent = getIndent(line).length;
+                const shiftedIndentLength = Math.max(0, currentLineIndent + delta);
+                const prependedIndentLength = (i === 0) ? Math.max(0, shiftedIndentLength - leadingContext.length) : shiftedIndentLength;
+                return indentChar.repeat(prependedIndentLength) + line.trimStart();
+            }).join('\n');
+        };
+
+        // --- MATCHER ---
+        const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let matchRegex = null;
+
+        if (content_to_replace !== '' && currentFileContent.includes(content_to_replace)) {
+            matchRegex = new RegExp(exactPattern, 'g');
+        } else {
+            const fuzzyLines = content_to_replace.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+                .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
+
+            if (fuzzyLines.length > 0) {
+                const fuzzyPattern = fuzzyLines.join('\\s*');
+                try { matchRegex = new RegExp(fuzzyPattern, 'g'); } catch (e) { matchRegex = new RegExp(exactPattern, 'g'); }
+            } else { matchRegex = new RegExp(exactPattern, 'g'); }
+        }
+
+        const matches = [...currentFileContent.matchAll(matchRegex)];
+        if (matches.length === 1) {
+            const startPos = matches[0].index;
+            const firstMatchContent = matches[0][0];
+            const lineStart = currentFileContent.lastIndexOf('\n', startPos) + 1;
+            const leadingContext = currentFileContent.substring(lineStart, startPos);
+
+            const finalReplacement = adjustIndentation(content_to_add, firstMatchContent, leadingContext);
+            currentFileContent = currentFileContent.substring(0, startPos) + finalReplacement + currentFileContent.substring(startPos + firstMatchContent.length);
+        }
+    }
+    return currentFileContent;
+};

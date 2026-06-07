@@ -16,13 +16,13 @@ export const getTerminalEnv = () => {
  */
 export const emojiSpace = (baseSpaces = 2) => {
     const env = getTerminalEnv();
-    
+
     // Windows Terminal (wt) handles emoji widths natively and tends to show
     // more space than VS Code for the same character sequence.
     if (env === 'wt') {
         return ' '.repeat(Math.max(1, baseSpaces - 1));
     }
-    
+
     // VS Code integrated terminal often collapses the visual gap after an emoji.
     if (env === 'vscode') {
         return ' '.repeat(baseSpaces);

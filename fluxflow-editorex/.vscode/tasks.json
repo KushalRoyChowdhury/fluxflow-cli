@@ -1,0 +1,68 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+            "label": "watch",
+            "dependsOn": [
+                "npm: watch:tsc",
+                "npm: watch:esbuild"
+            ],
+            "presentation": {
+                "reveal": "never"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "npm",
+            "script": "watch:esbuild",
+            "group": "build",
+            "isBackground": true,
+            "label": "npm: watch:esbuild",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            },
+            "options": {
+                "cwd": "D:/PROJECTS/Flux-Flow/fluxflow-editorex"
+            }
+        },
+		{
+            "type": "npm",
+            "script": "watch:tsc",
+            "group": "build",
+            "isBackground": true,
+            "label": "npm: watch:tsc",
+            "presentation": {
+                "group": "watch",
+                "reveal": "never"
+            },
+            "options": {
+                "cwd": "D:/PROJECTS/Flux-Flow/fluxflow-editorex"
+            }
+        },
+		{
+			"type": "npm",
+			"script": "watch-tests",
+			"isBackground": true,
+			"presentation": {
+				"reveal": "never",
+				"group": "watchers"
+			},
+			"group": "build",
+			"options": {
+				"cwd": "D:/PROJECTS/Flux-Flow/fluxflow-editorex"
+			}
+		},
+		{
+			"label": "tasks: watch-tests",
+			"dependsOn": [
+				"npm: watch",
+				"npm: watch-tests"
+			],
+			"problemMatcher": []
+		}
+	]
+}

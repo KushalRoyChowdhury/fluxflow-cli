@@ -29,6 +29,16 @@ The execution flow of a single user prompt follows this loop:
    - **Multi-Stage Failover**: The loop features a sophisticated 16-attempt retry engine with exponential backoff (1s - 32s).
    - **Critical Fallback Pivot**: If the primary model fails 14 consecutive times, the agent surgically pivots to a lighter, high-concurrency fallback model (`gemini-3.1-flash-lite`) for the final 3 attempts to ensure session navigation through API congestion.
 
+## The IDE Bridge (Companion Extension)
+
+Flux Flow includes an optional but powerful **IDE Bridge** (the `fluxflow+` extension) that establishes a real-time link between your code editor (VS Code and forks) and the CLI agent.
+
+- **Sidecar Communication**: The extension starts a WebSocket server on a dedicated local port (`56832`). The CLI agent acts as a client, automatically connecting upon startup.
+- **Bi-Directional Context**:
+    - **CLI → IDE**: When the agent creates a file (`write_file`) or patches code (`update_file`), it sends a command to the editor to automatically open the document and apply green highlights to the newly added lines.
+    - **IDE → CLI**: Before every prompt, the CLI requests a context snapshot. The extension reports the **focused file path**, **cursor line number**, **active text selection**, and **manual user edits** (calculated by diffing the document against its state at the start of the turn).
+- **State Persistence**: The extension maintains `lastKnownStates` for all visible tabs to ensure that only manual human edits are reported back to the AI, preventing redundant context loops.
+
 ## Multimodal Pipeline
 
 Flux Flow implements a native multimodal processing engine in `src/tools/view_file.js`. This allows the agent to move beyond text-based reasoning and analyze visual assets directly (Only on supported models).

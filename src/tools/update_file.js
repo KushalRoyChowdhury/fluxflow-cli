@@ -7,7 +7,7 @@ import { RevertManager } from '../utils/revert.js';
  * Update File Tool (Smart Patching)
  * Replaces a specific block of text with new content.
  */
-export const update_file = async (args) => {
+export const update_file = async (args, context = {}) => {
     const parsed = parseArgs(args);
     const targetPath = parsed.path;
 
@@ -62,7 +62,7 @@ export const update_file = async (args) => {
         // Record file change for Reversion Time Travel (One record for the whole transaction)
         await RevertManager.recordFileChange(absolutePath);
 
-        let diskContent = fs.readFileSync(absolutePath, 'utf8');
+        let diskContent = context.forcedContent || fs.readFileSync(absolutePath, 'utf8');
         if (diskContent.startsWith('\uFEFF')) diskContent = diskContent.slice(1);
         let currentFileContent = diskContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -225,6 +225,7 @@ export const update_file = async (args) => {
                 diffText += `-${res.originalStartLine + i}|${line}\n`;
             });
             newLines.forEach((line, i) => {
+                // Ensure every single new line is marked with its final line number
                 diffText += `+${res.originalStartLine + i}|${line}\n`;
             });
 

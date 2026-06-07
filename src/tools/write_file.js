@@ -7,7 +7,7 @@ import { RevertManager } from '../utils/revert.js';
  * Write File Tool
  * Creates or overwrites a file with the provided content.
  */
-export const write_file = async (args) => {
+export const write_file = async (args, context = {}) => {
     let { path: targetPath, content } = parseArgs(args);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';

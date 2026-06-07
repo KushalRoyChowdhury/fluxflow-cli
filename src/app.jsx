@@ -31,6 +31,82 @@ import { emojiSpace } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
+import { isBridgeConnected } from './utils/editor.js';
+
+const getIDEName = () => {
+    const envStr = JSON.stringify(process.env).toLowerCase();
+    if (envStr.includes('antigravity')) return 'Antigravity';
+    if (process.env.CURSOR_SETTINGS_DIR || process.env.TERM_PROGRAM === 'cursor' || envStr.includes('cursor')) return 'Cursor';
+    if (process.env.TERM_PROGRAM === 'windsurf' || envStr.includes('windsurf')) return 'Windsurf';
+    if (process.env.TERM_PROGRAM === 'codium' || envStr.includes('codium') || envStr.includes('vscode-oss')) return 'VSCodium';
+    if (envStr.includes('trae')) return 'Trae';
+    if (envStr.includes('positron')) return 'Positron';
+    if (process.env.TERM_PROGRAM === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || envStr.includes('vscode')) return 'VS Code';
+    if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || envStr.includes('intellij')) return 'JetBrains';
+    return 'IDE';
+};
+
+
+const getPromoOptions = (ideName) => {
+    const isStandardVSCode = ideName === 'VS Code';
+    const options = [];
+
+    if (isStandardVSCode) {
+        options.push({ label: 'Install Manually (VSIX)', url: 'https://github.com/KushalRoyChowdhury/fluxflow-cli/releases' });
+        options.push({ label: 'Install from VS Code Marketplace', url: 'https://marketplace.visualstudio.com/items?itemName=fluxflow-cli.fluxflow-cli-companion' });
+    } else {
+        options.push({ label: `Download for ${ideName} (GitHub)`, url: 'https://github.com/KushalRoyChowdhury/fluxflow-cli/releases' });
+    }
+
+    options.push({ label: 'Continue to CLI only', action: 'dismiss' });
+    return options;
+};
+
+const BridgePromo = ({ width, height, selectedIndex }) => {
+    const ideName = getIDEName();
+    const options = getPromoOptions(ideName);
+
+    return (
+        <Box
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            width={width}
+            height={height}
+        >
+            <Box marginBottom={1}>
+                <Text>{FLUX_LOGO}</Text>
+            </Box>
+            <Box flexDirection="column" borderStyle="double" borderColor="cyan" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
+                <Text bold color="cyan" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
+                <Box marginY={1} flexDirection="column" alignItems="left">
+                    <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="magenta">Flux-Flow Companion</Text> is inactive.</Text>
+                    <Box flexDirection="column" marginY={1}>
+                        <Text color="gray">  ✅ Real-time file & cursor tracking</Text>
+                        <Text color="gray">  ✅ Auto-open files created by agent</Text>
+                        <Text color="gray">  ✅ Native green highlights for AI edits</Text>
+                        <Text color="gray">  ✅ Direct IDE context sharing</Text>
+                    </Box>
+                </Box>
+
+                <Box flexDirection="column" marginTop={1}>
+                    {options.map((opt, i) => (
+                        <Box key={i}>
+                            <Text color={selectedIndex === i ? "yellow" : "white"} bold={selectedIndex === i}>
+                                {selectedIndex === i ? " ❯ " : "   "}
+                                {opt.label}
+                            </Text>
+                        </Box>
+                    ))}
+                </Box>
+
+                <Box marginTop={1} alignItems="center" justifyContent="center">
+                    <Text dimColor italic>(Use arrows to navigate, Enter to select)</Text>
+                </Box>
+            </Box>
+        </Box>
+    );
+};
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
@@ -235,8 +311,31 @@ export default function App({ args = [] }) {
 
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isFilePickerDismissed, setIsFilePickerDismissed] = useState(false);
+    const [showBridgePromo, setShowBridgePromo] = useState(false);
+    const [promoSelectedIndex, setPromoSelectedIndex] = useState(0);
     const persistedModelRef = useRef(null);
+    useEffect(() => {
+        const isIDE = getIDEName() !== 'IDE' || !!process.env.VSC_TERMINAL_URL;
 
+        // Wait 500ms before showing promo to allow WebSocket to connect
+        const graceTimer = setTimeout(() => {
+            if (isIDE && !isBridgeConnected()) {
+                setShowBridgePromo(true);
+            }
+        }, 500);
+
+        // Keep checking connection
+        const interval = setInterval(() => {
+            if (isBridgeConnected()) {
+                setShowBridgePromo(false);
+            }
+        }, 1000);
+
+        return () => {
+            clearTimeout(graceTimer);
+            clearInterval(interval);
+        };
+    }, []);
     // Parse CLI startup arguments
     const parsedArgs = useMemo(() => {
         const parsed = {};
@@ -266,7 +365,7 @@ export default function App({ args = [] }) {
                     parsed.autoDel = del;
                 }
                 i++;
-            } else if (arg === '--auto-exec' && args[i + 1]) {
+            } else if (arg === '--yolo' && args[i + 1]) {
                 parsed.autoExec = args[i + 1].toLowerCase();
                 i++;
             } else if (arg === '--external-access' && args[i + 1]) {
@@ -479,7 +578,7 @@ export default function App({ args = [] }) {
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
     const terminalEnv = useMemo(() => {
-        const isIDE = process.env.TERM_PROGRAM === 'vscode' || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
+        const isIDE = getIDEName() !== 'IDE' || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
         return {
             isIDE,
             shortcut: isIDE ? 'Shift + Enter' : 'Ctrl + Enter'
@@ -617,6 +716,27 @@ export default function App({ args = [] }) {
 
     // Global Key Listener (ONE listener to rule them all)
     useInput((inputText, key) => {
+        if (showBridgePromo) {
+            const ideName = getIDEName();
+            const options = getPromoOptions(ideName);
+
+            if (key.upArrow) {
+                setPromoSelectedIndex(prev => (prev > 0 ? prev - 1 : options.length - 1));
+            } else if (key.downArrow) {
+                setPromoSelectedIndex(prev => (prev < options.length - 1 ? prev + 1 : 0));
+            } else if (key.return) {
+                const opt = options[promoSelectedIndex];
+                if (opt.action === 'dismiss') {
+                    setShowBridgePromo(false);
+                } else if (opt.url) {
+                    const openCmd = process.platform === 'win32' ? `start ${opt.url}` : process.platform === 'darwin' ? `open ${opt.url}` : `xdg-open ${opt.url}`;
+                    exec(openCmd);
+                    setShowBridgePromo(false);
+                }
+            }
+            return;
+        }
+
         // [LIVE TERMINAL FOCUS TOGGLE]
         if (key.tab && activeCommand) {
             setIsTerminalFocused(prev => !prev);
@@ -2804,7 +2924,7 @@ export default function App({ args = [] }) {
             case 'autoExecDanger':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} width="100%">
-                        <Text color="yellow" bold underline>⚠️ SECURITY WARNING: AUTO EXECUTE MODE</Text>
+                        <Text color="yellow" bold underline>⚠️ SECURITY WARNING: YOLO MODE</Text>
                         <Text marginTop={1}>Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step.</Text>
                         <Text marginTop={1} color="yellow">RISKS INVOLVED:</Text>
                         <Text>• The agent may execute destructive commands (rm -rf, etc.) by mistake.</Text>
@@ -2857,7 +2977,7 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1} width="100%">
                         <Text color="red" bold underline>⛔ CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK</Text>
-                        <Text marginTop={1}>You are attempting to enable BOTH [Auto Execute] and [External Workspace Access] simultaneously.</Text>
+                        <Text marginTop={1}>You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously.</Text>
                         <Text marginTop={1} color="red" bold>THIS IS NOT RECOMMENDED.</Text>
                         <Text marginTop={1} color="yellow">THE CRITICAL RISK:</Text>
                         <Text>The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision.</Text>
@@ -3098,7 +3218,7 @@ export default function App({ args = [] }) {
                             <Text color="gray">--- PROPOSED CONTENT / DIFF ---</Text>
                             {(() => {
                                 const args = parseArgs(pendingApproval?.args || '{}');
-                                
+
                                 // Collect all patch pairs
                                 const patchPairs = [];
                                 const indices = new Set();
@@ -3109,7 +3229,7 @@ export default function App({ args = [] }) {
                                         indices.add(index);
                                     }
                                 });
-                                
+
                                 const sortedIndices = Array.from(indices).sort((a, b) => a - b);
                                 sortedIndices.forEach(i => {
                                     let r, n;
@@ -3142,7 +3262,7 @@ export default function App({ args = [] }) {
                                         </Box>
                                     );
                                 }
-                                
+
                                 const newVal = args.content || args.ReplacementContent || args.content_to_add || args.replacementContent || args.newContent || null;
                                 return <Text color="white" wrap="anywhere">{(newVal ? newVal.replace(/\[\/n\]?/g, '\\n') : null) || 'Updating file content...'}</Text>;
                             })()}
@@ -3332,14 +3452,17 @@ export default function App({ args = [] }) {
 
     return (
         <Box flexDirection="column" width="100%">
+            {showBridgePromo ? (
+                <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} />
+            ) : (
+                <>
+                    <Box flexDirection="column" width="100%" flexGrow={1}>
+                        {windowedHistory.items.map((msg, idx) => (
+                            <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} columns={stdout?.columns || 80} />
+                        ))}
+                    </Box>
 
-            <Box flexDirection="column" width="100%" flexGrow={1}>
-                {windowedHistory.items.map((msg, idx) => (
-                    <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} columns={stdout?.columns || 80} />
-                ))}
-            </Box>
-
-            <Box flexDirection="column" padding={1} width="100%">
+                    <Box flexDirection="column" padding={1} width="100%">
                 {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
                     <Box flexDirection="column" width="100%">
                         <ChatLayout
@@ -3609,6 +3732,8 @@ export default function App({ args = [] }) {
                     );
                 })()}
             </Box>
+                </>
+            )}
         </Box>
     );
 }

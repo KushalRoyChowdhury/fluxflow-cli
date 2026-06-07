@@ -58,7 +58,7 @@ By default, the agent **cannot** execute dangerous actions without your consent.
 - **Safe Commands**: Basic read-only commands (like `ls`, `git status`, `pwd`) are automatically allowed to minimize friction.
 
 ### Auto-Execution (Advanced)
-For power users, **Auto-Exec** can be enabled in `/settings`.
+For power users, **YOLO Mode** can be enabled in `/settings`.
 - **⚠️ Warning**: This allows the agent to run any tool and execute any command autonomously.
 - **External Access**: You can also toggle whether the agent is allowed to access files outside of its current working directory.
 - **Manual Commad Control**: Specify which commands you want the agent to auto-execute, manually approve or auto-deny.

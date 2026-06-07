@@ -9,9 +9,11 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 import { emojiSpace } from './terminal.js';
+import { applyPatches } from './text.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
+import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected } from './editor.js';
 
 let client = null;
 
@@ -1410,7 +1412,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr} | v${versionFluxflow}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const ideCtx = await getIDEContext();
+        let ideBlock = "";
+        if (ideCtx.file_focused !== "none") {
+            const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
+            const relOpened = (ideCtx.opened_editors || []).map(p => path.relative(process.cwd(), p));
+
+            ideBlock = `**IDE CONTEXT**\nFocused File: ${relFocused}\nCursor Line: ${ideCtx.cursor_line}\n`;
+            if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
+            if (ideCtx.manual_edits) {
+                let edits = ideCtx.manual_edits;
+                const CHAR_LIMIT = 4 * 2048; // 8192 chars
+                const LINE_LIMIT = 300;
+
+                const lines = edits.split('\n');
+                if (lines.length > LINE_LIMIT) {
+                    edits = lines.slice(0, LINE_LIMIT).join('\n') + `\n... (${lines.length - LINE_LIMIT} more lines truncated)`;
+                }
+                if (edits.length > CHAR_LIMIT) {
+                    edits = edits.substring(0, CHAR_LIMIT) + `\n... (Character limit reached, truncated)`;
+                }
+                
+                ideBlock += `Recent Manual Edits:\n${edits}\n`;
+            }
+            if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
+        }
+
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${ideBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -1935,6 +1963,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const allToolsFound = detectToolCalls(toolActionableText);
                             while (allToolsFound.length > toolCallPointer) {
                                 const toolCall = allToolsFound[toolCallPointer];
+                                const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
                                     'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
@@ -2148,11 +2177,106 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                         }
 
+                                        let diffOpened = false;
                                         if (!approval) {
+                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                                try {
+                                                    const toolArgs = parseArgs(toolCall.args);
+                                                    const { path: filePath } = toolArgs;
+                                                    if (filePath) {
+                                                        const absPath = path.resolve(process.cwd(), filePath);
+                                                        const normAbsPath = absPath.toLowerCase().replace(/^[a-z]:/, m => m.toUpperCase());
+
+                                                        // CRITICAL: Get the absolute most recent content from the IDE if bridge is active
+                                                        let originalContent = "";
+                                                        let hasOriginal = false;
+                                                        const currentIDE = await getIDEContext();
+                                                        const normFocused = currentIDE?.file_focused?.toLowerCase().replace(/^[a-z]:/, m => m.toUpperCase());
+
+                                                        if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
+                                                            originalContent = currentIDE.full_content;
+                                                            hasOriginal = true;
+                                                        } else if (fs.existsSync(absPath)) {
+                                                            originalContent = fs.readFileSync(absPath, 'utf8');
+                                                            hasOriginal = true;
+                                                        }
+
+                                                        if (hasOriginal) {
+                                                            let modifiedContent = originalContent;
+                                                            // ... (patch simulation)
+                                                            if (normToolName === 'write_file') {
+                                                                modifiedContent = toolArgs.content || toolArgs.newContent || '';
+                                                            } else {
+                                                                const patches = [];
+                                                                const indices = new Set();
+                                                                Object.keys(toolArgs).forEach(key => {
+                                                                    const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+                                                                    if (m) {
+                                                                        const index = m[2] ? parseInt(m[2]) : 1;
+                                                                        indices.add(index);
+                                                                    }
+                                                                });
+                                                                const sortedIndices = Array.from(indices).sort((a, b) => a - b);
+                                                                for (const i of sortedIndices) {
+                                                                    let r, n;
+                                                                    if (i === 1) {
+                                                                        r = toolArgs.replaceContent1 ?? (toolArgs.content_to_replace ?? toolArgs.replaceContent);
+                                                                        n = toolArgs.newContent1 ?? (toolArgs.content_to_add ?? toolArgs.newContent);
+                                                                    } else {
+                                                                        r = toolArgs[`replaceContent${i}`] ?? toolArgs[`content_to_replace${i}`];
+                                                                        n = toolArgs[`newContent${i}`] ?? toolArgs[`content_to_add${i}`];
+                                                                    }
+                                                                    if (r !== undefined && n !== undefined) {
+                                                                        patches.push({ replace: r, new: n });
+                                                                    }
+                                                                }
+                                                                modifiedContent = applyPatches(originalContent, patches);
+                                                            }
+
+                                                            if (isBridgeConnected()) {
+                                                                showDiffInIDE(filePath, originalContent, modifiedContent);
+                                                                diffOpened = true;
+                                                            }
+                                                        } else if (normToolName === 'write_file') {
+                                                            const modifiedContent = toolArgs.content || toolArgs.newContent || '';
+                                                            if (isBridgeConnected()) {
+                                                                showDiffInIDE(filePath, '', modifiedContent);
+                                                                diffOpened = true;
+                                                            }
+                                                        }
+                                                    }
+                                                } catch (e) {}
+                                            }
+
                                             approval = await settings.onToolApproval(normToolName, toolCall.args);
+                                            
+                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                                const { path: filePath } = parseArgs(toolCall.args);
+                                                if (filePath) closeDiffInIDE(filePath, approval);
+                                            }
+
                                             if (approval === 'deny') {
                                                 denyReason = 'user';
                                             }
+                                        }
+
+                                        if (approval === 'allow' && diffOpened && isBridgeConnected()) {
+                                            // SUCCESS: The changes are already in the IDE buffer and we told it to save.
+                                            // We don't need to run the tool again (which would fail due to mismatch).
+                                            const { path: filePath } = parseArgs(toolCall.args);
+                                            const result = `SUCCESS: File [${filePath}] updated and saved via IDE bridge (including any manual tweaks).`;
+                                            
+                                            const toolEnd = Date.now();
+                                            lastToolFinishedAt = toolEnd;
+                                            yield { type: 'tool_time', content: toolEnd - executionStart };
+                                            
+                                            const aiContent = `[TOOL RESULT]: ${result}`;
+                                            toolResults.push({ role: 'user', text: aiContent });
+                                            anyToolExecutedInThisTurn = true;
+                                            yield { type: 'tool_result', content: result, aiContent: aiContent, toolName: normToolName };
+                                            
+                                            toolCallPointer++;
+                                            continue; 
                                         }
 
                                         if (approval === 'deny') {
@@ -2208,15 +2332,36 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 }
 
-                                const executionStart = Date.now();
                                 yield { type: 'spinner', content: false };
-                                let result = await dispatchTool(normToolName, toolCall.args, {
+
+                                // CRITICAL: Sync with IDE buffer one last time before execution if approved
+                                let execToolContext = {
                                     chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
                                     systemSettings: settings.systemSettings,
                                     mode,
                                     isMultiModal: isModelMultimodal(targetModel)
-                                });
+                                };
+
+                                if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                    try {
+                                        const { path: filePath } = parseArgs(toolCall.args);
+                                        if (filePath) {
+                                            const absPath = path.resolve(process.cwd(), filePath);
+                                            const currentIDE = await getIDEContext();
+                                            if (currentIDE && currentIDE.file_focused === absPath && currentIDE.full_content) {
+                                                execToolContext.forcedContent = currentIDE.full_content;
+                                            }
+                                        }
+                                    } catch (e) {}
+                                }
+
+                                let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                                 yield { type: 'spinner', content: true };
+
+                                if (normToolName === 'write_file' && result.startsWith('SUCCESS')) {
+                                    const { path: filePath } = parseArgs(toolCall.args);
+                                    if (filePath) openFileInEditor(filePath);
+                                }
 
                                 // Restore title back to "Working..." after tool is complete
                                 if (process.stdout.isTTY) {
@@ -2547,7 +2692,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // [STRICT PROTOCOL ENFORCEMENT]
             // If the model explicitly finished or if there are no pending tool results to execute and send back,
             // we finish the agent loop immediately.
-            let isActuallyFinished = hasFinish || !shouldContinue;
+            // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
+            let isActuallyFinished = !hasContinue && (hasFinish || !shouldContinue) && toolResults.length === 0;
 
 
             if (isActuallyFinished) {

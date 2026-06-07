@@ -71,7 +71,7 @@ export default function SettingsMenu({
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState('');
- 
+
     // Get items for current category
     const getCategoryItems = (catId) => {
         switch (catId) {
@@ -83,7 +83,7 @@ export default function SettingsMenu({
                 const activePreset = getActivePreset(systemSettings);
                 return [
                     { label: 'Sandbox Preset', value: 'sandboxPreset', status: activePreset, section: 'Sandbox' },
-                    { label: 'Auto Execute', value: 'autoExec', status: systemSettings.autoExec ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'YOLO Mode', value: 'autoExec', status: systemSettings.autoExec ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'External Workspace Access', value: 'externalAccess', status: systemSettings.allowExternalAccess ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Network Access (Terminal)', value: 'networkAccess', status: systemSettings.networkAccess !== false ? 'ON' : 'OFF', section: 'Sandbox' },
                     { label: 'Always Ask Commands', value: 'alwaysAsk', status: truncateCSV(systemSettings.alwaysAskCommands), section: 'Sandbox' },
