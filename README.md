@@ -27,10 +27,12 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **PNG Metadata Embedding**: Autonomously injects custom `tEXt` metadata chunks (Title, Software, Author, Seed, Model, and exact Prompt details) straight into the output image headers.
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
-  - **Live Context Awareness**: The agent knows exactly which file you are looking at and where your cursor is.
-  - **Selection-Driven Reasoning**: Select a block of code in your IDE and ask "What does this do?"—the agent receives your selection instantly.
-  - **Native Edit Highlights**: AI code changes appear in real-time as diff viewer inside your editor.
-  - **Universal Compatibility**: Works flawlessly with VS Code, Cursor, VSCodium, and Antigravity.
+  - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.
+  - **Live Status Heartbeat**: Real-time telemetry in the VS Code Status Bar shows exactly what the agent is doing (e.g., *Thinking...*, *Reading file.js...*, *Patching app.jsx...*).
+  - **Clickable Terminal Links**: All file paths and line numbers printed in the terminal are live links; click them to jump straight to that code in your IDE.
+  - **Selection-Driven Reasoning**: Select code and right-click -> "Chat with FluxFlow" to instantly focus the agent with full context.
+  - **Smart Context Awareness**: The agent knows your cursor position, active selection, and even errors in files you don't have open.
+  - **Universal Compatibility**: Works flawlessly with VS Code, Cursor, VSCodium, Trae, and Antigravity.
 
 - **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `ReadFile` tool with high-fidelity context retention (Only on supported models).
 - **Document Engineering Suite**: Generate professional, branded PDF, DOCX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
