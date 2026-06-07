@@ -1412,49 +1412,55 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             writeEncryptedJson(summariesFile, summaries);
         }
         const currentSummary = typeof chatDataObj === 'object' ? (chatDataObj.summary || '') : (chatDataObj || '');
-        const summaryBlock = currentSummary ? `\n\n--- CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH) ---\n${currentSummary}\n\n` : '';
+        const summaryBlock = currentSummary ? `\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}` : '';
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
-        if (ideCtx.file_focused !== "none") {
-            const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
-            const relOpened = (ideCtx.opened_editors || []).map(p => {
-                const rel = path.relative(process.cwd(), p);
-                return rel.startsWith('..') ? `[External] ${path.basename(p)}` : rel;
-            });
+        if (isBridgeConnected()) {
+            ideBlock = "[IDE CONTEXT]\n";
+            if (ideCtx.file_focused !== "none") {
+                const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
+                const relOpened = (ideCtx.opened_editors || []).map(p => {
+                    const rel = path.relative(process.cwd(), p);
+                    return rel.startsWith('..') ? `[External] ${path.basename(p)}` : rel;
+                });
 
-            ideBlock = `**IDE CONTEXT**\nFocused File: ${relFocused}\nCursor Line: ${ideCtx.cursor_line}\n`;
-            if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
-            if (ideCtx.manual_edits) {
-                let edits = ideCtx.manual_edits;
-                const CHAR_LIMIT = 4 * 2048; // 8192 chars
-                const LINE_LIMIT = 300;
+                ideBlock += `Focused File: ${relFocused}\nCursor Line: ${ideCtx.cursor_line}\n`;
+                if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
+                if (ideCtx.manual_edits) {
+                    let edits = ideCtx.manual_edits;
+                    const CHAR_LIMIT = 4 * 512; // 2048 chars
+                    const LINE_LIMIT = 50;
 
-                const lines = edits.split('\n');
-                if (lines.length > LINE_LIMIT) {
-                    edits = lines.slice(0, LINE_LIMIT).join('\n') + `\n... (${lines.length - LINE_LIMIT} more lines truncated)`;
+                    const lines = edits.split('\n');
+                    if (lines.length > LINE_LIMIT) {
+                        edits = lines.slice(0, LINE_LIMIT).join('\n') + `\n... (${lines.length - LINE_LIMIT} more lines truncated)`;
+                    }
+                    if (edits.length > CHAR_LIMIT) {
+                        edits = edits.substring(0, CHAR_LIMIT) + `\n... (Character limit reached, truncated)`;
+                    }
+
+                    ideBlock += `Recent Manual Edits:\n${edits}\n`;
                 }
-                if (edits.length > CHAR_LIMIT) {
-                    edits = edits.substring(0, CHAR_LIMIT) + `\n... (Character limit reached, truncated)`;
-                }
+                if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
 
-                ideBlock += `Recent Manual Edits:\n${edits}\n`;
-            }
-            if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
-            
-            // Always inject errors if they exist
-            if (ideCtx.diagnostics) ideBlock += `\n**FILE DIAGNOSTICS (Active Errors):**\n${ideCtx.diagnostics}\n`;
-            
-            // Only inject warnings if the user specifically asked about lint/warnings
-            const isLintRequest = agentText.toLowerCase().includes('lint') || agentText.toLowerCase().includes('warning');
-            if (isLintRequest && ideCtx.warnings) {
-                ideBlock += `\n**FILE WARNINGS (Linting):**\n${ideCtx.warnings}\n`;
+                // Always inject errors if they exist
+                if (ideCtx.diagnostics) ideBlock += `\n**ACTIVE FILE ERRORS**:\n${ideCtx.diagnostics}\n`;
+
+                // Only inject warnings if the user specifically asked about lint/warnings
+                const isLintRequest = agentText.toLowerCase().includes('lint') || agentText.toLowerCase().includes('warning');
+                if (isLintRequest && ideCtx.warnings) {
+                    ideBlock += `\n**LINT WARNINGS**:\n${ideCtx.warnings}\n`;
+                }
+            } else {
+                ideBlock += `No file currently focused.`
             }
         }
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}\n${summaryBlock}\n${ideBlock}\n${memoryPrompt}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${summaryBlock}${memoryPrompt}${ideBlock}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         let lastUsage = null;
@@ -2860,9 +2866,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } else {
                 if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] System failed to verify tool execution, Verify tool syntax, proper escaping and try again if failed` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked if unsure` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output. ' : 'If you have finished your task use [turn: finish] else continue.'}`}` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output' : 'If you have finished your task use [turn: finish] else continue'}`}` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;
