@@ -74,7 +74,7 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "
 
 -- AGENT LOOP RULES (PRIORITY: HIGH) --
 - MUST END WITH [turn: finish] to END AGENT LOOP WHEN COMPLETED
-- NO [turn: finish] marker with tool calls
+- NO CHAT OUTPUT AFTER TOOL CALL IN SAME TURN
 
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT] (system priority)

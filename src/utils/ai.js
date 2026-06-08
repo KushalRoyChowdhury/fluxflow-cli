@@ -1557,7 +1557,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const contents = modifiedHistory
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
-                            const parts = [{ text: msg.text }];
+                            let text = msg.text || '';
+                            if (msg.role === 'agent') {
+                                text = text.replace(/\[turn:\s*finish\]/gi, '').trim();
+                            }
+                            const parts = [{ text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
                                 // 2-Turn Freshness Check: Only include binary data if it appeared within the last 2 physical user turns
                                 const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
@@ -2810,6 +2814,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
             // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
             let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
+            isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
 
 
             if (isActuallyFinished) {
