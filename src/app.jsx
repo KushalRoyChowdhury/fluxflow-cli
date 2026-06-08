@@ -2015,7 +2015,7 @@ export default function App({ args = [] }) {
             }
         } else {
             // Normal chat message with temporal grounding
-            const timestamp = `[Prompted on: ${new Date().toLocaleString()}]`;
+            const timestamp = `[Prompted on: ${new Date().toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}]`;
             const userMessage = { id: 'user-' + Date.now(), role: 'user', text: `${absoluteClean}\n\n${timestamp}` };
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1); // Flush the user message immediately
