@@ -206,7 +206,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
                         hasNewData = true;
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         if (Date.now() - lastFlushTime >= 150 && hasNewData) {
@@ -1125,7 +1125,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextCompressionCount) {
-                        yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
+            yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
 
             const flattenContext = (hist) => {
                 return hist
@@ -1485,6 +1485,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+            wasToolCalledInLastLoop = false
             if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
@@ -1554,7 +1555,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                     const contents = modifiedHistory
-                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
+                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')) && ((msg.text && msg.text.trim() !== '') || msg.binaryPart))
                         .map((msg, idx, arr) => {
                             const parts = [{ text: msg.text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -1707,7 +1708,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // Success - Reset model name display for final chunks
                     yield { type: 'model_update', content: null };
-                                yield { type: 'status', content: 'Working...' };
+                    yield { type: 'status', content: 'Working...' };
 
                     dedupeBuffer = '';
                     isDedupeActive = accumulatedContext.length > 0;
@@ -1732,7 +1733,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (!inThinkingState) {
                                             chunkText += '<think>';
                                             inThinkingState = true;
-                                                                                    }
+                                        }
                                         chunkText += part.text;
                                     }
                                 } else if (part.text) {
@@ -2367,7 +2368,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize/1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
                                             }
 
                                             // Restore UI feedback
@@ -2465,7 +2466,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 execToolContext.forcedContent = currentIDE.full_content;
                                             }
                                         }
-                                    } catch (e) {}
+                                    } catch (e) { }
                                 }
 
                                 let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
@@ -2621,7 +2622,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
 
                     const pureOutputText = signalSafeText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
-                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText);
+                    const endsWithEmoji = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u.test(pureOutputText);
+                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || endsWithEmoji;
 
                     if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
                         throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals.");
@@ -2797,7 +2799,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-                        yield { type: 'status', content: 'Working...' };
+            yield { type: 'status', content: 'Working...' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
                 .trim();
@@ -2807,14 +2809,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // we finish the agent loop immediately.
             // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
             // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
-            let isActuallyFinished = !hasContinue && (hasFinish || !shouldContinue) && toolResults.length === 0 && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
+            let isActuallyFinished = toolResults.length === 0 && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
 
 
             if (isActuallyFinished) {
                 const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
                 const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
 
-                                yield {
+                yield {
                     type: 'interactive_turn_finished',
                     data: {
                         agentText,
@@ -2851,7 +2853,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             }
 
-                if (isActuallyFinished) break;
+            if (isActuallyFinished) break;
             // SDK PROTECTION: Ensure agent response is never empty before next turn
             const nextAgentMsg = cleanedTurnText.trim() || '*Working...*';
             modifiedHistory.push({ role: 'agent', text: nextAgentMsg });
