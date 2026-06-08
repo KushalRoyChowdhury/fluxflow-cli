@@ -2205,11 +2205,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 denyReason = 'prohibited';
                                             }
                                         }
-
                                         let diffOpened = false;
                                         let originalContentForReporting = "";
                                         let patchResults = [];
                                         let requestedPatchCount = 0;
+                                        let isNewFileCreated = false;
 
                                         if (!approval) {
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
@@ -2251,6 +2251,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 if (parseError) {
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: ${parseError}`;
                                                                     toolResults.push({ role: 'user', text: errorMsg });
+                                                                    await incrementUsage('toolFailure');
+                                                                    if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                                                     yield { type: 'tool_result', content: errorMsg, toolName: normToolName };
                                                                     toolCallPointer++;
                                                                     continue;
@@ -2263,9 +2265,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 // STRICT MATCHING ENFORCEMENT:
                                                                 // If ANY block failed in the simulation, we do not show the IDE diff.
                                                                 // Instead, we report the error immediately.
+                                                                const successes = patchResults.filter(r => r.success);
                                                                 const failures = patchResults.filter(r => !r.success);
-                                                                if (failures.length > 0) {
-                                                                    const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\\n${failures.map(f => `  • ${f.error}`).join('\\n')}`;
+                                                                if (successes.length === 0) {
+                                                                    const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
                                                                     const errorLabel = `💾 Edited: ${path.basename(absPath)}`.toUpperCase();
@@ -2276,6 +2279,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
 
                                                                     toolResults.push({ role: 'user', text: errorMsg });
+                                                                    await incrementUsage('toolFailure');
+                                                                    if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                                                     yield { type: 'tool_result', content: errorMsg, toolName: normToolName };
 
                                                                     toolCallPointer++;
@@ -2289,6 +2294,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             await new Promise(r => setTimeout(r, 50)); // Beat delay
                                                         } else if (normToolName === 'write_file') {
                                                             const modifiedContent = toolArgs.content || toolArgs.newContent || '';
+                                                            if (!fs.existsSync(absPath)) {
+                                                                isNewFileCreated = true;
+                                                                fs.mkdirSync(path.dirname(absPath), { recursive: true });
+                                                                fs.writeFileSync(absPath, '', 'utf8');
+                                                            }
                                                             yield { type: 'status', content: `Opening New File Diff in IDE: ${path.basename(absPath)}...` };
                                                             showDiffInIDE(absPath, '', modifiedContent);
                                                             diffOpened = true;
@@ -2298,17 +2308,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 } catch (e) {
                                                     console.error("Simulation/Diff Error:", e);
                                                 }
-                                                }
+                                            }
 
-                                                // Bridge Security Integration:
-                                                // Allow resolving approval via IDE WebSocket messages
-                                                let ideDecision = null;
-                                                registerSecurityListener((res) => {
+                                            // Bridge Security Integration:
+                                            // Allow resolving approval via IDE WebSocket messages
+                                            let ideDecision = null;
+                                            registerSecurityListener((res) => {
                                                 ideDecision = res;
-                                                });
+                                            });
 
-                                                const originalApproval = settings.onToolApproval;
-                                                approval = await new Promise(async (resolve) => {
+                                            const originalApproval = settings.onToolApproval;
+                                            approval = await new Promise(async (resolve) => {
                                                 // Start a polling loop to check for IDE decision while waiting for terminal input
                                                 const pollInterval = setInterval(() => {
                                                     if (ideDecision) {
@@ -2325,15 +2335,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     clearInterval(pollInterval);
                                                     resolve('deny');
                                                 }
-                                                });
+                                            });
 
-                                                // Clear listener for next tool
-                                                registerSecurityListener(null);
+                                            // Clear listener for next tool
+                                            registerSecurityListener(null);
 
-                                                if (normToolName === 'write_file' || normToolName === 'update_file') {                                                const { path: filePath } = parseArgs(toolCall.args);
+                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
+                                                const { path: filePath } = parseArgs(toolCall.args);
                                                 if (filePath) {
                                                     const absPath = path.resolve(process.cwd(), filePath);
                                                     closeDiffInIDE(absPath, approval);
+                                                    if (approval === 'deny' && isNewFileCreated && fs.existsSync(absPath)) {
+                                                        try {
+                                                            fs.unlinkSync(absPath);
+                                                        } catch (e) {}
+                                                    }
                                                 }
                                             }
 
@@ -2420,6 +2436,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const aiContent = `[TOOL RESULT]: ${result}`;
                                             toolResults.push({ role: 'user', text: aiContent });
                                             anyToolExecutedInThisTurn = true;
+                                            await incrementUsage('toolSuccess');
+                                            if (settings.onToolResult) settings.onToolResult('success', normToolName);
                                             yield { type: 'tool_result', content: result, aiContent: aiContent, toolName: normToolName };
 
                                             toolCallPointer++;
@@ -2507,7 +2525,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (normToolName === 'write_file' && result.startsWith('SUCCESS')) {
                                     const { path: filePath } = parseArgs(toolCall.args);
-                                    if (filePath) openFileInEditor(filePath);
+                                    if (filePath) {
+                                        const absPath = path.resolve(process.cwd(), filePath);
+                                        openFileInEditor(absPath);
+                                    }
                                 }
 
                                 // Restore title back to "Working..." after tool is complete
@@ -2904,7 +2925,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (wasToolCalledInLastLoop) {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked if unsure` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER-THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize the execution/output' : 'If you have finished your task use [turn: finish] else continue'}`}` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [turn: finish] else continue'}`}` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;

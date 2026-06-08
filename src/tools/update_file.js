@@ -38,7 +38,9 @@ export const update_file = async (args, context = {}) => {
 
         // Check for failures
         const failures = results.filter(r => !r.success);
-        if (failures.length > 0) {
+        const successes = results.filter(r => r.success);
+
+        if (successes.length === 0) {
             return `ERROR: Patch Failed to apply to [${targetPath}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
         }
 
@@ -48,6 +50,9 @@ export const update_file = async (args, context = {}) => {
 
         // --- REPORTING ---
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
+        if (failures.length > 0) {
+            return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
+        }
         return `SUCCESS: File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}`;
 
     } catch (err) {

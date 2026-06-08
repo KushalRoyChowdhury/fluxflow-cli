@@ -200,20 +200,22 @@ export const applyPatches = (content, patches) => {
         }).join('\n');
     };
 
-    // --- ATOMIC PRE-CHECK ---
-    let tempContent = currentFileContent;
-    const plan = [];
+    let finalContent = currentFileContent;
 
-    for (const pair of patches) {
+    for (let i = 0; i < patches.length; i++) {
+        const pair = patches[i];
         const content_to_replace = strip(pair.replace || '');
         const content_to_add = strip(pair.new || '');
 
-        if (content_to_replace === '' && content_to_add === '') continue;
+        if (content_to_replace === '' && content_to_add === '') {
+            results.push({ success: false, error: `Block ${i + 1}: Empty replace and add content.` });
+            continue;
+        }
 
         const exactPattern = content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         let matchRegex = null;
 
-        if (content_to_replace !== '' && tempContent.includes(content_to_replace)) {
+        if (content_to_replace !== '' && finalContent.includes(content_to_replace)) {
             matchRegex = new RegExp(exactPattern, 'g');
         } else {
             const fuzzyLines = content_to_replace.split('\n').map(line => line.trim()).filter(line => line.length > 0)
@@ -223,62 +225,24 @@ export const applyPatches = (content, patches) => {
                 const fuzzyPattern = fuzzyLines.join('\\s*');
                 try { matchRegex = new RegExp(fuzzyPattern, 'g'); } catch (e) { matchRegex = new RegExp(exactPattern, 'g'); }
             } else { matchRegex = new RegExp(exactPattern, 'g'); }
-
-        }
-
-        const matches = [...tempContent.matchAll(matchRegex)];
-        if (matches.length === 0) {
-            results.push({ success: false, error: `Block ${results.length + 1}: Could not find match.` });
-            continue;
-        }
-        if (matches.length > 1) {
-            results.push({ success: false, error: `Block ${results.length + 1}: Found ${matches.length} matches (must be unique).` });
-            continue;
-        }
-
-        const startPos = matches[0].index;
-        const firstMatchContent = matches[0][0];
-        const lineStart = tempContent.lastIndexOf('\n', startPos) + 1;
-        const leadingContext = tempContent.substring(lineStart, startPos);
-
-        const finalReplacement = adjustIndentation(content_to_add, firstMatchContent, leadingContext);
-        
-        plan.push({ startPos, firstMatchContent, finalReplacement, content_to_replace, content_to_add });
-        tempContent = tempContent.substring(0, startPos) + finalReplacement + tempContent.substring(startPos + firstMatchContent.length);
-    }
-
-    // --- EXECUTION PASS ---
-    // If ANY block failed in pre-check, we still return the results but NO content change
-    const failures = results.filter(r => !r.success);
-    if (failures.length > 0) {
-        return { content, results };
-    }
-
-    // Re-apply to generate reporting metadata for successful blocks
-    let finalContent = currentFileContent;
-    const finalResults = [];
-
-    for (let i = 0; i < plan.length; i++) {
-        const p = plan[i];
-        
-        // Match again on the CURRENT state to get accurate line numbers and context
-        const exactPattern = p.content_to_replace.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        let matchRegex = null;
-        if (p.content_to_replace !== '' && finalContent.includes(p.content_to_replace)) {
-            matchRegex = new RegExp(exactPattern, 'g');
-        } else {
-            const fuzzyLines = p.content_to_replace.split('\n').map(line => line.trim()).filter(line => line.length > 0)
-                .map(line => line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*'));
-            const fuzzyPattern = fuzzyLines.join('\\s*');
-            try { matchRegex = new RegExp(fuzzyPattern, 'g'); } catch (e) { matchRegex = new RegExp(exactPattern, 'g'); }
         }
 
         const matches = [...finalContent.matchAll(matchRegex)];
+        if (matches.length === 0) {
+            results.push({ success: false, error: `Block ${i + 1}: Could not find match.` });
+            continue;
+        }
+        if (matches.length > 1) {
+            results.push({ success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique).` });
+            continue;
+        }
+
         const startPos = matches[0].index;
         const firstMatchContent = matches[0][0];
         const lineStart = finalContent.lastIndexOf('\n', startPos) + 1;
         const leadingContext = finalContent.substring(lineStart, startPos);
-        const finalReplacement = adjustIndentation(p.content_to_add, firstMatchContent, leadingContext);
+
+        const finalReplacement = adjustIndentation(content_to_add, firstMatchContent, leadingContext);
 
         const allLines = finalContent.split('\n');
         const patchStartLine = finalContent.substring(0, startPos).split('\n').length;
@@ -293,7 +257,7 @@ export const applyPatches = (content, patches) => {
             contextAfter.push({ num: j + 1, text: allLines[j] });
         }
 
-        finalResults.push({
+        results.push({
             success: true,
             oldContent: firstMatchContent,
             newContent: finalReplacement,
@@ -305,7 +269,7 @@ export const applyPatches = (content, patches) => {
         finalContent = finalContent.substring(0, startPos) + finalReplacement + finalContent.substring(startPos + firstMatchContent.length);
     }
 
-    return { content: finalContent, results: finalResults };
+    return { content: finalContent, results };
 };
 
 export const generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8) => {
@@ -320,12 +284,14 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     // We track where we are in the final content to ensure line numbers are smooth
     let currentFinalLineIdx = 0;
 
+    let lastSuccessfulHunk = null;
+
     patchResults.forEach((res, idx) => {
         if (!res.success) return;
 
         // 1. Context Before / Hunk Merging
-        if (idx === 0) {
-            // Very first hunk: Show context lines before it
+        if (lastSuccessfulHunk === null) {
+            // Very first successful hunk: Show context lines before it
             const contextStart = Math.max(0, res.originalStartLine - 4);
             currentFinalLineIdx = contextStart;
             while (currentFinalLineIdx < res.originalStartLine - 1) {
@@ -333,7 +299,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
                 currentFinalLineIdx++;
             }
         } else {
-            const prev = patchResults[idx - 1];
+            const prev = lastSuccessfulHunk;
             const prevOriginalEnd = prev.originalStartLine + prev.oldContent.split('\n').length - 1;
             const gap = res.originalStartLine - prevOriginalEnd - 1;
             
@@ -377,7 +343,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         let hunkEndInFinal = currentFinalLineIdx;
         if (resyncAnchorText !== null) {
             // Scan ahead in the final content to find the resync anchor
-            const lookAheadLimit = (idx < patchResults.length - 1) ? patchResults[idx+1].originalStartLine + 10 : allLinesFinal.length;
+            const lookAheadLimit = (idx < patchResults.length - 1) ? (patchResults[idx+1].originalStartLine || allLinesFinal.length) + 10 : allLinesFinal.length;
             for (let s = currentFinalLineIdx; s < lookAheadLimit; s++) {
                 if (allLinesFinal[s] === resyncAnchorText) {
                     hunkEndInFinal = s;
@@ -395,15 +361,17 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             currentFinalLineIdx++;
         }
 
-        // 4. Final context after if this is the last patch
-        if (idx === patchResults.length - 1) {
-            let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
-            while (currentFinalLineIdx < limit) {
-                diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
-                currentFinalLineIdx++;
-            }
-        }
+        lastSuccessfulHunk = res;
     });
+
+    // 4. Final context after if the last successful hunk is set
+    if (lastSuccessfulHunk !== null) {
+        let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
+        while (currentFinalLineIdx < limit) {
+            diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+            currentFinalLineIdx++;
+        }
+    }
 
     diffText += `[DIFF_END]`;
     return diffText;

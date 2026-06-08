@@ -604,6 +604,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
     const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
+        !msg.text?.includes('[DIFF_START]') &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
     const isHomeWarning = msg.isHomeWarning;

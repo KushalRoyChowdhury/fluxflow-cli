@@ -254,14 +254,14 @@ export default function SettingsMenu({
     };
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%" height={27}>
             {/* Title Bar */}
             <Box paddingX={1} paddingY={0} marginBottom={1} borderStyle="single" borderColor="magenta" width="100%">
                 <Text color="magenta" bold>🔧 SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
-            <Box flexDirection="row" width="100%" minHeight={8}>
+            <Box flexDirection="row" width="100%" minHeight={19}>
                 {/* Left Column: Categories */}
                 <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'cyan' : 'gray'} padding={1}>
                     <Box marginBottom={1}>
@@ -275,7 +275,7 @@ export default function SettingsMenu({
                         return (
                             <Box
                                 key={cat.id}
-                                marginTop={isExit ? 1 : 0}
+                                marginTop={isExit ? 8 : 0}
                                 backgroundColor={isSelected ? (activeColumn === 'categories' ? '#2a2a2a' : '#1e1e1e') : undefined}
                                 paddingX={1}
                             >
@@ -393,7 +393,7 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={4} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={10} paddingX={1}>
                                         <Text color={isPtyAvailable ? "green" : "yellow"}>
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>

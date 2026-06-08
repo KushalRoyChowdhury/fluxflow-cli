@@ -119,7 +119,7 @@ export const write_pdf = async (args) => {
         // to prevent substring collision bugs (e.g. replacing 'bg.png' inside 'hero-bg.png' or inside unrelated text)
         for (const [originalSrc, dataUri] of Object.entries(resolvedCache)) {
             const escapedSrc = originalSrc.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            
+
             // Safe replacement in HTML src attributes
             const srcRegex = new RegExp(`(src=["'])(${escapedSrc})(["'])`, 'gi');
             resolvedContent = resolvedContent.replace(srcRegex, `$1${dataUri}$3`);

@@ -32,12 +32,12 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
-3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 8)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile > guessing.
-4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile >>> WriteFile. Verify Imports
+3. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing
+4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 5. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
-6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user
+6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD ONLY`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user
 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Usage: Mockups, PDF thumbnails, any visual content
-8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout (100vh/vw)
+8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
@@ -45,7 +45,6 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
 - File structure: Real newlines for code formatting`.trim() : `
-- FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user,\` /mode flux\` if needed)`.trim()}
+- FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user to,\` /mode flux\` if needed)`.trim()}
 
-- Results: Passed as [TOOL RESULT]
-- MAX Tool call stack: STRICTLY 3 per turn`.trim();
+- Results: Passed as [TOOL RESULT] in user turn`.trim();
