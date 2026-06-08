@@ -13,9 +13,10 @@ import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
-import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected } from './editor.js';
+import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 
 let client = null;
+let globalSettings = {};
 
 let TERMINATION_SIGNAL = false;
 
@@ -938,8 +939,9 @@ const detectToolCalls = (text) => {
 /**
  * Initializes the new Gemini client
  */
-export const initAI = (apiKey) => {
+export const initAI = (apiKey, settings = {}) => {
     if (!apiKey) return null;
+    globalSettings = settings;
     client = new GoogleGenAI({ apiKey });
     return client;
 };
@@ -2296,12 +2298,39 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 } catch (e) {
                                                     console.error("Simulation/Diff Error:", e);
                                                 }
-                                            }
+                                                }
 
-                                            approval = await settings.onToolApproval(normToolName, toolCall.args);
+                                                // Bridge Security Integration:
+                                                // Allow resolving approval via IDE WebSocket messages
+                                                let ideDecision = null;
+                                                registerSecurityListener((res) => {
+                                                ideDecision = res;
+                                                });
 
-                                            if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                                const { path: filePath } = parseArgs(toolCall.args);
+                                                const originalApproval = settings.onToolApproval;
+                                                approval = await new Promise(async (resolve) => {
+                                                // Start a polling loop to check for IDE decision while waiting for terminal input
+                                                const pollInterval = setInterval(() => {
+                                                    if (ideDecision) {
+                                                        if (globalSettings.onIDEApproval) globalSettings.onIDEApproval(ideDecision);
+                                                        clearInterval(pollInterval);
+                                                        resolve(ideDecision);
+                                                    }
+                                                }, 100);
+                                                try {
+                                                    const res = await originalApproval(normToolName, toolCall.args);
+                                                    clearInterval(pollInterval);
+                                                    resolve(res);
+                                                } catch (e) {
+                                                    clearInterval(pollInterval);
+                                                    resolve('deny');
+                                                }
+                                                });
+
+                                                // Clear listener for next tool
+                                                registerSecurityListener(null);
+
+                                                if (normToolName === 'write_file' || normToolName === 'update_file') {                                                const { path: filePath } = parseArgs(toolCall.args);
                                                 if (filePath) {
                                                     const absPath = path.resolve(process.cwd(), filePath);
                                                     closeDiffInIDE(absPath, approval);

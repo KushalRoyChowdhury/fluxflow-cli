@@ -12,6 +12,7 @@ let isCliConnected = false;
 let fluxFlowTerminal: vscode.Terminal | undefined;
 
 const lastKnownStates = new Map<string, string>();
+const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
 const newFilesCreatedByBridge = new Set<string>();
 
@@ -137,6 +138,23 @@ export function activate(context: vscode.ExtensionContext) {
         }, 500);
     }));
 
+    // Register commands for Accept/Deny from Title Bar
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.acceptDiff', () => {
+        wss?.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({ command: 'securityResponse', result: 'allow' }));
+            }
+        });
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('fluxflow-editorex.denyDiff', () => {
+        wss?.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({ command: 'securityResponse', result: 'deny' }));
+            }
+        });
+    }));
+
     // Cleanup reference if terminal is closed manually
     context.subscriptions.push(vscode.window.onDidCloseTerminal((terminal) => {
         if (terminal === fluxFlowTerminal) {
@@ -168,6 +186,12 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('setContext', 'fluxflow.hasErrors', hasErrors);
         vscode.commands.executeCommand('setContext', 'fluxflow.hasWarnings', hasWarnings);
         vscode.commands.executeCommand('setContext', 'fluxflow.activeFileHasWarnings', activeFileHasWarnings);
+
+        // Update Diff Visibility Context
+        const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+        const isDiff = activeTab?.input instanceof vscode.TabInputTextDiff && 
+                       activeTab.input.original.scheme === 'fluxflow-diff';
+        vscode.commands.executeCommand('setContext', 'fluxflow.isDiffVisible', isDiff);
     };
 
     context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(updateErrorContext));
@@ -179,6 +203,8 @@ export function activate(context: vscode.ExtensionContext) {
             lastCursorLine = editor.selection.active.line + 1;
         }
     }));
+    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(() => updateErrorContext()));
+    context.subscriptions.push(vscode.window.tabGroups.onDidChangeTabGroups(() => updateErrorContext()));
     updateErrorContext();
 
     // Code Action Provider (The Lightbulb)
@@ -505,6 +531,9 @@ async function handleMessage(message: any, ws?: WebSocket) {
             }
 
             const doc = await vscode.workspace.openTextDocument(uri);
+            // Store original state for robust denial/revert
+            originalStates.set(uri.fsPath.toLowerCase(), originalContent !== undefined ? originalContent : doc.getText());
+            
             // Open doc with preserveFocus: true
             const editor = await vscode.window.showTextDocument(doc, { preview: false, preserveFocus: true });
 
@@ -536,36 +565,64 @@ async function handleMessage(message: any, ws?: WebSocket) {
             await doc.save();
         }
         else if (command === 'closeDiff') {
-            const tabGroups = vscode.window.tabGroups.all;
             const targetPath = uri.fsPath.toLowerCase();
+            const tabsToClose: vscode.Tab[] = [];
 
-            for (const group of tabGroups) {
+            // 1. Identify all matching tabs first
+            for (const group of vscode.window.tabGroups.all) {
                 for (const tab of group.tabs) {
                     if (tab.input instanceof vscode.TabInputTextDiff &&
                         tab.input.original.scheme === 'fluxflow-diff') {
-
-                        const tabPath = tab.input.modified.fsPath.toLowerCase();
+                        const tabPath = (tab.input.modified as vscode.Uri).fsPath.toLowerCase();
                         if (tabPath === targetPath) {
-                            if (result === 'deny') {
-                                try {
-                                    await vscode.commands.executeCommand('workbench.action.files.revert', tab.input.modified);
-                                    // If it was a new file created by us, delete it from disk
-                                    if (newFilesCreatedByBridge.has(targetPath)) {
-                                        await vscode.workspace.fs.delete(tab.input.modified, { recursive: false });
-                                    }
-                                } catch (e) {}
-                            } else if (result === 'allow') {
-                                try {
-                                    const doc = await vscode.workspace.openTextDocument(tab.input.modified);
-                                    await doc.save();
-                                } catch (e) {}
-                            }
-
-                            newFilesCreatedByBridge.delete(targetPath);
-                            await vscode.window.tabGroups.close(tab);
+                            tabsToClose.push(tab);
                         }
                     }
                 }
+            }
+
+            // 2. Perform restoration/save logic in background
+            if (result === 'deny') {
+                try {
+                    const original = originalStates.get(targetPath);
+                    if (original !== undefined) {
+                        const doc = await vscode.workspace.openTextDocument(uri);
+                        const wsEdit = new vscode.WorkspaceEdit();
+                        const fullRange = new vscode.Range(
+                            doc.positionAt(0),
+                            doc.positionAt(doc.getText().length)
+                        );
+                        wsEdit.replace(uri, fullRange, original);
+                        await vscode.workspace.applyEdit(wsEdit);
+                        await doc.save();
+                    } else {
+                        // Fallback revert
+                        await vscode.commands.executeCommand('workbench.action.files.revert', uri);
+                    }
+                    
+                    // If it was a new file created by us, delete it from disk
+                    if (newFilesCreatedByBridge.has(targetPath)) {
+                        if (fs.existsSync(targetPath)) {
+                            fs.unlinkSync(targetPath);
+                        }
+                    }
+                } catch (e) {}
+            } else if (result === 'allow') {
+                try {
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    await doc.save();
+                } catch (e) {}
+            }
+
+            // 3. Cleanup state
+            originalStates.delete(targetPath);
+            newFilesCreatedByBridge.delete(targetPath);
+
+            // 4. Close the tabs
+            for (const tab of tabsToClose) {
+                try {
+                    await vscode.window.tabGroups.close(tab);
+                } catch (e) {}
             }
         }
     } catch (err: any) {

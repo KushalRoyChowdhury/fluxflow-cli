@@ -5,12 +5,17 @@ let isConnecting = false;
 const BRIDGE_URL = 'ws://localhost:56832';
 const messageQueue = [];
 let contextResolver = null;
+let securityListener = null;
 
 let cliVersion = '2.0.0'; // Default fallback
 
 export const initBridge = (version) => {
     cliVersion = version;
     connect();
+};
+
+export const registerSecurityListener = (callback) => {
+    securityListener = callback;
 };
 
 const connect = () => {
@@ -39,6 +44,8 @@ const connect = () => {
             if (msg.command === 'contextResponse' && contextResolver) {
                 contextResolver(msg.data);
                 contextResolver = null;
+            } else if (msg.command === 'securityResponse' && securityListener) {
+                securityListener(msg.result);
             }
         } catch (e) {}
     });

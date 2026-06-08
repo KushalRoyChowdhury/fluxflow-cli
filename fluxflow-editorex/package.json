@@ -4,7 +4,7 @@
   "publisher": "fluxflow-cli",
   "icon": "fluxflow-cli-companion.png",
   "description": "Enable FluxFlow CLI with direct access to your IDE workspace.",
-  "version": "1.2.2",
+  "version": "1.3.0",
 
   "engines": {
     "vscode": "^1.90.0"
@@ -40,6 +40,16 @@
         "command": "fluxflow-editorex.fixWarnings",
         "title": "Fix Warnings/Lint",
         "icon": "$(info)"
+      },
+      {
+        "command": "fluxflow-editorex.acceptDiff",
+        "title": "Accept (FluxFlow)",
+        "icon": "$(check)"
+      },
+      {
+        "command": "fluxflow-editorex.denyDiff",
+        "title": "Deny (FluxFlow)",
+        "icon": "$(close)"
       }
     ],
     "submenus": [
@@ -100,6 +110,16 @@
           "command": "fluxflow-editorex.fixErrors",
           "group": "navigation",
           "when": "fluxflow.hasErrors"
+        },
+        {
+          "command": "fluxflow-editorex.acceptDiff",
+          "group": "navigation",
+          "when": "fluxflow.isDiffVisible"
+        },
+        {
+          "command": "fluxflow-editorex.denyDiff",
+          "group": "navigation",
+          "when": "fluxflow.isDiffVisible"
         }
       ]
     }

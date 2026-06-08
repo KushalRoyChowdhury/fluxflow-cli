@@ -625,6 +625,11 @@ export default function App({ args = [] }) {
     const [pendingApproval, setPendingApproval] = useState(null);
     const [pendingAsk, setPendingAsk] = useState(null);
 
+    const resetPendingApproval = (decision) => {
+        setPendingApproval(null);
+        setActiveView('chat');
+    };
+
     const formatDuration = (totalSecs) => {
         const h = Math.floor(totalSecs / 3600);
         const m = Math.floor((totalSecs % 3600) / 60);
@@ -1052,7 +1057,7 @@ export default function App({ args = [] }) {
             const key = await getProviderAPIKey(startupProvider);
             if (key) {
                 setApiKey(key);
-                initAI(key); // Initialize SDK
+                initAI(key, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
             }
 
             // 3. Clean up old history and logs (older than 7 days)
@@ -1148,7 +1153,7 @@ export default function App({ args = [] }) {
         if (key.length >= minLength) {
             await saveProviderAPIKey(aiProvider, key);
             setApiKey(key);
-            initAI(key); // Initialize SDK
+            initAI(key, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
 
             let defaultModel = 'gemma-4-31b-it';
             if (aiProvider === 'OpenRouter') {
@@ -2672,8 +2677,7 @@ export default function App({ args = [] }) {
                             if (key) {
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
-                                initAI(key);
-
+                                initAI(key, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
                                 let defaultModel = 'gemma-4-31b-it';
                                 if (selectedProvider === 'OpenRouter') {
                                     defaultModel = 'google/gemma-4-31b-it:free';
@@ -2815,8 +2819,7 @@ export default function App({ args = [] }) {
                                         await saveProviderAPIKey(prov, keyInput);
                                         setAiProvider(prov);
                                         setApiKey(keyInput);
-                                        initAI(keyInput);
-
+                                        initAI(keyInput, { aiProvider: prov, onIDEApproval: resetPendingApproval });
                                         let defaultModel = 'gemma-4-31b-it';
                                         if (prov === 'OpenRouter') {
                                             defaultModel = 'google/gemma-4-31b-it:free';
