@@ -1555,7 +1555,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
                     const contents = modifiedHistory
-                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')) && ((msg.text && msg.text.trim() !== '') || msg.binaryPart))
+                        .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
                             const parts = [{ text: msg.text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -2623,7 +2623,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     const pureOutputText = signalSafeText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
                     const endsWithEmoji = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u.test(pureOutputText);
-                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || endsWithEmoji;
+                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || pureOutputText.endsWith('."') || endsWithEmoji;
 
                     if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
                         throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals.");
@@ -2809,7 +2809,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // we finish the agent loop immediately.
             // We MUST NOT finish if a tool was executed (toolResults.length > 0) or if a continue signal is present.
             // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
-            let isActuallyFinished = toolResults.length === 0 && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
+            let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
 
 
             if (isActuallyFinished) {
