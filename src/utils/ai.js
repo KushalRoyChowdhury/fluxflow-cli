@@ -127,6 +127,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
             'Low': 'high',
             'Medium': 'high',
             'High': 'high',
+            'Standard': 'high',
             'xHigh': 'max'
         };
         requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
@@ -274,6 +275,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
     const reasoningEffortMap = {
         'Low': 'low',
         'Medium': 'medium',
+        'Standard': 'medium',
         'High': 'high',
         'xHigh': 'high'
     };
@@ -1673,12 +1675,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (isGemma4) {
                                             return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
                                         }
-                                        return {
+                                                                        return {
                                             includeThoughts: true,
                                             thinkingLevel: {
                                                 'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
                                                 'Low': ThinkingLevel.LOW,
                                                 'Medium': ThinkingLevel.MEDIUM,
+                                                'Standard': ThinkingLevel.MEDIUM,
                                                 'High': ThinkingLevel.HIGH,
                                                 'xHigh': ThinkingLevel.HIGH
                                             }[thinkingLevel] || ThinkingLevel.MEDIUM
@@ -1688,6 +1691,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'Fast': 0,
                                             'Low': 512,
                                             'Medium': 2048,
+                                            'Standard': 2048,
                                             'High': 16384,
                                             'xHigh': 24576
                                         }[thinkingLevel] || 2048;

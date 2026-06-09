@@ -23,6 +23,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
         let levelKey = thinkingLevel;
         if (thinkingLevel === 'Fast') levelKey = 'Off';
         if (thinkingLevel === 'Low') levelKey = 'Minimal';
+        if (thinkingLevel === 'Standard') levelKey = 'Medium';
         if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'xHigh';
         thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
     }

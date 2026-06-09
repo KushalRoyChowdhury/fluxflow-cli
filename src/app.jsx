@@ -363,8 +363,34 @@ export default function App({ args = [] }) {
     // Parse CLI startup arguments
     const parsedArgs = useMemo(() => {
         const parsed = {};
+        // Pass 1: Parse --key first to determine default keys and potentially providers from suffixes
         for (let i = 0; i < args.length; i++) {
             const arg = args[i];
+            if (arg === '--key' && args[i + 1]) {
+                const val = args[i + 1];
+                parsed.key = val;
+                if (val.includes('@')) {
+                    const parts = val.split('@');
+                    const keyPart = parts[0];
+                    const provPart = parts[1].toLowerCase();
+                    if (['google', 'deepseek', 'openrouter'].includes(provPart)) {
+                        let mapped = 'Google';
+                        if (provPart === 'google') mapped = 'Google';
+                        else if (provPart === 'deepseek') mapped = 'DeepSeek';
+                        else if (provPart === 'openrouter') mapped = 'OpenRouter';
+                        parsed.key = keyPart;
+                        parsed.provider = mapped;
+                    }
+                }
+            }
+        }
+        // Pass 2: Parse other arguments (and skip --key since it was already parsed)
+        for (let i = 0; i < args.length; i++) {
+            const arg = args[i];
+            if (arg === '--key') {
+                i++; // Skip key value
+                continue;
+            }
             if (arg === '--model' && args[i + 1]) {
                 parsed.model = args[i + 1];
                 i++;
@@ -373,9 +399,6 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--resume' && args[i + 1]) {
                 parsed.resume = args[i + 1];
-                i++;
-            } else if (arg === '--update' && args[i + 1]) {
-                parsed.update = args[i + 1].toLowerCase();
                 i++;
             } else if (arg === '--package' && args[i + 1]) {
                 const pkg = args[i + 1].toLowerCase();
@@ -411,31 +434,15 @@ export default function App({ args = [] }) {
             } else if (arg === '--thinking' && args[i + 1]) {
                 const val = args[i + 1];
                 const lower = val.toLowerCase();
-                if (['fast', 'low', 'medium', 'high', 'xhigh'].includes(lower)) {
+                if (['fast', 'low', 'medium', 'high', 'xhigh', 'standard'].includes(lower)) {
                     let mapped = 'Medium';
                     if (lower === 'fast') mapped = 'Fast';
                     else if (lower === 'low') mapped = 'Low';
+                    else if (lower === 'standard') mapped = 'Standard';
                     else if (lower === 'medium') mapped = 'Medium';
                     else if (lower === 'high') mapped = 'High';
                     else if (lower === 'xhigh') mapped = 'xHigh';
                     parsed.thinking = mapped;
-                }
-                i++;
-            } else if (arg === '--key' && args[i + 1]) {
-                const val = args[i + 1];
-                parsed.key = val;
-                if (val.includes('@')) {
-                    const parts = val.split('@');
-                    const keyPart = parts[0];
-                    const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter'].includes(provPart)) {
-                        let mapped = 'Google';
-                        if (provPart === 'google') mapped = 'Google';
-                        else if (provPart === 'deepseek') mapped = 'DeepSeek';
-                        else if (provPart === 'openrouter') mapped = 'OpenRouter';
-                        parsed.key = keyPart;
-                        parsed.provider = mapped;
-                    }
                 }
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
@@ -1117,15 +1124,8 @@ export default function App({ args = [] }) {
             }
             cleanupOldLogs(LOGS_DIR);
 
-            // 4. Check for updates / handle CLI flags
-            if (parsedArgs.update === 'check') {
-                performVersionCheck(true, freshSettings);
-            } else if (parsedArgs.update === 'latest') {
-                setActiveView('update');
-                performVersionCheck(true, freshSettings);
-            } else {
-                performVersionCheck(false, freshSettings);
-            }
+            // 4. Check for updates
+            performVersionCheck(false, freshSettings);
 
             // 5. Prime usage cache and handle resume flag
             await initUsage();
