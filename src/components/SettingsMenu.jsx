@@ -29,7 +29,7 @@ const getActivePreset = (settings) => {
         settings.autoExec === true &&
         settings.allowExternalAccess === false &&
         settings.networkAccess !== false &&
-        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time' &&
+        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time, mkdir' &&
         disallow === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
         alwaysAsk === 'killall, pkill, taskkill, Stop-Process, mv /*, move c:\\*, chmod 000, chmod -R 777, chown, icacls, shutdown, reboot, init 0, init 6, git reset --hard, git clean -fd, npm r, npm uninstall' &&
         settings.autoApproveGit === false;
@@ -38,7 +38,7 @@ const getActivePreset = (settings) => {
         settings.autoExec === true &&
         settings.allowExternalAccess === true &&
         settings.networkAccess !== false &&
-        approve === '' &&
+        approve === 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time, mkdir' &&
         disallow === '' &&
         alwaysAsk === 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c' &&
         settings.autoApproveGit === true;

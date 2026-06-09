@@ -408,8 +408,7 @@ export default function App({ args = [] }) {
                     parsed.mode = mapped;
                 }
                 i++;
-            }
-            else if (arg === '--thinking' && args[i + 1]) {
+            } else if (arg === '--thinking' && args[i + 1]) {
                 const val = args[i + 1];
                 const lower = val.toLowerCase();
                 if (['fast', 'low', 'medium', 'high', 'xhigh'].includes(lower)) {
@@ -420,6 +419,33 @@ export default function App({ args = [] }) {
                     else if (lower === 'high') mapped = 'High';
                     else if (lower === 'xhigh') mapped = 'xHigh';
                     parsed.thinking = mapped;
+                }
+                i++;
+            } else if (arg === '--key' && args[i + 1]) {
+                const val = args[i + 1];
+                parsed.key = val;
+                if (val.includes('@')) {
+                    const parts = val.split('@');
+                    const keyPart = parts[0];
+                    const provPart = parts[1].toLowerCase();
+                    if (['google', 'deepseek', 'openrouter'].includes(provPart)) {
+                        let mapped = 'Google';
+                        if (provPart === 'google') mapped = 'Google';
+                        else if (provPart === 'deepseek') mapped = 'DeepSeek';
+                        else if (provPart === 'openrouter') mapped = 'OpenRouter';
+                        parsed.key = keyPart;
+                        parsed.provider = mapped;
+                    }
+                }
+                i++;
+            } else if (arg === '--provider' && args[i + 1]) {
+                const val = args[i + 1].toLowerCase();
+                if (['google', 'deepseek', 'openrouter'].includes(val)) {
+                    let mapped = 'Google';
+                    if (val === 'google') mapped = 'Google';
+                    else if (val === 'deepseek') mapped = 'DeepSeek';
+                    else if (val === 'openrouter') mapped = 'OpenRouter';
+                    parsed.provider = mapped;
                 }
                 i++;
             }
@@ -999,11 +1025,34 @@ export default function App({ args = [] }) {
                 setThinkingLevel(saved.thinkingLevel);
             }
 
-            setAiProvider(saved.aiProvider || 'Google');
+            const startupProvider = parsedArgs.provider || saved.aiProvider || 'Google';
+            setAiProvider(startupProvider);
+
+            const currentTier = saved.apiTier || 'Free';
 
             persistedModelRef.current = saved.activeModel;
             if (parsedArgs.model) {
                 setActiveModel(parsedArgs.model);
+            } else if (parsedArgs.provider) {
+                let defaultModel = '';
+                if (currentTier === 'Free') {
+                    if (startupProvider === 'Google') {
+                        defaultModel = 'gemma-4-31b-it';
+                    } else if (startupProvider === 'DeepSeek') {
+                        defaultModel = 'deepseek-v4-flash';
+                    } else { // OpenRouter
+                        defaultModel = 'google/gemma-4-31b-it:free';
+                    }
+                } else {
+                    if (startupProvider === 'Google') {
+                        defaultModel = 'gemini-3-flash-preview';
+                    } else if (startupProvider === 'DeepSeek') {
+                        defaultModel = 'deepseek-v4-flash';
+                    } else { // OpenRouter
+                        defaultModel = 'deepseek/deepseek-v4-flash';
+                    }
+                }
+                setActiveModel(defaultModel);
             } else {
                 setActiveModel(saved.activeModel);
             }
@@ -1053,11 +1102,13 @@ export default function App({ args = [] }) {
             setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
 
             // 2. Load API key
-            const startupProvider = saved.aiProvider || 'Google';
-            const key = await getProviderAPIKey(startupProvider);
+            let key = parsedArgs.key;
+            if (!key) {
+                key = await getProviderAPIKey(startupProvider);
+            }
             if (key) {
                 setApiKey(key);
-                initAI(key, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
+                initAI(key, { aiProvider: startupProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
             }
 
             // 3. Clean up old history and logs (older than 7 days)
@@ -1377,6 +1428,10 @@ export default function App({ args = [] }) {
                     ]
                     : (apiTier === 'Free'
                         ? [
+                            {
+                                cmd: 'gemma-4-26b-a4b-it',
+                                desc: 'Standard & Faster'
+                            },
                             {
                                 cmd: 'gemma-4-31b-it',
                                 desc: 'Standard Default'

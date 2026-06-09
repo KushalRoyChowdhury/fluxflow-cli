@@ -115,6 +115,21 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
                     current = '';
                 }
                 tokens.push(usePowerShell ? ';' : '&');
+            } else if (char === '&' && !current.includes('://')) {
+                if (command[i + 1] === '&') {
+                    if (current.length > 0) {
+                        tokens.push(current);
+                        current = '';
+                    }
+                    tokens.push('&&');
+                    i++; // Skip the second &
+                } else {
+                    if (current.length > 0) {
+                        tokens.push(current);
+                        current = '';
+                    }
+                    tokens.push('&');
+                }
             } else if (char === '|' && !current.includes('://')) {
                 if (current.length > 0) {
                     tokens.push(current);
@@ -375,6 +390,28 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
 
         return processed;
     });
+
+    if (usePowerShell) {
+        let cmdStr = '';
+        let openBraces = 0;
+        for (let i = 0; i < processedTokens.length; i++) {
+            const token = processedTokens[i];
+            if (token === '&&') {
+                cmdStr += '; if ($?) {';
+                openBraces++;
+            } else if (token === ';') {
+                cmdStr += ' }'.repeat(openBraces) + ';';
+                openBraces = 0;
+            } else {
+                if (cmdStr && !cmdStr.endsWith(' ') && !cmdStr.endsWith('{')) {
+                    cmdStr += ' ';
+                }
+                cmdStr += token;
+            }
+        }
+        cmdStr += ' }'.repeat(openBraces);
+        return cmdStr;
+    }
 
     return processedTokens.join(' ');
 };
