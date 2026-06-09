@@ -101,14 +101,16 @@ fluxflow [options]
 
 ### Supported Flags:
 - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.1-pro-preview`). Keps settings file untouched.
-- `--memory <on|off>`: Toggle persistent long-term agent memory for the session.
+- `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
 - `--resume <session-id>`: Resume a previous chat session programmatically.
-- `--update <check|latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
-- `--package <npm|pnpm|yarn|bun>`: Override default package manager to run core application updates.
-- `--auto-del <1d|7d|30d>`: Set automated chat log deletion schedule.
-- `--yolo <on|off>`: Toggle autonomous command execution permission.
-- `--external-access <on|off>`: Toggle permission to let agent read files outside CWD.
-- `--thinking <Fast|Medium|High|xHigh>`: Override default thinking level.
+- `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
+- `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
+- `--auto-del <1d | 7d | 30d>`: Set automated chat log deletion schedule.
+- `--yolo <on | off>`: Toggle autonomous command execution permission.
+- `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
+- `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
+- `--key <key@google | key@deepseek | key@openrouter>`: Set API key and provider.
+- `--provider <google | deepseek | openrouter>`: Override default provider.
 
 ---
 
