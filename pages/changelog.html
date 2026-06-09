@@ -225,12 +225,13 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.2.7"]
+        const stableVersions = ["2.2.8"]
         const changelogData = {
-            "2.2.7": {
+            "2.2.8": {
                 "note": "",
                 "added": [
-                    "**Quick Patch Acceptance:** Added option to directly accept or reject the changes proposed by the agent in IDE."
+                    "**Quick Patch Acceptance:** Added option to directly accept or reject the changes proposed by the agent in IDE.",
+                    "Added quick CLI argument for guide, --help (shows available arguments)"
                 ],
                 "changed": [
                     "Improved IDE Connection Stability.",

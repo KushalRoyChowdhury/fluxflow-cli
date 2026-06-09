@@ -129,15 +129,123 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                         console.error('Error: Could not retrieve latest version.');
                         process.exit(1);
                     }
+                    if (latestVersion === versionFluxflow) {
+                        console.log(`FluxFlow is already up to date (v${versionFluxflow}).`);
+                        process.exit(0);
+                    }
 
-                    const { loadSettings } = await import('./utils/settings.js');
-                    const settings = await loadSettings();
-                    const manager = settings?.systemSettings?.updateManager || settings?.updateManager || 'npm';
+                    const promptPackageManager = async () => {
+                        const React = (await import('react')).default;
+                        const { useState } = React;
+                        const { render, Box, Text } = await import('ink');
+                        const SelectInput = (await import('ink-select-input')).default;
+                        const TextInput = (await import('ink-text-input')).default;
+
+                        return new Promise((resolve) => {
+                            const items = [
+                                { label: 'NPM', value: 'npm' },
+                                { label: 'PNPM', value: 'pnpm' },
+                                { label: 'Yarn', value: 'yarn' },
+                                { label: 'Bun', value: 'bun' },
+                                { label: 'Custom Command', value: 'custom' }
+                            ];
+
+                            const CustomItem = ({ label, isSelected }) => {
+                                return (
+                                    <Box width="100%">
+                                        <Text color={isSelected ? 'cyan' : 'gray'} bold={isSelected}>
+                                            └─ {isSelected ? '◉' : '○'} {label}
+                                        </Text>
+                                    </Box>
+                                );
+                            };
+
+                            let unmountFn;
+
+                            const PromptComponent = () => {
+                                const [step, setStep] = useState('select'); // 'select' | 'custom'
+                                const [customCommand, setCustomCommand] = useState('');
+
+                                const handleSelect = (item) => {
+                                    if (item.value === 'custom') {
+                                        setStep('custom');
+                                    } else {
+                                        cleanupAndResolve({ manager: item.value });
+                                    }
+                                };
+
+                                const handleCustomSubmit = (value) => {
+                                    cleanupAndResolve({ manager: 'custom', customCommand: value });
+                                };
+
+                                if (step === 'custom') {
+                                    return (
+                                        <Box flexDirection="column" marginY={1}>
+                                            <Box marginBottom={1}>
+                                                <Text color="magenta" bold>🔧 Enter custom update command:</Text>
+                                            </Box>
+                                            <Box flexDirection="row">
+                                                <Text color="cyan" bold>   ❯ </Text>
+                                                <TextInput
+                                                    value={customCommand}
+                                                    onChange={setCustomCommand}
+                                                    onSubmit={handleCustomSubmit}
+                                                />
+                                            </Box>
+                                            <Box marginTop={1}>
+                                                <Text color="gray" dimColor italic>   (Press Enter to confirm)</Text>
+                                            </Box>
+                                        </Box>
+                                    );
+                                }
+
+                                return (
+                                    <Box flexDirection="column" marginY={1}>
+                                        <Box marginBottom={1}>
+                                            <Text color="magenta" bold>📦 Select a package manager for the update:</Text>
+                                        </Box>
+                                        <SelectInput
+                                            items={items}
+                                            onSelect={handleSelect}
+                                            itemComponent={CustomItem}
+                                            indicatorComponent={() => null}
+                                        />
+                                    </Box>
+                                );
+                            };
+
+                            const cleanupAndResolve = (val) => {
+                                if (unmountFn) unmountFn();
+                                resolve(val);
+                            };
+
+                            const { unmount } = render(<PromptComponent />);
+                            unmountFn = unmount;
+                        });
+                    };
+
+                    let manager;
+                    let customCommand = '';
+                    let settings;
+                    try {
+                        const { loadSettings } = await import('./utils/settings.js');
+                        settings = await loadSettings();
+                        manager = settings?.systemSettings?.updateManager || settings?.updateManager;
+                    } catch (e) {
+                        // settings.js not found or failed to load
+                    }
+
+                    if (!manager) {
+                        const result = await promptPackageManager();
+                        manager = result.manager;
+                        customCommand = result.customCommand;
+                    }
+
                     let command = '';
                     if (manager === 'pnpm') command = `pnpm add -g fluxflow-cli@${latestVersion}`;
                     else if (manager === 'bun') command = `bun add -g fluxflow-cli@${latestVersion}`;
                     else if (manager === 'yarn') command = `yarn global add fluxflow-cli@${latestVersion}`;
-                    else if (manager === 'custom') command = settings.customUpdateCommand || `npm install -g fluxflow-cli@${latestVersion}`;
+                    else if (manager === 'custom') command = customCommand || settings?.customUpdateCommand || `npm install -g fluxflow-cli@${latestVersion}`;
                     else command = `npm install -g fluxflow-cli@${latestVersion}`;
 
                     console.log(`Updating FluxFlow to v${latestVersion} using ${manager}...`);
