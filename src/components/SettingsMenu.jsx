@@ -181,7 +181,7 @@ export default function SettingsMenu({
                     updated.autoExec = true;
                     updated.allowExternalAccess = true;
                     updated.networkAccess = true;
-                    updated.autoApproveCommands = '';
+                    updated.autoApproveCommands = 'ls, dir, cat, type, echo, pwd, cd, git status, git log, git diff, git branch, git show, help, mkdir, touch, md, whoami, hostname, ps, Get-Process, date, time';
                     updated.autoDisallowCommands = '';
                     updated.alwaysAskCommands = 'rm -rf, rm -f, del /f, del /q, rd /s, rmdir /s, format, mkfs, dd if=/dev, shred, srm, Remove-Item -Recurse -Force, Initialize-Disk, Clear-Disk, format c:, flashrom, nvram -c';
                     updated.autoApproveGit = true;
@@ -254,16 +254,16 @@ export default function SettingsMenu({
     };
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%" height={27}>
+        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%" minHeight={32}>
             {/* Title Bar */}
-            <Box paddingX={1} paddingY={0} marginBottom={1} borderStyle="single" borderColor="magenta" width="100%">
+            <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="magenta" width="100%">
                 <Text color="magenta" bold>🔧 SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
-            <Box flexDirection="row" width="100%" minHeight={19}>
+            <Box flexDirection="row" width="100%" minHeight={26}>
                 {/* Left Column: Categories */}
-                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'cyan' : 'gray'} padding={1}>
+                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'cyan' : 'gray'} padding={1} paddingY={0}>
                     <Box marginBottom={1}>
                         <Text color={activeColumn === 'categories' ? 'cyan' : 'white'} bold underline>
                             CATEGORIES
@@ -275,7 +275,7 @@ export default function SettingsMenu({
                         return (
                             <Box
                                 key={cat.id}
-                                marginTop={isExit ? 8 : 0}
+                                marginTop={isExit ? 17 : 0}
                                 backgroundColor={isSelected ? (activeColumn === 'categories' ? '#2a2a2a' : '#1e1e1e') : undefined}
                                 paddingX={1}
                             >
@@ -291,7 +291,7 @@ export default function SettingsMenu({
                 </Box>
 
                 {/* Right Column: Settings */}
-                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'cyan' : 'gray'} padding={1} marginLeft={1}>
+                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'cyan' : 'gray'} paddingX={1} marginLeft={1} paddingY={0}>
                     <Box marginBottom={1}>
                         <Text color={activeColumn === 'items' ? 'cyan' : 'white'} bold underline>
                             {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
@@ -393,7 +393,7 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={10} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={19} paddingX={1}>
                                         <Text color={isPtyAvailable ? "green" : "yellow"}>
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>
@@ -424,7 +424,7 @@ export default function SettingsMenu({
             </Box>
 
             {/* Navigation Guide Footer */}
-            <Box paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
+            <Box paddingX={1} marginTop={0} flexDirection="row" justifyContent="space-between">
                 <Text color="gray" dimColor italic>
                     {activeColumn === 'categories'
                         ? '▲▼ Select Category • Enter/► to configure'
