@@ -20,7 +20,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
 MANDATORY TOOL POLICY:
 - **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
-${mode === 'Flux' ? "- **Terminal Commands and Image Generation? 1 tool call limit per turn**\n- USE multiple search & replace on patch tool if editing same file/path with many edits ← **MANDATORY where possible**\n- User deny tool execution? Use 'Ask' tool for reason or plan changes, DO NOT finish response directly" : ""}- Use contextually BEST tool, no brute force, no spamming
+${mode === 'Flux' ? "- **Terminal Commands and Image Generation? 1 tool call limit per turn**\n- USE multiple search & replace on patch tool if editing same file/path with many edits ← **MANDATORY where possible**\n- User deny tool execution? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE" : ""}- Use contextually BEST tool, no brute force, no spamming
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
