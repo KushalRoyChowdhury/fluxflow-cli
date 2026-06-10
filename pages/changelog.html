@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.2.8"]
+        const stableVersions = ["2.2.10"]
         const changelogData = {
+            "2.2.10": {
+                "note": "Efficiency Improvements & Image Generation Deprecated",
+                "added": [],
+                "changed": [
+                    "Image Generation Deprecated.",
+                    "v1.11.0 - 2.2.9 will continue to deliver Image generation capability until 2026-06-22. Post that date this capability will be discontinued."
+                ],
+                "fixes": [
+                    "Fixed terminal output bugs.",
+                    "Improve context efficiency for terminal outputs."
+                ]
+            },
             "2.2.8": {
                 "note": "",
                 "added": [

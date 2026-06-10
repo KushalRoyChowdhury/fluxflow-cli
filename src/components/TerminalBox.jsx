@@ -3,31 +3,142 @@ import { Box, Text } from 'ink';
 import { wrapText } from '../utils/text.js';
 
 export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false }) => {
-    // A smart carriage return resolver that simulates terminal overwrites for Ink
+    // A smart terminal output resolver that simulates a terminal grid for Ink
     const processPTY = (text) => {
         if (!text) return '';
 
-        // 1. Handle Hard Clears: Discard everything before the last clear screen/home signal
-        const screenResetRegex = /\x1b\[H|\x1b\[2J|\x1b\[3J|\x1bc/g;
-        const resetMatches = [...text.matchAll(screenResetRegex)];
-        let workingText = text;
-        if (resetMatches.length > 0) {
-            const lastMatch = resetMatches[resetMatches.length - 1];
-            workingText = text.substring(lastMatch.index + lastMatch[0].length);
+        // Each line is an array of cell objects: { char, style }
+        const lines = [[]];
+        let cursorRow = 0;
+        let cursorCol = 0;
+        let currentStyle = '';
+
+        const ansiRegex = /\x1b\[([0-9;]*?)([a-zA-Z])/g;
+        let lastIndex = 0;
+        let match;
+
+        const writeText = (plainText) => {
+            for (let i = 0; i < plainText.length; i++) {
+                const char = plainText[i];
+                if (char === '\n') {
+                    cursorRow++;
+                    cursorCol = 0;
+                    while (cursorRow >= lines.length) {
+                        lines.push([]);
+                    }
+                } else if (char === '\r') {
+                    cursorCol = 0;
+                } else {
+                    while (cursorRow >= lines.length) {
+                        lines.push([]);
+                    }
+                    const line = lines[cursorRow];
+                    while (cursorCol > line.length) {
+                        line.push({ char: ' ', style: '' });
+                    }
+                    line[cursorCol] = { char, style: currentStyle };
+                    cursorCol++;
+                }
+            }
+        };
+
+        while ((match = ansiRegex.exec(text)) !== null) {
+            writeText(text.substring(lastIndex, match.index));
+
+            const params = match[1];
+            const command = match[2];
+            const paramValues = params ? params.split(';').map(Number) : [];
+
+            if (command === 'A') {
+                const count = paramValues[0] || 1;
+                cursorRow = Math.max(0, cursorRow - count);
+            } else if (command === 'B') {
+                const count = paramValues[0] || 1;
+                cursorRow = cursorRow + count;
+                while (cursorRow >= lines.length) {
+                    lines.push([]);
+                }
+            } else if (command === 'C') {
+                const count = paramValues[0] || 1;
+                cursorCol = cursorCol + count;
+            } else if (command === 'D') {
+                const count = paramValues[0] || 1;
+                cursorCol = Math.max(0, cursorCol - count);
+            } else if (command === 'G') {
+                const col = (paramValues[0] || 1) - 1;
+                cursorCol = Math.max(0, col);
+            } else if (command === 'H' || command === 'f') {
+                const row = (paramValues[0] || 1) - 1;
+                const col = (paramValues[1] || 1) - 1;
+                cursorRow = Math.max(0, row);
+                cursorCol = Math.max(0, col);
+                while (cursorRow >= lines.length) {
+                    lines.push([]);
+                }
+            } else if (command === 'K') {
+                const mode = paramValues[0] || 0;
+                if (cursorRow < lines.length) {
+                    const line = lines[cursorRow];
+                    if (mode === 0) {
+                        line.length = cursorCol;
+                    } else if (mode === 1) {
+                        for (let c = 0; c < cursorCol && c < line.length; c++) {
+                            line[c] = { char: ' ', style: '' };
+                        }
+                    } else if (mode === 2) {
+                        line.length = 0;
+                    }
+                }
+            } else if (command === 'J') {
+                const mode = paramValues[0] || 0;
+                if (mode === 2 || mode === 3) {
+                    lines.length = 0;
+                    lines.push([]);
+                    cursorRow = 0;
+                    cursorCol = 0;
+                }
+            } else if (command === 'm') {
+                const escSeq = match[0];
+                if (escSeq === '\x1b[0m') {
+                    currentStyle = '';
+                } else {
+                    currentStyle = escSeq;
+                }
+            }
+
+            lastIndex = ansiRegex.lastIndex;
         }
 
-        // 2. Normalize Newlines
-        const noTrailingCr = workingText.replace(/\r+\n/g, '\n');
+        writeText(text.substring(lastIndex));
 
-        // 3. Resolve Carriage Returns (Overwrites)
-        return noTrailingCr.split('\n').map(line => {
-            const parts = line.split('\r');
-            return parts[parts.length - 1];
-        }).join('\n');
+        const resultLines = lines.map(line => {
+            let lineStr = '';
+            let activeStyle = '';
+            for (let i = 0; i < line.length; i++) {
+                const cell = line[i] || { char: ' ', style: '' };
+                if (cell.style !== activeStyle) {
+                    if (activeStyle) {
+                        lineStr += '\x1b[0m';
+                    }
+                    lineStr += cell.style;
+                    activeStyle = cell.style;
+                }
+                lineStr += cell.char;
+            }
+            if (activeStyle) {
+                lineStr += '\x1b[0m';
+            }
+            return lineStr;
+        });
+
+        while (resultLines.length > 0 && resultLines[resultLines.length - 1] === '') {
+            resultLines.pop();
+        }
+
+        return resultLines.join('\n');
     };
 
-    // For standard spawn we do minor cleanup, but for PTY we use the smart resolver
-    const cleanOutput = (isPty ? processPTY(output) : (output || '').replace(/\r\n/g, '\n')).replace(/\n{3,}/g, '\n\n');
+    const cleanOutput = processPTY(output).replace(/\n{3,}/g, '\n\n');
 
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');

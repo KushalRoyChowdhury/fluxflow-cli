@@ -28,7 +28,7 @@ import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace } from './utils/terminal.js';
-import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty } from './tools/exec_command.js';
+import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
@@ -2150,27 +2150,9 @@ export default function App({ args = [] }) {
                             onExecEnd: () => {
                                 setMessages(prev => {
                                     if (!activeCommandRef.current) return prev;
-                                    // Normalize output for history/agent (resolve carriage returns to simulate terminal overwrite)
+                                    // Normalize output for history/agent (resolve carriage returns and terminal movements to simulate terminal overwrite)
                                     const rawOutput = execOutputRef.current || '';
-                                    let normalizedOutput = '';
-                                    if (isActiveCommandPty) {
-                                        // 1. Handle Hard Clears: Discard everything before the last clear screen/home signal
-                                        const screenResetRegex = /\x1b\[H|\x1b\[2J|\x1b\[3J|\x1bc/g;
-                                        const resetMatches = [...rawOutput.matchAll(screenResetRegex)];
-                                        let workingText = rawOutput;
-                                        if (resetMatches.length > 0) {
-                                            const lastMatch = resetMatches[resetMatches.length - 1];
-                                            workingText = rawOutput.substring(lastMatch.index + lastMatch[0].length);
-                                        }
-
-                                        const noTrailingCr = workingText.replace(/\r+\n/g, '\n');
-                                        normalizedOutput = noTrailingCr.split('\n').map(line => {
-                                            const parts = line.split('\r');
-                                            return parts[parts.length - 1];
-                                        }).join('\n');
-                                    } else {
-                                        normalizedOutput = rawOutput.replace(/\r\n/g, '\n');
-                                    }
+                                    const normalizedOutput = cleanTerminalOutput(rawOutput);
                                     const finalStatus = `[TERMINAL_RECORD]
                                     COMMAND: ${activeCommandRef.current}
                                     PTY: ${isActiveCommandPty}

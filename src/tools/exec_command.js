@@ -20,6 +20,113 @@ const stripAnsi = (str) => {
     return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 };
 
+export const cleanTerminalOutput = (text) => {
+    if (!text) return '';
+
+    // Simulate character grid to resolve carriage returns and cursor movements
+    const lines = [[]];
+    let cursorRow = 0;
+    let cursorCol = 0;
+
+    const ansiRegex = /\x1b\[([0-9;]*?)([a-zA-Z])/g;
+    let lastIndex = 0;
+    let match;
+
+    const writeText = (plainText) => {
+        for (let i = 0; i < plainText.length; i++) {
+            const char = plainText[i];
+            if (char === '\n') {
+                cursorRow++;
+                cursorCol = 0;
+                while (cursorRow >= lines.length) {
+                    lines.push([]);
+                }
+            } else if (char === '\r') {
+                cursorCol = 0;
+            } else {
+                while (cursorRow >= lines.length) {
+                    lines.push([]);
+                }
+                const line = lines[cursorRow];
+                while (cursorCol > line.length) {
+                    line.push(' ');
+                }
+                line[cursorCol] = char;
+                cursorCol++;
+            }
+        }
+    };
+
+    while ((match = ansiRegex.exec(text)) !== null) {
+        writeText(text.substring(lastIndex, match.index));
+
+        const params = match[1];
+        const command = match[2];
+        const paramValues = params ? params.split(';').map(Number) : [];
+
+        if (command === 'A') {
+            const count = paramValues[0] || 1;
+            cursorRow = Math.max(0, cursorRow - count);
+        } else if (command === 'B') {
+            const count = paramValues[0] || 1;
+            cursorRow = cursorRow + count;
+            while (cursorRow >= lines.length) {
+                lines.push([]);
+            }
+        } else if (command === 'C') {
+            const count = paramValues[0] || 1;
+            cursorCol = cursorCol + count;
+        } else if (command === 'D') {
+            const count = paramValues[0] || 1;
+            cursorCol = Math.max(0, cursorCol - count);
+        } else if (command === 'G') {
+            const col = (paramValues[0] || 1) - 1;
+            cursorCol = Math.max(0, col);
+        } else if (command === 'H' || command === 'f') {
+            const row = (paramValues[0] || 1) - 1;
+            const col = (paramValues[1] || 1) - 1;
+            cursorRow = Math.max(0, row);
+            cursorCol = Math.max(0, col);
+            while (cursorRow >= lines.length) {
+                lines.push([]);
+            }
+        } else if (command === 'K') {
+            const mode = paramValues[0] || 0;
+            if (cursorRow < lines.length) {
+                const line = lines[cursorRow];
+                if (mode === 0) {
+                    line.length = cursorCol;
+                } else if (mode === 1) {
+                    for (let c = 0; c < cursorCol && c < line.length; c++) {
+                        line[c] = ' ';
+                    }
+                } else if (mode === 2) {
+                    line.length = 0;
+                }
+            }
+        } else if (command === 'J') {
+            const mode = paramValues[0] || 0;
+            if (mode === 2 || mode === 3) {
+                lines.length = 0;
+                lines.push([]);
+                cursorRow = 0;
+                cursorCol = 0;
+            }
+        }
+
+        lastIndex = ansiRegex.lastIndex;
+    }
+
+    writeText(text.substring(lastIndex));
+
+    const resultLines = lines.map(line => line.join(''));
+    while (resultLines.length > 0 && resultLines[resultLines.length - 1] === '') {
+        resultLines.pop();
+    }
+
+    return resultLines.join('\n');
+};
+
 /**
  * Execute Command Tool
  * Runs a terminal command and returns the output.
@@ -478,8 +585,8 @@ export const exec_command = async (args, options = {}) => {
                     ptyProcess.onExit(({ exitCode }) => {
                         if (isResolved) return;
                         activeChildProcess = null;
-                        // Normalize output for the agent (convert all line breaks to \n)
-                        const normalizedOutput = (output || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                        // Resolve terminal movements/overwrites first
+                        const normalizedOutput = cleanTerminalOutput(output || '');
                         const finalOutput = stripAnsi(normalizedOutput).replace(/\n{3,}/g, '\n\n') || 'Command executed with no output.';
                         if (exitCode !== 0) {
                             resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].\n\n${finalOutput}`);
@@ -575,8 +682,10 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
         if (isResolved) return;
         activeChildProcess = null;
         const result = [];
-        if (stdout) result.push(`STDOUT:\n${stdout}`);
-        if (stderr) result.push(`STDERR:\n${stderr}`);
+        const cleanStdout = cleanTerminalOutput(stdout);
+        const cleanStderr = cleanTerminalOutput(stderr);
+        if (cleanStdout) result.push(`STDOUT:\n${cleanStdout}`);
+        if (cleanStderr) result.push(`STDERR:\n${cleanStderr}`);
         if (code !== 0) result.push(`EXIT CODE: ${code}`);
 
         const rawOutput = result.join('\n\n') || 'Command executed with no output.';
