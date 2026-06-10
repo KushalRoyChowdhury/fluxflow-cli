@@ -3,7 +3,7 @@ import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { loadSettings } from '../utils/settings.js';
 import { checkImageQuota, recordImageGeneration, getImageQuotaStats } from '../utils/usage.js';
-import { FALLBACK_IMAGE_KEY } from '../utils/fallback_key.js';
+// import { FALLBACK_IMAGE_KEY } from '../utils/fallback_key.js';
 import { RevertManager } from '../utils/revert.js';
 
 /**

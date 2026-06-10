@@ -37,14 +37,12 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/
 4. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 5. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
 6. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD ONLY`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT OR 3 CONSECUTIVE RUN TOOL ONLY**
-7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Mockups, PDF thumbnails, any visual content
-8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
-9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
+7. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
+8. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
 - File structure: Real newlines for code formatting`.trim() : `
-- FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user to,\` /mode flux\` if needed)`.trim()}
-
-- Results: Passed as [TOOL RESULT] in user turn`.trim();
+- FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user to,\` /mode flux\` if needed)`.trim()}`.trim();
+// 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Mockups, PDF thumbnails, any visual content

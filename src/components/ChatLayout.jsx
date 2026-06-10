@@ -115,6 +115,7 @@ const cleanSignals = (text) => {
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')
         .replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
+        .replace(/\[\[END\]\]/gi, '')
         .replace(/\[\s*turn\s*:?.*?$/gi, '')
         .replace(/\n\s*turn\s*:?.*?$/gi, '')
         .replace(/\[\s*$/gi, '')

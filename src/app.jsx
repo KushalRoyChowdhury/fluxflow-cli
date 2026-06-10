@@ -1272,32 +1272,32 @@ export default function App({ args = [] }) {
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
-        {
-            cmd: '/image', desc: 'Generate images using Pollinations', subs: [
-                {
-                    cmd: 'setup', desc: 'Configure defaults', subs: [
-                        {
-                            cmd: 'key', desc: 'Set API key strategy', subs: [
-                                { cmd: 'default', desc: 'Default (Quota: Dynamic 25 max/hr)' },
-                                { cmd: 'custom', desc: 'Custom Key' }
-                            ]
-                        },
-                        {
-                            cmd: 'quality', desc: 'Set default quality', subs: [
-                                { cmd: 'low', desc: imageSettings?.keyType === 'Custom' ? '(0.001/img)' : '(1/img)' },
-                                { cmd: 'low-high', desc: imageSettings?.keyType === 'Custom' ? '(0.002/img)' : '(2/img)' },
-                                { cmd: 'medium', desc: imageSettings?.keyType === 'Custom' ? '(0.008/img)' : '(8/img)' },
-                                { cmd: 'medium-high', desc: imageSettings?.keyType === 'Custom' ? '(0.01/img)' : '(10/img)' },
-                                { cmd: 'high', desc: imageSettings?.keyType === 'Custom' ? '(0.045/img)' : '(45/img)' },
-                                { cmd: 'ultra', desc: imageSettings?.keyType === 'Custom' ? '(0.0488/img)' : '(49/img)' },
-                                { cmd: 'premium', desc: imageSettings?.keyType === 'Custom' ? '(0.1/img)' : '(100/img)' }
-                            ]
-                        }
-                    ]
-                },
-                { cmd: 'stats', desc: 'Show remaining credits or Pollinations balance status' }
-            ]
-        },
+        // {
+        //     cmd: '/image', desc: 'Generate images using Pollinations', subs: [
+        //         {
+        //             cmd: 'setup', desc: 'Configure defaults', subs: [
+        //                 {
+        //                     cmd: 'key', desc: 'Set API key strategy', subs: [
+        //                         { cmd: 'default', desc: 'Default (Quota: Dynamic 25 max/hr)' },
+        //                         { cmd: 'custom', desc: 'Custom Key' }
+        //                     ]
+        //                 },
+        //                 {
+        //                     cmd: 'quality', desc: 'Set default quality', subs: [
+        //                         { cmd: 'low', desc: imageSettings?.keyType === 'Custom' ? '(0.001/img)' : '(1/img)' },
+        //                         { cmd: 'low-high', desc: imageSettings?.keyType === 'Custom' ? '(0.002/img)' : '(2/img)' },
+        //                         { cmd: 'medium', desc: imageSettings?.keyType === 'Custom' ? '(0.008/img)' : '(8/img)' },
+        //                         { cmd: 'medium-high', desc: imageSettings?.keyType === 'Custom' ? '(0.01/img)' : '(10/img)' },
+        //                         { cmd: 'high', desc: imageSettings?.keyType === 'Custom' ? '(0.045/img)' : '(45/img)' },
+        //                         { cmd: 'ultra', desc: imageSettings?.keyType === 'Custom' ? '(0.0488/img)' : '(49/img)' },
+        //                         { cmd: 'premium', desc: imageSettings?.keyType === 'Custom' ? '(0.1/img)' : '(100/img)' }
+        //                     ]
+        //                 }
+        //             ]
+        //         },
+        //         { cmd: 'stats', desc: 'Show remaining credits or Pollinations balance status' }
+        //     ]
+        // },
         {
             cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
                 { cmd: 'flux', desc: 'Enable Dev toolset' },
@@ -1892,6 +1892,7 @@ export default function App({ args = [] }) {
                             const cleanThinkText = (msg.text || '')
                                 .replace(/\[turn:\s*continue\]/gi, '')
                                 .replace(/\[turn:\s*finish\]/gi, '')
+                                .replace(/\[\[END\]\]/gi, '')
                                 .replace(/\[TOOL RESULTS\]/gi, '')
                                 .trim();
                             if (cleanThinkText) {
@@ -1911,6 +1912,7 @@ export default function App({ args = [] }) {
                                     const cleanContent = block.content
                                         .replace(/\[turn:\s*continue\]/gi, '')
                                         .replace(/\[turn:\s*finish\]/gi, '')
+                                        .replace(/\[\[END\]\]/gi, '')
                                         .replace(/\[TOOL RESULTS\]/gi, '')
                                         .trim();
                                     if (cleanContent) {

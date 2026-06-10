@@ -443,6 +443,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 })
                 .replace(/\[turn: continue\]/g, '')
                 .replace(/\[turn: finish\]/g, '')
+                .replace(/\[\[END\]\]/g, '')
                 .replace(/\[TOOL RESULTS\]/g, '')
                 .replace(/\[tool results\]/g, '')
                 .replace(/\r?\n\r?\n/g, '\n')
@@ -478,7 +479,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         needTitle
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[\[END\]\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
@@ -876,11 +877,14 @@ const getSanitizedText = (text) => {
 };
 
 const detectToolCalls = (text) => {
+    if (!text) return [];
+    // Strip any thinking blocks first to ensure no tool calls are detected inside them
+    const cleanText = text.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
     const results = [];
     const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
 
     let match;
-    while ((match = toolRegex.exec(text)) !== null) {
+    while ((match = toolRegex.exec(cleanText)) !== null) {
         const toolName = match[1];
         const startIdx = match.index + match[0].length - 1; // Index of '('
 
@@ -889,14 +893,14 @@ const detectToolCalls = (text) => {
         let endIdx = -1;
         let closingParenIdx = -1;
 
-        for (let i = startIdx; i < text.length; i++) {
-            const char = text[i];
+        for (let i = startIdx; i < cleanText.length; i++) {
+            const char = cleanText[i];
 
             if (inString) {
                 if (char === inString) {
                     // Check if escaped: count backslashes preceding this quote
                     let backslashCount = 0;
-                    for (let j = i - 1; j >= 0 && text[j] === '\\'; j--) {
+                    for (let j = i - 1; j >= 0 && cleanText[j] === '\\'; j--) {
                         backslashCount++;
                     }
                     if (backslashCount % 2 === 0) {
@@ -913,8 +917,8 @@ const detectToolCalls = (text) => {
                     if (balance === 0) {
                         closingParenIdx = i;
                         let j = i + 1;
-                        while (j < text.length && /\s/.test(text[j])) j++;
-                        if (j < text.length && text[j] === ']') {
+                        while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
+                        if (j < cleanText.length && cleanText[j] === ']') {
                             endIdx = j;
                             break;
                         }
@@ -924,8 +928,8 @@ const detectToolCalls = (text) => {
         }
 
         if (endIdx !== -1) {
-            const finalArgsText = text.substring(startIdx + 1, closingParenIdx);
-            const finalFullMatch = text.substring(match.index, endIdx + 1);
+            const finalArgsText = cleanText.substring(startIdx + 1, closingParenIdx);
+            const finalFullMatch = cleanText.substring(match.index, endIdx + 1);
             results.push({
                 fullMatch: finalFullMatch,
                 toolName: toolName.trim(),
@@ -1563,7 +1567,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         .map((msg, idx, arr) => {
                             let text = msg.text || '';
                             if (msg.role === 'agent') {
-                                text = text.replace(/\[turn:\s*finish\]/gi, '').trim();
+                                text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                             }
                             const parts = [{ text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -1622,7 +1626,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
                         const currentStep = loop + 1;
                         if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [turn:finish] quickly.`;
+                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] or [turn:finish] quickly.`;
                         }
                     }
 
@@ -2675,13 +2679,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // we assume the model finished its response but forgot the command tags. We bypass recovery
                     // and let the outer loop's loop-reset safety valve handle the continue/finish prompts!
                     const signalSafeText = (turnText || '').trim();
-                    const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
+                    const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase()) || /\[\[END\]\]/i.test(signalSafeText.toLowerCase());
                     const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
                     const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
 
                     const pureOutputText = signalSafeText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
                     const endsWithEmoji = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u.test(pureOutputText);
-                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || pureOutputText.endsWith('."') || endsWithEmoji;
+                    // This regex catches trailing markdown (*, **, _, `), quotes (", '), brackets, tables (|), and trailing spaces/newlines
+                    // Added curly quotes, curly brackets, wave dashes, and a unicode punctuation wildcard (\p{P})
+                    const superSneakyRegex = /([.!?"'*_`|\]\)”’~~]+|\s|`{3}|[\u200B-\u200D\uFEFF])$/u;
+
+                    // Check if your text ends with any of that chaos
+                    const endsWithFormatting = superSneakyRegex.test(pureOutputText.trim());
+                    const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || endsWithFormatting || endsWithEmoji;
 
                     if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
                         throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals.");
@@ -2853,13 +2863,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
 
             const signalSafeText = getSanitizedText(turnText);
-            const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase());
+            const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase()) || /\[\[END\]\]/i.test(signalSafeText.toLowerCase());
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
             yield { type: 'status', content: 'Working...' };
 
-            const cleanedTurnText = contextSafeReplace(turnText, /\[\s*(turn\s*:)?\s*(continue|finish)\s*\]/gi, '')
+            const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, '')
                 .trim();
 
             // [STRICT PROTOCOL ENFORCEMENT]
@@ -2929,7 +2939,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (wasToolCalledInLastLoop) {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked if unsure` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [turn: finish] else continue'}`}` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]] or [turn: finish] else continue'}`}` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;
