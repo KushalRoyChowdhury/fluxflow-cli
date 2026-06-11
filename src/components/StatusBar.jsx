@@ -7,7 +7,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
 
     let maxLimit = 256000;
-    if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+    if (aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || (aiProvider === 'Google' && apiTier === 'Paid')) {
         maxLimit = 400000;
     }
 

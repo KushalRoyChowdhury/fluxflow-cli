@@ -34,6 +34,8 @@ const MULTIMODAL_MODELS = [
     'openai/gpt-5.2-pro',
     'openai/gpt-5.5-pro',
     'moonshotai/kimi-k2.6',
+    // NVIDIA vision models
+    "moonshotai/kimi-k2.6",
     // Google models
     'gemma-4-31b-it',
     'gemini-2.5-flash',
@@ -222,6 +224,156 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
         }
     }
 };
+
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false) {
+    const messages = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+
+    contents.forEach(item => {
+        const role = item.role === 'model' ? 'assistant' : 'user';
+        const msgContent = [];
+
+        if (Array.isArray(item.parts)) {
+            item.parts.forEach(part => {
+                if (part.text) {
+                    msgContent.push({ type: 'text', text: part.text });
+                } else if (part.inlineData && isMultiModal) {
+                    const mimeType = part.inlineData.mimeType;
+                    const data = part.inlineData.data;
+                    const isImage = mimeType.startsWith('image/');
+
+                    if (isImage) {
+                        msgContent.push({
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${data}`
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        messages.push({
+            role,
+            content: (msgContent.length === 1 && msgContent[0].type === 'text') ? msgContent[0].text : msgContent
+        });
+    });
+
+    const reasoningBudgets = {
+        'Low': 512,
+        'Medium': 4096,
+        'High': 8192,
+        'xHigh': 16384
+    };
+    const budget = reasoningBudgets[thinkingLevel] || 0;
+    const isThinking = thinkingLevel !== 'Fast' && budget > 0;
+
+    const body = {
+        model: model,
+        messages: messages,
+        temperature: mode === 'Flux' ? 0.7 : 1.0,
+        top_p: isThinking ? 0.95 : 0.7,
+        max_tokens: 16384,
+        stream: true,
+        stream_options: { include_usage: true }
+    };
+
+    if (isThinking && !mode.includes('deepseek')) {
+        body.reasoning_budget = model.includes('gemma-4') ? 16384 : budget;
+        if (!model.includes('minimax')) body.chat_template_kwargs = { "enable_thinking": true };
+    }
+
+    if (model.includes('deepseek')) {
+        if (isThinking) body.chat_template_kwargs = { "enable_thinking": true, "reasoning_effort": "high" };
+    }
+
+    const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
+        error.status = response.status;
+        throw error;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    let pendingParts = [];
+    let latestUsageMetadata = null;
+    let lastFlushTime = Date.now();
+    let hasNewData = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+            }
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed === 'data: [DONE]') continue;
+            if (trimmed.startsWith('data: ')) {
+                try {
+                    const json = JSON.parse(trimmed.substring(6));
+                    const usage = json.usage;
+                    if (usage) {
+                        latestUsageMetadata = {
+                            totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                            promptTokenCount: usage.prompt_tokens || 0,
+                            candidatesTokenCount: usage.completion_tokens || 0,
+                            thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
+                        };
+                        hasNewData = true;
+                    }
+
+                    const thinking = json.choices?.[0]?.delta?.reasoning || json.choices?.[0]?.delta?.reasoning_content || '';
+                    const content = json.choices?.[0]?.delta?.content || '';
+
+                    if (thinking) {
+                        pendingParts.push({ text: thinking, thought: true });
+                        hasNewData = true;
+                    }
+                    if (content) {
+                        pendingParts.push({ text: content });
+                        hasNewData = true;
+                    }
+                } catch (e) { }
+            }
+        }
+
+        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+            yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+        }
+    }
+}
 
 const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
     const messages = [];
@@ -539,6 +691,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
+                            mode,
+                            false
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else if (aiProvider === 'NVIDIA') {
+                        const stream = getNVIDIAStream(
+                            apiKey,
+                            'deepseek-ai/deepseek-v4-flash',
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast',
                             mode,
                             false
                         );
@@ -966,6 +1131,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         stream = getOpenRouterStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
     } else if (aiProvider === 'DeepSeek') {
         stream = getDeepSeekStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+    } else if (aiProvider === 'NVIDIA') {
+        stream = getNVIDIAStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
     } else {
         const genStream = await client.models.generateContentStream({
             model: model,
@@ -1128,7 +1295,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let contextCompressionCount = 252000;
         let contextTruncationCount = 254000;
 
-        if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+        if (aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || (aiProvider === 'Google' && apiTier === 'Paid')) {
             contextCompressionCount = 396000;
             contextTruncationCount = 400000;
         }
@@ -1155,6 +1322,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 let targetModel = 'gemma-4-26b-a4b-it';
                 if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
                 if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
+                if (aiProvider === 'NVIDIA') targetModel = 'nvidia/llama-3.1-405b-instruct';
 
                 let attempts = 0;
                 let success = false;
@@ -1631,7 +1799,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
-                    // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `<bos>\n<system>\n${currentSystemInstruction}\n\n<user>\n${firstUserMsg}\n<eos>`); break
+                    // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`); break
 
                     let activeContents = contents;
@@ -1648,6 +1816,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal
+                        );
+                    } else if (aiProvider === 'NVIDIA') {
+                        stream = getNVIDIAStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -1723,15 +1901,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // Success - Reset model name display for final chunks
                     yield { type: 'model_update', content: null };
-                    yield { type: 'status', content: 'Working...' };
 
                     dedupeBuffer = '';
                     isDedupeActive = accumulatedContext.length > 0;
 
                     let pendingGoogleText = '';
                     let lastGoogleFlushTime = Date.now();
+                    let isFirstChunk = true;
 
                     for await (const chunk of stream) {
+                        if (isFirstChunk) {
+                            yield { type: 'status', content: 'Working...' };
+                            isFirstChunk = false;
+                        }
+
                         if (TERMINATION_SIGNAL) {
                             yield { type: 'status', content: 'Termination Signal Received.' };
                             // wait 3s

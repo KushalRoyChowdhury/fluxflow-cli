@@ -4,7 +4,6 @@
 <p align="left">
   <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v2-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://deepmind.google"><img src="https://img.shields.io/badge/Engine-Gemma%204-red?style=plastic" alt="Engine Gemma 4"></a>
-  <a href="https://pollinations.ai"><img src="https://img.shields.io/badge/Built%20With-pollinations.ai-cyan?style=plastic" alt="Built With pollinations.ai"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D20-green?style=plastic" alt="Node Compatibility"></a>
 </p>
@@ -19,12 +18,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
-- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively, and **OpenRouter** (Experimental) to connect to hundreds of LLMs.
-
-- **Creative & Visual Sovereignty**: Generate gorgeous, high-fidelity images directly from the command line using [Pollinations AI](https://pollinations.ai). Use the `/image` command or ask the agent to create visuals. Features:
-  - **Customizable Presets**: Supports models like Flux, ZImage, Qwen, and Nanobanana-Pro, custom aspect ratios, and randomized seeds.
-  - **Budget Telemetry**: Real-time credits tracker displayed in sleek high-contrast Ink terminal boxes.
-  - **PNG Metadata Embedding**: Autonomously injects custom `tEXt` metadata chunks (Title, Software, Author, Seed, Model, and exact Prompt details) straight into the output image headers.
+- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively, and **OpenRouter** (Experimental) to connect to hundreds of LLMs, **NVIDIA** to get best open-weight models for free.
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
   - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.

@@ -18,6 +18,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false) => {
+    // fs.writeFileSync('debug.txt', `${aiProvider}\n\n${targetModel}`);
     let thinkingConfig = '';
     if (thinkingLevel !== 'GEM') {
         let levelKey = thinkingLevel;
@@ -71,7 +72,7 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
 
     return `${nameStr}${nicknameStr}${userInstrStr}[SYSTEM]
 Identity: Flux Flow (by Kushal Roy Chowdhury). Conversational, Sassy${mode === 'Flux' ? ', Respectful' : ', Friendly, Humorous, Sarcastic' }, CLI Agent
-Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking Mode)" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Client-Server Sync" : "Concise"}
+Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Client-Server Sync" : "Concise"}
 
 -- AGENT RULES (PRIORITY: HIGH) --
 - **MANDATORY: MUST END EVERY RESPONSE WITH [[END]]**
@@ -96,7 +97,6 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- NO EMOJI AT END OF RESPONSE
 - NO LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 [/SYSTEM]`.trim();
 };

@@ -376,11 +376,12 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
                         else if (provPart === 'openrouter') mapped = 'OpenRouter';
+                        else if (provPart === 'nvidia') mapped = 'NVIDIA';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -450,11 +451,12 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
                     else if (val === 'openrouter') mapped = 'OpenRouter';
+                    else if (val === 'nvidia') mapped = 'NVIDIA';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -611,6 +613,9 @@ export default function App({ args = [] }) {
             } else if (aiProvider === 'DeepSeek') {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash (Free default)';
+            } else if (aiProvider === 'NVIDIA') {
+                defaultModel = 'moonshotai/kimi-k2.6';
+                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'google/gemma-4-31b-it:free';
                 modelDisplayName = 'Gemma 4 (Free default)';
@@ -622,6 +627,9 @@ export default function App({ args = [] }) {
             } else if (aiProvider === 'DeepSeek') {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
+            } else if (aiProvider === 'NVIDIA') {
+                defaultModel = 'moonshotai/kimi-k2.6';
+                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'deepseek/deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
@@ -694,7 +702,7 @@ export default function App({ args = [] }) {
                 setWittyPhrase(randomPhrase);
             };
             if (!wittyPhrase) updatePhrase(); // Initial pick
-            interval = setInterval(updatePhrase, 5000);
+            interval = setInterval(updatePhrase, 10000);
         } else {
             setWittyPhrase('');
         }
@@ -1067,16 +1075,20 @@ export default function App({ args = [] }) {
                         defaultModel = 'gemma-4-31b-it';
                     } else if (startupProvider === 'DeepSeek') {
                         defaultModel = 'deepseek-v4-flash';
-                    } else { // OpenRouter
+                    } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'google/gemma-4-31b-it:free';
+                    } else if (startupProvider === 'NVIDIA') {
+                        defaultModel = 'moonshotai/kimi-k2.6';
                     }
                 } else {
                     if (startupProvider === 'Google') {
                         defaultModel = 'gemini-3-flash-preview';
                     } else if (startupProvider === 'DeepSeek') {
                         defaultModel = 'deepseek-v4-flash';
-                    } else { // OpenRouter
+                    } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'deepseek/deepseek-v4-flash';
+                    } else if (startupProvider === 'NVIDIA') {
+                        defaultModel = 'moonshotai/kimi-k2.6';
                     }
                 }
                 setActiveModel(defaultModel);
@@ -1217,9 +1229,10 @@ export default function App({ args = [] }) {
 
     const handleSetup = async (val) => {
         const key = val.trim();
-        let minLength = 30;
-        if (aiProvider === 'OpenRouter') minLength = 10;
-        if (aiProvider === 'DeepSeek') minLength = 20;
+        let minLength = 39;
+        if (aiProvider === 'OpenRouter') minLength = 30;
+        if (aiProvider === 'DeepSeek') minLength = 30;
+        if (aiProvider === 'NVIDIA') minLength = 30;
 
         if (key.length >= minLength) {
             await saveProviderAPIKey(aiProvider, key);
@@ -1231,6 +1244,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'google/gemma-4-31b-it:free';
             } else if (aiProvider === 'DeepSeek') {
                 defaultModel = 'deepseek-v4-flash';
+            } else if (aiProvider === 'NVIDIA') {
+                defaultModel = 'moonshotai/kimi-k2.6';
             }
             setActiveModel(defaultModel);
 
@@ -1332,28 +1347,33 @@ export default function App({ args = [] }) {
                     { cmd: 'Standard', desc: 'Standard Reasoning' },
                     { cmd: 'xHigh', desc: 'Extended Reasoning' }
                 ]
-                : aiProvider === 'OpenRouter'
+                : aiProvider === 'NVIDIA'
                     ? [
-                        { cmd: 'Fast', desc: 'Fastest' },
-                        { cmd: 'Low', desc: 'Quick Reasoning' },
-                        { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                        { cmd: 'High', desc: 'Deep Reasoning' },
-                        { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                        { cmd: 'Fast', desc: 'Reasoning Disabled' },
+                        { cmd: 'xHigh', desc: 'Reasoning Enabled' }
                     ]
-                    : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                    : aiProvider === 'OpenRouter'
                         ? [
-                            { cmd: 'Fast', desc: 'Fastest' },
-                            { cmd: 'Low', desc: 'Quick Reasoning' },
-                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                            { cmd: 'High', desc: 'Deep Reasoning' }
-                        ]
-                        : [ // Google General / Gemma
                             { cmd: 'Fast', desc: 'Fastest' },
                             { cmd: 'Low', desc: 'Quick Reasoning' },
                             { cmd: 'Medium', desc: 'Balanced Reasoning' },
                             { cmd: 'High', desc: 'Deep Reasoning' },
                             { cmd: 'xHigh', desc: 'Extended Reasoning' }
                         ]
+                        : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                            ? [
+                                { cmd: 'Fast', desc: 'Fastest' },
+                                { cmd: 'Low', desc: 'Quick Reasoning' },
+                                { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                { cmd: 'High', desc: 'Deep Reasoning' }
+                            ]
+                            : [ // Google General / Gemma
+                                { cmd: 'Fast', desc: 'Fastest' },
+                                { cmd: 'Low', desc: 'Quick Reasoning' },
+                                { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                { cmd: 'High', desc: 'Deep Reasoning' },
+                                { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                            ]
         },
         {
             cmd: '/model',
@@ -1447,52 +1467,79 @@ export default function App({ args = [] }) {
                             desc: 'High-Intelligence Reasoning'
                         }
                     ]
-                    : (apiTier === 'Free'
+                    : aiProvider === 'NVIDIA'
                         ? [
                             {
-                                cmd: 'gemma-4-26b-a4b-it',
-                                desc: 'Standard & Faster'
+                                cmd: 'moonshotai/kimi-k2.6',
+                                desc: 'Multimodal [STABLE]'
                             },
                             {
-                                cmd: 'gemma-4-31b-it',
-                                desc: 'Standard Default'
+                                cmd: 'google/gemma-4-31b-it',
+                                desc: '[STABLE]'
                             },
                             {
-                                cmd: 'gemini-2.5-flash',
-                                desc: 'Fast & Reliable (Limited Free Quota)'
+                                cmd: 'stepfun-ai/step-3.7-flash',
+                                desc: '[STABLE]'
                             },
                             {
-                                cmd: 'gemini-3-flash-preview',
-                                desc: 'Fast & Lightweight (Limited Free Quota)'
+                                cmd: 'minimaxai/minimax-m2.7',
+                                desc: '[STABLE]'
                             },
                             {
-                                cmd: 'gemini-3.5-flash',
-                                desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                                cmd: 'deepseek-ai/deepseek-v4-flash',
+                                desc: ''
+                            },
+                            {
+                                cmd: 'deepseek-ai/deepseek-v4-pro',
+
                             }
                         ]
-                        : [
-                            {
-                                cmd: 'gemini-2.5-flash',
-                                desc: 'Fast & Reliable'
-                            },
-                            {
-                                cmd: 'gemini-3.1-flash-lite',
-                                desc: 'Ultra-Fast & Lite'
-                            },
-                            {
-                                cmd: 'gemini-3-flash-preview',
-                                desc: 'Default, Fast & Lightweight'
-                            },
-                            {
-                                cmd: 'gemini-3.5-flash',
-                                desc: 'Flash Latest  [Instability Issues]'
-                            },
-                            {
-                                cmd: 'gemini-3.1-pro-preview',
-                                desc: 'Pro Reasoning'
-                            },
+                        : (apiTier === 'Free'
+                            ? [
+                                {
+                                    cmd: 'gemma-4-26b-a4b-it',
+                                    desc: 'Standard & Faster'
+                                },
+                                {
+                                    cmd: 'gemma-4-31b-it',
+                                    desc: 'Standard Default'
+                                },
+                                {
+                                    cmd: 'gemini-2.5-flash',
+                                    desc: 'Fast & Reliable (Limited Free Quota)'
+                                },
+                                {
+                                    cmd: 'gemini-3-flash-preview',
+                                    desc: 'Fast & Lightweight (Limited Free Quota)'
+                                },
+                                {
+                                    cmd: 'gemini-3.5-flash',
+                                    desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                                }
+                            ]
+                            : [
+                                {
+                                    cmd: 'gemini-2.5-flash',
+                                    desc: 'Fast & Reliable'
+                                },
+                                {
+                                    cmd: 'gemini-3.1-flash-lite',
+                                    desc: 'Ultra-Fast & Lite'
+                                },
+                                {
+                                    cmd: 'gemini-3-flash-preview',
+                                    desc: 'Default, Fast & Lightweight'
+                                },
+                                {
+                                    cmd: 'gemini-3.5-flash',
+                                    desc: 'Flash Latest  [Instability Issues]'
+                                },
+                                {
+                                    cmd: 'gemini-3.1-pro-preview',
+                                    desc: 'Pro Reasoning'
+                                },
 
-                        ])
+                            ])
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
@@ -2732,6 +2779,7 @@ export default function App({ args = [] }) {
                             { label: 'Google (Free/Paid)', value: 'Google' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                            { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' },
                             { label: 'Back', value: 'settings' }
                         ]}
                         onSelect={async (item) => {
@@ -2752,6 +2800,8 @@ export default function App({ args = [] }) {
                                     defaultModel = 'google/gemma-4-31b-it:free';
                                 } else if (selectedProvider === 'DeepSeek') {
                                     defaultModel = 'deepseek-v4-flash';
+                                } else if (selectedProvider === 'NVIDIA') {
+                                    defaultModel = 'moonshotai/kimi-k2.6';
                                 }
                                 setActiveModel(defaultModel);
                                 saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier, quotas });
@@ -2894,8 +2944,9 @@ export default function App({ args = [] }) {
                                             defaultModel = 'google/gemma-4-31b-it:free';
                                         } else if (prov === 'DeepSeek') {
                                             defaultModel = 'deepseek-v4-flash';
-                                        }
-                                        setActiveModel(defaultModel);
+                                        } else if (prov === 'NVIDIA') {
+                                            defaultModel = 'moonshotai/kimi-k2.6';
+                                        }                                        setActiveModel(defaultModel);
                                         newSettings.aiProvider = prov;
                                         newSettings.activeModel = defaultModel;
 
@@ -3664,7 +3715,8 @@ export default function App({ args = [] }) {
                                             items={[
                                                 { label: 'Google (Free/Paid)', value: 'Google' },
                                                 { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
-                                                { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' }
+                                                { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                                                { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' }
                                             ]}
                                             onSelect={(item) => {
                                                 setAiProvider(item.value);
@@ -3851,6 +3903,9 @@ export default function App({ args = [] }) {
                                     } else if (aiProvider === 'OpenRouter') {
                                         url = "https://openrouter.ai/settings/profile";
                                         label = "profile";
+                                    } else if (aiProvider === 'NVIDIA') {
+                                        url = "https://build.nvidia.com/settings/api-keys";
+                                        label = "billing";
                                     }
                                     return (
                                         <Text color="gray" dimColor italic>

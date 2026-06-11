@@ -225,8 +225,20 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.3.0", "2.2.10"]
+        // Thanks to Gemini CLI. (つ╥﹏╥)つ
+        // Logging Off...
+        const stableVersions = ["2.3.0", "2.4.0"]
         const changelogData = {
+            "2.4.0": {
+                "note": "EXPERIMENTAL support for NVIDIA API. Thank You for supporting.",
+                "added": [
+                    "Added support for NVIDIA API with limited models to harness the free unlimited AI.",
+                    "Stable-ish models: Kimi 2.6 Reasoning, Stepfun 3.7 Flash, GLM 5.1.",
+                    "Known issues with NVIDIA API integration: Some models might show unstable reasoning regardless of /thinking config. Permanent memory features might be unstable. Caching might not work depending on routing."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "2.3.0": {
                 "note": "High-Fidelity Code Mapping",
                 "added": [
@@ -1106,6 +1118,7 @@
             edges: []
         };
 
+        // Drawn by Gemini CLI
         const createGeminiText = () => {
             const spacing = 20;
             const pts = [];

@@ -27,6 +27,7 @@ export const getProviderAPIKey = async (provider) => {
         if (provider === 'Google') return secrets.GOOGLE_API_KEY || secrets.API_KEY || null;
         if (provider === 'DeepSeek') return secrets.DEEPSEEK_API_KEY || null;
         if (provider === 'OpenRouter') return secrets.OPENROUTER_API_KEY || null;
+        if (provider === 'NVIDIA') return secrets.NVIDIA_API_KEY || null;
     } catch (e) {}
     return null;
 };
@@ -39,6 +40,8 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('DEEPSEEK_API_KEY', key);
     } else if (provider === 'OpenRouter') {
         await saveSecret('OPENROUTER_API_KEY', key);
+    } else if (provider === 'NVIDIA') {
+        await saveSecret('NVIDIA_API_KEY', key);
     }
 };
 
