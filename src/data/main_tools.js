@@ -32,7 +32,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
-2. [tool:functions.FileMap(path="...")]. Showsl file structure. Does NOT read file contents. Only Dependency, Function, Variable Maps. Token Efficient. Need File structure? FileMap >> ReadFile
+2. [tool:functions.FileMap(path="...")]. Shows file structure. Does NOT read file contents. Only Dependency, Function, Variable Maps. Token Efficient. Need File structure? FileMap >> ReadFile
 3. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 4. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
