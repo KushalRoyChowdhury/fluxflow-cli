@@ -96,6 +96,10 @@ function getNextInterestingNodes(node) {
   return nodes;
 }
 
+function toCamelCase(str) {
+  return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+}
+
 function traverse(node, depth = 0, isLast = true, prefix = '') {
   const MAX_DEPTH = 6;
   if (depth > MAX_DEPTH) return '';
@@ -107,7 +111,8 @@ function traverse(node, depth = 0, isLast = true, prefix = '') {
     const startLine = node.startPosition.row + 1;
     const endLine = node.endPosition.row + 1;
     const name = getDisplayName(node);
-    const label = name ? `${type} [${name}]` : type;
+    const camelType = toCamelCase(type);
+    const label = name ? `${camelType} [${name}]` : camelType;
     if (depth === 0) {
       result += `📁 ROOT (Lines: ${startLine}-${endLine})\n`;
     } else {
