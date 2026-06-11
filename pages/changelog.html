@@ -225,8 +225,19 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        const stableVersions = ["2.2.10"]
+        const stableVersions = ["2.3.0", "2.2.10"]
         const changelogData = {
+            "2.3.0": {
+                "note": "High-Fidelity Code Mapping",
+                "added": [
+                    "**FileMap Tool:** Introduced a powerful AST based mapping engine that provides structural skeletons of code files (Classes, Functions, Imports) without reading the entire content (95% token efficient than reading full files).",
+                    "**Language Parser Manager:** New interactive UI in Settings > Other to download/delete language parsers (JS, TS, Python, C++, Java, HTML)."
+                ],
+                "changed": [
+                    "Upgraded structural analysis core for improved context efficiency."
+                ],
+                "fixes": []
+            },
             "2.2.10": {
                 "note": "Efficiency Improvements & Image Generation Deprecated",
                 "added": [],
@@ -912,7 +923,7 @@
                 ],
                 "changed": [
                     "Changed Source Code from `CRLF` to `LF`.",
-                    "Inproved Minimalism in Status Bar."
+                    "Improved Minimalism in Status Bar."
                 ],
                 "fixes": [
                     "Improved Tool Usage"
@@ -955,7 +966,6 @@
                     "UI Improvements."
                 ]
             },
-
             "1.0.9": {
                 "added": [
                     "Improved Error handling.",
@@ -967,7 +977,6 @@
                 ],
                 "fixes": []
             },
-
             "1.0.0": {
                 "added": [
                     "Initial release of **Flux Flow CLI**",
@@ -1074,22 +1083,85 @@
                 { dx: 0, dy: 45 },    // 6: Chin
                 { dx: -20, dy: 0 },   // 7: L Eye
                 { dx: 20, dy: 0 },    // 8: R Eye
+                { dx: 0, dy: 15 },    // 9: Nose
+                { dx: -70, dy: 5 },   // 10: L Whisker 1
+                { dx: -70, dy: 15 },  // 11: L Whisker 2
+                { dx: 70, dy: 5 },    // 12: R Whisker 1
+                { dx: 70, dy: 15 },   // 13: R Whisker 2
+                { dx: -10, dy: 30 },  // 14: L Mouth
+                { dx: 10, dy: 30 },   // 15: R Mouth
             ],
             edges: [
-                [0, 2], [2, 4], [4, 6], [6, 5], [5, 3], [3, 1], [1, 0] // Outline
+                [0, 2], [2, 4], [4, 6], [6, 5], [5, 3], [3, 1], [1, 0], // Outline
+                [4, 10], [4, 11], // L Whiskers
+                [5, 12], [5, 13], // R Whiskers
+                [9, 14], [9, 15], // Mouth
+                [7, 9], [8, 9]    // Connect eyes to nose for structure
             ]
         };
+
+        let geminiTextGroup = {
+            x: 0, y: 0, vx: 0.05, vy: 0.03,
+            nodes: [],
+            edges: []
+        };
+
+        const createGeminiText = () => {
+            const spacing = 20;
+            const pts = [];
+            const edges = [];
+            let nodeOffset = 0;
+
+            const addLetter = (char, ox) => {
+                // Define precise drawing paths (lines) for each letter
+                const lmap = {
+                    'G': { n: [[1,0],[0,0],[0,2],[1,2],[1,1],[0.6,1]], e: [[0,1],[1,2],[2,3],[3,4],[4,5]] },
+                    'E': { n: [[1,0],[0,0],[0,1],[0.8,1],[0,2],[1,2]], e: [[0,1],[1,4],[4,5],[2,3]] },
+                    'M': { n: [[0,2],[0,0],[0.5,1],[1,0],[1,2]], e: [[0,1],[1,2],[2,3],[3,4]] },
+                    'I': { n: [[0.5,0],[0.5,2]], e: [[0,1]] },
+                    'N': { n: [[0,2],[0,0],[1,2],[1,0]], e: [[0,1],[1,2],[2,3]] },
+                    'C': { n: [[1,0],[0,0],[0,2],[1,2]], e: [[0,1],[1,2],[2,3]] },
+                    'L': { n: [[0,0],[0,2],[1,2]], e: [[0,1],[1,2]] }
+                };
+
+                if (!lmap[char]) return;
+
+                const letterNodes = lmap[char].n;
+                const letterEdges = lmap[char].e;
+
+                letterNodes.forEach(p => {
+                    pts.push({ dx: ox + p[0]*13, dy: p[1]*18 }); // Width: 12->13, Height: 20->18
+                });
+
+                letterEdges.forEach(e => {
+                    edges.push([nodeOffset + e[0], nodeOffset + e[1]]);
+                });
+
+                nodeOffset += letterNodes.length;
+            };
+
+            let cursor = -100;
+            "GEMINI".split('').forEach(c => { addLetter(c, cursor); cursor += spacing; });
+            cursor += 15;
+            "CLI".split('').forEach(c => { addLetter(c, cursor); cursor += spacing; });
+            return { pts, edges };
+        };
+        const textData = createGeminiText();
+        geminiTextGroup.nodes = textData.pts;
+        geminiTextGroup.edges = textData.edges;
 
         function initCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             particles = [];
 
-            // Randomly position the Easter egg
+            // Randomly position the Easter eggs
             fluxConstellation.x = Math.random() * canvas.width;
             fluxConstellation.y = Math.random() * canvas.height;
+            geminiTextGroup.x = Math.random() * canvas.width;
+            geminiTextGroup.y = Math.random() * canvas.height;
 
-            for (let i = 0; i < 40; i++) {
+            for (let i = 0; i < 120; i++) { // Increased by 200% (40 -> 120)
                 particles.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
@@ -1104,7 +1176,7 @@
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update & Draw Easter Egg Constellation
+            // Update & Draw Easter Egg Constellation (Cat)
             fluxConstellation.x += fluxConstellation.vx;
             fluxConstellation.y += fluxConstellation.vy;
             if (fluxConstellation.x < 0 || fluxConstellation.x > canvas.width) fluxConstellation.vx *= -1;
@@ -1128,36 +1200,70 @@
                 ctx.arc(fluxConstellation.x + node.dx, fluxConstellation.y + node.dy, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             });
+
+            // Update & Draw Gemini CLI Text (Subtle & Interactive)
+            geminiTextGroup.x += geminiTextGroup.vx;
+            geminiTextGroup.y += geminiTextGroup.vy;
+            if (geminiTextGroup.x < 0 || geminiTextGroup.x > canvas.width) geminiTextGroup.vx *= -1;
+            if (geminiTextGroup.y < 0 || geminiTextGroup.y > canvas.height) geminiTextGroup.vy *= -1;
+
+            // Draw explicit lines for text to guarantee readability
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            geminiTextGroup.edges.forEach(edge => {
+                const n1 = geminiTextGroup.nodes[edge[0]];
+                const n2 = geminiTextGroup.nodes[edge[1]];
+                ctx.beginPath();
+                ctx.globalAlpha = 0.5; // Visible but faint
+                ctx.moveTo(geminiTextGroup.x + n1.dx, geminiTextGroup.y + n1.dy);
+                ctx.lineTo(geminiTextGroup.x + n2.dx, geminiTextGroup.y + n2.dy);
+                ctx.stroke();
+            });
+
+            const textPts = geminiTextGroup.nodes.map(n => ({
+                x: geminiTextGroup.x + n.dx,
+                y: geminiTextGroup.y + n.dy,
+                color: '#ffffff',
+                size: 1.5,
+                isText: true
+            }));
+
+            const allActiveParticles = [...particles, ...textPts];
+
             ctx.globalAlpha = 1.0;
-
-            particles.forEach((p, i) => {
-                p.x += p.speedX;
-                p.y += p.speedY;
-
-                if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
-                if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+            allActiveParticles.forEach((p, i) => {
+                if (!p.isText) {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+                    if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+                }
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.isText ? 0.7 : 0.6;
                 ctx.fill();
 
-                // Draw lines between nearby particles
-                for (let j = i + 1; j < particles.length; j++) {
-                    const p2 = particles[j];
+                // Distance-based webbing (only for non-text -> non-text, or text -> non-text)
+                for (let j = i + 1; j < allActiveParticles.length; j++) {
+                    const p2 = allActiveParticles[j];
+
+                    // NEVER draw distance-based lines between two text nodes (prevents blobs)
+                    if (p.isText && p2.isText) continue;
+
                     const dx = p.x - p2.x;
                     const dy = p.y - p2.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
 
-                    if (dist < 150) {
+                    if (dist < 120) {
                         ctx.beginPath();
                         ctx.strokeStyle = p.color;
-                        ctx.globalAlpha = 1 - (dist / 150);
+                        ctx.globalAlpha = (1 - (dist / 120)) * 0.3;
                         ctx.lineWidth = 0.5;
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(p2.x, p2.y);
                         ctx.stroke();
-                        ctx.globalAlpha = 1;
                     }
                 }
             });

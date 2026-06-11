@@ -14,6 +14,7 @@ import { search_keyword } from '../tools/search_keyword.js';
 import { generate_image } from '../tools/generate_image.js';
 import { saveSummary } from '../tools/saveSummary.js';
 import { addMemScore } from '../tools/addMemScore.js';
+import { file_map } from '../tools/file_map.js';
 
 const TOOL_MAP = {
     web_search,
@@ -31,6 +32,7 @@ const TOOL_MAP = {
     generate_image,
     saveSummary,
     addMemScore,
+    file_map,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -54,7 +56,8 @@ const TOOL_MAP = {
     add_mem_score: addMemScore,
     AddMemScore: addMemScore,
     addMemoryScore: addMemScore,
-    AddMemoryScore: addMemScore
+    AddMemoryScore: addMemScore,
+    FileMap: file_map
 };
 
 /**

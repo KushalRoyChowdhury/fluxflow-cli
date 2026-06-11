@@ -21,7 +21,10 @@ import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, c
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
+import ParserDownloadModal from './components/ParserDownloadModal.jsx';
 import { RevertManager } from './utils/revert.js';
+import { GEMINI_QUOTES } from './data/gemini_quotes.js';
+import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
@@ -681,6 +684,23 @@ export default function App({ args = [] }) {
         return formatDuration(Math.floor(ms / 1000));
     };
     const [statusText, setStatusText] = useState(null);
+    const [wittyPhrase, setWittyPhrase] = useState('');
+
+    useEffect(() => {
+        let interval;
+        if (statusText) {
+            const updatePhrase = () => {
+                const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
+                setWittyPhrase(randomPhrase);
+            };
+            if (!wittyPhrase) updatePhrase(); // Initial pick
+            interval = setInterval(updatePhrase, 5000);
+        } else {
+            setWittyPhrase('');
+        }
+        return () => clearInterval(interval);
+    }, [statusText]);
+
     const [isSpinnerActive, setIsSpinnerActive] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [escPressed, setEscPressed] = useState(false);
@@ -1269,6 +1289,7 @@ export default function App({ args = [] }) {
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
+        { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
@@ -2062,6 +2083,15 @@ export default function App({ args = [] }) {
                     }
                     const isForce = parts.includes('--latest');
                     setActiveView('update');
+                    break;
+                }
+                case '/gemini': {
+                    const randomQuote = GEMINI_QUOTES[Math.floor(Math.random() * GEMINI_QUOTES.length)];
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: Date.now(), role: 'system', text: `✨ [GEMINI CLI] ${randomQuote}` }];
+                    });
+                    setInput('');
                     break;
                 }
                 case '/help': {
@@ -2909,11 +2939,11 @@ export default function App({ args = [] }) {
                                 <Text color="white">{sessionAgentCalls}</Text>
                             </Box>
                             <Box marginLeft={2}>
-                                <Box width={23}><Text color="blue" dimColor>» API Time:</Text></Box>
+                                <Box width={23}><Text color="grey">» API Time:</Text></Box>
                                 <Text color="white">{formatMsDuration(sessionApiTime)}</Text>
                             </Box>
                             <Box marginLeft={2}>
-                                <Box width={23}><Text color="blue" dimColor>» Tool Time:</Text></Box>
+                                <Box width={23}><Text color="grey">» Tool Time:</Text></Box>
                                 <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
                             </Box>
                             <Box>
@@ -2927,18 +2957,18 @@ export default function App({ args = [] }) {
                             {sessionTotalTokens > 0 && (
                                 <>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                        <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
                                         <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
                                     </Box>
                                     {sessionTotalCachedTokens > 0 && (
                                         <Box marginLeft={4}>
-                                            <Box width={21}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                            <Box width={21}><Text color="grey">» Cached:</Text></Box>
                                             <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
                                         </Box>
                                     )}
                                     {sessionTotalCandidateTokens > 0 && (
                                         <Box marginLeft={2}>
-                                            <Box width={23}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                            <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
                                             <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
                                         </Box>
                                     )}
@@ -2993,18 +3023,18 @@ export default function App({ args = [] }) {
                             {(dailyUsage?.tokens || 0) > 0 && (
                                 <>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                        <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
                                         <Text color="white">{formatTokens((dailyUsage?.tokens || 0) - (dailyUsage?.candidateTokens || 0))}</Text>
                                     </Box>
                                     {(dailyUsage?.cachedTokens || 0) > 0 && (
                                         <Box marginLeft={4}>
-                                            <Box width={21}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                            <Box width={21}><Text color="grey">» Cached:</Text></Box>
                                             <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
                                         </Box>
                                     )}
                                     {(dailyUsage?.candidateTokens || 0) > 0 && (
                                         <Box marginLeft={2}>
-                                            <Box width={23}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                            <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
                                             <Text color="white">{formatTokens(dailyUsage.candidateTokens)}</Text>
                                         </Box>
                                     )}
@@ -3295,6 +3325,12 @@ export default function App({ args = [] }) {
                         <MemoryModal onClose={() => setActiveView('chat')} />
                     </Box>
                 );
+            case 'parserDownload':
+                return (
+                    <Box width="100%" alignItems="center" justifyContent="center">
+                        <ParserDownloadModal onClose={() => setActiveView('settings')} />
+                    </Box>
+                );
             case 'profile':
                 return (
                     <ProfileForm
@@ -3509,6 +3545,9 @@ export default function App({ args = [] }) {
                                     <Box>
                                         {isSpinnerActive && !isSpinnerActive && <StatusSpinner />}
                                         <Text color="magenta" bold italic>{isSpinnerActive && !isSpinnerActive ? ' ' : ''}{statusText.toUpperCase()}</Text>
+                                        {wittyPhrase && (
+                                            <Text color="gray" dimColor italic> {wittyPhrase}</Text>
+                                        )}
                                     </Box>
                                 ) : (
                                     <Text color="cyan" dimColor italic> {input.length > 0 && escPressCount ? "Press ESC again to clear input" : "READY FOR COMMAND..."}</Text>
@@ -3698,9 +3737,8 @@ export default function App({ args = [] }) {
                     return (
                         <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
                             <Box marginBottom={1}>
-                                <Text color="cyan" bold>Agent powering down. <Text color="magenta">Goodbye!</Text></Text>
+                                <Text bold>{gradient(['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
                             </Box>
-
                             <Box flexDirection="column">
                                 <Text color="white" bold underline>Interaction Summary</Text>
                                 <Box marginTop={1}>
@@ -3726,18 +3764,18 @@ export default function App({ args = [] }) {
                                 {sessionTotalTokens > 0 && (
                                     <>
                                         <Box marginLeft={2}>
-                                            <Box width={18}><Text color="blue" dimColor>» Input Tokens:</Text></Box>
+                                            <Box width={18}><Text color="grey">» Input Tokens:</Text></Box>
                                             <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
                                         </Box>
                                         {sessionTotalCachedTokens > 0 && (
                                             <Box marginLeft={4}>
-                                                <Box width={16}><Text color="blue" dimColor>» Cached:</Text></Box>
+                                                <Box width={16}><Text color="grey">» Cached:</Text></Box>
                                                 <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
                                             </Box>
                                         )}
                                         {sessionTotalCandidateTokens > 0 && (
                                             <Box marginLeft={2}>
-                                                <Box width={18}><Text color="blue" dimColor>» Output Tokens:</Text></Box>
+                                                <Box width={18}><Text color="grey">» Output Tokens:</Text></Box>
                                                 <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
                                             </Box>
                                         )}
@@ -3768,11 +3806,11 @@ export default function App({ args = [] }) {
                                     <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
                                 </Box>
                                 <Box marginLeft={2}>
-                                    <Box width={18}><Text color="blue" dimColor>» API Time:</Text></Box>
+                                    <Box width={18}><Text color="grey">» API Time:</Text></Box>
                                     <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
                                 </Box>
                                 <Box marginLeft={2}>
-                                    <Box width={18}><Text color="blue" dimColor>» Tool Time:</Text></Box>
+                                    <Box width={18}><Text color="grey">» Tool Time:</Text></Box>
                                     <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
                                 </Box>
                             </Box>

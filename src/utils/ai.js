@@ -396,6 +396,7 @@ const TOOL_LABELS = {
     'web_scrape': 'Reading',
     'memory': 'Updating Memory',
     'search_keyword': 'Searching',
+    'file_map': 'Generating Map',
     'ask': 'User Input',
     'write_pdf': 'Creating',
     'write_docx': 'Creating',
@@ -1826,6 +1827,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
+                                    'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
                                     'GenerateImage': 'generate_image', 'generate_image': 'generate_image'
                                 };
@@ -1834,7 +1836,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
-                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image'].includes(potentialTool)) {
+                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map'].includes(potentialTool)) {
                                     const pArgs = parseArgs(partialArgs);
                                     const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                                     const keyword = pArgs.keyword;
@@ -1848,7 +1850,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword)\s*=\s*\\?["']?([^\\"' \),]+)/);
                                         if (m) {
                                             const val = m[1].replace(/["']/g, '');
-                                            detail = potentialTool === 'search_keyword' ? val : path.basename(val.replace(/\\/g, '/'));
+                                            detail = (potentialTool === 'search_keyword' || potentialTool === 'file_map') ? val : path.basename(val.replace(/\\/g, '/'));
                                         }
                                     }
                                 }
@@ -2007,6 +2009,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
+                                    'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
                                     'GenerateImage': 'generate_image', 'generate_image': 'generate_image'
                                 };
@@ -2067,6 +2070,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     label = `📑 Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_docx') {
                                     label = `📝 Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                } else if (normToolName === 'file_map') {
+                                    label = `📋 Get Map: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'search_keyword') {
                                     label = '';
                                 } else if (normToolName === 'generate_image') {

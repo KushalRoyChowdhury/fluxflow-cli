@@ -101,9 +101,9 @@ export default function SettingsMenu({
             case 'other':
                 return [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    { label: 'API Tier', value: 'apiTier', status: apiTier }
-                ];
-            default:
+                    { label: 'API Tier', value: 'apiTier', status: apiTier },
+                    { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
+                ];            default:
                 return [];
         }
     };
@@ -250,6 +250,8 @@ export default function SettingsMenu({
             }
         } else if (item.value === 'updateManager') {
             setActiveView('updateManager');
+        } else if (item.value === 'parserDownload') {
+            setActiveView('parserDownload');
         }
     };
 
@@ -345,6 +347,7 @@ export default function SettingsMenu({
                                      (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
                                      (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow'));
                                 const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'autoApprove' || item.value === 'autoDisallow';
+                                const isParserDownload = item.value === 'parserDownload';
 
                                 elements.push(
                                     <Box key={item.value} flexDirection="column">
@@ -352,10 +355,11 @@ export default function SettingsMenu({
                                             <Text
                                                 color={isSelected ? 'cyan' : 'white'}
                                                 bold={isSelected}
+                                                underline={isParserDownload}
                                             >
                                                 {isSelected ? '❯ ' : '  '}{item.label}
                                             </Text>
-                                            {!isCommandListItem && (
+                                            {!isCommandListItem && !isParserDownload && (
                                                 <>
                                                     <Text color="gray" dimColor>{dots}</Text>
                                                     <Text color={getStatusColor(item)} bold>
@@ -393,7 +397,7 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={19} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={18} paddingX={1}>
                                         <Text color={isPtyAvailable ? "green" : "yellow"}>
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>

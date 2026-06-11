@@ -58,3 +58,4 @@ export const TEMP_MEM_CHAT_FILE = path.join(SECRET_DIR, 'temp-memory-chat.json')
 export const BACKUPS_DIR = path.join(DATA_DIR, 'backups');
 export const LEDGER_FILE = path.join(SECRET_DIR, 'ledger.json');
 export const PATHS_FILE = path.join(SECRET_DIR, 'path.json');
+export const PARSER_DIR = path.join(DATA_DIR, 'parsers');

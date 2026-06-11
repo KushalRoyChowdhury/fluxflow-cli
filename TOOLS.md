@@ -8,13 +8,13 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | :--- | :---: | :---: |
 | **Web Search** | ✅ | ✅ |
 | **Web Scrape** | ✅ | ✅ |
-| **Generate Image** | ✅ | ❌ |
 | **Write PDF** | ✅ | ❌ |
 | **Write DOCX** | ✅ | ❌ |
 | **View/Read Files** | ✅ | ❌ |
 | **Write/Update Files** | ✅ | ❌ |
 | **Execute Commands** | ✅ | ❌ |
 | **Search Keyword** | ✅ | ❌ |
+| **File Map** | ✅ | ❌ |
 
 ---
 
@@ -39,6 +39,9 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 - **`ViewFile`**: Reads the content of a file.
   - **Native Multimodality**: Supports analyzing images (JPG, PNG, WEBP) and PDF documents. The tool automatically detects binary formats and encodes them for AI analysis.
   - **Text Reading**: Supports specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
+- **`FileMap`**: Generates a high-level structural map of a code file using Tree-Sitter.
+  - **Structural Insight**: Identifies classes, functions, methods, and control flow blocks without reading the entire file content.
+  - **Multi-Language**: Supports JS, TS, TSX, Python, C, C++, Java, and HTML.
 - **`SearchKeyword`**: Performs a global project search for a specific string or keyword. Returns file paths and line numbers where matches are found, making it essential for navigation and impact analysis.
 
 ### ✍️ Code Editing
