@@ -1,3 +1,6 @@
+/**
+ * @description Gemini CLI witty phrases. Preservation.
+ */
 export const WITTY_LOADING_PHRASES = [
   "I'm Feeling Lucky",
   'Shipping awesomeness',
