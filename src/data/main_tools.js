@@ -21,7 +21,7 @@ Access to internal tools. MUST use the exact syntax on a new line: [tool:functio
 
 MANDATORY TOOL USAGE POLICY:
 - **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many edits ← **MANDATORY where possible**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile for understandling files efficiently\n" : ""}- No brute force, no spamming of tools
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many edits ← **MANDATORY where possible**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >>> ReadFile for understandling files efficiently\n" : ""}- No brute force, no spamming of tools
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
@@ -32,7 +32,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
-2. [tool:functions.FileMap(path="...")]. Shows file structure, dependency, functions, variable maps. Token Efficient than ReadFile. Understand File? FileMap >>> ReadFile
+2. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps. Token Efficient than ReadFile. Understand File? FileMap >>> ReadFile
 3. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 4. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
