@@ -2896,7 +2896,7 @@ export default function App({ args = [] }) {
                             { label: 'Google (Free/Paid)', value: 'Google' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                            { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' },
+                            { label: 'NVIDIA (Free/Paid)', value: 'NVIDIA' },
                             { label: 'Back', value: 'settings' }
                         ]}
                         onSelect={async (item) => {
@@ -3834,7 +3834,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Google (Free/Paid)', value: 'Google' },
                                                         { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                                                         { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                                                        { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' }
+                                                        { label: 'NVIDIA (Free/Paid)', value: 'NVIDIA' }
                                                     ]}
                                                     onSelect={(item) => {
                                                         setAiProvider(item.value);

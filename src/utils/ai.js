@@ -502,7 +502,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         model: model,
         messages: messages,
         stream: true,
-        temperature: mode === 'Flux' ? 0.8 : 1.2,
+        temperature: mode === 'Flux' ? 0.75 : 1.2,
     };
 
     const effort = reasoningEffortMap[thinkingLevel];
@@ -767,10 +767,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     } else if (aiProvider === 'NVIDIA') {
                         const stream = getNVIDIAStream(
                             apiKey,
-                            'z-ai/glm-5.1',
+                            'moonshotai/kimi-k2.6',
                             janitorContents,
                             janitorPrompt,
-                            'Fast',
+                            'Fast', // Janitor always minimal
                             mode,
                             false
                         );
@@ -779,7 +779,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         return { iterator, firstResult };
                     } else {
                         const stream = await client.models.generateContentStream({
-                            model: janitorModel || 'gemma-4-26b-a4b-it',
+                            model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? 'gemini-3.1-flash-lite' : 'gemma-4-26b-a4b-it'),
                             contents: janitorContents,
                             config: {
                                 systemInstruction: janitorPrompt,
@@ -791,7 +791,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                                     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                 ],
-                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL } // Janitor always minimal
                             }
                         });
                         const iterator = stream[Symbol.asyncIterator]();
@@ -2085,7 +2085,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (isGemma4) {
                                             return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
                                         }
-                                                                        return {
+                                        return {
                                             includeThoughts: true,
                                             thinkingLevel: {
                                                 'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
@@ -2779,7 +2779,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     if (approval === 'deny' && isNewFileCreated && fs.existsSync(absPath)) {
                                                         try {
                                                             fs.unlinkSync(absPath);
-                                                        } catch (e) {}
+                                                        } catch (e) { }
                                                     }
                                                 }
                                             }

@@ -230,18 +230,20 @@
         const stableVersions = ["2.5.0"]
         const changelogData = {
             "2.5.0": {
-                "note": "",
+                "note": "v2.5.1",
                 "added": [
                     "Added /compress command to let users manually compress chat history when needed instead of waiting for context limit."
                 ],
                 "changed": [
                     "Added model support for NVIDIA integration: Gemma 4 31B, Mistral 3.5.",
-                    "Added model support for Gemini: Gemini 2.5 Pro, Gemini 2.5 Flash Lite"
+                    "Added model support for Gemini: Gemini 2.5 Pro, Gemini 2.5 Flash Lite.",
+                    "Removed [EXPRERIMENTAL] tag for NVIDIA.",
+                    "Updated GenAI SDK."
                 ],
                 "fixes": [
                     "Resolved a bug where multi turn tool use could affect caching.",
                     "Resolved thinking instability issues with NVIDIA API",
-                    "Improved memory stability with NVIDIA integration."
+                    "Improved memory stability with NVIDIA integration & Google.",
                 ]
             },
             "2.4.0": {
