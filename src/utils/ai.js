@@ -1751,6 +1751,51 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 parts
                             };
                         });
+
+                    // [ROLE ALTERNATION & TOOL PAIRING FIX]
+                    // 1. Re-order tool calls and tool results so each result immediately follows its tool call.
+                    for (let i = 0; i < contents.length; i++) {
+                        const msg = contents[i];
+                        const text = msg.parts?.[0]?.text || '';
+                        if (msg.role === 'model' && /\[tool:/i.test(text)) {
+                            // Find the first user [TOOL RESULT] message *after* this index
+                            let resultIdx = -1;
+                            for (let j = i + 1; j < contents.length; j++) {
+                                const nextMsg = contents[j];
+                                const nextText = nextMsg.parts?.[0]?.text || '';
+                                if (nextMsg.role === 'user' && nextText.startsWith('[TOOL RESULT]')) {
+                                    resultIdx = j;
+                                    break;
+                                }
+                            }
+                            // If found, and it is not already directly after the tool call, move it to i + 1
+                            if (resultIdx !== -1 && resultIdx !== i + 1) {
+                                const [resultMsg] = contents.splice(resultIdx, 1);
+                                contents.splice(i + 1, 0, resultMsg);
+                            }
+                        }
+                    }
+
+                    // 2. Merge consecutive same-role messages to guarantee strict role alternation.
+                    const finalContents = [];
+                    for (let i = 0; i < contents.length; i++) {
+                        const current = contents[i];
+                        if (finalContents.length === 0) {
+                            finalContents.push(current);
+                        } else {
+                            const last = finalContents[finalContents.length - 1];
+                            if (last.role === current.role) {
+                                last.parts[0].text += '\n\n' + (current.parts?.[0]?.text || '');
+                                if (current.parts?.length > 1) {
+                                    last.parts.push(...current.parts.slice(1));
+                                }
+                            } else {
+                                finalContents.push(current);
+                            }
+                        }
+                    }
+                    contents.length = 0;
+                    contents.push(...finalContents);
                     // Quota Check
                     if (!(await checkQuota('agent', settings))) {
                         throw new Error("Error: Quota Exausted for Agent");
@@ -1779,11 +1824,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
-                    const isGemma = modelName && modelName.toLowerCase().startsWith('gemma');
+                    const isGemma = modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google";
                     const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**` : ''}`;
+                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
@@ -1800,7 +1845,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
-                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`); break
+                    fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     let activeContents = contents;
 
@@ -3127,7 +3172,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (wasToolCalledInLastLoop) {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked if unsure` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]] or [turn: finish] else continue'}`}` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`}` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;
@@ -3137,11 +3182,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         // [JIT CLEANUP] - Clean up JIT instruction injection markers from the persistent history
-        if (modelName && modelName.toLowerCase().startsWith('gemma')) {
+        if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google") {
             modifiedHistory.forEach(msg => {
                 if (msg.role === 'user' && msg.text && msg.text.startsWith('[TOOL RESULT]')) {
                     const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn`;
-                    const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>}**`;
+                    const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**`;
                     msg.text = msg.text.replace(jitInstructionThinking, '').replace(jitInstructionFast, '').trim();
                 }
             });
