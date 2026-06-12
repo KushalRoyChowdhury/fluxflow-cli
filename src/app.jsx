@@ -15,7 +15,7 @@ import ProfileForm from './components/ProfileForm.jsx';
 import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
-import { initAI, getAIStream, signalTermination, runJanitorTask } from './utils/ai.js';
+import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
@@ -1317,6 +1317,7 @@ export default function App({ args = [] }) {
     const COMMANDS = [
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
         { cmd: '/help', desc: 'Show all available commands' },
+        { cmd: '/compress', desc: 'Summarize and condense chat history' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
@@ -2156,6 +2157,54 @@ export default function App({ args = [] }) {
                         return [...prev, { id: Date.now(), role: 'system', text: `✨ [GEMINI CLI] ${randomQuote}` }];
                     });
                     setInput('');
+                    break;
+                }
+                case '/compress': {
+                    setInput('');
+                    const runCompress = async () => {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Compressing session history...', isMeta: true }];
+                        });
+
+                        try {
+                            const config = {
+                                chatId,
+                                aiProvider,
+                                apiKey,
+                                thinkingLevel,
+                                mode,
+                                janitorModel,
+                                systemSettings,
+                                sessionStats
+                            };
+                            const summary = await compressHistory(config, messages);
+                            if (summary) {
+                                const s = emojiSpace(2);
+                                setMessages(prev => {
+                                    const finalMsgs = [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `⚙️${s}[SYSTEM] Chat History compressed saving tokens.`,
+                                        isMeta: true
+                                    }];
+                                    setCompletedIndex(finalMsgs.length);
+                                    return finalMsgs;
+                                });
+                            } else {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: '❌ [SYSTEM] Compression failed (no summary returned).', isMeta: true }];
+                                });
+                            }
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Error during compression: ${err.message}`, isMeta: true }];
+                            });
+                        }
+                    };
+                    runCompress();
                     break;
                 }
                 case '/help': {
@@ -3298,6 +3347,7 @@ export default function App({ args = [] }) {
                                     const result = await RevertManager.rollbackToBefore(txId);
                                     if (result.success) {
                                         const { targetPrompt } = result;
+                                        deleteChatSummary(chatId);
 
                                         // Find index of reverted user message
                                         const targetIdx = messages.findIndex(m =>

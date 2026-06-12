@@ -1127,17 +1127,22 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
     let fullText = '';
     let usageMetadata = null;
 
+    // Normalize string prompt to GenAI content array format
+    const normalizedContents = typeof contents === 'string'
+        ? [{ role: 'user', parts: [{ text: contents }] }]
+        : contents;
+
     let stream;
     if (aiProvider === 'OpenRouter') {
-        stream = getOpenRouterStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
     } else if (aiProvider === 'DeepSeek') {
-        stream = getDeepSeekStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
     } else if (aiProvider === 'NVIDIA') {
-        stream = getNVIDIAStream(apiKey, model, contents, systemInstruction, thinkingLevel, mode, false);
+        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
     } else {
         const genStream = await client.models.generateContentStream({
             model: model,
-            contents: contents,
+            contents: normalizedContents,
             config: {
                 systemInstruction: systemInstruction,
                 maxOutputTokens: 2048,
@@ -1266,6 +1271,96 @@ Chats to process:
 };
 
 /**
+ * Compresses chat history by generating a technical summary and writing it to the summaries file.
+ */
+export const compressHistory = async (settings, history) => {
+    const { chatId, aiProvider = 'Google' } = settings;
+    const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+
+    const flattenContext = (hist) => {
+        return hist
+            .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta)
+            .map(m => {
+                const role = m.text?.startsWith('[TOOL RESULT]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
+                return `[${role}]: ${m.text}`;
+            })
+            .join('\n\n');
+    };
+
+    const runCondenser = async (flattenedText, oldSummary) => {
+        const systemInstruction = `You are an expert context summarizer. Summarize the provided chat history (which may include previous summaries, user instructions, agent outputs, and tool results) into a detailed, coherent, and highly technical summary of 1000 to 1500 words. Focus on preserving the architectural decisions made, current system state, task progress, and critical code details, chat messages, file changes. Under no circumstances exceed MAX 2000 words.`;
+        const prompt = oldSummary
+            ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
+            : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
+
+        let targetModel = 'gemma-4-26b-a4b-it';
+        if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
+        if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
+        if (aiProvider === 'NVIDIA') targetModel = 'stepfun-ai/step-3.7-flash';
+
+        let attempts = 0;
+        let success = false;
+        let response = null;
+        while (attempts <= 3 && !success) {
+            attempts++;
+            try {
+                response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
+                success = true;
+            } catch (err) {
+                if (attempts > 3) {
+                    if (aiProvider === 'Google') {
+                        try {
+                            const fallback = await generateSimpleContent(settings, 'gemini-3.1-flash-lite', prompt, systemInstruction, 'Fast');
+                            return fallback.text || '';
+                        } catch (e) {
+                            return '';
+                        }
+                    }
+                    return '';
+                }
+            }
+        }
+        return response ? (response.text || '') : '';
+    };
+
+    const flattenedText = flattenContext(history);
+    const summaries = readEncryptedJson(summariesFile, {});
+    let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
+    if (typeof chatData === 'string') {
+        chatData = { summary: chatData, historyLength: 0 };
+    }
+    const oldSummary = chatData.summary || '';
+    const newSummary = await runCondenser(flattenedText, oldSummary);
+    if (newSummary) {
+        chatData.summary = newSummary;
+        const cleanLen = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+        chatData.historyLength = cleanLen;
+        summaries[chatId] = chatData;
+        writeEncryptedJson(summariesFile, summaries);
+        return newSummary;
+    }
+    return null;
+};
+
+/**
+ * Deletes chat summary by removing the chatId key from the summaries file.
+ */
+export const deleteChatSummary = (chatId) => {
+    try {
+        const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
+        if (fs.existsSync(summariesFile)) {
+            const summaries = readEncryptedJson(summariesFile, {});
+            if (summaries[chatId]) {
+                delete summaries[chatId];
+                writeEncryptedJson(summariesFile, summaries);
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+};
+
+/**
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
@@ -1292,6 +1387,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     try {
         let modifiedHistory = [...history.slice(0, -1)];
 
+        // If we have a valid summary, slice modifiedHistory to exclude already-summarized turns
+        {
+            const summaries = readEncryptedJson(summariesFile, {});
+            const chatDataObj = summaries[chatId] || { summary: '', historyLength: 0 };
+            if (chatDataObj.summary && chatDataObj.historyLength > 0) {
+                let cleanCount = 0;
+                const slicedHistory = [];
+                for (let i = 0; i < modifiedHistory.length; i++) {
+                    const msg = modifiedHistory[i];
+                    const isClean = (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta;
+                    if (isClean) {
+                        cleanCount++;
+                    }
+                    if (cleanCount > chatDataObj.historyLength) {
+                        slicedHistory.push(msg);
+                    }
+                }
+                modifiedHistory = slicedHistory;
+            }
+        }
+
         // Truncation & Condensation Logic (Compression 0.0)
         let contextCompressionCount = 252000;
         let contextTruncationCount = 254000;
@@ -1301,76 +1417,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             contextTruncationCount = 400000;
         }
 
-        if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if ((sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
-
-            const flattenContext = (hist) => {
-                return hist
-                    .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta)
-                    .map(m => {
-                        const role = m.text?.startsWith('[TOOL RESULT]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
-                        return `[${role}]: ${m.text}`;
-                    })
-                    .join('\n\n');
-            };
-
-            const runCondenser = async (flattenedText, oldSummary) => {
-                const systemInstruction = `You are an expert context condenser. Summarize the provided chat history (which may include previous summaries, user instructions, agent outputs, and tool results) into a detailed, coherent, and highly technical summary of 1000 to 1500 words. Focus on preserving the architectural decisions made, current system state, task progress, and critical code details. Under no circumstances exceed MAX 2000 words.`;
-                const prompt = oldSummary
-                    ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
-                    : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
-
-                let targetModel = 'gemma-4-26b-a4b-it';
-                if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
-                if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-                if (aiProvider === 'NVIDIA') targetModel = 'nvidia/llama-3.1-405b-instruct';
-
-                let attempts = 0;
-                let success = false;
-                let response = null;
-                while (attempts <= 3 && !success) {
-                    attempts++;
-                    try {
-                        response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
-                        success = true;
-                    } catch (err) {
-                        if (attempts > 3) {
-                            // Fallback spectrum for Google if all retry attempts fail
-                            if (aiProvider === 'Google') {
-                                try {
-                                    const fallback = await generateSimpleContent(settings, 'gemini-3.1-flash-lite', prompt, systemInstruction, 'Fast');
-                                    return fallback.text || '';
-                                } catch (e) {
-                                    return '';
-                                }
-                            }
-                            return '';
-                        }
-                    }
-                }
-                return response ? (response.text || '') : '';
-            };
-
-            const flattenedText = flattenContext(modifiedHistory);
-            const summaries = readEncryptedJson(summariesFile, {});
-            let chatData = summaries[chatId] || { summary: '', historyLength: 0 };
-            if (typeof chatData === 'string') {
-                chatData = { summary: chatData, historyLength: 0 };
-            }
-            const currentCleanLen = modifiedHistory.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-            if (chatData.historyLength && currentCleanLen < chatData.historyLength) {
-                chatData.summary = '';
-                chatData.historyLength = 0;
-                summaries[chatId] = chatData;
-                writeEncryptedJson(summariesFile, summaries);
-            }
-            const oldSummary = chatData.summary || '';
-
-            const newSummary = await runCondenser(flattenedText, oldSummary);
+            const newSummary = await compressHistory(settings, modifiedHistory);
             if (newSummary) {
-                chatData.summary = newSummary;
-                summaries[chatId] = chatData;
-                writeEncryptedJson(summariesFile, summaries);
                 modifiedHistory = [];
                 wasCompressedInStream = true;
             }
@@ -1590,7 +1640,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             writeEncryptedJson(summariesFile, summaries);
         }
         const currentSummary = typeof chatDataObj === 'object' ? (chatDataObj.summary || '') : (chatDataObj || '');
-        const summaryBlock = currentSummary ? `\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}` : '';
+        const summaryBlock = currentSummary ? `\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n` : '';
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
@@ -1846,7 +1896,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
-                    fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     let activeContents = contents;
 
