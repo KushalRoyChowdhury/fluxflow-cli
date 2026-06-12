@@ -52,6 +52,30 @@ export const isModelMultimodal = (model) => {
     return MULTIMODAL_MODELS.some(m => m.toLowerCase() === lower);
 };
 
+export const getCleanGroupedLength = (rawHistory) => {
+    const cleanHistory = [];
+    rawHistory.forEach((m) => {
+        const isCleanMsg = (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
+            m.role !== 'think' &&
+            !m.isVisualFeedback &&
+            !m.isMeta &&
+            !String(m.id).startsWith('welcome');
+        if (!isCleanMsg) return;
+
+        let text = m.fullText || m.text || '';
+        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
+            const prev = cleanHistory[cleanHistory.length - 1];
+            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
+                prev.text += '\n\n' + text;
+                return;
+            }
+        }
+        cleanHistory.push({ ...m, text });
+    });
+    return cleanHistory.length;
+};
+
+
 const stripAnsi = (str) => {
     if (typeof str !== 'string') return str;
     // eslint-disable-next-line no-control-regex
@@ -142,7 +166,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: mode === 'Flux' ? 1.0 : 1.4,
+        temperature: mode === 'Flux' ? 0.85 : 1.2,
     };
 
     // DeepSeek Specific Reasoning
@@ -308,7 +332,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const body = {
         model: model,
         messages: messages,
-        temperature: mode === 'Flux' ? 0.7 : 1.0,
+        temperature: mode === 'Flux' ? 0.8 : 1.2,
         max_tokens: maxTokens,
         stream: true,
         stream_options: { include_usage: true }
@@ -478,7 +502,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         model: model,
         messages: messages,
         stream: true,
-        temperature: mode === 'Flux' ? 1.0 : 1.4,
+        temperature: mode === 'Flux' ? 0.8 : 1.2,
     };
 
     const effort = reasoningEffortMap[thinkingLevel];
@@ -1315,13 +1339,18 @@ Chats to process:
 /**
  * Compresses chat history by generating a technical summary and writing it to the summaries file.
  */
-export const compressHistory = async (settings, history) => {
+export const compressHistory = async (settings, history, isAuto = false) => {
     const { chatId, aiProvider = 'Google' } = settings;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
 
     const flattenContext = (hist) => {
         return hist
-            .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta)
+            .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
+                m.role !== 'think' &&
+                !m.isVisualFeedback &&
+                !m.isMeta &&
+                !String(m.id).startsWith('welcome')
+            )
             .map(m => {
                 const role = m.text?.startsWith('[TOOL RESULT]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
                 return `[${role}]: ${m.text}`;
@@ -1375,8 +1404,12 @@ export const compressHistory = async (settings, history) => {
     const newSummary = await runCondenser(flattenedText, oldSummary);
     if (newSummary) {
         chatData.summary = newSummary;
-        const cleanLen = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-        chatData.historyLength = cleanLen;
+        const cleanLen = getCleanGroupedLength(history);
+        if (isAuto) {
+            chatData.historyLength = (chatData.historyLength || 0) + cleanLen;
+        } else {
+            chatData.historyLength = cleanLen;
+        }
         summaries[chatId] = chatData;
         writeEncryptedJson(summariesFile, summaries);
         return newSummary;
@@ -1426,6 +1459,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     await RevertManager.startTransaction(chatId, agentText);
 
+    TERMINATION_SIGNAL = false;
+
     let connectionPollInterval = null;
     try {
         const abortController = new AbortController();
@@ -1474,7 +1509,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         if ((sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
-            const newSummary = await compressHistory(settings, modifiedHistory);
+            const newSummary = await compressHistory(settings, modifiedHistory, true);
             if (newSummary) {
                 modifiedHistory = [];
                 wasCompressedInStream = true;
@@ -1688,6 +1723,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             chatDataObj = { summary: chatDataObj, historyLength: 0 };
         }
         const currentCleanLen = history.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+        // fs.appendFileSync("debug.txt", `\n[DEBUG] historyLength=${chatDataObj.historyLength}, currentCleanLen=${currentCleanLen}, modifiedHistory.length=${modifiedHistory.length}`)
+        // yield { type: 'status_history', content: `[DEBUG] historyLength=${chatDataObj.historyLength}, currentCleanLen=${currentCleanLen}, modifiedHistory.length=${modifiedHistory.length}` };
         if (chatDataObj.historyLength && currentCleanLen < chatDataObj.historyLength) {
             chatDataObj.summary = '';
             chatDataObj.historyLength = 0;
@@ -1695,7 +1732,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             writeEncryptedJson(summariesFile, summaries);
         }
         const currentSummary = typeof chatDataObj === 'object' ? (chatDataObj.summary || '') : (chatDataObj || '');
-        const summaryBlock = currentSummary ? `\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n` : '';
+        const hasExistingTurnsAfterCompression = modifiedHistory.length > 0;
+
+        if (hasExistingTurnsAfterCompression && currentSummary) {
+            if (modifiedHistory[0] && (modifiedHistory[0].role === 'user' || modifiedHistory[0].role === 'system')) {
+                if (!modifiedHistory[0].text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
+                    modifiedHistory[0].text = `[SYSTEM METADATA (PRIORITY: HIGH)]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n\n[USER] ${modifiedHistory[0].text}`;
+                    yield { type: 'summary_injected', content: { id: modifiedHistory[0].id, text: modifiedHistory[0].text } };
+                }
+            }
+        }
+
+        const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA (PRIORITY: HIGH)]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n` : '';
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
@@ -1743,8 +1791,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${summaryBlock}${memoryPrompt}${ideBlock}\n${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim()}`.trim();
+        const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${cleanAgentText}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
+
+        if (activeSummaryBlock && history[history.length - 1]?.id) {
+            yield { type: 'summary_injected', content: { id: history[history.length - 1].id, text: firstUserMsg } };
+        }
 
         let lastUsage = null;
         const MAX_LOOPS = mode === 'Flux' ? 70 : 7;
@@ -1964,6 +2017,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
+                    const abortPromise = new Promise((_, reject) => {
+                        if (abortController.signal.aborted) {
+                            reject(new DOMException('The user aborted a request.', 'AbortError'));
+                        }
+                        abortController.signal.addEventListener('abort', () => {
+                            reject(new DOMException('The user aborted a request.', 'AbortError'));
+                        });
+                    });
+
                     let activeContents = contents;
 
                     if (aiProvider === 'OpenRouter') {
@@ -2000,7 +2062,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal
                         );
                     } else {
-                        stream = await client.models.generateContentStream({
+                        const apiCallPromise = client.models.generateContentStream({
                             model: targetModel || "gemma-4-31b-it",
                             contents: activeContents,
                             config: {
@@ -2055,6 +2117,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 })(),
                             },
                         }, { signal: abortController.signal });
+
+                        stream = await Promise.race([apiCallPromise, abortPromise]);
                     }
 
                     // Reset turn state for this specific retry attempt
@@ -2074,7 +2138,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let lastGoogleFlushTime = Date.now();
                     let isFirstChunk = true;
 
-                    for await (const chunk of stream) {
+                    const iterator = stream[Symbol.asyncIterator]();
+                    while (true) {
+                        const { value: chunk, done } = await Promise.race([
+                            iterator.next(),
+                            abortPromise
+                        ]);
+                        if (done) break;
+
                         if (isFirstChunk) {
                             yield { type: 'status', content: 'Working...' };
                             isFirstChunk = false;
@@ -3261,24 +3332,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     modifiedHistory.push({ role: 'agent', text: cleanedFullResponse });
                 }
 
-                // Update History Length Baseline in chat-summaries.json
-                try {
-                    const summaries = readEncryptedJson(summariesFile, {});
-                    let existing = summaries[chatId] || { summary: '', historyLength: 0 };
-                    if (typeof existing === 'string') {
-                        existing = { summary: existing, historyLength: 0 };
-                    }
-                    const cleanLen = modifiedHistory.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
-                    if (wasCompressedInStream) {
-                        existing.historyLength = (existing.historyLength || 0) + cleanLen;
-                    } else {
-                        existing.historyLength = cleanLen;
-                    }
-                    summaries[chatId] = existing;
-                    writeEncryptedJson(summariesFile, summaries);
-                } catch (e) {
-                    // Silently ignore storage errors to avoid breaking stream
-                }
+                // History baselines are updated directly during compression events; no end-of-turn overrides are needed.
             }
 
             if (isActuallyFinished) break;

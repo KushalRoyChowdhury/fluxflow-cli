@@ -2197,9 +2197,10 @@ export default function App({ args = [] }) {
                         break;
                     }
                     const runCompress = async () => {
+                        const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: '⚙️ [SYSTEM] Compressing session history...', isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `⚙️${s}[SYSTEM] Compressing session history...`, isMeta: true }];
                         });
 
                         try {
@@ -2282,9 +2283,16 @@ export default function App({ args = [] }) {
                         let text = m.fullText || m.text;
                         // Strip metadata from older user messages
                         if (m.role === 'user' && idx < rawHistory.length - 1) {
-                            const userIndex = text.lastIndexOf('[USER]');
-                            if (userIndex !== -1) {
-                                text = text.substring(userIndex + 6).trim();
+                            if (text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
+                                const summaryIndex = text.indexOf('[SYSTEM METADATA (PRIORITY: HIGH)]');
+                                if (summaryIndex !== -1) {
+                                    text = text.substring(summaryIndex).trim();
+                                }
+                            } else {
+                                const userIndex = text.lastIndexOf('[USER]');
+                                if (userIndex !== -1) {
+                                    text = text.substring(userIndex + 6).trim();
+                                }
                             }
                         }
 
@@ -2468,6 +2476,14 @@ export default function App({ args = [] }) {
                                 sendStatus(packet.content);
                             }
                             setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `⚙️ [SYSTEM] ${packet.content}`, isMeta: true }]);
+                            continue;
+                        }
+                        if (packet.type === 'summary_injected') {
+                            setMessages(prev => prev.map(m =>
+                                m.id === packet.content.id
+                                    ? { ...m, fullText: packet.content.text }
+                                    : m
+                            ));
                             continue;
                         }
                         if (packet.type === 'spinner') {
