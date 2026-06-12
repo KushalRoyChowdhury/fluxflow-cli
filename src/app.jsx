@@ -578,6 +578,22 @@ export default function App({ args = [] }) {
     const isFirstRender = useRef(true);
     const isSecondRender = useRef(true);
     const isThirdRender = useRef(true);
+    const prevProviderRef = useRef(aiProvider);
+
+    // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
+    useEffect(() => {
+        if (prevProviderRef.current !== aiProvider) {
+            prevProviderRef.current = aiProvider;
+            const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA';
+            setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
+        } else {
+            if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
+                if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
+                    setThinkingLevel('High');
+                }
+            }
+        }
+    }, [aiProvider, activeModel, thinkingLevel]);
 
     // [TIER AWARENESS] Auto-switch models if moving between Free and Paid tiers
     useEffect(() => {
@@ -1345,12 +1361,13 @@ export default function App({ args = [] }) {
                 ? [
                     { cmd: 'Fast', desc: 'Fastest' },
                     { cmd: 'Standard', desc: 'Standard Reasoning' },
-                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                    { cmd: 'High', desc: 'Extended Reasoning' }
                 ]
                 : aiProvider === 'NVIDIA'
                     ? [
                         { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                        { cmd: 'xHigh', desc: 'Reasoning Enabled' }
+                        { cmd: 'Standard', desc: 'Balanced Reasoning' },
+                        { cmd: 'High', desc: 'Reasoning Enabled' }
                     ]
                     : aiProvider === 'OpenRouter'
                         ? [

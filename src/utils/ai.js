@@ -128,8 +128,8 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
         const reasoningEffortMap = {
             'Low': 'high',
             'Medium': 'high',
-            'High': 'high',
             'Standard': 'high',
+            'High': 'max',
             'xHigh': 'max'
         };
         requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
@@ -265,6 +265,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const reasoningBudgets = {
         'Low': 512,
         'Medium': 4096,
+        'Standard': 4096,
         'High': 8192,
         'xHigh': 16384
     };
