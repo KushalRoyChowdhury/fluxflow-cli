@@ -59,20 +59,42 @@ const stripAnsi = (str) => {
 };
 
 const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
+    const signal = options?.signal;
     for (let i = 0; i < retries; i++) {
+        if (signal?.aborted) {
+            throw new DOMException('The user aborted a request.', 'AbortError');
+        }
         try {
             const response = await fetch(url, options);
             if (response.ok) return response;
             if (response.status !== 429 && response.status < 500) return response;
         } catch (e) {
+            if (e.name === 'AbortError' || signal?.aborted) throw e;
             if (i === retries - 1) throw e;
         }
-        await new Promise(resolve => setTimeout(resolve, Math.min(24000, delay * Math.pow(2, i))));
+        if (signal) {
+            await new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    signal.removeEventListener('abort', abortHandler);
+                    resolve();
+                }, Math.min(24000, delay * Math.pow(2, i)));
+                const abortHandler = () => {
+                    clearTimeout(timer);
+                    reject(new DOMException('The user aborted a request.', 'AbortError'));
+                };
+                signal.addEventListener('abort', abortHandler);
+            });
+        } else {
+            await new Promise(resolve => setTimeout(resolve, Math.min(24000, delay * Math.pow(2, i))));
+        }
+    }
+    if (signal?.aborted) {
+        throw new DOMException('The user aborted a request.', 'AbortError');
     }
     return fetch(url, options);
 };
 
-const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -145,6 +167,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestPayload),
+        signal: signal
     });
 
     if (!response.ok) {
@@ -225,7 +248,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
     }
 };
 
-const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false) {
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -314,7 +337,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: signal
     });
 
     if (!response.ok) {
@@ -393,7 +417,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 }
 
-const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal) {
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -471,6 +495,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
             'X-Cache': 'true',
         },
         body: JSON.stringify(requestPayload),
+        signal: signal
     });
 
     if (!response.ok) {
@@ -1401,7 +1426,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
     await RevertManager.startTransaction(chatId, agentText);
 
+    let connectionPollInterval = null;
     try {
+        const abortController = new AbortController();
+
+        connectionPollInterval = setInterval(() => {
+            if (TERMINATION_SIGNAL) {
+                abortController.abort();
+                if (connectionPollInterval) {
+                    clearInterval(connectionPollInterval);
+                    connectionPollInterval = null;
+                }
+            }
+        }, 400);
+
         let modifiedHistory = [...history.slice(0, -1)];
 
         // If we have a valid summary, slice modifiedHistory to exclude already-summarized turns
@@ -1738,9 +1776,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield { type: 'status', content: 'Processed. Reconnecting...' };
             }
             if (TERMINATION_SIGNAL) {
-                yield { type: 'status', content: 'Termination Signal Received.' };
-                // wait 1.5s
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                yield { type: 'status', content: 'Request Cancelled' };
+                yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
                 break;
             }
 
@@ -1844,6 +1881,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
+                    // 1.5. Delete stranded user turns (where user is followed by system-initiated user turn without a model turn in between)
+                    for (let i = contents.length - 2; i >= 0; i--) {
+                        const current = contents[i];
+                        const next = contents[i + 1];
+                        if (current.role === 'user' && next.role === 'user') {
+                            const nextText = next.parts?.[0]?.text || '';
+                            if (nextText.trim().startsWith('[SYSTEM')) {
+                                contents.splice(i, 1);
+                            }
+                        }
+                    }
+
                     // 2. Merge consecutive same-role messages to guarantee strict role alternation.
                     const finalContents = [];
                     for (let i = 0; i < contents.length; i++) {
@@ -1925,7 +1974,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             currentSystemInstruction,
                             thinkingLevel,
                             mode,
-                            isMultiModal
+                            isMultiModal,
+                            abortController.signal
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -1935,7 +1985,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             currentSystemInstruction,
                             thinkingLevel,
                             mode,
-                            isMultiModal
+                            isMultiModal,
+                            abortController.signal
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         stream = getNVIDIAStream(
@@ -1945,7 +1996,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             currentSystemInstruction,
                             thinkingLevel,
                             mode,
-                            isMultiModal
+                            isMultiModal,
+                            abortController.signal
                         );
                     } else {
                         stream = await client.models.generateContentStream({
@@ -2002,7 +2054,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 })(),
                             },
-                        });
+                        }, { signal: abortController.signal });
                     }
 
                     // Reset turn state for this specific retry attempt
@@ -2029,9 +2081,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         if (TERMINATION_SIGNAL) {
-                            yield { type: 'status', content: 'Termination Signal Received.' };
-                            // wait 3s
-                            await new Promise(resolve => setTimeout(resolve, 1500));
+                            yield { type: 'status', content: 'Request Cancelled' };
+                            yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
                             break;
                         }
 
@@ -3002,6 +3053,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // Count the successful call
                     await incrementUsage('agent');
                 } catch (err) {
+                    if (TERMINATION_SIGNAL) {
+                        yield { type: 'status', content: 'Request Cancelled' };
+                        yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
+                        break;
+                    }
                     if (String(err).includes('Incomplete JSON segment at the end')) {
                         if (inThinkingState) {
                             inThinkingState = false;
@@ -3107,6 +3163,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
+                                if (TERMINATION_SIGNAL) break;
                                 yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
@@ -3125,6 +3182,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]...` };
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
+                                if (TERMINATION_SIGNAL) break;
                                 yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
@@ -3261,6 +3319,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
     } finally {
+        if (connectionPollInterval) {
+            clearInterval(connectionPollInterval);
+            connectionPollInterval = null;
+        }
         await RevertManager.commitTransaction();
     }
     yield { type: 'status', content: null };
