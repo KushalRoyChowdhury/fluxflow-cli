@@ -67,7 +67,7 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
         } catch (e) {
             if (i === retries - 1) throw e;
         }
-        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+        await new Promise(resolve => setTimeout(resolve, Math.min(24000, delay * Math.pow(2, i))));
     }
     return fetch(url, options);
 };
@@ -262,33 +262,50 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         });
     });
 
-    const reasoningBudgets = {
-        'Low': 512,
-        'Medium': 4096,
-        'Standard': 4096,
-        'High': 8192,
-        'xHigh': 16384
+    const thinkingLevelMap = {
+        'Fast': 'Fast',
+        'Low': 'Fast',
+        'Medium': 'Standard',
+        'Standard': 'Standard',
+        'High': 'High',
+        'xHigh': 'High'
     };
-    const budget = reasoningBudgets[thinkingLevel] || 0;
-    const isThinking = thinkingLevel !== 'Fast' && budget > 0;
+    const apiLevel = thinkingLevelMap[thinkingLevel] || 'Standard';
+    const isThinking = apiLevel !== 'Fast';
+
+    const isKimi = model.includes('kimi');
+    const isGemma = model.includes('gemma');
+    const isDeepSeek = model.includes('deepseek');
+    const isGlm = model.includes('glm');
+    const isMistral = model.includes('mistral');
+    const isMinimax = model.includes('minimax');
+
+    const maxTokens = (isMinimax || isDeepSeek) ? 16384 : 32768;
 
     const body = {
         model: model,
         messages: messages,
         temperature: mode === 'Flux' ? 0.7 : 1.0,
-        top_p: isThinking ? 0.95 : 0.7,
-        max_tokens: 16384,
+        max_tokens: maxTokens,
         stream: true,
         stream_options: { include_usage: true }
     };
 
-    if (isThinking && !mode.includes('deepseek')) {
-        body.reasoning_budget = model.includes('gemma-4') ? 16384 : budget;
-        if (!model.includes('minimax')) body.chat_template_kwargs = { "enable_thinking": true };
-    }
-
-    if (model.includes('deepseek')) {
-        if (isThinking) body.chat_template_kwargs = { "enable_thinking": true, "reasoning_effort": "high" };
+    if (isKimi) {
+        body.chat_template_kwargs = { thinking: isThinking };
+    } else if (isGemma) {
+        body.chat_template_kwargs = { enable_thinking: isThinking };
+    } else if (isDeepSeek) {
+        if (isThinking) {
+            const effort = apiLevel === 'High' ? 'max' : 'high';
+            body.chat_template_kwargs = { thinking: true, reasoning_effort: effort };
+        } else {
+            body.chat_template_kwargs = { thinking: false };
+        }
+    } else if (isGlm) {
+        body.chat_template_kwargs = { enable_thinking: isThinking, clear_thinking: !isThinking };
+    } else if (isMistral) {
+        body.reasoning_effort = isThinking ? 'high' : 'none';
     }
 
     const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -701,7 +718,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     } else if (aiProvider === 'NVIDIA') {
                         const stream = getNVIDIAStream(
                             apiKey,
-                            'deepseek-ai/deepseek-v4-flash',
+                            'z-ai/glm-5.1',
                             janitorContents,
                             janitorPrompt,
                             'Fast',
@@ -1854,7 +1871,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
                     targetModel = modelName;
-                    if (aiProvider === 'DeepSeek' && thinkingLevel === 'Fast') {
+                    if (aiProvider === 'DeepSeek' && thinkingLevel === 'Fast' && targetModel.includes('flash')) {
                         targetModel = 'deepseek-chat';
                     }
                     if (retryCount === MAX_RETRIES - 1) {

@@ -1317,7 +1317,7 @@ export default function App({ args = [] }) {
     const COMMANDS = [
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
         { cmd: '/help', desc: 'Show all available commands' },
-        { cmd: '/compress', desc: 'Summarize and condense chat history' },
+        { cmd: '/compress', desc: 'Summarize and compress chat history' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
@@ -1489,19 +1489,19 @@ export default function App({ args = [] }) {
                         ? [
                             {
                                 cmd: 'moonshotai/kimi-k2.6',
-                                desc: 'Multimodal [STABLE]'
+                                desc: 'Multimodal'
                             },
                             {
                                 cmd: 'google/gemma-4-31b-it',
-                                desc: '[STABLE]'
+                                desc: ''
                             },
                             {
                                 cmd: 'stepfun-ai/step-3.7-flash',
-                                desc: '[STABLE]'
+                                desc: ''
                             },
                             {
                                 cmd: 'minimaxai/minimax-m2.7',
-                                desc: '[STABLE]'
+                                desc: ''
                             },
                             {
                                 cmd: 'deepseek-ai/deepseek-v4-flash',
@@ -1509,7 +1509,15 @@ export default function App({ args = [] }) {
                             },
                             {
                                 cmd: 'deepseek-ai/deepseek-v4-pro',
-
+                                desc: ''
+                            },
+                            {
+                                cmd: 'mistralai/mistral-medium-3.5-128b',
+                                desc: ''
+                            },
+                            {
+                                cmd: 'z-ai/glm-5.1',
+                                desc: ''
                             }
                         ]
                         : (apiTier === 'Free'
@@ -1521,6 +1529,10 @@ export default function App({ args = [] }) {
                                 {
                                     cmd: 'gemma-4-31b-it',
                                     desc: 'Standard Default'
+                                },
+                                {
+                                    cmd: 'gemini-2.5-flash-lite',
+                                    desc: 'Fast & Cheap (Limited Free Quota)'
                                 },
                                 {
                                     cmd: 'gemini-2.5-flash',
@@ -1537,8 +1549,16 @@ export default function App({ args = [] }) {
                             ]
                             : [
                                 {
+                                    cmd: 'gemini-2.5-flash-lite',
+                                    desc: 'Fast & Cheap'
+                                },
+                                {
                                     cmd: 'gemini-2.5-flash',
                                     desc: 'Fast & Reliable'
+                                },
+                                {
+                                    cmd: 'gemini-2.5-pro',
+                                    desc: 'Last gen Pro reasoning'
                                 },
                                 {
                                     cmd: 'gemini-3.1-flash-lite',
@@ -2161,6 +2181,21 @@ export default function App({ args = [] }) {
                 }
                 case '/compress': {
                     setInput('');
+                    const cleanCount = messages.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
+                    const tokens = sessionStats?.tokens || 0;
+                    if (cleanCount < 30 || tokens < 32768) {
+                        const s = emojiSpace(2);
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, {
+                                id: Date.now(),
+                                role: 'system',
+                                text: `⚠️${s}[SYSTEM] Compression skipped: History requires at least 30 messages and 32k tokens (current: ${cleanCount}/30 msgs, ${tokens}/32000 tokens).`,
+                                isMeta: true
+                            }];
+                        });
+                        break;
+                    }
                     const runCompress = async () => {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
@@ -3012,7 +3047,7 @@ export default function App({ args = [] }) {
                                             defaultModel = 'deepseek-v4-flash';
                                         } else if (prov === 'NVIDIA') {
                                             defaultModel = 'moonshotai/kimi-k2.6';
-                                        }                                        setActiveModel(defaultModel);
+                                        } setActiveModel(defaultModel);
                                         newSettings.aiProvider = prov;
                                         newSettings.activeModel = defaultModel;
 
@@ -3748,289 +3783,289 @@ export default function App({ args = [] }) {
                     </Box>
 
                     <Box flexDirection="column" padding={1} width="100%">
-                {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
-                    <Box flexDirection="column" width="100%">
-                        <ChatLayout
-                            messages={messages.slice(completedIndex)}
-                            showFullThinking={showFullThinking}
-                            columns={Math.max(20, (stdout?.columns || 80) - 1)}
-                        />
-                        {activeCommand && (
-                            <Box marginTop={1}>
-                                <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} />
+                        {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
+                            <Box flexDirection="column" width="100%">
+                                <ChatLayout
+                                    messages={messages.slice(completedIndex)}
+                                    showFullThinking={showFullThinking}
+                                    columns={Math.max(20, (stdout?.columns || 80) - 1)}
+                                />
+                                {activeCommand && (
+                                    <Box marginTop={1}>
+                                        <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} />
+                                    </Box>
+                                )}
                             </Box>
                         )}
-                    </Box>
-                )}
 
-                {isInitializing ? (
-                    <Box borderStyle="double" borderColor="magenta" padding={1} flexShrink={0}>
-                        <Text color="magenta">🌊 Starting Flux Flow...</Text>
-                    </Box>
-                ) : !apiKey ? (
-                    <Box borderStyle="round" borderColor="gray" padding={0} flexDirection="column" flexShrink={0} width="100%">
-                        <Box paddingX={1} marginBottom={1}>
-                            <Text color="yellow" bold>🔑{emojiSpace(2)}API KEY REQUIRED</Text>
-                        </Box>
-
-                        <Box paddingX={1} flexDirection="column">
-                            {setupStep === 0 ? (
-                                <>
-                                    <Text>Select your Preferred Provider:</Text>
-                                    <Box marginTop={1}>
-                                        <CommandMenu
-                                            items={[
-                                                { label: 'Google (Free/Paid)', value: 'Google' },
-                                                { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
-                                                { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                                                { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' }
-                                            ]}
-                                            onSelect={(item) => {
-                                                setAiProvider(item.value);
-                                                setSetupStep(1);
-                                            }}
-                                        />
-                                    </Box>
-                                </>
-                            ) : (
-                                <>
-                                    <Text>Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
-                                    <Box marginTop={1}>
-                                        <Text color="cyan" bold>💠 </Text>
-                                        <TextInput
-                                            value={tempKey}
-                                            onChange={setTempKey}
-                                            onSubmit={handleSetup}
-                                            mask="*"
-                                        />
-                                    </Box>
-                                    <Box marginTop={1}>
-                                        <Text color="gray" italic>(Press ESC to go back to provider selection)</Text>
-                                    </Box>
-                                </>
-                            )}
-                        </Box>
-
-                        <Box paddingX={1} marginTop={1}>
-                            <Text color="gray" dimColor italic>{setupStep === 0 ? '(Use arrows to select and Enter to confirm)' : '(Press Enter to confirm and initialize)'}</Text>
-                        </Box>
-                    </Box>
-                ) : (
-                    renderActiveView()
-                )}
-
-                {confirmExit && (
-                    <Box borderStyle="round" borderColor="red" paddingX={2} marginY={0} width="100%">
-                        <Text color="red" bold>🔴 EXIT CONFIRMATION: </Text>
-                        <Text color="white">Press </Text>
-                        <Text color="red" bold>CTRL + C</Text>
-                        <Text color="white"> again to exit ({exitCountdown}s). Press </Text>
-                        <Text color="cyan" bold>ESC</Text>
-                        <Text color="white"> to cancel.</Text>
-                    </Box>
-                )}
-
-                <Box flexShrink={0} width="100%">
-                    <StatusBar
-                        mode={mode}
-                        thinkingLevel={thinkingLevel}
-                        tokens={sessionStats.tokens}
-                        tokensTotal={sessionStats.tokens}
-                        chatId={chatId}
-                        isMemoryEnabled={systemSettings.memory}
-                        apiTier={apiTier}
-                        aiProvider={aiProvider}
-                    />
-                </Box>
-
-                {activeView === 'exit' && (() => {
-                    const wallTimeMs = Date.now() - SESSION_START_TIME;
-
-                    const totalTools = sessionToolSuccess + sessionToolFailure;
-                    const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
-
-                    const agentActiveMs = sessionApiTime + sessionToolTime;
-                    const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
-                    const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
-
-                    return (
-                        <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
-                            <Box marginBottom={1}>
-                                <Text bold>{gradient(['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
+                        {isInitializing ? (
+                            <Box borderStyle="double" borderColor="magenta" padding={1} flexShrink={0}>
+                                <Text color="magenta">🌊 Starting Flux Flow...</Text>
                             </Box>
-                            <Box flexDirection="column">
-                                <Text color="white" bold underline>Interaction Summary</Text>
-                                <Box marginTop={1}>
-                                    <Box width={20}><Text color="blue">Session ID:</Text></Box>
-                                    <Text color="white">{chatId}</Text>
+                        ) : !apiKey ? (
+                            <Box borderStyle="round" borderColor="gray" padding={0} flexDirection="column" flexShrink={0} width="100%">
+                                <Box paddingX={1} marginBottom={1}>
+                                    <Text color="yellow" bold>🔑{emojiSpace(2)}API KEY REQUIRED</Text>
                                 </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                    <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✕ {sessionToolFailure}</Text> )</Text>
-                                </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Success Rate:</Text></Box>
-                                    <Text color="white">{successRate}%</Text>
-                                </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Code Changes:</Text></Box>
-                                    <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
-                                </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
-                                    <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
-                                </Box>
-                                {sessionTotalTokens > 0 && (
-                                    <>
-                                        <Box marginLeft={2}>
-                                            <Box width={18}><Text color="grey">» Input Tokens:</Text></Box>
-                                            <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
-                                        </Box>
-                                        {sessionTotalCachedTokens > 0 && (
-                                            <Box marginLeft={4}>
-                                                <Box width={16}><Text color="grey">» Cached:</Text></Box>
-                                                <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+
+                                <Box paddingX={1} flexDirection="column">
+                                    {setupStep === 0 ? (
+                                        <>
+                                            <Text>Select your Preferred Provider:</Text>
+                                            <Box marginTop={1}>
+                                                <CommandMenu
+                                                    items={[
+                                                        { label: 'Google (Free/Paid)', value: 'Google' },
+                                                        { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                                                        { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                                                        { label: 'NVIDIA [EXPERIMENTAL]', value: 'NVIDIA' }
+                                                    ]}
+                                                    onSelect={(item) => {
+                                                        setAiProvider(item.value);
+                                                        setSetupStep(1);
+                                                    }}
+                                                />
                                             </Box>
-                                        )}
-                                        {sessionTotalCandidateTokens > 0 && (
-                                            <Box marginLeft={2}>
-                                                <Box width={18}><Text color="grey">» Output Tokens:</Text></Box>
-                                                <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
-                                            </Box>
-                                        )}
-                                    </>
-                                )}
-                                {sessionImageCount > 0 && (
-                                    <>
-                                        <Box>
-                                            <Box width={20}><Text color="blue">Images Made:</Text></Box>
-                                            <Text color="white">{sessionImageCount}</Text>
-                                        </Box>
-                                        <Box>
-                                            <Box width={20}><Text color="blue">Image Credits:</Text></Box>
-                                            <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
-                                        </Box>
-                                    </>
-                                )}
-                            </Box>
-
-                            <Box flexDirection="column" marginTop={1}>
-                                <Text color="white" bold underline>Performance</Text>
-                                <Box marginTop={1}>
-                                    <Box width={20}><Text color="blue">Wall Time:</Text></Box>
-                                    <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
-                                </Box>
-                                <Box>
-                                    <Box width={20}><Text color="blue">Agent Active:</Text></Box>
-                                    <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
-                                </Box>
-                                <Box marginLeft={2}>
-                                    <Box width={18}><Text color="grey">» API Time:</Text></Box>
-                                    <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
-                                </Box>
-                                <Box marginLeft={2}>
-                                    <Box width={18}><Text color="grey">» Tool Time:</Text></Box>
-                                    <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
-                                </Box>
-                            </Box>
-                        </Box>
-                    );
-                })()}
-
-                {/* 💡 Modernized Suggestion Box - Sleek, structured, and premium */}
-                {suggestions.length > 0 && (() => {
-                    const windowSize = 5;
-                    const startIdx = Math.max(0, Math.min(selectedIndex - 2, suggestions.length - windowSize));
-                    const visible = suggestions.slice(startIdx, startIdx + windowSize);
-                    const remaining = suggestions.length - (startIdx + visible.length);
-
-                    return (
-                        <Box
-                            flexDirection="column"
-                            borderStyle="round"
-                            borderColor="gray"
-                            paddingX={0}
-                            paddingY={0}
-                            width="100%"
-                        >
-                            <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
-                                <Text color="gray" bold dimColor>
-                                    {suggestions[0]?.cmd?.startsWith('@') ? "📁 FILE SUGGESTIONS" : "🔍 COMMAND SUGGESTIONS"}
-                                </Text>
-                                {suggestions[0]?.cmd?.startsWith('@') ? (
-                                    <Text color="gray" dimColor italic>
-                                        (Use '#Lstart-Lend' to specify line numbers)
-                                    </Text>
-                                ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
-                                    let url = "https://aistudio.google.com/billing";
-                                    let label = "billing";
-                                    if (aiProvider === 'DeepSeek') {
-                                        url = "https://platform.deepseek.com/usage";
-                                        label = "billing";
-                                    } else if (aiProvider === 'OpenRouter') {
-                                        url = "https://openrouter.ai/settings/profile";
-                                        label = "profile";
-                                    } else if (aiProvider === 'NVIDIA') {
-                                        url = "https://build.nvidia.com/settings/api-keys";
-                                        label = "billing";
-                                    }
-                                    return (
-                                        <Text color="gray" dimColor italic>
-                                            Paid API has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
-                                        </Text>
-                                    );
-                                })() : null}
-                            </Box>
-
-                            {visible.map((s, i) => {
-                                const actualIdx = startIdx + i;
-                                const isActive = actualIdx === selectedIndex;
-                                const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';
-
-                                return (
-                                    <Box
-                                        key={s.cmd}
-                                        flexDirection="row"
-                                        backgroundColor={isActive ? "#2a2a2a" : undefined}
-                                        paddingX={1}
-                                    >
-                                        <Box width={3}>
-                                            <Text color={isActive ? "cyan" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
-                                        </Box>
-                                        <Box width={55}>
-                                            <Text
-                                                color={isGemmaDisabled ? "gray" : (isActive ? "yellow" : "white")}
-                                                bold={isActive}
-                                                dimColor={isGemmaDisabled && !isActive}
-                                            >
-                                                {s.cmd?.startsWith('@[') && s.cmd?.endsWith(']') ? (() => {
-                                                    const pathPart = s.cmd.slice(2, -1);
-                                                    const parts = pathPart.split(/[/\\]/);
-                                                    return parts[parts.length - 1];
-                                                })() : s.cmd}
-                                            </Text>
-                                        </Box>
-                                        <Box flexGrow={1}>
-                                            <Text color="gray" italic dimColor={!isActive}>{s.desc}</Text>
-                                        </Box>
-                                    </Box>
-                                );
-                            })}
-
-                            {/* ⚓ Height Anchor: More indicators for long lists */}
-                            {suggestions.length > 5 && (
-                                <Box paddingX={1} height={1}>
-                                    {remaining > 0 ? (
-                                        <Text color="gray" dimColor italic>   ... ({remaining} more commands available)</Text>
+                                        </>
                                     ) : (
-                                        <Text color="gray" dimColor italic>   (End of list)</Text>
+                                        <>
+                                            <Text>Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
+                                            <Box marginTop={1}>
+                                                <Text color="cyan" bold>💠 </Text>
+                                                <TextInput
+                                                    value={tempKey}
+                                                    onChange={setTempKey}
+                                                    onSubmit={handleSetup}
+                                                    mask="*"
+                                                />
+                                            </Box>
+                                            <Box marginTop={1}>
+                                                <Text color="gray" italic>(Press ESC to go back to provider selection)</Text>
+                                            </Box>
+                                        </>
                                     )}
                                 </Box>
-                            )}
+
+                                <Box paddingX={1} marginTop={1}>
+                                    <Text color="gray" dimColor italic>{setupStep === 0 ? '(Use arrows to select and Enter to confirm)' : '(Press Enter to confirm and initialize)'}</Text>
+                                </Box>
+                            </Box>
+                        ) : (
+                            renderActiveView()
+                        )}
+
+                        {confirmExit && (
+                            <Box borderStyle="round" borderColor="red" paddingX={2} marginY={0} width="100%">
+                                <Text color="red" bold>🔴 EXIT CONFIRMATION: </Text>
+                                <Text color="white">Press </Text>
+                                <Text color="red" bold>CTRL + C</Text>
+                                <Text color="white"> again to exit ({exitCountdown}s). Press </Text>
+                                <Text color="cyan" bold>ESC</Text>
+                                <Text color="white"> to cancel.</Text>
+                            </Box>
+                        )}
+
+                        <Box flexShrink={0} width="100%">
+                            <StatusBar
+                                mode={mode}
+                                thinkingLevel={thinkingLevel}
+                                tokens={sessionStats.tokens}
+                                tokensTotal={sessionStats.tokens}
+                                chatId={chatId}
+                                isMemoryEnabled={systemSettings.memory}
+                                apiTier={apiTier}
+                                aiProvider={aiProvider}
+                            />
                         </Box>
-                    );
-                })()}
-            </Box>
+
+                        {activeView === 'exit' && (() => {
+                            const wallTimeMs = Date.now() - SESSION_START_TIME;
+
+                            const totalTools = sessionToolSuccess + sessionToolFailure;
+                            const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
+
+                            const agentActiveMs = sessionApiTime + sessionToolTime;
+                            const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+                            const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
+
+                            return (
+                                <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="red" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
+                                    <Box marginBottom={1}>
+                                        <Text bold>{gradient(['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
+                                    </Box>
+                                    <Box flexDirection="column">
+                                        <Text color="white" bold underline>Interaction Summary</Text>
+                                        <Box marginTop={1}>
+                                            <Box width={20}><Text color="blue">Session ID:</Text></Box>
+                                            <Text color="white">{chatId}</Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
+                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✕ {sessionToolFailure}</Text> )</Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Success Rate:</Text></Box>
+                                            <Text color="white">{successRate}%</Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Code Changes:</Text></Box>
+                                            <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
+                                            <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                                        </Box>
+                                        {sessionTotalTokens > 0 && (
+                                            <>
+                                                <Box marginLeft={2}>
+                                                    <Box width={18}><Text color="grey">» Input Tokens:</Text></Box>
+                                                    <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                                </Box>
+                                                {sessionTotalCachedTokens > 0 && (
+                                                    <Box marginLeft={4}>
+                                                        <Box width={16}><Text color="grey">» Cached:</Text></Box>
+                                                        <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                                    </Box>
+                                                )}
+                                                {sessionTotalCandidateTokens > 0 && (
+                                                    <Box marginLeft={2}>
+                                                        <Box width={18}><Text color="grey">» Output Tokens:</Text></Box>
+                                                        <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                                    </Box>
+                                                )}
+                                            </>
+                                        )}
+                                        {sessionImageCount > 0 && (
+                                            <>
+                                                <Box>
+                                                    <Box width={20}><Text color="blue">Images Made:</Text></Box>
+                                                    <Text color="white">{sessionImageCount}</Text>
+                                                </Box>
+                                                <Box>
+                                                    <Box width={20}><Text color="blue">Image Credits:</Text></Box>
+                                                    <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                                </Box>
+                                            </>
+                                        )}
+                                    </Box>
+
+                                    <Box flexDirection="column" marginTop={1}>
+                                        <Text color="white" bold underline>Performance</Text>
+                                        <Box marginTop={1}>
+                                            <Box width={20}><Text color="blue">Wall Time:</Text></Box>
+                                            <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
+                                        </Box>
+                                        <Box>
+                                            <Box width={20}><Text color="blue">Agent Active:</Text></Box>
+                                            <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
+                                        </Box>
+                                        <Box marginLeft={2}>
+                                            <Box width={18}><Text color="grey">» API Time:</Text></Box>
+                                            <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
+                                        </Box>
+                                        <Box marginLeft={2}>
+                                            <Box width={18}><Text color="grey">» Tool Time:</Text></Box>
+                                            <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            );
+                        })()}
+
+                        {/* 💡 Modernized Suggestion Box - Sleek, structured, and premium */}
+                        {suggestions.length > 0 && (() => {
+                            const windowSize = 5;
+                            const startIdx = Math.max(0, Math.min(selectedIndex - 2, suggestions.length - windowSize));
+                            const visible = suggestions.slice(startIdx, startIdx + windowSize);
+                            const remaining = suggestions.length - (startIdx + visible.length);
+
+                            return (
+                                <Box
+                                    flexDirection="column"
+                                    borderStyle="round"
+                                    borderColor="gray"
+                                    paddingX={0}
+                                    paddingY={0}
+                                    width="100%"
+                                >
+                                    <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
+                                        <Text color="gray" bold dimColor>
+                                            {suggestions[0]?.cmd?.startsWith('@') ? "📁 FILE SUGGESTIONS" : "🔍 COMMAND SUGGESTIONS"}
+                                        </Text>
+                                        {suggestions[0]?.cmd?.startsWith('@') ? (
+                                            <Text color="gray" dimColor italic>
+                                                (Use '#Lstart-Lend' to specify line numbers)
+                                            </Text>
+                                        ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
+                                            let url = "https://aistudio.google.com/billing";
+                                            let label = "billing";
+                                            if (aiProvider === 'DeepSeek') {
+                                                url = "https://platform.deepseek.com/usage";
+                                                label = "billing";
+                                            } else if (aiProvider === 'OpenRouter') {
+                                                url = "https://openrouter.ai/settings/profile";
+                                                label = "profile";
+                                            } else if (aiProvider === 'NVIDIA') {
+                                                url = "https://build.nvidia.com/settings/api-keys";
+                                                label = "billing";
+                                            }
+                                            return (
+                                                <Text color="gray" dimColor italic>
+                                                    Paid API has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
+                                                </Text>
+                                            );
+                                        })() : null}
+                                    </Box>
+
+                                    {visible.map((s, i) => {
+                                        const actualIdx = startIdx + i;
+                                        const isActive = actualIdx === selectedIndex;
+                                        const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';
+
+                                        return (
+                                            <Box
+                                                key={s.cmd}
+                                                flexDirection="row"
+                                                backgroundColor={isActive ? "#2a2a2a" : undefined}
+                                                paddingX={1}
+                                            >
+                                                <Box width={3}>
+                                                    <Text color={isActive ? "cyan" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
+                                                </Box>
+                                                <Box width={55}>
+                                                    <Text
+                                                        color={isGemmaDisabled ? "gray" : (isActive ? "yellow" : "white")}
+                                                        bold={isActive}
+                                                        dimColor={isGemmaDisabled && !isActive}
+                                                    >
+                                                        {s.cmd?.startsWith('@[') && s.cmd?.endsWith(']') ? (() => {
+                                                            const pathPart = s.cmd.slice(2, -1);
+                                                            const parts = pathPart.split(/[/\\]/);
+                                                            return parts[parts.length - 1];
+                                                        })() : s.cmd}
+                                                    </Text>
+                                                </Box>
+                                                <Box flexGrow={1}>
+                                                    <Text color="gray" italic dimColor={!isActive}>{s.desc}</Text>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })}
+
+                                    {/* ⚓ Height Anchor: More indicators for long lists */}
+                                    {suggestions.length > 5 && (
+                                        <Box paddingX={1} height={1}>
+                                            {remaining > 0 ? (
+                                                <Text color="gray" dimColor italic>   ... ({remaining} more commands available)</Text>
+                                            ) : (
+                                                <Text color="gray" dimColor italic>   (End of list)</Text>
+                                            )}
+                                        </Box>
+                                    )}
+                                </Box>
+                            );
+                        })()}
+                    </Box>
                 </>
             )}
         </Box>

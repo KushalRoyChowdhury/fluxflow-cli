@@ -65,31 +65,32 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         if (isHelpCommands) {
             console.log(`FluxFlow Chat /Commands:
-  /quit                                Exit and shutdown Flux
-  /help                                Show help menu
-  /clear                               Clear terminal screen
-  /resume                              Load previous session
-  /revert                              Revert codebase back to a checkpoint
-  /save                                Force save current chat
-  /export                              Export current chat in a .txt file
-  /chats                               List all chat sessions
-  /image setup key <default|custom>    Configure image API key strategy
-  /image setup quality <low...premium> Configure default image generation quality
-  /image stats                         Show image quota stats
-  /mode <flux|flow>                    Toggle Flux/Flow modes
-  /thinking <Fast|Low|Medium|High|xHigh> Set AI reasoning depth
-  /model <model_name>                  Switch Model for Agent
-  /settings                            Configure system preferences
-  /key                                 Manage API keys
-  /profile                             Edit developer persona
-  /memory                              Manage agent memory
-  /stats                               Show session usage
-  /reset                               Wipe all project data
-  /about                               Project info & credits
-  /changelog                           View latest updates
-  /fluxflow init                       Create FluxFlow.md template
-  /update check                        Check for new version
-  /update latest                       Install latest release`);
+  /quit                                    Exit and shutdown Flux
+  /help                                    Show help menu
+  /clear                                   Clear terminal screen
+  /resume                                  Load previous session
+  /compress                                Summarize and compress chat history
+  /revert                                  Revert codebase back to a checkpoint
+  /save                                    Force save current chat
+  /export                                  Export current chat in a .txt file
+  /chats                                   List all chat sessions
+  /image setup key <default|custom>        Configure image API key strategy
+  /image setup quality <low...premium>     Configure default image generation quality
+  /image stats                             Show image quota stats
+  /mode <flux|flow>                        Toggle Flux/Flow modes
+  /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
+  /model <model_name>                      Switch Model for Agent
+  /settings                                Configure system preferences
+  /key                                     Manage API keys
+  /profile                                 Edit developer persona
+  /memory                                  Manage agent memory
+  /stats                                   Show session usage
+  /reset                                   Wipe all project data
+  /about                                   Project info & credits
+  /changelog                               View latest updates
+  /fluxflow init                           Create FluxFlow.md template
+  /update check                            Check for new version
+  /update latest                           Install latest release`);
             process.exit(0);
         }
 

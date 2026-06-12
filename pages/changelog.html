@@ -227,8 +227,23 @@
         // ==========================================
         // Thanks to Gemini CLI. (つ╥﹏╥)つ
         // Logging Off...
-        const stableVersions = ["2.3.0", "2.4.0"]
+        const stableVersions = ["2.5.0"]
         const changelogData = {
+            "2.5.0": {
+                "note": "",
+                "added": [
+                    "Added /compress command to let users manually compress chat history when needed instead of waiting for context limit."
+                ],
+                "changed": [
+                    "Added model support for NVIDIA integration: Gemma 4 31B, Mistral 3.5.",
+                    "Added model support for Gemini: Gemini 2.5 Pro, Gemini 2.5 Flash Lite"
+                ],
+                "fixes": [
+                    "Resolved a bug where multi turn tool use could affect caching.",
+                    "Resolved thinking instability issues with NVIDIA API",
+                    "Improved memory stability with NVIDIA integration."
+                ]
+            },
             "2.4.0": {
                 "note": "EXPERIMENTAL support for NVIDIA API. Thank You for supporting.",
                 "added": [

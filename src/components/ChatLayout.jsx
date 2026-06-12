@@ -737,7 +737,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
         const commandList = [
             { cmd: '/quit', desc: 'Exit and shutdown Flux' },
             { cmd: '/help', desc: 'Show all available commands' },
-            { cmd: '/compress', desc: 'Summarize and condense chat history' },
+            { cmd: '/compress', desc: 'Summarize and compress chat history' },
             { cmd: '/clear', desc: 'Clear terminal screen' },
             { cmd: '/resume', desc: 'Load previous session' },
             { cmd: '/revert', desc: 'Revert codebase to checkpoint' },
