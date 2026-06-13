@@ -3372,6 +3372,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             });
         }
 
+    } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        const date = new Date().toLocaleString();
+        const agentErrDir = path.join(LOGS_DIR, 'agent');
+        if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
+        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err instanceof Error ? err.stack : err}\n\n----------------------------------------------------------------------\n\n`);
+        
+        yield { type: 'tool_result', content: `ERROR: [INTERNAL CRITICAL] ${errorMsg}` };
     } finally {
         if (connectionPollInterval) {
             clearInterval(connectionPollInterval);

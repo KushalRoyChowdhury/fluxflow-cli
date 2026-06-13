@@ -85,6 +85,7 @@ export const dispatchTool = async (toolName, args, context = {}) => {
         // Support both sync and async tools, passing external context
         return await tool(args, context);
     } catch (err) {
-        return `ERROR: Execution failed for [${toolName}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Execution failed for [${toolName}]: ${errorMsg}`;
     }
 };

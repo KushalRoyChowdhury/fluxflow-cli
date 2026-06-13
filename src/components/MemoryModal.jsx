@@ -55,7 +55,7 @@ export default function MemoryModal({ onClose }) {
     const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
 
     const getBarColor = () => {
-        if (usagePercent < 50) return "green";
+        if (usagePercent < 50) return "grey";
         if (usagePercent < 90) return "yellow";
         return "red";
     };
@@ -65,7 +65,7 @@ export default function MemoryModal({ onClose }) {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1} justifyContent="space-between">
-                <Text color="cyan" bold>🧠 AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
+                <Text color="white" bold>AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
                 <Box>
                     <Text color="gray">Vault: </Text>
                     <Text color={getBarColor()}>{barStr}</Text>
@@ -93,13 +93,13 @@ export default function MemoryModal({ onClose }) {
                                 width="100%"
                             >
                                 <Box flexGrow={1}>
-                                    <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+                                    <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}{idx + 1}. {cleanDisplay(mem.memory)}
                                     </Text>
                                 </Box>
                                 {isSelected && (
                                     <Box flexShrink={0}>
-                                        <Text color="red" bold>[X] WIPE </Text>
+                                        <Text color="grey" bold>[X] WIPE </Text>
                                     </Box>
                                 )}
                             </Box>
@@ -117,7 +117,7 @@ export default function MemoryModal({ onClose }) {
                 borderBottom={false}
                 borderColor="gray"
             >
-                <Text dimColor italic>↑↓ navigate • x wipe memory • Esc close</Text>
+                <Text color={'grey'} italic>↑↓ navigate • x wipe memory • Esc close</Text>
             </Box>
         </Box>
     );

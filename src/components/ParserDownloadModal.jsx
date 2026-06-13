@@ -64,7 +64,7 @@ export default function ParserDownloadModal({ onClose }) {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="cyan" bold>📦 LANGUAGE PARSER MANAGER</Text>
+                <Text color="white" bold>LANGUAGE PARSER MANAGER</Text>
             </Box>
 
             <Box flexDirection="column">
@@ -98,7 +98,7 @@ export default function ParserDownloadModal({ onClose }) {
                             width="100%"
                         >
                             <Box>
-                                <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+                                <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
                                     {isSelected ? '❯ ' : '  '}{item.label} <Text dimColor>({item.exts.join(', ')})</Text>
                                 </Text>
                             </Box>
@@ -122,7 +122,7 @@ export default function ParserDownloadModal({ onClose }) {
                 borderBottom={false}
                 borderColor="gray"
             >
-                <Text dimColor italic>↑↓ navigate • Enter download • x delete • Esc close</Text>
+                <Text color="grey" italic>↑↓ navigate • Enter download • x delete • Esc close</Text>
             </Box>
         </Box>
     );

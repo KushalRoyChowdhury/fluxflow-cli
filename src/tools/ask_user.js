@@ -37,6 +37,7 @@ export const ask_user = async (args, context) => {
         const choice = await context.onAskUser(question, options);
         return `USER CHOOSE: ${choice}`;
     } catch (err) {
-        return `ERROR: Failed to get user input: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to get user input: ${errorMsg}`;
     }
 };

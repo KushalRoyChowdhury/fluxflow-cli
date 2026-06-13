@@ -27,7 +27,7 @@ export default function ProfileForm({ initialData, onSave, onCancel }) {
             onCancel();
             return;
         }
-        
+
         const currentKey = steps[step].key;
         const newProfile = { ...profile, [currentKey]: val.trim() };
         setProfile(newProfile);
@@ -41,36 +41,36 @@ export default function ProfileForm({ initialData, onSave, onCancel }) {
     };
 
     return (
-        <Box 
-            borderStyle="round" 
-            borderColor="gray" 
-            padding={0} 
-            marginTop={1} 
-            flexShrink={0} 
+        <Box
+            borderStyle="round"
+            borderColor="gray"
+            padding={0}
+            marginTop={1}
+            flexShrink={0}
             flexDirection="column"
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
-                <Text color="magenta" bold>👤 DEVELOPER PROFILE CONFIGURATION</Text>
+                <Text color="white" bold>👤 DEVELOPER PROFILE CONFIGURATION</Text>
             </Box>
 
             <Box paddingX={1} flexDirection="column">
                 <Box>
-                    <Text color="cyan" bold>{steps[step].label}</Text>
+                    <Text color="white" bold>{steps[step].label}</Text>
                     <TextInput
                         value={currentInput}
                         onChange={setCurrentInput}
                         onSubmit={handleSubmit}
                     />
                 </Box>
-                
+
                 <Box marginTop={1}>
-                    <Text color="gray" dimColor italic>Step {step + 1} of {steps.length}</Text>
+                    <Text color="gray" italic>Step {step + 1} of {steps.length}</Text>
                 </Box>
             </Box>
 
             <Box paddingX={1} marginTop={1}>
-                <Text color="gray" dimColor italic>(Enter to submit • Type /cancel to abort)</Text>
+                <Text color="gray" italic>(Enter to submit • Type /cancel to abort)</Text>
             </Box>
         </Box>
     );

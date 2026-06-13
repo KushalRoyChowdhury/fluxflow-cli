@@ -58,7 +58,18 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                         // Strip ANSI codes and carriage returns for clean log display
                         const cleanStr = str.replace(/\x1B\[[0-?]*[ -/]*[@-~]|\x1B\][^\x07\x1B]*[\x07\x1B]|\b|\x07/g, '').replace(/\r/g, '').trim();
                         if (cleanStr) {
-                            setLog(prev => (prev + '\n' + cleanStr).split('\n').slice(-5).join('\n'));
+                            setLog(prev => {
+                                const lines = prev.split('\n');
+                                const lastLine = lines[lines.length - 1];
+                                
+                                // Deduplicate progress updates (pnpm/npm style)
+                                if (lastLine?.startsWith('Progress:') && cleanStr.startsWith('Progress:')) {
+                                    lines[lines.length - 1] = cleanStr;
+                                    return lines.slice(-5).join('\n');
+                                }
+                                
+                                return (prev + '\n' + cleanStr).split('\n').slice(-5).join('\n');
+                            });
                         }
                     };
 
@@ -160,27 +171,27 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
     if (status === 'initializing' || status === 'downloading') {
         const frame = SPINNER_FRAMES[Math.floor(tick / 3) % SPINNER_FRAMES.length];
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1}>
+            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
                 <Box>
-                    <Text color="magenta">{frame}</Text>
-                    <Text marginLeft={1} bold> Updating Flux Flow to v{latest}...</Text>
+                    <Text color="gray">{frame}</Text>
+                    <Text marginLeft={1} bold color="white"> Updating Flux Flow to v{latest}...</Text>
                 </Box>
-                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="#333">
+                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="gray">
                     <Text color="gray" italic>{log || 'Preparing environment...'}</Text>
                 </Box>
-                <Text marginTop={1} dimColor>(Please do not close the terminal)</Text>
+                <Text marginTop={1} color="gray">(Please do not close the terminal)</Text>
             </Box>
         );
     }
 
     if (status === 'success') {
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="green" paddingX={2} paddingY={1}>
-                <Text color="green" bold>✅ UPDATE SUCCESSFUL!</Text>
-                <Text marginTop={1}>Flux Flow has been updated to <Text color="cyan">v{latest}</Text>.</Text>
-                <Text marginTop={1} color="yellow" bold>Please restart your terminal session to apply changes.</Text>
+            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
+                <Text color="white" bold>✅ UPDATE SUCCESSFUL!</Text>
+                <Text marginTop={1} color="white">Flux Flow has been updated to <Text color="gray">v{latest}</Text>.</Text>
+                <Text marginTop={1} color="white" bold>Please restart your terminal session to apply changes.</Text>
                 <Box marginTop={1}>
-                    <Text dimColor>(Press ESC to return to chat)</Text>
+                    <Text color="gray">(Press ESC to return to chat)</Text>
                 </Box>
             </Box>
         );
@@ -188,17 +199,17 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
 
     if (status === 'error') {
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={2} paddingY={1}>
-                <Text color="red" bold>❌ UPDATE FAILED</Text>
-                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="red">
-                    <Text color="red">{error}</Text>
+            <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1}>
+                <Text color="white" bold>❌ UPDATE FAILED</Text>
+                <Box marginTop={1} paddingX={1} borderStyle="single" borderColor="gray">
+                    <Text color="white">{error}</Text>
                 </Box>
-                <Text marginTop={1}>Possible causes:</Text>
-                <Text>• Missing permissions (Try running as Administrator/Sudo)</Text>
-                <Text>• Package manager ({settings.updateManager}) not found</Text>
-                <Text>• Network failure</Text>
+                <Text marginTop={1} color="white">Possible causes:</Text>
+                <Text color="white">• Missing permissions (Try running as Administrator/Sudo)</Text>
+                <Text color="white">• Package manager ({settings.updateManager}) not found</Text>
+                <Text color="white">• Network failure</Text>
                 <Box marginTop={1}>
-                    <Text dimColor>(Press ESC to return to chat)</Text>
+                    <Text color="gray">(Press ESC to return to chat)</Text>
                 </Box>
             </Box>
         );

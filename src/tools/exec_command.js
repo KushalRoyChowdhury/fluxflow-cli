@@ -705,6 +705,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
             return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false);
         }
         activeChildProcess = null;
-        resolve(`ERROR: Failed to start command [${rawCommand}]: ${err.message}`);
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        resolve(`ERROR: Failed to start command [${rawCommand}]: ${errorMsg}`);
     });
 };

@@ -36,6 +36,7 @@ export const saveSummary = async (rawArgs, context = {}) => {
 
         return `SUCCESS: Saved summary and purged raw memories for chat [${id}].`;
     } catch (err) {
-        return `ERROR: Failed to save summary for chat [${id}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to save summary for chat [${id}]: ${errorMsg}`;
     }
 };

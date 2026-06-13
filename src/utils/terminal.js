@@ -1,3 +1,5 @@
+import gradient from 'gradient-string';
+
 /**
  * Terminal capability detection and normalization.
  * Handles the "Emoji Gap" disparity between VS Code and Windows Terminal.
@@ -29,4 +31,21 @@ export const emojiSpace = (baseSpaces = 2) => {
     }
 
     return ' '.repeat(baseSpaces);
+};
+
+export const getFluxLogo = (version = '2.0.0', provider = 'Google') => {
+    const art = [
+        " ▗▄",
+        "  ▗▟▀",
+        "   ▝▜▄",
+        "  ▗▟▀",
+        " ▝▀"
+    ];
+    const coloredArt = gradient(['#00ffff', '#0077ff', '#ff00ff']).multiline(art.join('\n')).split('\n');
+
+    return `${coloredArt[0]}     Fluxflow CLI v${version}
+${coloredArt[1]}
+${coloredArt[2]}
+${coloredArt[3]}    Selected Provider: ${provider}
+${coloredArt[4]}`;
 };

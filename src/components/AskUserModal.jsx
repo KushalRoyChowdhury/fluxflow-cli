@@ -35,13 +35,13 @@ const AskUserModal = ({ question, options, onResolve }) => {
         return (
             <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                 <Box paddingX={1}>
-                    <Text color="cyan" bold>💬 SUGGEST SOMETHING ELSE</Text>
+                    <Text color="white" bold>💬 SUGGEST SOMETHING ELSE</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1}>
                     <Text italic color="gray">Replying to: {question}</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1} flexDirection="row">
-                    <Text color="cyan" bold>💠 </Text>
+                    <Text color="white" bold>💠 </Text>
                     <TextInput
                         value={customInput}
                         onChange={setCustomInput}
@@ -49,7 +49,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
                     />
                 </Box>
                 <Box marginTop={1} paddingX={1} marginBottom={1}>
-                    <Text color="gray" dimColor italic>(Press Enter to send)</Text>
+                    <Text color="gray" italic>(Press Enter to send)</Text>
                 </Box>
             </Box>
         );
@@ -58,7 +58,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="cyan" bold>💬 AGENT REQUEST: ACTION REQUIRED</Text>
+                <Text color="white" bold>💬 AGENT REQUEST: ACTION REQUIRED</Text>
             </Box>
 
             <Box paddingX={1} marginBottom={1}>
@@ -78,12 +78,12 @@ const AskUserModal = ({ question, options, onResolve }) => {
                             paddingX={1}
                             marginBottom={idx === allOptions.length - 1 ? 0 : 1}
                         >
-                            <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+                            <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
                                 {isSelected ? '❯ ' : '  '}{opt.label}
                             </Text>
                             {opt.description && (
                                 <Box marginLeft={4}>
-                                    <Text color="gray" italic dimColor>{opt.description}</Text>
+                                    <Text color="gray" italic>{opt.description}</Text>
                                 </Box>
                             )}
                         </Box>
@@ -92,7 +92,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
             </Box>
 
             <Box paddingX={1} marginTop={1} marginBottom={1}>
-                <Text color="gray" dimColor italic>(Use Arrows to navigate, Enter to confirm)</Text>
+                <Text color="gray" italic>(Use Arrows to navigate, Enter to confirm)</Text>
             </Box>
         </Box>
     );

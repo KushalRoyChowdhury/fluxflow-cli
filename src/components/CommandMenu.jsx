@@ -12,7 +12,7 @@ const CustomItem = ({ label, isSelected }) => {
             paddingX={1}
             width="100%"
         >
-            <Text color={isSelected ? 'cyan' : 'white'} bold={isSelected}>
+            <Text color={isSelected ? 'white' : 'gray'} bold={isSelected}>
                 {isSelected ? '❯ ' : '  '}{label}
             </Text>
         </Box>
@@ -24,19 +24,19 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
         <Box
             flexDirection="column"
             borderStyle="round"
-            borderColor="gray"
+            borderColor="white"
             padding={0}
             marginTop={1}
             flexShrink={0}
             width="100%"
         >
             <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
-                <Text color="magenta" bold>🔧 {typeof title === 'string' ? title.toUpperCase() : title}</Text>
+                <Text color="gray" bold>🔧 {typeof title === 'string' ? title.toUpperCase() : title}</Text>
             </Box>
 
             {subtitle && (
                 <Box paddingX={1} marginBottom={1}>
-                    <Text color="yellow" dimColor italic>   {subtitle}</Text>
+                    <Text color="gray" italic>   {subtitle}</Text>
                 </Box>
             )}
 
@@ -50,7 +50,7 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
             </Box>
 
             <Box paddingX={1} marginTop={1}>
-                <Text color="gray" dimColor italic>(Arrows to select • Enter to confirm)</Text>
+                <Text color="gray" italic>(Arrows to select • Enter to confirm)</Text>
             </Box>
         </Box>
     );

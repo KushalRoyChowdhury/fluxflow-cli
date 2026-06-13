@@ -28,39 +28,60 @@ export const RevertManager = {
     async recordFileChange(absolutePath, forcedContent = null) {
         if (!currentTransaction) return;
 
-        // Prevent redundant backups of the same file in the same prompt execution
-        const alreadyBackedUp = currentTransaction.changes.some(c => c.filePath === absolutePath);
-        if (alreadyBackedUp) return;
+        try {
+            // Prevent redundant backups of the same file in the same prompt execution
+            const alreadyBackedUp = currentTransaction.changes.some(c => c.filePath === absolutePath);
+            if (alreadyBackedUp) return;
 
-        const fileExists = await fs.pathExists(absolutePath);
-        let type = (fileExists && !forcedContent) ? 'update' : (forcedContent ? 'update' : 'create');
-        // If file doesn't exist on disk but we have forcedContent, it's still an update (to the placeholder)
-        if (!fileExists && !forcedContent) type = 'create';
-        
-        let backupFile = null;
+            const fileExists = await fs.pathExists(absolutePath);
+            let type = (fileExists && !forcedContent) ? 'update' : (forcedContent ? 'update' : 'create');
+            // If file doesn't exist on disk but we have forcedContent, it's still an update (to the placeholder)
+            if (!fileExists && !forcedContent) type = 'create';
+            
+            let backupFile = null;
 
-        if (fileExists || forcedContent) {
-            type = 'update';
-            const fileName = path.basename(absolutePath);
-            backupFile = `${currentTransaction.id}_${fileName}.bak`;
+            if (fileExists || forcedContent) {
+                type = 'update';
+                const fileName = path.basename(absolutePath);
+                backupFile = `${currentTransaction.id}_${fileName}.bak`;
 
-            // Create a sub-directory specifically for the current chat session
-            const chatBackupDir = path.join(BACKUPS_DIR, currentTransaction.chatId);
-            await fs.ensureDir(chatBackupDir);
+                // Create a sub-directory specifically for the current chat session
+                const chatBackupDir = path.join(BACKUPS_DIR, currentTransaction.chatId);
+                await fs.ensureDir(chatBackupDir);
 
-            const backupPath = path.join(chatBackupDir, backupFile);
+                const backupPath = path.join(chatBackupDir, backupFile);
 
-            // Use forcedContent if provided, otherwise read from disk
-            const content = (forcedContent !== null) ? forcedContent : await fs.readFile(absolutePath, 'utf8');
-            const encrypted = encryptAes(content);
-            await fs.writeFile(backupPath, encrypted, 'utf8');
+                // Use forcedContent if provided, otherwise read from disk
+                let content;
+                if (forcedContent !== null) {
+                    content = forcedContent;
+                } else {
+                    try {
+                        content = await fs.readFile(absolutePath, 'utf8');
+                    } catch (readErr) {
+                        // If we can't read it, we can't back it up as an update. 
+                        // It might be locked or in transition. Treat as create if it's not critical.
+                        console.warn(`[RevertManager] Could not read file for backup: ${absolutePath}. ${readErr.message}`);
+                        type = 'create';
+                        backupFile = null;
+                    }
+                }
+
+                if (backupFile) {
+                    const encrypted = encryptAes(content);
+                    await fs.writeFile(backupPath, encrypted, 'utf8');
+                }
+            }
+
+            currentTransaction.changes.push({
+                filePath: absolutePath,
+                type,
+                backupFile
+            });
+        } catch (err) {
+            console.error(`[RevertManager] Error recording file change for ${absolutePath}:`, err.message);
+            // Don't throw, let the main operation proceed even if backup fails
         }
-
-        currentTransaction.changes.push({
-            filePath: absolutePath,
-            type,
-            backupFile
-        });
     },
 
     /**

@@ -256,18 +256,18 @@ export default function SettingsMenu({
     };
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%" minHeight={32}>
+        <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%" minHeight={32}>
             {/* Title Bar */}
-            <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="magenta" width="100%">
-                <Text color="magenta" bold>🔧 SYSTEM CONFIGURATION</Text>
+            <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="gray" width="100%">
+                <Text color="gray" bold>🔧 SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
             <Box flexDirection="row" width="100%" minHeight={26}>
                 {/* Left Column: Categories */}
-                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'cyan' : 'gray'} padding={1} paddingY={0}>
+                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'gray' : 'white'} padding={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'categories' ? 'cyan' : 'white'} bold underline>
+                        <Text color={activeColumn === 'categories' ? 'gray' : 'white'} bold underline>
                             CATEGORIES
                         </Text>
                     </Box>
@@ -282,7 +282,7 @@ export default function SettingsMenu({
                                 paddingX={1}
                             >
                                 <Text
-                                    color={isSelected ? (activeColumn === 'categories' ? 'cyan' : 'yellow') : 'white'}
+                                    color={isSelected ? (activeColumn === 'categories' ? 'gray' : 'white') : 'white'}
                                     bold={isSelected}
                                 >
                                     {isSelected ? '❯ ' : '  '}{cat.label}
@@ -293,9 +293,9 @@ export default function SettingsMenu({
                 </Box>
 
                 {/* Right Column: Settings */}
-                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'cyan' : 'gray'} paddingX={1} marginLeft={1} paddingY={0}>
+                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'gray' : 'white'} paddingX={1} marginLeft={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'items' ? 'cyan' : 'white'} bold underline>
+                        <Text color={activeColumn === 'items' ? 'gray' : 'white'} bold underline>
                             {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
                         </Text>
                     </Box>
@@ -323,13 +323,13 @@ export default function SettingsMenu({
                                 const getStatusColor = (item) => {
                                     if (currentCatId === 'security') {
                                         if ((item.value === 'autoExec' || item.value === 'externalAccess') && item.status === 'ON') {
-                                            return 'red';
+                                            return 'white';
                                         }
-                                        return 'yellow';
+                                        return 'gray';
                                     }
-                                    if (item.status?.startsWith('✓')) return 'green';
-                                    if (item.status?.startsWith('⚠')) return 'yellow';
-                                    return item.status === 'ON' ? 'green' : (item.status === 'OFF' ? 'red' : 'yellow');
+                                    if (item.status?.startsWith('✓')) return 'white';
+                                    if (item.status?.startsWith('⚠')) return 'gray';
+                                    return item.status === 'ON' ? 'white' : (item.status === 'OFF' ? 'gray' : 'white');
                                 };
 
                                 // Render section header if it changed
@@ -337,7 +337,7 @@ export default function SettingsMenu({
                                     lastSection = item.section;
                                     elements.push(
                                         <Box key={`sec-hdr-${item.section}`} marginTop={elements.length > 0 ? 1 : 0} marginBottom={0} paddingX={1}>
-                                            <Text color="magenta" bold underline>📂 {item.section.toUpperCase()}</Text>
+                                            <Text color="gray" bold underline>📂 {item.section.toUpperCase()}</Text>
                                         </Box>
                                     );
                                 }
@@ -353,7 +353,7 @@ export default function SettingsMenu({
                                     <Box key={item.value} flexDirection="column">
                                         <Box backgroundColor={isSelected && !isEditingThis ? '#2a2a2a' : undefined} paddingX={2}>
                                             <Text
-                                                color={isSelected ? 'cyan' : 'white'}
+                                                color={isSelected ? 'gray' : 'white'}
                                                 bold={isSelected}
                                                 underline={isParserDownload}
                                             >
@@ -361,7 +361,7 @@ export default function SettingsMenu({
                                             </Text>
                                             {!isCommandListItem && !isParserDownload && (
                                                 <>
-                                                    <Text color="gray" dimColor>{dots}</Text>
+                                                    <Text color="gray">{dots}</Text>
                                                     <Text color={getStatusColor(item)} bold>
                                                         {item.value === 'aiProvider' ? item.status : `[ ${item.status} ]`}
                                                     </Text>
@@ -370,13 +370,13 @@ export default function SettingsMenu({
                                         </Box>
                                         {isCommandListItem && !isEditingThis && item.status !== 'None' && (
                                             <Box paddingX={4} marginBottom={1}>
-                                                <Text color="gray" dimColor>↳ {item.status}</Text>
+                                                <Text color="gray">↳ {item.status}</Text>
                                             </Box>
                                         )}
                                         {isEditingThis && (
                                             <Box flexDirection="column" marginLeft={4} marginBottom={1}>
-                                                <Box paddingX={1} borderStyle="single" borderColor="cyan" flexDirection="row">
-                                                    <Text color="cyan" bold>{'> '} </Text>
+                                                <Box paddingX={1} borderStyle="single" borderColor="gray" flexDirection="row">
+                                                    <Text color="gray" bold>{'> '} </Text>
                                                     <TextInput
                                                         value={editValue}
                                                         onChange={setEditValue}
@@ -388,7 +388,7 @@ export default function SettingsMenu({
                                                         }}
                                                     />
                                                 </Box>
-                                                <Text color="gray" dimColor italic>  Comma separated • Press Enter to save, Esc to cancel</Text>
+                                                <Text color="gray" italic>  Comma separated • Press Enter to save, Esc to cancel</Text>
                                             </Box>
                                         )}
                                     </Box>
@@ -398,7 +398,7 @@ export default function SettingsMenu({
                             if (currentCatId === 'other') {
                                 elements.push(
                                     <Box key="pty-notice" marginTop={18} paddingX={1}>
-                                        <Text color={isPtyAvailable ? "green" : "yellow"}>
+                                        <Text color="white">
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>
                                     </Box>
@@ -408,7 +408,7 @@ export default function SettingsMenu({
                             if (hasConflict) {
                                 elements.push(
                                     <Box key="conflict-warning" marginTop={1} paddingX={1}>
-                                        <Text color="red" dimColor italic>
+                                        <Text color="white" italic>
                                             * Conflicting commands will be ignored and defaulted to highest priority
                                         </Text>
                                     </Box>
@@ -429,13 +429,13 @@ export default function SettingsMenu({
 
             {/* Navigation Guide Footer */}
             <Box paddingX={1} marginTop={0} flexDirection="row" justifyContent="space-between">
-                <Text color="gray" dimColor italic>
+                <Text color="gray" italic>
                     {activeColumn === 'categories'
                         ? '▲▼ Select Category • Enter/► to configure'
                         : '▲▼ Select Option • Enter to Toggle • ◄/ESC to go back'}
                 </Text>
                 {activeColumn === 'categories' && (
-                    <Text color="gray" dimColor>
+                    <Text color="gray">
                         {CATEGORIES[selectedCategoryIndex].desc}
                     </Text>
                 )}

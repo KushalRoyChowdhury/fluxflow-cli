@@ -196,7 +196,8 @@ export const write_pdf = async (args) => {
         const stats = await fs.stat(absolutePath);
         return `SUCCESS: PDF generated successfully at [${targetPath}] (${(stats.size / 1024).toFixed(2)} KB).`;
     } catch (err) {
-        return `ERROR: Failed to generate PDF [${targetPath}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to generate PDF [${targetPath}]: ${errorMsg}`;
     } finally {
         // Cleanup
         if (browser) await browser.close();

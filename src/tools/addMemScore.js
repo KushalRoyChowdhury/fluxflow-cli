@@ -58,6 +58,7 @@ export const addMemScore = async (rawArgs, context = {}) => {
 
         return `SUCCESS: Adjusted memory scores. Target [${id}] is now ${finalScoreStr}.${deletedCount > 0 ? ` Purged ${deletedCount} decayed memories.` : ''}`;
     } catch (err) {
-        return `ERROR: Failed to adjust memory score for [${id}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to adjust memory score for [${id}]: ${errorMsg}`;
     }
 };

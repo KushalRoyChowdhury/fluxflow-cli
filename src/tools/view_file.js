@@ -89,6 +89,7 @@ export const view_file = async (args, context = {}) => {
 
         return `${header}\n\n${code}`;
     } catch (err) {
-        return `ERROR: Failed to read file [${targetPath}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to read file [${targetPath}]: ${errorMsg}`;
     }
 };

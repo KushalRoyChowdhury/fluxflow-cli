@@ -56,6 +56,7 @@ export const update_file = async (args, context = {}) => {
         return `SUCCESS: File [${targetPath}] updated. [${results.length}/${patchPairs.length}] blocks applied.\n\n${diffText}`;
 
     } catch (err) {
-        return `ERROR: Failed to update file [${targetPath}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to update file [${targetPath}]: ${errorMsg}`;
     }
 };

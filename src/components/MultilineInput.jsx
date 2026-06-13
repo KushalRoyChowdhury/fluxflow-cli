@@ -92,25 +92,31 @@ export const ControlledMultilineInput = ({
         postCursor: []
       };
     }
+
     const textBefore = value.slice(0, cursorIndex);
-    const textAfter = value.slice(cursorIndex);
+    const charAtCursor = value[cursorIndex] || ' ';
+    const textAfter = value.slice(cursorIndex + 1);
+
     if (!focus) {
       return {
         preCursor: [{ value: formatText(value) }],
         postCursor: []
       };
     }
+
     const hasValidHighlight = highlight && highlight.end > highlight.start && highlight.start >= 0 && highlight.end <= value.length;
+    
     if (!hasValidHighlight) {
       const formattedBefore = formatText(textBefore);
       const formattedAfter = formatText(textAfter);
       const lineStart = formattedBefore.lastIndexOf('\n') + 1;
-      const lineEnd = formattedAfter.indexOf('\n');
+      const lineEnd = formattedAfter.indexOf('\n') === -1 ? formattedAfter.length : formattedAfter.indexOf('\n');
+      
       return {
         preCursor: [
           { value: formattedBefore.slice(0, lineStart) },
           { value: formattedBefore.slice(lineStart), type: 'highlight' },
-          { value: showCursor && focus ? ' ' : '', type: 'cursor' }
+          { value: formatText(charAtCursor), type: 'cursor' }
         ],
         postCursor: [
           { value: formattedAfter.slice(0, lineEnd), type: 'highlight' },
@@ -118,26 +124,27 @@ export const ControlledMultilineInput = ({
         ]
       };
     } else {
+      // In highlight mode, we still use the standard cursor split but handle charAtCursor
       return {
         preCursor: [
-          { value: formatText(textBefore.slice(0, highlight.start)) },
+          { value: formatText(value.slice(0, Math.min(cursorIndex, highlight.start))) },
           {
-            value: formatText(textBefore.slice(highlight.start, Math.min(highlight.end, cursorIndex))),
+            value: formatText(value.slice(Math.max(0, highlight.start), Math.min(highlight.end, cursorIndex))),
             type: 'highlight'
           },
-          { value: formatText(textBefore.slice(highlight.end)) },
-          { value: showCursor && focus ? ' ' : '', type: 'cursor' }
+          { value: formatText(value.slice(Math.max(highlight.end, 0), cursorIndex)) },
+          { value: formatText(charAtCursor), type: 'cursor' }
         ],
         postCursor: [
           {
-            value: formatText(textAfter.slice(0, Math.max(highlight.start - cursorIndex, 0)))
+            value: formatText(value.slice(cursorIndex + 1, Math.max(cursorIndex + 1, highlight.start)))
           },
           {
-            value: formatText(textAfter.slice(Math.max(highlight.start - cursorIndex, 0), Math.max(highlight.end - cursorIndex, 0))),
+            value: formatText(value.slice(Math.max(cursorIndex + 1, highlight.start), Math.max(cursorIndex + 1, highlight.end))),
             type: 'highlight'
           },
           {
-            value: formatText(textAfter.slice(Math.max(highlight.end - cursorIndex, 0)))
+            value: formatText(value.slice(Math.max(cursorIndex + 1, highlight.end)))
           }
         ]
       };
@@ -183,7 +190,7 @@ export const ControlledMultilineInput = ({
         case 'cursor':
           return {
             ...textStyle,
-            color: (showCursor && focus) ? 'cyan' : undefined,
+            color: (showCursor && focus) ? 'white' : undefined,
             bold: showCursor && focus,
             inverse: showCursor && focus
           };

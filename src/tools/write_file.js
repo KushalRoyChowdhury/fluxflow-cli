@@ -80,6 +80,7 @@ export const write_file = async (args, context = {}) => {
 
         return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${ (verifiedSize/1024).toFixed(1) } KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
     } catch (err) {
-        return `ERROR: Failed to write file [${targetPath}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to write file [${targetPath}]: ${errorMsg}`;
     }
 };

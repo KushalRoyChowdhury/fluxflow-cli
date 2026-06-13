@@ -68,6 +68,7 @@ export const read_folder = async (args) => {
         return result;
         
     } catch (err) {
-        return `ERROR: Failed to read folder [${targetPath}]: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed to read folder [${targetPath}]: ${errorMsg}`;
     }
 };

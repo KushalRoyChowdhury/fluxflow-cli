@@ -244,6 +244,7 @@ export const generate_image = async (args, context = {}) => {
             }
         };
     } catch (err) {
-        return `ERROR: Failed during image generation: ${err.message}`;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        return `ERROR: Failed during image generation: ${errorMsg}`;
     }
 };

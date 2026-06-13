@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
-import { HISTORY_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE } from './paths.js';
+import { HISTORY_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
@@ -18,7 +18,7 @@ const withLock = (op) => {
         }
     });
     // Update the lock chain, ensuring we don't block the next op even if this one fails
-    WRITE_LOCK = nextLock.catch(() => {}); 
+    WRITE_LOCK = nextLock.catch(() => {});
     return nextLock;
 };
 
@@ -45,12 +45,12 @@ export const saveChat = async (id, name, messages) => {
     return withLock(async () => {
         const history = await loadHistory();
         const existingChat = history[id];
-        
+
         // [CLEANUP] Filter out ephemeral messages (like update notices or transient meta alerts)
         // These should only exist in the live UI session.
         const persistentMessages = (messages || []).filter(m => !m.isUpdateNotification && !m.isMeta);
 
-        // Defensive name selection: 
+        // Defensive name selection:
         // 1. Provided name
         // 2. Existing name on disk
         // 3. Fallback to unique ID suffix
@@ -229,7 +229,7 @@ const cleanupLogFile = async (filePath) => {
         for (const entry of entries) {
             const entryText = entry.header + (entry.body.length > 0 ? '\n' + entry.body.join('\n') : '');
             const match = entryText.match(timestampRegex);
-            
+
             if (match) {
                 const timeMs = parseCustomDate(match[1]);
                 if (timeMs && (now - timeMs) > threshold) {
@@ -290,15 +290,15 @@ export const cleanupOldLogs = async (logsDir) => {
  */
 export const getTruncatedHistory = (history, exchangesToRemove = 4) => {
     if (history.length <= 1) return history;
-    
+
     const welcome = history[0];
     const rest = history.slice(1);
-    
+
     // 1 exchange = 1 user + 1 agent turn (usually)
     // We remove 2 * exchangesToRemove messages
     const sliceIndex = exchangesToRemove * 2;
     const truncated = rest.slice(sliceIndex);
-    
+
     return [welcome, ...truncated];
 };
 
@@ -309,19 +309,43 @@ export const getTruncatedHistory = (history, exchangesToRemove = 4) => {
 export const getRangeByTokens = (history, startToken, endToken) => {
     let currentTokens = 0;
     const results = [];
-    
+
     for (const msg of history) {
         const msgTokens = Math.ceil((msg.text?.length || 0) / 4);
         const nextTokens = currentTokens + msgTokens;
-        
+
         // If message is within or partially within the token range
         if (nextTokens > startToken && currentTokens < endToken) {
             results.push(msg);
         }
-        
+
         currentTokens = nextTokens;
         if (currentTokens >= endToken) break;
     }
-    
+
     return results;
+};
+export const saveChatContext = async (chatId, tokens) => {
+    return withLock(async () => {
+        let contextData = [];
+        if (await fs.pathExists(CONTEXT_FILE)) {
+            try {
+                const content = await fs.readFile(CONTEXT_FILE, 'utf8');
+                contextData = JSON.parse(content);
+            } catch (e) {
+                contextData = [];
+            }
+        }
+
+        if (!Array.isArray(contextData)) contextData = [];
+
+        const existingIdx = contextData.findIndex(item => Object.keys(item)[0] === String(chatId));
+        if (existingIdx !== -1) {
+            contextData[existingIdx] = { [chatId]: tokens };
+        } else {
+            contextData.push({ [chatId]: tokens });
+        }
+
+        await fs.writeFile(CONTEXT_FILE, JSON.stringify(contextData, null, 2), 'utf8');
+    });
 };

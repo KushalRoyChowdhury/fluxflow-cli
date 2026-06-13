@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
 import { wrapText } from '../utils/text.js';
-import { emojiSpace } from '../utils/terminal.js';
+import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 
 const TOOL_LABELS = {
     'write_file': 'WriteFile',
@@ -228,7 +228,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                 if (part.startsWith('```') && part.endsWith('```')) {
                     // Render as inline to prevent <Box> inside <Text> crashes
                     const content = part.slice(3, -3);
-                    return <Text key={j} color="cyan" backgroundColor="#003333"> {content} </Text>;
+                    return <Text key={j} color="cyan">{content}</Text>;
                 }
 
                 // 🏷️ Recursive Bold
@@ -247,13 +247,13 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                         return p1.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
                     });
                     const hasFileRef = content.includes('@[');
-                    return <Text key={j} color="cyan" bold={hasFileRef} backgroundColor={hasFileRef ? "#111124" : "#003333"}> {formatted} </Text>;
+                    return <Text key={j} color="cyan" bold={hasFileRef}>{formatted}</Text>;
                 }
 
                 if (part.startsWith('@[') && part.endsWith(']')) {
                     const filePath = part.slice(2, -1);
                     const basename = filePath.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
-                    return <Text key={j} color="cyan" bold backgroundColor="#111124"> {basename} </Text>;
+                    return <Text key={j} color="cyan" bold>{basename}</Text>;
                 }
 
                 // 📐 Advanced LaTeX support
@@ -272,7 +272,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     if (match) return (
                         <Text key={j}>
                             <Text color="cyan" underline bold>{match[1]}</Text>
-                            <Text color="gray" dimColor italic> ({match[2]})</Text>
+                            <Text color="gray" italic> ({match[2]})</Text>
                         </Text>
                     );
                 }
@@ -281,7 +281,7 @@ const InlineMarkdown = React.memo(({ text, color }) => {
                     if (match) return (
                         <Text key={j}>
                             <Text color="cyan" underline bold>{match[1]}</Text>
-                            <Text color="gray" dimColor italic> [{match[2]}]</Text>
+                            <Text color="gray" italic> [{match[2]}]</Text>
                         </Text>
                     );
                 }
@@ -553,15 +553,15 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                         const gutterWidth = String(codeLines.length).length;
 
                         return (
-                            <Box key={i} flexDirection="column" marginY={0} backgroundColor="#111" borderStyle="round" borderColor="#333" paddingX={1} width="100%">
+                            <Box key={i} flexDirection="column" marginY={0} borderStyle="round" borderColor="#444" paddingX={1} width="100%">
                                 <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
-                                    <Text backgroundColor="#333" color="white"> {lang.toUpperCase()} </Text>
+                                    <Text backgroundColor="#444" color="white"> {lang.toUpperCase()} </Text>
                                 </Box>
                                 <Box flexDirection="column" paddingY={1} width="100%">
                                     {codeLines.map((line, idx) => (
                                         <Box key={idx} width="100%">
                                             <Box width={gutterWidth + 2} flexShrink={0}>
-                                                <Text color="gray" dimColor>{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
+                                                <Text color="gray">{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                             </Box>
                                             <Box flexGrow={1}>
                                                 <Text color="cyan">{line}</Text>
@@ -601,7 +601,7 @@ const formatThinkingDuration = (ms) => {
     return `${totalSecs}s`;
 };
 
-export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) => {
+export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, aiProvider, version }) => {
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
     const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
@@ -627,8 +627,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     if (msg.isLogo) {
         return (
-            <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
-                <Text>{msg.text}</Text>
+            <Box flexDirection="column" alignItems="flex-start" width="100%" marginY={1}>
+                <Text>{getFluxLogo(version, aiProvider)}</Text>
             </Box>
         );
     }
@@ -813,34 +813,42 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
 
     return (
         // [SPACE POINT]
-        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 1 : msg.role === 'agent' ? 0 : 1} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
+        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 1} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
-                <Box
-                    backgroundColor="#262626"
-                    paddingX={1}
-                    paddingY={1}
-                    width="100%"
-                    flexDirection="column"
-                >
-                    {wrapText(
-                        finalContent
-                            .replace(/\r\n/g, '\n')
-                            .replace(/\r/g, '\n')
-                            .replace(/\\\n/g, '\n')
-                            .replace(/\\$/, ''),
-                        columns - 6
-                    )
-                        .split('\n')
-                        .map((line, lineIdx) => (
-                            <Box key={lineIdx} flexDirection="row" width="100%">
-                                <Box flexShrink={0} width={2}>
-                                    <Text bold color="white">{lineIdx === 0 ? '❯' : ' '}</Text>
+                <Box flexDirection="column" width="100%">
+                    <Box width="100%" height={1} overflow="hidden">
+                        <Text color="#444444">{'▄'.repeat(Math.max(1, columns))}</Text>
+                    </Box>
+                    <Box
+                        backgroundColor="#444444"
+                        paddingX={1}
+                        paddingY={0}
+                        width="100%"
+                        flexDirection="column"
+                    >
+                        {wrapText(
+                            finalContent
+                                .replace(/\r\n/g, '\n')
+                                .replace(/\r/g, '\n')
+                                .replace(/\\\n/g, '\n')
+                                .replace(/\\$/, ''),
+                            columns - 6
+                        )
+                            .split('\n')
+                            .map((line, lineIdx) => (
+                                <Box key={lineIdx} flexDirection="row" width="100%">
+                                    <Box flexShrink={0} width={2}>
+                                        <Text bold color="white">{lineIdx === 0 ? '>' : ' '}</Text>
+                                    </Box>
+                                    <Box flexGrow={1} marginLeft={1}>
+                                        <InlineMarkdown text={line} color={msg.color || "white"} />
+                                    </Box>
                                 </Box>
-                                <Box flexGrow={1} marginLeft={1}>
-                                    <InlineMarkdown text={line} color={msg.color || "white"} />
-                                </Box>
-                            </Box>
-                        ))}
+                            ))}
+                    </Box>
+                    <Box width="100%" height={1} overflow="hidden">
+                        <Text color="#444444">{'▀'.repeat(Math.max(1, columns))}</Text>
+                    </Box>
                 </Box>
 
             ) : msg.role === 'think' ? (
@@ -850,7 +858,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     ) : (
                         <Text bold color="white">
                             ✦ Thought{msg.duration ? (
-                                <Text color="gray"> for <Text bold color="cyan">{formatThinkingDuration(msg.duration)}</Text></Text>
+                                <Text color="gray"> for <Text bold color="white">{formatThinkingDuration(msg.duration)}</Text></Text>
                             ) : ''}
                         </Text>
                     )}
@@ -864,13 +872,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
                     <CodeRenderer text={finalContent.replace(/ \|\n\n/g, ' |\n')} columns={columns} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
-                            <Text color="yellow" italic>✨ [Memory Updated]</Text>
+                            <Text color="white" italic>[Memory Updated]</Text>
                         </Box>
                     )}
                     {msg.role === 'agent' && msg.workedDuration ? (
                         <Box marginTop={1} marginBottom={2} width="100%">
                             <Text>[</Text><Text color="gray">
-                                ⚡ Worked for <Text bold color="cyan">{formatThinkingDuration(msg.workedDuration)}</Text>
+                                Worked for <Text bold color="white">{formatThinkingDuration(msg.workedDuration)}</Text>
                             </Text><Text>]</Text>
                         </Box>
                     ) : null}
@@ -880,7 +888,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80 }) 
     );
 });
 
-const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80 }) => {
+const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80, aiProvider, version }) => {
     return (
         <Box flexDirection="column" width="100%">
             {messages.map((msg, idx) => (
@@ -889,6 +897,8 @@ const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80 }) => 
                     msg={msg}
                     showFullThinking={showFullThinking}
                     columns={columns}
+                    aiProvider={aiProvider}
+                    version={version}
                 />
             ))}
         </Box>
