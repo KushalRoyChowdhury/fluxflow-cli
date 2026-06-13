@@ -19,9 +19,9 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
 Access to internal tools. MUST use the exact syntax on a new line: [tool:functions.ToolName(args)]
 
-MANDATORY TOOL USAGE POLICY:
+**TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN. Next Turn, verify results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many edits ← **MANDATORY where possible**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >>> ReadFile for understandling files efficiently\n" : ""}- No brute force, no spamming of tools
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **MANDATORY when possible**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >>> ReadFile for understandling files efficiently\n- Want a spefific word/varible to find across project? SearchKeyword >> Guessing" : ""}- No brute force, no spamming of tools
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
@@ -46,4 +46,4 @@ ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/
 - Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
 - File structure: Real newlines for code formatting`.trim() : `
 - FILE TOOLS ARE NOT AVAILABLE IN FLOW (Tell user to,\` /mode flux\` if needed)`.trim()}`.trim();
-// 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Mockups, PDF thumbnails, any visual content
+// [DEPRICATED] 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")]. Mockups, PDF thumbnails, any visual content
