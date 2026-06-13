@@ -564,7 +564,8 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                                 <Text color="gray">{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                             </Box>
                                             <Box flexGrow={1}>
-                                                <Text color="cyan">{line}</Text>
+                                                {/* yellow */}
+                                                <Text color="#fcfca4ff">{line}</Text>
                                             </Box>
                                         </Box>
                                     ))}
@@ -708,7 +709,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
-                        <Text color="cyan" bold>💠 ABOUT FLUX FLOW</Text>
+                        <Text color="white" bold>ABOUT FLUX FLOW</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
                         <Text>{msg.text}</Text>
@@ -723,7 +724,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
-                        <Text color="cyan" bold>🚀 FLUX FLOW UPDATE AVAILABLE</Text>
+                        <Text color="white" bold>UPDATE AVAILABLE</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
                         <CodeRenderer text={msg.text} columns={columns} />

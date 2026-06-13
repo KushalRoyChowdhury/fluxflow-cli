@@ -4,11 +4,11 @@ import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
 
 const CATEGORIES = [
-    { id: 'memory', label: '🧠 Memory', desc: 'Manage system context & agent\'s memory' },
-    { id: 'security', label: '🔒 Security', desc: 'Configure permissions & data safety' },
-    { id: 'updater', label: '🔄 Updater', desc: 'Manage application updates' },
-    { id: 'other', label: '📋 Other', desc: 'Miscellaneous preferences' },
-    { id: 'exit', label: '🚪 Exit Settings', desc: 'Return to chat view' }
+    { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
+    { id: 'security', label: 'Security', desc: 'Configure permissions & data safety' },
+    { id: 'updater', label: 'Updater', desc: 'Manage application updates' },
+    { id: 'other', label: 'Other', desc: 'Miscellaneous preferences' },
+    { id: 'exit', label: 'Exit Settings', desc: 'Return to chat view' }
 ];
 
 const getActivePreset = (settings) => {
@@ -245,7 +245,7 @@ export default function SettingsMenu({
                 const newSettings = { ...systemSettings, useExternalData: false };
                 setSystemSettings(newSettings);
                 saveSettings({ systemSettings: newSettings, apiTier, quotas });
-                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '🏠 [STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart.' }]);
+                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: '[STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart.' }]);
                 setActiveView('chat');
             }
         } else if (item.value === 'updateManager') {
@@ -259,15 +259,15 @@ export default function SettingsMenu({
         <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%" minHeight={32}>
             {/* Title Bar */}
             <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="gray" width="100%">
-                <Text color="gray" bold>🔧 SYSTEM CONFIGURATION</Text>
+                <Text color="gray" bold>SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
             <Box flexDirection="row" width="100%" minHeight={26}>
                 {/* Left Column: Categories */}
-                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'gray' : 'white'} padding={1} paddingY={0}>
+                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'white' : 'grey'} padding={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'categories' ? 'gray' : 'white'} bold underline>
+                        <Text color={activeColumn === 'categories' ? 'white' : 'grey'} bold underline>
                             CATEGORIES
                         </Text>
                     </Box>
@@ -282,7 +282,7 @@ export default function SettingsMenu({
                                 paddingX={1}
                             >
                                 <Text
-                                    color={isSelected ? (activeColumn === 'categories' ? 'gray' : 'white') : 'white'}
+                                    color={isSelected ? (activeColumn === 'categories' ? 'white' : 'grey') : 'grey'}
                                     bold={isSelected}
                                 >
                                     {isSelected ? '❯ ' : '  '}{cat.label}
@@ -293,9 +293,9 @@ export default function SettingsMenu({
                 </Box>
 
                 {/* Right Column: Settings */}
-                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'gray' : 'white'} paddingX={1} marginLeft={1} paddingY={0}>
+                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'white' : 'grey'} paddingX={1} marginLeft={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'items' ? 'gray' : 'white'} bold underline>
+                        <Text color={activeColumn === 'items' ? 'white' : 'grey'} bold underline>
                             {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
                         </Text>
                     </Box>
@@ -337,7 +337,7 @@ export default function SettingsMenu({
                                     lastSection = item.section;
                                     elements.push(
                                         <Box key={`sec-hdr-${item.section}`} marginTop={elements.length > 0 ? 1 : 0} marginBottom={0} paddingX={1}>
-                                            <Text color="gray" bold underline>📂 {item.section.toUpperCase()}</Text>
+                                            <Text color="gray" bold underline>{item.section.toUpperCase()}</Text>
                                         </Box>
                                     );
                                 }
@@ -353,7 +353,7 @@ export default function SettingsMenu({
                                     <Box key={item.value} flexDirection="column">
                                         <Box backgroundColor={isSelected && !isEditingThis ? '#2a2a2a' : undefined} paddingX={2}>
                                             <Text
-                                                color={isSelected ? 'gray' : 'white'}
+                                                color={isSelected ? 'white' : 'grey'}
                                                 bold={isSelected}
                                                 underline={isParserDownload}
                                             >

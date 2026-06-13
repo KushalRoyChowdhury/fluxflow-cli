@@ -17,7 +17,7 @@ import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
-import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs, saveChatContext } from './utils/history.js';
+import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs, saveChatContext, loadChatContext } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
 import UpdateProcessor from './components/UpdateProcessor.jsx';
@@ -452,6 +452,9 @@ export default function App({ args = [] }) {
                     parsed.provider = mapped;
                 }
                 i++;
+            } else if ((arg === '--resume' || arg === '-r') && args[i + 1]) {
+                parsed.resume = args[i + 1];
+                i++;
             }
         }
         return parsed;
@@ -498,14 +501,14 @@ export default function App({ args = [] }) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
                     const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}-stable` : versionFluxflow;
-                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `✅ [SYSTEM] Flux Flow is already up to date (${displayVer}).`, isMeta: true }];
+                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `[SYSTEM] Flux Flow is already up to date (${displayVer}).`, isMeta: true }];
                 });
             }
         } catch (err) {
             if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to check for updates: ${err.message}`, isMeta: true }];
+                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `ERROR: Failed to check for updates: ${err.message}`, isMeta: true }];
                 });
             }
         }
@@ -571,9 +574,9 @@ export default function App({ args = [] }) {
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
         setChatTokens(nextTokens);
         if (chatId) {
-            saveChatContext(chatId, nextTokens).catch(() => { });
+            saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => {});
         }
-    }, [sessionTotalTokens, chatId]);
+    }, [sessionTotalTokens, chatId, sessionStats.tokens]);
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
@@ -662,7 +665,7 @@ export default function App({ args = [] }) {
             return [...prev, {
                 id: 'tier-switch-' + Date.now(),
                 role: 'system',
-                text: `⚠️${s}**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+                text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
                 isMeta: true
             }];
         });
@@ -763,7 +766,7 @@ export default function App({ args = [] }) {
             msgs.push({
                 id: 'system-warning',
                 role: 'system',
-                text: `🛑 [CRITICAL SECURITY ALERT] SYSTEM DIRECTORY DETECTED`,
+                text: `[CRITICAL SECURITY ALERT] SYSTEM DIRECTORY DETECTED`,
                 subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. PLEASE MOVE TO A PROJECT FOLDER FOR SAFETY.`,
                 isHomeWarning: true,
                 isMeta: true
@@ -952,7 +955,7 @@ export default function App({ args = [] }) {
                                     } else {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 No revert checkpoints found for this session.', isMeta: true }];
+                                            return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 Nothing to revert to.', isMeta: true }];
                                         });
                                     }
                                 });
@@ -1057,12 +1060,12 @@ export default function App({ args = [] }) {
             if (!checkPuppeteerReady()) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '🔧 [SYSTEM] Installing Required dependencies... (One-time setup)', isMeta: true }];
+                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '[SYSTEM] Installing Required dependencies... (One-time setup)', isMeta: true }];
                 });
                 await installPuppeteerBrowser();
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '✅ [SYSTEM] All dependencies installed successfully.', isMeta: true }];
+                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '[SYSTEM] All dependencies installed successfully.', isMeta: true }];
                 });
             }
 
@@ -1186,20 +1189,25 @@ export default function App({ args = [] }) {
                 const id = parsedArgs.resume;
                 if (h[id]) {
                     setChatId(id);
+                    const savedData = await loadChatContext(id);
+                    chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                    setChatTokens(savedData.total);
+                    setSessionStats({ tokens: savedData.context });
+
                     const resumedMsgs = [...h[id].messages];
-                    const hasLogo = resumedMsgs[0]?.text?.includes('▝▜▄');
+                    const hasLogo = resumedMsgs[0]?.text?.includes('░░░███');
                     if (!hasLogo) {
                         resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true });
                     }
                     setMessages(resumedMsgs);
                     setActiveView('chat');
                     setMessages(prev => {
-                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED VIA CLI: [${id}]`, isMeta: true }];
+                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `SESSION RESUMED VIA CLI: [${id}]`, isMeta: true }];
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;
                     });
                 } else {
-                    setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `❌ ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+                    setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
                 }
             }
 
@@ -1248,7 +1256,7 @@ export default function App({ args = [] }) {
 
     const handleSetup = async (val) => {
         const key = val.trim();
-        let minLength = 39;
+        let minLength = 38;
         if (aiProvider === 'OpenRouter') minLength = 30;
         if (aiProvider === 'DeepSeek') minLength = 30;
         if (aiProvider === 'NVIDIA') minLength = 30;
@@ -1268,9 +1276,9 @@ export default function App({ args = [] }) {
             }
             setActiveModel(defaultModel);
 
-            setMessages(prev => [...prev, { role: 'system', text: `✅ ${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
         } else {
-            setMessages(prev => [...prev, { role: 'system', text: `❌ INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
             setTempKey('');
         }
     };
@@ -1521,6 +1529,14 @@ export default function App({ args = [] }) {
                             {
                                 cmd: 'z-ai/glm-5.1',
                                 desc: ''
+                            },
+                            {
+                                cmd: 'google/diffusiongemma-26b-a4b-it',
+                                desc: ''
+                            },
+                            {
+                                cmd: 'minimaxai/minimax-m3',
+                                desc: ''
                             }
                         ]
                         : (apiTier === 'Free'
@@ -1648,7 +1664,7 @@ export default function App({ args = [] }) {
             if (hintText.startsWith('/')) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '❌ [RESTRICTED] Steering Hints cannot start with /', isMeta: true }];
+                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '[RESTRICTED] Steering Hints cannot start with /', isMeta: true }];
                 });
                 setInput('');
                 return;
@@ -1688,22 +1704,28 @@ export default function App({ args = [] }) {
                         const resumeSession = async () => {
                             const h = await loadHistory();
                             const target = h[targetId] || Object.values(h).find(h => h.name.toLowerCase() === targetId.toLowerCase());
+
                             if (target) {
                                 stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                 setChatId(targetId);
 
+                                const savedData = await loadChatContext(targetId);
+                                chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                setChatTokens(savedData.total);
+                                setSessionStats({ tokens: savedData.context });
+
                                 // Ensure logo is present at the start of resumed history
                                 const resumedMsgs = [...target.messages];
-                                const hasLogo = resumedMsgs[0]?.text?.includes('▝▜▄');
+                                const hasLogo = resumedMsgs[0]?.text?.includes('░░░███');
                                 if (!hasLogo) {
                                     resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true });
                                 }
 
                                 setMessages(resumedMsgs);
-                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `📡 SESSION RESUMED: [${targetId}]`, isMeta: true }]);
+                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `SESSION RESUMED: [${targetId}]`, isMeta: true }]);
                                 setCompletedIndex(0);
                             } else {
-                                setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `❌ ERROR: Session [${targetId}] not found.` }]);
+                                setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `ERROR: Session [${targetId}] not found.` }]);
                             }
                         };
                         resumeSession();
@@ -1751,7 +1773,7 @@ export default function App({ args = [] }) {
                             setThinkingLevel('High');
                         }
                         const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
                     }
@@ -1766,7 +1788,7 @@ export default function App({ args = [] }) {
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `🔗${s}[SYSTEM] Key strategy is Custom. Redirecting to Pollinations dashboard (https://enter.pollinations.ai/#pollen)...`,
+                                    text: `[SYSTEM] Key strategy is Custom. Redirecting to Pollinations dashboard (https://enter.pollinations.ai/#pollen)...`,
                                     isMeta: true
                                 }];
                             });
@@ -1794,7 +1816,7 @@ export default function App({ args = [] }) {
                                     return [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `❌ [SYSTEM] Failed to load image quota stats.`,
+                                        text: `[SYSTEM] Failed to load image quota stats.`,
                                         isMeta: true
                                     }];
                                 });
@@ -1810,7 +1832,7 @@ export default function App({ args = [] }) {
                                     const s = emojiSpace(2);
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Image key strategy set to ${strategy}`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Image key strategy set to ${strategy}`, isMeta: true }];
                                     });
 
                                     if (strategy === 'Custom') {
@@ -1828,14 +1850,14 @@ export default function App({ args = [] }) {
                                     const s = emojiSpace(2);
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Invalid key option. Choose: Default or Custom.`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Invalid key option. Choose: Default or Custom.`, isMeta: true }];
                                     });
                                 }
                             } else {
                                 const s = emojiSpace(2);
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup Key <Default|Custom>`, isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Usage: /image setup Key <Default|Custom>`, isMeta: true }];
                                 });
                             }
                         } else if (parts[2]?.toLowerCase() === 'quality') {
@@ -1858,34 +1880,34 @@ export default function App({ args = [] }) {
                                     const s = emojiSpace(2);
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Image quality set to ${chosenQuality}`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Image quality set to ${chosenQuality}`, isMeta: true }];
                                     });
                                 } else {
                                     const s = emojiSpace(2);
                                     setMessages(prev => {
                                         setCompletedIndex(prev.length + 1);
-                                        return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Invalid quality level. Choose from: Low, Low-High, Medium, Medium-High, High, Ultra, Premium.`, isMeta: true }];
+                                        return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Invalid quality level. Choose from: Low, Low-High, Medium, Medium-High, High, Ultra, Premium.`, isMeta: true }];
                                     });
                                 }
                             } else {
                                 const s = emojiSpace(2);
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup Quality <Low|Low-High|Medium|Medium-High|High|Ultra>`, isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Usage: /image setup Quality <Low|Low-High|Medium|Medium-High|High|Ultra>`, isMeta: true }];
                                 });
                             }
                         } else {
                             const s = emojiSpace(2);
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
                             });
                         }
                     } else {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Usage: /image setup <Key|Quality> ...`, isMeta: true }];
                         });
                     }
                     break;
@@ -1904,12 +1926,12 @@ export default function App({ args = [] }) {
                         if (!isBypass && mode === 'Flow' && (formattedLevel === 'Medium' || formattedLevel === 'High' || formattedLevel === 'xHigh')) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
                             const s = emojiSpace(1);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧 [SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated 🕵️${s})` : ''}`, isMeta: true }]; });
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated)` : ''}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('thinking');
@@ -1925,7 +1947,7 @@ export default function App({ args = [] }) {
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `❌ **[ACCESS DENIED]** Gemma is restricted to the Free API tier. Automatically switching you to **Gemini 3 Flash Preview** for optimal performance.`,
+                                    text: `**[ACCESS DENIED]** Gemma is restricted to the Free API tier. Automatically switching you to **Gemini 3 Flash Preview** for optimal performance.`,
                                     isMeta: true
                                 }];
                             });
@@ -1933,7 +1955,7 @@ export default function App({ args = [] }) {
                         } else {
                             setActiveModel(mod);
                             const s = emojiSpace(2);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('model');
@@ -1964,7 +1986,7 @@ export default function App({ args = [] }) {
                 case '/save': {
                     const name = parts.slice(1).join(' ') || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `💾 [MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
                     break;
                 }
                 case '/export': {
@@ -2045,7 +2067,7 @@ export default function App({ args = [] }) {
                             return [...prev, {
                                 id: Date.now(),
                                 role: 'system',
-                                text: `📤 [EXPORT] Chat exported successfully to "${exportFile}"`,
+                                text: `[EXPORT] Chat exported to "${exportFile}"`,
                                 isMeta: true
                             }];
                         });
@@ -2055,7 +2077,7 @@ export default function App({ args = [] }) {
                             return [...prev, {
                                 id: Date.now(),
                                 role: 'system',
-                                text: `❌ [EXPORT ERROR] Failed to export chat: ${err.message}`,
+                                text: `[EXPORT ERROR] Failed to export chat: ${err.message}`,
                                 isMeta: true
                             }];
                         });
@@ -2068,7 +2090,7 @@ export default function App({ args = [] }) {
                         const list = Object.entries(history).map(([id, info]) => `• ${id}: ${info.name}`).join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `🗃️ [HISTORY] Saved Chats:\n${list || 'No saved chats found.'}`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `[HISTORY] Saved Chats:\n${list || 'No saved chats found.'}`, isMeta: true }];
                         });
                     };
                     run();
@@ -2083,7 +2105,7 @@ export default function App({ args = [] }) {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: '☢️ [NUCLEAR] Initiating reset...', isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: '[NUCLEAR] Initiating reset...', isMeta: true }];
                             });
 
                             if (fs.existsSync(LOGS_DIR)) fs.removeSync(LOGS_DIR);
@@ -2103,7 +2125,7 @@ export default function App({ args = [] }) {
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [RESET ERROR] Failed to purge data: ${err.message}` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[RESET ERROR] Failed to purge data: ${err.message}` }];
                             });
                         }
                     };
@@ -2112,9 +2134,9 @@ export default function App({ args = [] }) {
                 }
                 case '/about': {
                     const s = emojiSpace(2);
-                    const aboutText = `🔹 FluxFlow Version: v${versionFluxflow}\n` +
-                        `🔹 Status: ${latestVer && latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'Up to date'}\n` +
-                        `🔹 Released on: ${updatedOn}`;
+                    const aboutText = `• FluxFlow Version: v${versionFluxflow}\n` +
+                        `• Status: ${latestVer && latestVer !== versionFluxflow ? `Update Available [v${latestVer}]` : 'Up to date'}\n` +
+                        `• Released on: ${updatedOn}`;
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: 'about-' + Date.now(), role: 'system', text: aboutText, isAboutRecord: true, isMeta: true }];
@@ -2127,7 +2149,7 @@ export default function App({ args = [] }) {
                     exec(`${command} ${CHANGELOG_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `🌐 [BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
                     });
                     break;
                 }
@@ -2139,26 +2161,26 @@ export default function App({ args = [] }) {
                         if (fs.pathExistsSync(filePath)) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: '❌ ERROR: FluxFlow.md already exists in this directory.', isMeta: true }];
+                                return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: 'ERROR: FluxFlow.md already exists in this directory.', isMeta: true }];
                             });
                         } else {
                             try {
                                 fs.writeFileSync(filePath, template);
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '✅ [SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
+                                    return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
                                 });
                             } catch (err) {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: `❌ ERROR: Failed to initialize FluxFlow.md: ${err.message}`, isMeta: true }];
+                                    return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: `ERROR: Failed to initialize FluxFlow.md: ${err.message}`, isMeta: true }];
                                 });
                             }
                         }
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: 'ff-err-' + Date.now(), role: 'system', text: '❓ Usage: /fluxflow init', isMeta: true }];
+                            return [...prev, { id: 'ff-err-' + Date.now(), role: 'system', text: 'Usage: /fluxflow init', isMeta: true }];
                         });
                     }
                     break;
@@ -2193,7 +2215,7 @@ export default function App({ args = [] }) {
                             return [...prev, {
                                 id: Date.now(),
                                 role: 'system',
-                                text: `⚠️${s}[SYSTEM] Compression skipped: History requires at least 100 messages and 32k tokens (current: ${cleanCount}/100 msgs, ${tokens}/32768 tokens).`,
+                                text: `[SYSTEM] Compression skipped: History requires at least 100 messages and 32k tokens (current: ${cleanCount}/100 msgs, ${tokens}/32768 tokens).`,
                                 isMeta: true
                             }];
                         });
@@ -2204,7 +2226,7 @@ export default function App({ args = [] }) {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `⚙️${s}[SYSTEM] Compressing session history...`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Compressing session history...`, isMeta: true }];
                         });
 
                         try {
@@ -2225,7 +2247,7 @@ export default function App({ args = [] }) {
                                     const finalMsgs = [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `⚙️${s}[SYSTEM] Chat History compressed saving tokens.`,
+                                        text: `[SYSTEM] Chat History compressed saving tokens.`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(finalMsgs.length);
@@ -2234,13 +2256,13 @@ export default function App({ args = [] }) {
                             } else {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: '❌ [SYSTEM] Compression failed (no summary returned).', isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: '[SYSTEM] Compression failed (no summary returned).', isMeta: true }];
                                 });
                             }
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `❌ [SYSTEM] Error during compression: ${err.message}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Error during compression: ${err.message}`, isMeta: true }];
                             });
                         } finally {
                             setIsCompressing(false);
@@ -2258,7 +2280,7 @@ export default function App({ args = [] }) {
                 }
                 default:
                     const s = emojiSpace(2);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `🔧${s}[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
@@ -2481,7 +2503,7 @@ export default function App({ args = [] }) {
                             if (isBridgeConnected()) {
                                 sendStatus(packet.content);
                             }
-                            setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `⚙️ [SYSTEM] ${packet.content}`, isMeta: true }]);
+                            setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `[SYSTEM] ${packet.content}`, isMeta: true }]);
                             continue;
                         }
                         if (packet.type === 'summary_injected') {
@@ -3098,7 +3120,7 @@ export default function App({ args = [] }) {
 
             case 'stats':
                 return (
-                    <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} width={Math.min(100, (stdout?.columns || 100) - 2)}>
+                    <Box flexDirection="column" borderStyle="round" borderColor={'grey'} paddingX={3} paddingY={1} width={Math.min(100, (stdout?.columns || 100) - 2)}>
                         <Box marginBottom={1}>
                             <Text color="white" bold underline>SESSION TELEMETRY</Text>
                         </Box>
@@ -3470,9 +3492,14 @@ export default function App({ args = [] }) {
                                     stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                     setChatId(id);
 
+                                    const savedData = await loadChatContext(id);
+                                    chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                    setChatTokens(savedData.total);
+                                    setSessionStats({ tokens: savedData.context });
+
                                     // Ensure logo is present at the start of resumed history
                                     const resumedMsgs = [...h[id].messages];
-                                    const hasLogo = resumedMsgs[0]?.text?.includes('▝▜▄');
+                                    const hasLogo = resumedMsgs[0]?.text?.includes('░░░███');
                                     if (!hasLogo) {
                                         resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true });
                                     }
@@ -3762,7 +3789,7 @@ export default function App({ args = [] }) {
                                                         ) : escPressCount === 1 ? (
                                                             <Text color="white" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
-                                                            <Text color="#cccccc">{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compressing session history, please wait..." : !isProcessing ? `  Send message or /cmd ... (${terminalEnv.shortcut} for newline), @file` : "  Enter a prompt to steer the agent."}</Text>
+                                                            <Text color="#cccccc">{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compressing session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}
@@ -3772,6 +3799,7 @@ export default function App({ args = [] }) {
                                                     showCursor={isAppFocused && !isCompressing}
                                                     lastFocusEventTime={lastFocusEventTime.current}
                                                     value={input}
+                                                    textStyle={{ bold: true }}
                                                     columns={terminalSize.columns}
                                                     onChange={(val) => {
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
@@ -3808,7 +3836,14 @@ export default function App({ args = [] }) {
                 <>
                     <Box flexDirection="column" width="100%" flexGrow={1}>
                         {windowedHistory.items.map((msg, idx) => (
-                            <MessageItem key={msg.id || idx} msg={msg} showFullThinking={showFullThinking} columns={stdout?.columns || 80} />
+                            <MessageItem
+                                key={msg.id || idx}
+                                msg={msg}
+                                showFullThinking={showFullThinking}
+                                columns={stdout?.columns || 80}
+                                aiProvider={aiProvider}
+                                version={versionFluxflow}
+                            />
                         ))}
                     </Box>
 

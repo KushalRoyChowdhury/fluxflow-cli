@@ -48,7 +48,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color="gray" dimColor>┃ </Text>
 
                 <Box marginX={1}>
-                    <Text color="white"> {formatTokens(tokensTotal)} <Text dimColor>({((tokens / maxLimit) * 100).toFixed(0)}%)</Text></Text>
+                    <Text color="white"> {formatTokens(tokensTotal)} <Text dimColor>{((tokens / maxLimit) * 100).toFixed(0)}%</Text></Text>
                 </Box>
 
                 <Text color="gray" dimColor>┃ </Text>

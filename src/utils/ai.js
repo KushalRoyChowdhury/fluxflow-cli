@@ -353,6 +353,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         body.chat_template_kwargs = { enable_thinking: isThinking, clear_thinking: !isThinking };
     } else if (isMistral) {
         body.reasoning_effort = isThinking ? 'high' : 'none';
+    } else if (isMinimax && model.includes('minimax-m3')) {
+        body.chat_template_kwargs = { thinking_mode: isThinking ? 'enabled' : 'disabled' };
     }
 
     const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {

@@ -88,6 +88,17 @@ export const deleteChat = async (id) => {
         delete history[id];
         writeEncryptedJson(HISTORY_FILE, history);
 
+        // Also clean up context.json
+        if (await fs.pathExists(CONTEXT_FILE)) {
+            try {
+                const contextData = readEncryptedJson(CONTEXT_FILE, []);
+                if (Array.isArray(contextData)) {
+                    const filtered = contextData.filter(item => Object.keys(item)[0] !== String(id));
+                    writeEncryptedJson(CONTEXT_FILE, filtered);
+                }
+            } catch (e) {}
+        }
+
         // Also clean up temp memory if it exists
         const temp = readEncryptedJson(TEMP_MEM_FILE, {});
         if (temp[id]) {
@@ -325,27 +336,31 @@ export const getRangeByTokens = (history, startToken, endToken) => {
 
     return results;
 };
-export const saveChatContext = async (chatId, tokens) => {
+export const saveChatContext = async (chatId, chatTokens, contextTokens) => {
     return withLock(async () => {
-        let contextData = [];
-        if (await fs.pathExists(CONTEXT_FILE)) {
-            try {
-                const content = await fs.readFile(CONTEXT_FILE, 'utf8');
-                contextData = JSON.parse(content);
-            } catch (e) {
-                contextData = [];
-            }
-        }
-
+        let contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) contextData = [];
 
+        const data = { total: chatTokens, context: contextTokens };
         const existingIdx = contextData.findIndex(item => Object.keys(item)[0] === String(chatId));
         if (existingIdx !== -1) {
-            contextData[existingIdx] = { [chatId]: tokens };
+            contextData[existingIdx] = { [String(chatId)]: data };
         } else {
-            contextData.push({ [chatId]: tokens });
+            contextData.push({ [String(chatId)]: data });
         }
 
-        await fs.writeFile(CONTEXT_FILE, JSON.stringify(contextData, null, 2), 'utf8');
+        writeEncryptedJson(CONTEXT_FILE, contextData);
     });
+};
+
+export const loadChatContext = async (chatId) => {
+    try {
+        if (!(await fs.pathExists(CONTEXT_FILE))) return { total: 0, context: 0 };
+        const contextData = readEncryptedJson(CONTEXT_FILE, []);
+        if (!Array.isArray(contextData)) return { total: 0, context: 0 };
+        const entry = contextData.find(item => Object.keys(item)[0] === String(chatId));
+        return entry ? entry[String(chatId)] : { total: 0, context: 0 };
+    } catch (e) {
+        return { total: 0, context: 0 };
+    }
 };

@@ -225,10 +225,25 @@
         // DATABASE: Update this object for new versions
         // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
         // ==========================================
-        // Thanks to Gemini CLI. (つ╥﹏╥)つ
+        // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
-        const stableVersions = ["2.5.0"]
+        // ...hopefully no bugs now... let me SleeP.. (⸝⸝ᴗ_ᴗ⸝⸝) z z 𐰁
+        const stableVersions = ["2.6.0"]
         const changelogData = {
+            "2.6.0": {
+                "note": "Pro Edition Refresh & Stability",
+                "added": [
+                    "Model support for NVIDIA Integration: Minimax M3, Diffusion Gemma (1000+ TPS performance)."
+                ],
+                "changed": [
+                    "Full UI Overhaul: New professional monochrome aesthetic with improved readability.",
+                    "Modernized Logo: Dynamic header with real-time provider/version tracking and bold ASCII art.",
+                    "Persistent Token Metrics: Redesigned token calculation and segment-based tracking."
+                ],
+                "fixes": [
+                    "Global Error Mitigation: Hardened agent loop and file operation safety."
+                ]
+            },
             "2.5.0": {
                 "note": "v2.5.1",
                 "added": [
