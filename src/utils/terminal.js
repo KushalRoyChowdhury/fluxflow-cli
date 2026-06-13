@@ -35,17 +35,28 @@ export const emojiSpace = (baseSpaces = 2) => {
 
 export const getFluxLogo = (version = '2.0.0', provider = 'Google') => {
     const art = [
-        " ▗▄",
-        "  ▗▟▀",
-        "   ▝▜▄",
-        "  ▗▟▀",
-        " ▝▀"
+        "▝▜▄  ",
+        "  ▝▜▄",
+        " ▗▟▀ ",
+        "▝▀  ",
     ];
-    const coloredArt = gradient(['#00ffff', '#0077ff', '#ff00ff']).multiline(art.join('\n')).split('\n');
 
-    return `${coloredArt[0]}     Fluxflow CLI v${version}
-${coloredArt[1]}
-${coloredArt[2]}
-${coloredArt[3]}    Selected Provider: ${provider}
-${coloredArt[4]}`;
+    // Flat White ASCII Art for "FLUXFLOW" (4 lines height)
+    const bigText = [
+        "█▀▀▀▀ █     █   █ █   █  █▀▀▀▀ █     ▄▀▀▀▄ █  █  █",
+        "█▄▄   █     █   █  ▀▄▀   █▄▄   █     █   █ █  █  █",
+        "█     █     █   █ ▄▀ ▀▄  █     █     █   █ █  █  █",
+        "▀     ▀▀▀▀▀  ▀▀▀  ▀   ▀  ▀     ▀▀▀▀▀  ▀▀▀   ▀▀ ▀▀ "
+    ];
+    // "█     █     █   █   ▄▀▄    █     █     █   █ █  █  █",
+
+    const coloredArt = gradient(['#0077ff', '#ff00ff']).multiline(art.join('\n')).split('\n');
+    const grey = (t) => `\x1b[90m${t}\x1b[0m`;
+    const white = (t) => `\x1b[37m${t}\x1b[0m`;
+
+    return `${coloredArt[0]}    ${white(bigText[0])}  ${grey('v' + version)}
+${coloredArt[1]}    ${white(bigText[1])}
+${coloredArt[2]}    ${white(bigText[2])}
+${coloredArt[3]}     ${white(bigText[3])}
+Selected Provider: ${provider}`;
 };
