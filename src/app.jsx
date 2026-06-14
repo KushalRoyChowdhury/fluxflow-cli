@@ -1183,6 +1183,7 @@ export default function App({ args = [] }) {
 
             // 5. Prime usage cache and handle resume flag
             await initUsage();
+            await RevertManager.recoverCrashedTransaction();
 
             if (parsedArgs.resume) {
                 const h = await loadHistory();
