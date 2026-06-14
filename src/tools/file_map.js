@@ -11,71 +11,109 @@ import { parseArgs } from '../utils/arg_parser.js';
 let isParserInitialized = false;
 
 const INTERESTING_TYPES = new Set([
-  'class_declaration', 'function_declaration', 'method_definition', 'arrow_function',
-  'if_statement', 'for_statement', 'while_statement', 'do_statement', 'switch_statement', 'try_statement',
-  'variable_declaration', 'lexical_declaration', 'export_statement',
+  'class_declaration', 'function_declaration', 'method_definition', 'arrow_function', 'function_expression',
+  'if_statement', 'else_clause', 'for_statement', 'for_in_statement', 'for_of_statement', 'while_statement', 'do_statement', 'switch_statement', 'try_statement', 'catch_clause',
+  'variable_declarator', 'export_statement', 'lexical_declaration', 'variable_declaration',
   'interface_declaration', 'type_alias_declaration', 'enum_declaration',
   'import_declaration', 'jsx_element', 'jsx_self_closing_element',
   'class_definition', 'function_definition', 'decorated_definition',
   'import_from_statement', 'import_statement', 'preproc_include',
   'method_declaration', 'constructor_declaration',
+  'assignment_expression', 'pair',
   // C/C++
   'class_specifier', 'struct_specifier', 'enum_specifier', 'field_declaration',
   // HTML
   'element', 'script_element', 'style_element'
 ]);
 
+// These types are treated as "transparent wrappers" - they don't print themselves IF they have interesting children.
+const PASSTHROUGH_TYPES = new Set(['export_statement', 'lexical_declaration', 'variable_declaration', 'variable_declarator', 'pair', 'assignment_expression']);
+
+function sanitize(text, limit = 50) {
+  if (!text) return '';
+  const clean = text.replace(/\s+/g, ' ').trim();
+  return clean.length > limit ? clean.substring(0, limit - 3) + '...' : clean;
+}
+
 function getDisplayName(node) {
-  // HTML Support
-  if (node.type === 'element' || node.type === 'script_element' || node.type === 'style_element') {
-    const startTag = node.childForFieldName('start_tag') || node.children.find(c => c.type === 'start_tag');
-    if (startTag) {
-      const tagName = startTag.childForFieldName('name') || startTag.children.find(c => c.type === 'tag_name');
-      return tagName ? tagName.text : null;
-    }
-    const tagName = node.children.find(c => c.type === 'tag_name');
-    return tagName ? tagName.text : null;
+  const type = node.type;
+
+  // 1. Structural / Control Flow
+  if (type === 'if_statement') {
+    const cond = node.childForFieldName('condition');
+    return cond ? `if (${sanitize(cond.text, 40)})` : 'if';
+  }
+  if (type === 'else_clause') return 'else';
+  if (type === 'while_statement' || type === 'do_statement') {
+    const cond = node.childForFieldName('condition');
+    return `${type.split('_')[0]} (${cond ? sanitize(cond.text, 40) : ''})`;
+  }
+  if (type === 'for_statement' || type === 'for_in_statement' || type === 'for_of_statement') {
+    const text = node.text.split('\n')[0];
+    const match = text.match(/for\s*(?:await\s*)?\((.*)\)/);
+    if (match) return `for (${sanitize(match[1], 40)})`;
+    return 'for';
+  }
+  if (type === 'switch_statement') {
+    const val = node.childForFieldName('value');
+    return `switch (${val ? sanitize(val.text, 40) : ''})`;
+  }
+  if (type === 'try_statement') return 'try';
+  if (type === 'catch_clause') return 'catch';
+
+  // 2. HTML / JSX
+  if (type === 'element' || type === 'script_element' || type === 'style_element' ||
+      type === 'jsx_element' || type === 'jsx_self_closing_element') {
+    const opening = node.childForFieldName('opening_element') ||
+                  node.childForFieldName('start_tag') ||
+                  node.children.find(c => c.type === 'start_tag') || node;
+    const tagName = opening.childForFieldName('name') ||
+                  opening.childForFieldName('tag_name') ||
+                  opening.children.find(c => c.type === 'tag_name');
+    return tagName ? `<${sanitize(tagName.text, 30)}>` : null;
   }
 
-  if (node.type === 'jsx_element' || node.type === 'jsx_self_closing_element') {
-    const openingNode = node.childForFieldName('opening_element') || node;
-    const nameNode = openingNode.childForFieldName('name');
-    return nameNode ? nameNode.text : null;
+  // 3. Imports
+  if (['import_declaration', 'import_from_statement', 'import_statement', 'preproc_include'].includes(type)) {
+    return sanitize(node.text.split('\n')[0], 60);
   }
 
-  if (node.type === 'import_declaration' || node.type === 'import_from_statement' || node.type === 'import_statement' || node.type === 'preproc_include') {
-    return node.text.split('\n')[0].trim();
+  // 4. Names
+  if (type === 'pair') {
+    const key = node.childForFieldName('key');
+    return key ? sanitize(key.text.replace(/["']/g, ''), 40) : null;
   }
-
-  // C/C++ Specifics
-  if (node.type === 'function_definition' || node.type === 'function_declaration') {
-    const declarator = node.childForFieldName('declarator');
-    if (declarator) {
-      const id = declarator.descendantsOfType('identifier')[0] || 
-                 declarator.descendantsOfType('field_identifier')[0];
-      if (id) return id.text;
-    }
+  if (type === 'assignment_expression') {
+    const left = node.childForFieldName('left');
+    return left ? `${sanitize(left.text, 30)} = ...` : null;
+  }
+  if (type === 'variable_declarator') {
+    const id = node.childForFieldName('name') || node.children.find(c => ['identifier', 'object_pattern', 'array_pattern'].includes(c.type));
+    return id ? sanitize(id.text, 40) : null;
   }
 
   const nameNode = node.childForFieldName('name') ||
-                   node.children.find(c => c.type === 'identifier' || c.type === 'variable_declarator' || c.type === 'type_identifier' || c.type === 'field_identifier');
-  
+                 node.childForFieldName('declarator') ||
+                 node.children.find(c => ['identifier', 'type_identifier', 'field_identifier', 'property_identifier', 'shorthand_property_identifier'].includes(c.type));
+
   if (nameNode) {
-    if (nameNode.type === 'variable_declarator') {
-       const idNode = nameNode.childForFieldName('name') || nameNode.children.find(c => c.type === 'identifier');
-       return idNode ? idNode.text : null;
+    if (nameNode.type.includes('declarator')) {
+      const id = nameNode.descendantsOfType('identifier')[0] ||
+                 nameNode.descendantsOfType('field_identifier')[0];
+      if (id) return sanitize(id.text, 40);
     }
-    return nameNode.text;
+    return sanitize(nameNode.text, 40);
   }
 
-  if (node.type === 'lexical_declaration' || node.type === 'variable_declaration') {
-      const decl = node.children.find(c => c.type === 'variable_declarator');
-      if (decl) return getDisplayName(decl);
-  }
-
-  if (node.type === 'method_definition' || node.type === 'function_declaration') {
-     const id = node.childForFieldName('name') || node.children.find(c => c.type === 'identifier');
-     if (id) return id.text;
+  // Recursive name lookup for functions assigned to vars/keys
+  if (['arrow_function', 'function_expression', 'function_declaration'].includes(type)) {
+    let p = node.parent;
+    while (p && p.type !== 'program') {
+        const pName = getDisplayName(p);
+        if (pName) return pName;
+        if (!PASSTHROUGH_TYPES.has(p.type)) break;
+        p = p.parent;
+    }
   }
 
   return null;
@@ -100,31 +138,51 @@ function toCamelCase(str) {
   return str.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
 }
 
-function traverse(node, depth = 0, isLast = true, prefix = '') {
-  const MAX_DEPTH = 6;
+function traverse(node, depth = 0, isLast = true, prefix = '', parentName = null) {
+  const MAX_DEPTH = 12;
   if (depth > MAX_DEPTH) return '';
+
   const type = node.type;
+  const name = getDisplayName(node);
   const isInteresting = INTERESTING_TYPES.has(type) || depth === 0;
+  const children = getNextInterestingNodes(node);
+
+  // A node is skipped if it's a structural passthrough wrapper AND has children,
+  // OR if its name is identical to its parent (avoiding redundant lines for the same variable/function)
+  const isPassthrough = isInteresting && depth > 0 &&
+                       ((PASSTHROUGH_TYPES.has(type) && children.length > 0) ||
+                        (name !== null && name === parentName && children.length > 0));
+
   let result = '';
   let nextPrefix = prefix;
-  if (isInteresting) {
+  let nextDepth = depth;
+  let nextParentName = parentName;
+
+  if (isInteresting && !isPassthrough) {
     const startLine = node.startPosition.row + 1;
     const endLine = node.endPosition.row + 1;
-    const name = getDisplayName(node);
     const camelType = toCamelCase(type);
     const label = name ? `${camelType} [${name}]` : camelType;
+
     if (depth === 0) {
       result += `📁 ROOT (Lines: ${startLine}-${endLine})\n`;
+      nextPrefix = prefix; // remains same
     } else {
       result += `${prefix}${isLast ? '└── ' : '├── '}${label} (Lines: ${startLine}-${endLine})\n`;
       nextPrefix += isLast ? '    ' : '│   ';
     }
+    nextDepth = depth + 1;
+    nextParentName = name;
   }
 
-  const childrenToProcess = getNextInterestingNodes(node);
-  childrenToProcess.forEach((child, index) => {
-    const lastChild = index === childrenToProcess.length - 1;
-    result += traverse(child, depth + 1, lastChild, isInteresting ? nextPrefix : prefix);
+  children.forEach((child, index) => {
+    const isLastChildInLoop = index === children.length - 1;
+
+    // If we are passing through, we must propagate our OWN 'isLast' status to our children.
+    // Visually, the child is only the "end of the branch" if it's the last child AND the passthrough parent was the last.
+    const effectiveIsLast = isPassthrough ? (isLast && isLastChildInLoop) : isLastChildInLoop;
+
+    result += traverse(child, nextDepth, effectiveIsLast, nextPrefix, nextParentName);
   });
   return result;
 }
@@ -161,12 +219,10 @@ export const file_map = async (args) => {
   try {
     const Parser = TreeSitter.Parser;
     if (!isParserInitialized) {
-      // In bundled environments, we might need a more direct path to the wasm
       let tsWasmPath;
       try {
         tsWasmPath = path.join(path.dirname(require.resolve('web-tree-sitter')), 'tree-sitter.wasm');
       } catch (e) {
-        // Fallback to a common location if resolve fails
         tsWasmPath = path.join(process.cwd(), 'node_modules', 'web-tree-sitter', 'tree-sitter.wasm');
       }
 
@@ -187,11 +243,11 @@ export const file_map = async (args) => {
 
     const sourceCode = await fs.readFile(absolutePath, 'utf8');
     const tree = parser.parse(sourceCode);
-    const map = traverse(tree.rootNode);
+    const map = traverse(tree.rootNode, 0, true, ' ');
 
+    // fs.writeFileSync('filemap.txt', map);
     return `📄 File Map for: ${filePath}\n${map}`;
   } catch (err) {
-    // Stringify error more carefully
     const errMsg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
     const stack = err instanceof Error ? `\nStack: ${err.stack}` : '';
     return `ERROR: Failed to map file: ${errMsg}${stack}`;

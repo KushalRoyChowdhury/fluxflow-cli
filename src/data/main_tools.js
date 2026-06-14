@@ -32,11 +32,11 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 
 ${mode === 'Flux' ? `- PROJECT TOOLS (path = relative to CWD, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
-2. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps. Token Efficient than ReadFile. Understand File? FileMap >>> ReadFile
+2. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps. Token Efficient than ReadFile
 3. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats
 4. [tool:functions.PatchFile(path="...", replaceContent1="exact string", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file
+6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD ONLY`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT OR 3 CONSECUTIVE RUN TOOL ONLY**
 8. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 9. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
