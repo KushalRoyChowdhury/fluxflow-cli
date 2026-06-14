@@ -1162,7 +1162,7 @@
 
         // Drawn by Gemini CLI
         const createGeminiText = () => {
-            const spacing = 20;
+            const spacing = 14;
             const pts = [];
             const edges = [];
             let nodeOffset = 0;
@@ -1185,7 +1185,7 @@
                 const letterEdges = lmap[char].e;
 
                 letterNodes.forEach(p => {
-                    pts.push({ dx: ox + p[0]*13, dy: p[1]*18 }); // Width: 12->13, Height: 20->18
+                    pts.push({ dx: ox + p[0]*9, dy: p[1]*12 }); // Reduced from 13x18
                 });
 
                 letterEdges.forEach(e => {
@@ -1195,9 +1195,9 @@
                 nodeOffset += letterNodes.length;
             };
 
-            let cursor = -100;
+            let cursor = -70; // Adjusted from -100 to account for smaller overall width
             "GEMINI".split('').forEach(c => { addLetter(c, cursor); cursor += spacing; });
-            cursor += 15;
+            cursor += 5; // Reduced word gap from 10
             "CLI".split('').forEach(c => { addLetter(c, cursor); cursor += spacing; });
             return { pts, edges };
         };
