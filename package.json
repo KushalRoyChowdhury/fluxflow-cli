@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "2.6.3",
+	"version": "2.6.4",
 	"date": "2026-06-14",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
@@ -36,7 +36,7 @@
 	},
 	"scripts": {
 		"start": "tsx ./src/cli.jsx",
-		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --minify"
+		"build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter"
 	},
 	"dependencies": {
 		"@google/genai": "^1.52.0",

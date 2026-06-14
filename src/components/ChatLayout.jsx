@@ -508,7 +508,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         const contentPart = mainParts[1] || '';
 
         // Split content from footer
-        const footerMarker = 'Check if Starting and Ending matches';
+        const footerMarker = '[SYSTEM] Check if Starting and Ending matches';
         const contentAndFooter = contentPart.split(footerMarker);
         const content = contentAndFooter[0]?.trim() || '';
         const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';

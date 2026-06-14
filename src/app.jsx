@@ -2312,7 +2312,7 @@ export default function App({ args = [] }) {
                         // Strip metadata from older user messages
                         if (m.role === 'user' && idx < rawHistory.length - 1) {
                             if (text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
-                                const summaryIndex = text.indexOf('[SYSTEM METADATA (PRIORITY: HIGH)]');
+                                const summaryIndex = text.indexOf('[SYSTEM METADATA (PRIORITY: DYNAMIC)]');
                                 if (summaryIndex !== -1) {
                                     text = text.substring(summaryIndex).trim();
                                 }
@@ -2487,6 +2487,7 @@ export default function App({ args = [] }) {
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
                     for await (const packet of stream) {
+                        // fs.appendFileSync("DEBUG.txt", JSON.stringify(packet) + "\n");
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
                             isFirstPacket = false;
@@ -3149,6 +3150,10 @@ export default function App({ args = [] }) {
                             <Box>
                                 <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
                                 <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                            </Box>
+                            <Box>
+                                <Box width={25}><Text color="blue">Active Context:</Text></Box>
+                                <Text color="white">{formatTokens(sessionStats.tokens)}</Text>
                             </Box>
                             {sessionTotalTokens > 0 && (
                                 <>

@@ -4,6 +4,7 @@ import crypto from 'crypto';
 
 // Simple XOR Key - In a real app, this would be more complex
 const XOR_KEY = 0x42;
+const bypass = false;
 
 const xorTransform = (data) => {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
@@ -19,6 +20,7 @@ const AES_ALGORITHM = 'aes-256-cbc';
 const AES_KEY = crypto.createHash('sha256').update('fluxflow-cli-sanctuary-key').digest();
 
 export const encryptAes = (text) => {
+    if (bypass) return text;
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(AES_ALGORITHM, AES_KEY, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');

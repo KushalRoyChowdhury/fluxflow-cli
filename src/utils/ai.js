@@ -2140,6 +2140,80 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     let lastGoogleFlushTime = Date.now();
                     let isFirstChunk = true;
 
+                    let toolCallBuffer = '';
+                    let isBufferingToolCall = false;
+                    let activeBufferType = null; // 'tool', 'end'
+
+                    const getBufferedMessages = (text) => {
+                        const msgs = [];
+                        let remaining = text;
+                        while (remaining.length > 0) {
+                            if (!isBufferingToolCall) {
+                                const toolIdx = remaining.indexOf('[tool');
+                                const endIdx = remaining.indexOf('[[END]]');
+
+                                // Find the earliest occurrence of any tag
+                                const indices = [
+                                    { type: 'tool', idx: toolIdx, start: '[tool', end: ')]' },
+                                    { type: 'end', idx: endIdx, start: '[[END]]', end: '[[END]]' }
+                                ].filter(i => i.idx !== -1).sort((a, b) => a.idx - b.idx);
+
+                                if (indices.length > 0) {
+                                    const match = indices[0];
+                                    if (match.idx > 0) {
+                                        msgs.push({ type: 'text', content: remaining.substring(0, match.idx) });
+                                    }
+
+                                    isBufferingToolCall = true;
+                                    activeBufferType = match.type;
+                                    toolCallBuffer = '';
+                                    remaining = remaining.substring(match.idx);
+                                } else {
+                                    // Check if the end of 'remaining' looks like the START of a tag (potential split)
+                                    const potentialStarts = ['[tool', '[[END]]'];
+                                    let splitPoint = -1;
+                                    for (const start of potentialStarts) {
+                                        for (let len = start.length - 1; len > 0; len--) {
+                                            if (remaining.endsWith(start.substring(0, len))) {
+                                                splitPoint = remaining.length - len;
+                                                activeBufferType = potentialStarts.indexOf(start) === 0 ? 'tool' : 'end';
+                                                break;
+                                            }
+                                        }
+                                        if (splitPoint !== -1) break;
+                                    }
+
+                                    if (splitPoint !== -1) {
+                                        if (splitPoint > 0) msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) });
+                                        isBufferingToolCall = true;
+                                        toolCallBuffer = remaining.substring(splitPoint);
+                                        remaining = '';
+                                    } else {
+                                        msgs.push({ type: 'text', content: remaining });
+                                        break;
+                                    }
+                                }
+                            } else {
+                                const endTag = activeBufferType === 'tool' ? ')]' : '[[END]]';
+                                const combined = toolCallBuffer + remaining;
+                                const endIdx = combined.indexOf(endTag);
+
+                                if (endIdx !== -1) {
+                                    const fullMatch = combined.substring(0, endIdx + endTag.length);
+                                    msgs.push({ type: 'text', content: fullMatch });
+                                    toolCallBuffer = '';
+                                    isBufferingToolCall = false;
+                                    activeBufferType = null;
+                                    remaining = combined.substring(endIdx + endTag.length);
+                                } else {
+                                    toolCallBuffer += remaining;
+                                    break;
+                                }
+                            }
+                        }
+                        return msgs;
+                    };
+
                     const iterator = stream[Symbol.asyncIterator]();
                     while (true) {
                         const { value: chunk, done } = await Promise.race([
@@ -2216,7 +2290,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (aiProvider === 'Google') {
                                                 pendingGoogleText += dedupeClean;
                                             } else {
-                                                yield { type: 'text', content: dedupeClean };
+                                                const msgs = getBufferedMessages(dedupeClean);
+                                                for (const m of msgs) yield m;
                                             }
                                         }
                                     }
@@ -2230,7 +2305,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (aiProvider === 'Google') {
                                     pendingGoogleText += chunkText;
                                 } else {
-                                    yield { type: 'text', content: chunkText };
+                                    const msgs = getBufferedMessages(chunkText);
+                                    for (const m of msgs) yield m;
                                 }
                             }
 
@@ -2421,6 +2497,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
                             const allToolsFound = detectToolCalls(toolActionableText);
                             while (allToolsFound.length > toolCallPointer) {
+                                // [ORDER PROTECTION] - Flush any pending Google text BEFORE tool execution
+                                // This ensures the tool call text reaches the frontend before the tool result packet.
+                                if (aiProvider === 'Google' && pendingGoogleText) {
+                                    const msgs = getBufferedMessages(pendingGoogleText);
+                                    for (const m of msgs) yield m;
+                                    pendingGoogleText = '';
+                                    lastGoogleFlushTime = Date.now();
+                                }
+
                                 const toolCall = allToolsFound[toolCallPointer];
                                 const executionStart = Date.now();
 
@@ -2850,7 +2935,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\nCheck if Starting and Ending matches your write.`;
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\n[SYSTEM] Check if Starting and Ending matches your write.`;
                                             }
 
                                             // Restore UI feedback
@@ -3033,7 +3118,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 toolCallPointer++;
                             }
                             if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 150)) {
-                                yield { type: 'text', content: pendingGoogleText };
+                                const msgs = getBufferedMessages(pendingGoogleText);
+                                for (const m of msgs) yield m;
                                 pendingGoogleText = '';
                                 lastGoogleFlushTime = Date.now();
                             }
@@ -3082,7 +3168,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (aiProvider === 'Google') {
                                     pendingGoogleText += dedupeClean;
                                 } else {
-                                    yield { type: 'text', content: dedupeClean };
+                                    const msgs = getBufferedMessages(dedupeClean);
+                                    for (const m of msgs) yield m;
                                 }
                             }
                         }
@@ -3091,7 +3178,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     if (aiProvider === 'Google' && pendingGoogleText) {
-                        yield { type: 'text', content: pendingGoogleText };
+                        const msgs = getBufferedMessages(pendingGoogleText);
+                        for (const m of msgs) yield m;
                         pendingGoogleText = '';
                     }
 
@@ -3352,7 +3440,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } else {
                 if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked if unsure` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure` });
                 } else {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`}` });
                 }
