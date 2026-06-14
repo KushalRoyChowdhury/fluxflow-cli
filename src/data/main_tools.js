@@ -21,7 +21,7 @@ Access to internal tools. MUST use the exact syntax on a new line: [tool:functio
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **MANDATORY where possible**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile for understandling files efficiently\n- Want a spefific word/varible to find across project? SearchKeyword >> Guessing/ReadFile" : ""}- No brute force, no spamming of tools
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY PREFERRED**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile for understandling files efficiently\n- Want a spefific word/varible to find across project? SearchKeyword >> Guessing/ReadFile" : ""}- No brute force, no spamming of tools
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences

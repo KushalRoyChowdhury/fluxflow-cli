@@ -138,18 +138,27 @@ export const RevertManager = {
         for (const tx of toRevert) {
             // Revert changes in reverse order
             for (const change of [...tx.changes].reverse()) {
-                if (change.type === 'create') {
-                    if (await fs.pathExists(change.filePath)) {
-                        await fs.remove(change.filePath);
+                try {
+                    if (change.type === 'create') {
+                        if (await fs.pathExists(change.filePath)) {
+                            await fs.remove(change.filePath);
+                        }
+                    } else if (change.type === 'update') {
+                        // CRITICAL SAFETY: Only attempt restoration if a valid backup exists
+                        if (change.backupFile) {
+                            const backupPath = path.join(BACKUPS_DIR, tx.chatId, change.backupFile);
+                            if (await fs.pathExists(backupPath)) {
+                                // Read, decrypt and write back the restored file
+                                const encrypted = await fs.readFile(backupPath, 'utf8');
+                                const decrypted = decryptAes(encrypted);
+                                await fs.writeFile(change.filePath, decrypted, 'utf8');
+                            } else {
+                                console.warn(`[RevertManager] Backup file missing: ${backupPath}`);
+                            }
+                        }
                     }
-                } else if (change.type === 'update') {
-                    const backupPath = path.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-                    if (await fs.pathExists(backupPath)) {
-                        // Read, decrypt and write back the restored file
-                        const encrypted = await fs.readFile(backupPath, 'utf8');
-                        const decrypted = decryptAes(encrypted);
-                        await fs.writeFile(change.filePath, decrypted, 'utf8');
-                    }
+                } catch (err) {
+                    console.error(`[RevertManager] Failed to restore ${change.filePath}:`, err.message);
                 }
             }
             tx.reverted = true;
@@ -160,12 +169,13 @@ export const RevertManager = {
             for (const change of tx.changes) {
                 if (change.backupFile) {
                     const backupPath = path.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-                    await fs.remove(backupPath);
+                    await fs.remove(backupPath).catch(() => {});
                 }
             }
         }
 
-        // Update ledger by filtering out the reverted entries and saving it encrypted
+        // Efficiently update ledger by removing all entries from the target index onwards 
+        // that belong to this chat. Since ledger is chronological, this is safe.
         const updatedLedger = ledger.filter(t => !toRevert.some(r => r.id === t.id));
         writeEncryptedJson(LEDGER_FILE, updatedLedger);
 

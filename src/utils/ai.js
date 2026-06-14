@@ -2206,7 +2206,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     activeBufferType = null;
                                     remaining = combined.substring(endIdx + endTag.length);
                                 } else {
-                                    toolCallBuffer += remaining;
+                                    // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
+                                    // Flush current buffer if it exceeds 512 chars, then continue buffering.
+                                    const MAX_BUFFER = 512;
+                                    if (combined.length > MAX_BUFFER) {
+                                        msgs.push({ type: 'text', content: combined });
+                                        toolCallBuffer = '';
+                                    } else {
+                                        toolCallBuffer = combined;
+                                    }
+                                    remaining = '';
                                     break;
                                 }
                             }

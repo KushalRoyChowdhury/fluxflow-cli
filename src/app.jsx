@@ -3434,7 +3434,7 @@ export default function App({ args = [] }) {
                                         deleteChatSummary(chatId);
 
                                         // Find index of reverted user message
-                                        const targetIdx = messages.findIndex(m =>
+                                        const targetIdx = messages.findLastIndex(m =>
                                             m.role === 'user' &&
                                             m.text &&
                                             (m.text.startsWith(targetPrompt) || m.text.includes(targetPrompt))
