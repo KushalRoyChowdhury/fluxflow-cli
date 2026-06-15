@@ -3235,7 +3235,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const endsNormally = /[.!?}"'`’“”]$|```$/s.test(pureOutputText) || endsWithFormatting || endsWithEmoji;
 
                     if (!hasFinish && !hasContinue && !didCallTool && signalSafeText.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
-                        throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals.");
+                        // throw new Error("Silent stream cutoff (500): Model stream closed cleanly but cut off mid-sentence without signals."); [NEEDS TESTING]
                     }
 
                     success = true;
