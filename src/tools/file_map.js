@@ -197,7 +197,7 @@ export const file_map = async (args) => {
   }
 
   if (!filePath) {
-    return 'ERROR: No file path provided. Use [tool:functions.FileMap(path="...")]';
+    return 'ERROR: No file path provided. Use [[tool:functions.FileMap(path="...")]]';
   }
 
   const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath);

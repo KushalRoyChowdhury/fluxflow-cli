@@ -25,13 +25,13 @@ const connect = () => {
     socket.on('open', () => {
         ws = socket;
         isConnecting = false;
-        
+
         // Handshake: Send current CLI version, PID, and PPID
-        ws.send(JSON.stringify({ 
-            command: 'version', 
+        ws.send(JSON.stringify({
+            command: 'version',
             version: cliVersion,
             pid: process.pid,
-            ppid: process.ppid 
+            ppid: process.ppid
         }));
 
         while (messageQueue.length > 0) {
@@ -105,12 +105,12 @@ export const closeDiffInIDE = (filePath, result) => {
 export const highlightDiffInEditor = (filePath, diffText) => {
     const addedLines = [];
     const lines = diffText.split(/\r?\n/);
-    
+
     let inDiffBlock = false;
     for (const line of lines) {
-        if (line.includes('[DIFF_START]')) { inDiffBlock = true; continue; }
-        if (line.includes('[DIFF_END]')) { inDiffBlock = false; continue; }
-        
+        if (line.includes('[[DIFF_START]]')) { inDiffBlock = true; continue; }
+        if (line.includes('[[DIFF_END]]')) { inDiffBlock = false; continue; }
+
         if (inDiffBlock) {
             // More robust matching: handle whitespace and ensure we get the full number
             const match = line.match(/^\s*\+(\d+)\|/);

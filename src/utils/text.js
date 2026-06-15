@@ -6,7 +6,7 @@ import os from 'os';
 export const wrapText = (text, width) => {
     if (!text) return '';
     const ansiRegex = /\x1B\[[0-?]*[ -/]*[@-~]/g;
-    
+
     // Split by standard newline only, since processOutput already normalized it
     const sourceLines = text.split('\n');
     let finalLines = [];
@@ -17,7 +17,7 @@ export const wrapText = (text, width) => {
 
     sourceLines.forEach(sLine => {
         const visibleLength = getVisibleLength(sLine);
-        
+
         if (visibleLength <= width) {
             finalLines.push(sLine);
             return;
@@ -27,7 +27,7 @@ export const wrapText = (text, width) => {
         const tokens = sLine.split(/(\s+)/);
         let currentLine = '';
         let currentVisibleLength = 0;
-        
+
         const leadingSpaceMatch = sLine.match(/^(\s*)/);
         const indent = leadingSpaceMatch ? leadingSpaceMatch[1] : '';
 
@@ -156,14 +156,14 @@ export const applyPatches = (content, patches) => {
         const getIndentStyle = (text) => {
             const lines = text.split('\n').filter(l => l.trim() !== '');
             if (lines.length === 0) return { char: ' ', size: 4 };
-            
+
             const firstIndent = lines[0].match(/^\s*/)[0];
             if (firstIndent.includes('\t')) return { char: '\t', size: 1 };
-            
+
             // Detect space step
             const indents = lines.map(l => l.match(/^\s*/)[0].length).filter(l => l > 0);
             if (indents.length === 0) return { char: ' ', size: firstIndent.length || 4 };
-            
+
             // Find greatest common divisor of indents to guess step
             const gcd = (a, b) => b ? gcd(b, a % b) : a;
             const step = indents.reduce((a, b) => gcd(a, b));
@@ -176,7 +176,7 @@ export const applyPatches = (content, patches) => {
         const matchMinIndent = getMinIndent(originalMatch).length;
         const leadingIndent = (leadingContext.match(/^\s*/) || [''])[0].length;
         const targetBaseIndentRaw = leadingIndent + matchMinIndent;
-        
+
         // Convert physical lengths to logical units
         const targetUnits = targetBaseIndentRaw / fileStyle.size;
         const modelBaseUnits = getMinIndent(newText).length / modelStyle.size;
@@ -185,10 +185,10 @@ export const applyPatches = (content, patches) => {
         const newLines = newText.split('\n');
         return newLines.map((line, i) => {
             if (line.trim() === '' && i !== 0) return '';
-            
+
             const currentLineUnits = line.match(/^\s*/)[0].length / modelStyle.size;
             const finalUnits = Math.max(0, currentLineUnits + deltaUnits);
-            
+
             // Re-calculate for first line if it's already partially indented by leadingContext
             let unitCount = finalUnits;
             if (i === 0) {
@@ -278,9 +278,9 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     const allLinesOriginal = originalContent.split(/\r?\n/);
     const allLinesFinal = finalContent.split(/\r?\n/);
 
-    let diffText = `[DIFF_START]\n`;
+    let diffText = `[[DIFF_START]]\n`;
     const separatorLine = '═'.repeat(88);
-    
+
     // We track where we are in the final content to ensure line numbers are smooth
     let currentFinalLineIdx = 0;
 
@@ -295,34 +295,34 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             const contextStart = Math.max(0, res.originalStartLine - 4);
             currentFinalLineIdx = contextStart;
             while (currentFinalLineIdx < res.originalStartLine - 1) {
-                diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                 currentFinalLineIdx++;
             }
         } else {
             const prev = lastSuccessfulHunk;
             const prevOriginalEnd = prev.originalStartLine + prev.oldContent.split('\n').length - 1;
             const gap = res.originalStartLine - prevOriginalEnd - 1;
-            
+
             if (gap >= threshold) {
                 // Large gap: Show 3 lines of context after prev, then separator, then 3 lines before current
                 let afterLimit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
                 while (currentFinalLineIdx < afterLimit) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
-                diffText += `[UI_CONTEXT] ${separatorLine}\n`;
-                
+                diffText += `[[UI_CONTEXT]] ${separatorLine}\n`;
+
                 // Jump to context before current patch
                 const beforeStart = Math.max(currentFinalLineIdx, res.originalStartLine - 4);
                 currentFinalLineIdx = beforeStart;
                 while (currentFinalLineIdx < res.originalStartLine - 1) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             } else {
                 // Small gap: Simply fill the lines between patches
                 while (currentFinalLineIdx < res.originalStartLine - 1) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             }
@@ -343,7 +343,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         let hunkEndInFinal = currentFinalLineIdx;
         if (resyncAnchorText !== null) {
             // Scan ahead in the final content to find the resync anchor
-            const lookAheadLimit = (idx < patchResults.length - 1) ? (patchResults[idx+1].originalStartLine || allLinesFinal.length) + 10 : allLinesFinal.length;
+            const lookAheadLimit = (idx < patchResults.length - 1) ? (patchResults[idx + 1].originalStartLine || allLinesFinal.length) + 10 : allLinesFinal.length;
             for (let s = currentFinalLineIdx; s < lookAheadLimit; s++) {
                 if (allLinesFinal[s] === resyncAnchorText) {
                     hunkEndInFinal = s;
@@ -368,11 +368,11 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     if (lastSuccessfulHunk !== null) {
         let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
         while (currentFinalLineIdx < limit) {
-            diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+            diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
             currentFinalLineIdx++;
         }
     }
 
-    diffText += `[DIFF_END]`;
+    diffText += `[[DIFF_END]]`;
     return diffText;
 };

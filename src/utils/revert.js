@@ -22,17 +22,24 @@ async function performRestoration(change, tx) {
             if (!change.backupFile) return;
             const backupPath = path.join(BACKUPS_DIR, tx.chatId, change.backupFile);
             if (await fs.pathExists(backupPath)) {
-                const encrypted = await fs.readFile(backupPath, 'utf8');
-                const decrypted = decryptAes(encrypted);
+                // IMPORTANT: The backup file is an AES-encrypted JSON object containing { data: "encrypted_str" }
+                // We use readEncryptedJson which handles the AES decryption of the JSON shell automatically.
+                const backupContainer = readEncryptedJson(backupPath, null);
+                if (!backupContainer || !backupContainer.data) {
+                    throw new Error(`Backup container corrupt or empty for ${path.basename(change.filePath)}`);
+                }
                 
+                // Now decrypt the actual file content stored inside the 'data' field
+                const decrypted = decryptAes(backupContainer.data);
+
                 // Ensure we have permission to overwrite
                 if (await fs.pathExists(change.filePath)) {
                     await fs.chmod(change.filePath, 0o666).catch(() => {});
                 }
-                
+
                 await fs.writeFile(change.filePath, decrypted, 'utf8');
             } else {
-                console.warn(`[RevertManager] Backup file missing: ${backupPath}`);
+                // console.warn(`[RevertManager] Backup file missing: ${backupPath}`);
             }
         }
     } catch (err) {
@@ -52,7 +59,7 @@ async function restoreWithRetry(change, tx, maxAttempts = 7) {
         } catch (err) {
             attempt++;
             if (attempt >= maxAttempts) {
-                console.error(`[RevertManager] Permanent failure: ${change.filePath}. ${err.message}`);
+                // console.error(`[RevertManager] Permanent failure: ${change.filePath}. ${err.message}`);
                 return false;
             }
             const delay = Math.min(100 * Math.pow(2, attempt - 1), 5000);
@@ -159,8 +166,6 @@ export const RevertManager = {
             .slice(targetIndex)
             .filter(t => t.chatId === chatId && !t.reverted)
             .reverse();
-
-        console.log(`[RevertManager] Starting sequential rollback of ${toRevert.length} transactions...`);
 
         for (const tx of toRevert) {
             // 1. Restore files for this specific transaction

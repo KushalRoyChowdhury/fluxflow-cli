@@ -63,9 +63,9 @@ export const getCleanGroupedLength = (rawHistory) => {
         if (!isCleanMsg) return;
 
         let text = m.fullText || m.text || '';
-        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
+        if (m.role === 'system' && text?.startsWith('[[TOOL RESULT]]')) {
             const prev = cleanHistory[cleanHistory.length - 1];
-            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
+            if (prev && prev.role === 'system' && prev.text?.startsWith('[[TOOL RESULT]]')) {
                 prev.text += '\n\n' + text;
                 return;
             }
@@ -653,20 +653,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const janitorUserMemories = persistentStorage.map(m => `- [${m.id}]: ${m.memory}`).join('\n');
 
     const janitorContents = history.slice(0, -1)
-        .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
+        .filter(msg => msg.text && !msg.text.includes('[[TOOL RESULT]]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
         .slice(-14)
         .map(msg => {
             let processedText = stripAnsi(msg.text)
-                .replace(/\[tool:functions\..*?\]/g, '')
+                .replace(/\[\[tool:functions\..*?\]\]/g, '')
                 .replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '')
                 .replace(/\[Prompted on:.*?\]/g, '')
                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
                 })
-                .replace(/\[turn: continue\]/g, '')
-                .replace(/\[turn: finish\]/g, '')
+                .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
                 .replace(/\[\[END\]\]/g, '')
-                .replace(/\[TOOL RESULTS\]/g, '')
+                .replace(/\[\[TOOL RESULTS\]\]/g, '')
                 .replace(/\[tool results\]/g, '')
                 .replace(/\r?\n\r?\n/g, '\n')
                 .replace(/\n\n/g, '\n')
@@ -701,7 +700,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         needTitle
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[turn: continue\]/g, '').replace(/\[turn: finish\]/g, '').replace(/\[\[END\]\]/g, '').replace(/\[TOOL RESULTS\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    let agentRes = `${cleanedFullResponse.replace(/\[\[tool:functions\..*?\]\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[TOOL RESULTS\]\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
@@ -936,7 +935,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 };
 
 const getActiveToolContext = (text) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let match;
     while ((match = toolRegex.exec(text)) !== null) {
         const startIdx = match.index + match[0].length - 1; // Index of '('
@@ -958,12 +957,12 @@ const getActiveToolContext = (text) => {
                 else if (char === ')') balance--;
 
                 if (balance === 0) {
-                    // Check for closing ']' after ')'
+                    // Check for closing ']]' after ')'
                     let j = i + 1;
                     while (j < text.length && /\s/.test(text[j])) j++;
-                    if (j < text.length && text[j] === ']') {
+                    if (j < text.length && text[j] === ']' && text[j + 1] === ']') {
                         closed = true;
-                        toolRegex.lastIndex = j + 1;
+                        toolRegex.lastIndex = j + 2;
                         break;
                     }
                 }
@@ -980,7 +979,7 @@ const getActiveToolContext = (text) => {
 };
 
 const getContextSafeText = (text, stripThoughts = true) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let result = '';
     let lastIdx = 0;
     let match;
@@ -1017,8 +1016,8 @@ const getContextSafeText = (text, stripThoughts = true) => {
                     if (balance === 0) {
                         let j = i + 1;
                         while (j < text.length && /\s/.test(text[j])) j++;
-                        if (j < text.length && text[j] === ']') {
-                            endIdx = j;
+                        if (j < text.length && text[j] === ']' && text[j + 1] === ']') {
+                            endIdx = j + 1;
                             break;
                         }
                     }
@@ -1027,11 +1026,11 @@ const getContextSafeText = (text, stripThoughts = true) => {
         }
 
         if (endIdx !== -1) {
-            result += '[tool:functions.' + match[1] + '()]';
+            result += '[[tool:functions.' + match[1] + '()]]';
             lastIdx = endIdx + 1;
             toolRegex.lastIndex = lastIdx;
         } else {
-            result += '[tool:functions.' + match[1] + '(';
+            result += '[[tool:functions.' + match[1] + '(';
             lastIdx = text.length;
             break;
         }
@@ -1044,7 +1043,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
 };
 
 const contextSafeReplace = (text, regex, replacement) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
     let result = '';
     let lastIdx = 0;
     let match;
@@ -1081,8 +1080,8 @@ const contextSafeReplace = (text, regex, replacement) => {
                     if (balance === 0) {
                         let j = i + 1;
                         while (j < text.length && /\s/.test(text[j])) j++;
-                        if (j < text.length && text[j] === ']') {
-                            endIdx = j;
+                        if (j < text.length && text[j] === ']' && text[j + 1] === ']') {
+                            endIdx = j + 1;
                             break;
                         }
                     }
@@ -1116,7 +1115,7 @@ const detectToolCalls = (text) => {
     // Strip any thinking blocks first to ensure no tool calls are detected inside them
     const cleanText = text.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
     const results = [];
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
 
     let match;
     while ((match = toolRegex.exec(cleanText)) !== null) {
@@ -1151,10 +1150,11 @@ const detectToolCalls = (text) => {
                     balance--;
                     if (balance === 0) {
                         closingParenIdx = i;
+                        // Look for closing ']]'
                         let j = i + 1;
                         while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
-                        if (j < cleanText.length && cleanText[j] === ']') {
-                            endIdx = j;
+                        if (j < cleanText.length && cleanText[j] === ']' && cleanText[j + 1] === ']') {
+                            endIdx = j + 1;
                             break;
                         }
                     }
@@ -1260,7 +1260,7 @@ Your task is to summarize or merge temporary context memories from one or more p
 For each Chat ID provided, you must output a tool call to save the consolidated summary.
 
 The tool call format MUST be:
-[tool:functions.saveSummary(id="<chat-id>", summary="<updated summary string, max 400 words>")]
+[[tool:functions.saveSummary(id="<chat-id>", summary="<updated summary string, max 400 words>")]]
 
 Guidelines:
 - Create a single, updated, highly cohesive, and concise summary statement (max 400 words) for each Chat ID. It should contain WHAT user talked about, WHAT were the tasks, Temporal info, HOW/WHAT the model responded. DON'T REMOVE ANY KEY AND TURN BY TURN INFO DENSITY.
@@ -1354,7 +1354,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
                 !String(m.id).startsWith('welcome')
             )
             .map(m => {
-                const role = m.text?.startsWith('[TOOL RESULT]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
+                const role = m.text?.startsWith('[[TOOL RESULT]]') ? 'TOOL' : (m.role === 'agent' ? 'AGENT' : 'USER');
                 return `[${role}]: ${m.text}`;
             })
             .join('\n\n');
@@ -1794,7 +1794,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${cleanAgentText}`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[[SYSTEM]] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[USER] ${cleanAgentText}`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
@@ -1844,7 +1844,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[[[SYSTEM]]] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -1901,7 +1901,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const parts = [{ text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
                                 // 2-Turn Freshness Check: Only include binary data if it appeared within the last 2 physical user turns
-                                const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
+                                const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[[TOOL RESULT]]')).length;
                                 if (physicalUserTurnsAfter <= 2) {
                                     parts.push(msg.binaryPart);
                                 }
@@ -1917,13 +1917,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     for (let i = 0; i < contents.length; i++) {
                         const msg = contents[i];
                         const text = msg.parts?.[0]?.text || '';
-                        if (msg.role === 'model' && /\[tool:/i.test(text)) {
-                            // Find the first user [TOOL RESULT] message *after* this index
+                        if (msg.role === 'model' && /\[\[tool:/i.test(text)) {
+                            // Find the first user [[TOOL RESULT]] message *after* this index
                             let resultIdx = -1;
                             for (let j = i + 1; j < contents.length; j++) {
                                 const nextMsg = contents[j];
                                 const nextText = nextMsg.parts?.[0]?.text || '';
-                                if (nextMsg.role === 'user' && nextText.startsWith('[TOOL RESULT]')) {
+                                if (nextMsg.role === 'user' && nextText.startsWith('[[TOOL RESULT]]')) {
                                     resultIdx = j;
                                     break;
                                 }
@@ -2000,8 +2000,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}`;
-                        if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
+                        const jitInstruction = `\n[[SYSTEM]] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}`;
+                        if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[[TOOL RESULT]]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
                     }
@@ -2012,7 +2012,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
                         const currentStep = loop + 1;
                         if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] or [turn:finish] quickly.`;
+                            lastUserMsg.parts[0].text += `\n[[SYSTEM]] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly.`;
                         }
                     }
 
@@ -2070,7 +2070,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             config: {
                                 systemInstruction: currentSystemInstruction,
                                 temperature: mode === 'Flux' ? 1.0 : 1.4,
-                                maxOutputTokens: 32768,
                                 mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
@@ -2138,6 +2137,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     let pendingGoogleText = '';
                     let lastGoogleFlushTime = Date.now();
+
+                    const flushGoogleBuffer = async function* () {
+                        if (aiProvider === 'Google' && pendingGoogleText) {
+                            const msgs = getBufferedMessages(pendingGoogleText);
+                            for (const m of msgs) yield m;
+                            pendingGoogleText = '';
+                            lastGoogleFlushTime = Date.now();
+                        }
+                    };
                     let isFirstChunk = true;
 
                     let toolCallBuffer = '';
@@ -2149,12 +2157,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         let remaining = text;
                         while (remaining.length > 0) {
                             if (!isBufferingToolCall) {
-                                const toolIdx = remaining.indexOf('[tool');
+                                // Match the actual protocol starts: [[tool:functions. or [[END]]
+                                const toolIdx = remaining.indexOf('[[tool');
                                 const endIdx = remaining.indexOf('[[END]]');
 
                                 // Find the earliest occurrence of any tag
                                 const indices = [
-                                    { type: 'tool', idx: toolIdx, start: '[tool', end: ')]' },
+                                    { type: 'tool', idx: toolIdx, start: '[[tool', end: ']]' },
                                     { type: 'end', idx: endIdx, start: '[[END]]', end: '[[END]]' }
                                 ].filter(i => i.idx !== -1).sort((a, b) => a.idx - b.idx);
 
@@ -2170,7 +2179,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     remaining = remaining.substring(match.idx);
                                 } else {
                                     // Check if the end of 'remaining' looks like the START of a tag (potential split)
-                                    const potentialStarts = ['[tool', '[[END]]'];
+                                    // We only buffer if it's very likely the start of a protocol tag
+                                    const potentialStarts = ['[[tool', '[[END]]'];
                                     let splitPoint = -1;
                                     for (const start of potentialStarts) {
                                         for (let len = start.length - 1; len > 0; len--) {
@@ -2194,10 +2204,25 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 }
                             } else {
-                                const endTag = activeBufferType === 'tool' ? ')]' : '[[END]]';
+                                const endTag = activeBufferType === 'tool' ? ']]' : '[[END]]';
                                 const combined = toolCallBuffer + remaining;
-                                const endIdx = combined.indexOf(endTag);
 
+                                // [HEURISTIC] If we're buffering a tool call but it doesn't match the protocol prefix, FLUSH.
+                                // This prevents vanishing output when the model writes code like `[some_array]` or `| [ ] |`.
+                                if (activeBufferType === 'tool') {
+                                    const protocolPrefix = '[[tool:functions.';
+                                    // If we have enough chars to check the prefix and it doesn't match, or if it doesn't even start with '[[tool'
+                                    if (!combined.startsWith('[[tool') || (combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix))) {
+                                        msgs.push({ type: 'text', content: combined });
+                                        toolCallBuffer = '';
+                                        isBufferingToolCall = false;
+                                        activeBufferType = null;
+                                        remaining = '';
+                                        break;
+                                    }
+                                }
+
+                                const endIdx = combined.indexOf(endTag);
                                 if (endIdx !== -1) {
                                     const fullMatch = combined.substring(0, endIdx + endTag.length);
                                     msgs.push({ type: 'text', content: fullMatch });
@@ -2207,11 +2232,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     remaining = combined.substring(endIdx + endTag.length);
                                 } else {
                                     // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
-                                    // Flush current buffer if it exceeds 512 chars, then continue buffering.
+                                    // Flush current buffer if it exceeds 512 chars
                                     const MAX_BUFFER = 512;
                                     if (combined.length > MAX_BUFFER) {
                                         msgs.push({ type: 'text', content: combined });
                                         toolCallBuffer = '';
+                                        isBufferingToolCall = false; // Give up on this "tool call"
                                     } else {
                                         toolCallBuffer = combined;
                                     }
@@ -2274,13 +2300,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (chunkText) {
                             if (isDedupeActive) {
                                 dedupeBuffer += chunkText;
-                                // Wait for a small window to find a reliable overlap
-                                if (dedupeBuffer.length >= 30) {
+                                // Wait for a more substantial window to find a reliable overlap
+                                // 64 chars is usually enough to avoid false positives on common syntax/punctuation
+                                if (dedupeBuffer.length >= 64) {
                                     let overlapLen = 0;
                                     const maxPossibleOverlap = Math.min(accumulatedContext.length, dedupeBuffer.length);
 
                                     // Find the longest overlap between end of context and start of new buffer
-                                    for (let len = maxPossibleOverlap; len > 0; len--) {
+                                    // We start from 10 chars to avoid tiny, noisy overlaps (like " / ")
+                                    for (let len = maxPossibleOverlap; len >= 10; len--) {
                                         if (accumulatedContext.endsWith(dedupeBuffer.substring(0, len))) {
                                             overlapLen = len;
                                             break;
@@ -2508,12 +2536,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             while (allToolsFound.length > toolCallPointer) {
                                 // [ORDER PROTECTION] - Flush any pending Google text BEFORE tool execution
                                 // This ensures the tool call text reaches the frontend before the tool result packet.
-                                if (aiProvider === 'Google' && pendingGoogleText) {
-                                    const msgs = getBufferedMessages(pendingGoogleText);
-                                    for (const m of msgs) yield m;
-                                    pendingGoogleText = '';
-                                    lastGoogleFlushTime = Date.now();
-                                }
+                                yield* flushGoogleBuffer();
 
                                 const toolCall = allToolsFound[toolCallPointer];
                                 const executionStart = Date.now();
@@ -2620,8 +2643,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
                                             await new Promise(resolve => setTimeout(resolve, 50));
                                             if (settings.onExecEnd) settings.onExecEnd();
-                                            toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
-                                            yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
+                                            toolResults.push({ role: 'user', text: `[[TOOL RESULT]]: ERROR: ${denyMsg}` });
+                                            yield { type: 'tool_result', content: `[[TOOL RESULT]]: ERROR: ${denyMsg}` };
                                             toolCallPointer++;
                                             continue;
                                         }
@@ -2647,8 +2670,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
                                             yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                                         }
-                                        toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
-                                        yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
+                                        toolResults.push({ role: 'user', text: `[[TOOL RESULT]]: ERROR: ${denyMsg}` });
+                                        yield { type: 'tool_result', content: `[[TOOL RESULT]]: ERROR: ${denyMsg}` };
                                         toolCallPointer++;
                                         continue;
                                     }
@@ -2776,7 +2799,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             } else {
                                                                 const { patchPairs: patches, error: parseError } = parsePatchPairs(toolArgs);
                                                                 if (parseError) {
-                                                                    const errorMsg = `[TOOL RESULT]: ERROR: ${parseError}`;
+                                                                    const errorMsg = `[[TOOL RESULT]]: ERROR: ${parseError}`;
                                                                     toolResults.push({ role: 'user', text: errorMsg });
                                                                     await incrementUsage('toolFailure');
                                                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
@@ -2795,7 +2818,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 const successes = patchResults.filter(r => r.success);
                                                                 const failures = patchResults.filter(r => !r.success);
                                                                 if (successes.length === 0) {
-                                                                    const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
+                                                                    const errorMsg = `[[TOOL RESULT]]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
                                                                     const errorLabel = `💾 Edited: ${path.basename(absPath)}`.toUpperCase();
@@ -2944,7 +2967,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\n[SYSTEM] Check if Starting and Ending matches your write.`;
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\n[[SYSTEM]] Check if Starting and Ending matches your write.`;
                                             }
 
                                             // Restore UI feedback
@@ -2960,7 +2983,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             lastToolFinishedAt = toolEnd;
                                             yield { type: 'tool_time', content: toolEnd - executionStart };
 
-                                            const aiContent = `[TOOL RESULT]: ${result}`;
+                                            const aiContent = `[[TOOL RESULT]]: ${result}`;
                                             toolResults.push({ role: 'user', text: aiContent });
                                             anyToolExecutedInThisTurn = true;
                                             await incrementUsage('toolSuccess');
@@ -2998,8 +3021,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 await new Promise(resolve => setTimeout(resolve, 50));
                                                 if (settings.onExecEnd) settings.onExecEnd();
                                             }
-                                            toolResults.push({ role: 'user', text: `[TOOL RESULT]: DENIED: ${denyMsg}` });
-                                            yield { type: 'tool_result', content: `[TOOL RESULT]: DENIED: ${denyMsg}` };
+                                            toolResults.push({ role: 'user', text: `[[TOOL RESULT]]: DENIED: ${denyMsg}` });
+                                            yield { type: 'tool_result', content: `[[TOOL RESULT]]: DENIED: ${denyMsg}` };
                                             await incrementUsage('toolDenied');
                                             if (settings.onToolResult) settings.onToolResult('denied', normToolName);
                                             toolCallPointer++;
@@ -3112,13 +3135,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[UI_CONTEXT]')).join('\n')}`;
+                                const aiContent = `[[TOOL RESULT]]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[[UI_CONTEXT]]')).join('\n')}`;
                                 toolResults.push({ role: 'user', text: aiContent, binaryPart });
                                 anyToolExecutedInThisTurn = true;
 
-                                let uiContent = `[TOOL RESULT]: ${result || ''}`;
-                                if (normToolName === 'view_file' || normToolName === 'web_scrape') {
-                                    uiContent = `[TOOL RESULT]: ${label} (Context Locked for UI Clarity)`;
+                                let uiContent = `[[TOOL RESULT]]: ${result || ''}`;
+                                if (normToolName === 'view_file' || normToolName === 'web_scrape' || normToolName === 'file_map') {
+                                    uiContent = `[[TOOL RESULT]]: ${label} (Context Locked for UI Clarity)`;
                                 }
 
                                 yield { type: 'tool_result', content: uiContent, aiContent: aiContent, binaryPart, toolName: normToolName };
@@ -3186,11 +3209,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         dedupeBuffer = '';
                     }
 
-                    if (aiProvider === 'Google' && pendingGoogleText) {
-                        const msgs = getBufferedMessages(pendingGoogleText);
-                        for (const m of msgs) yield m;
-                        pendingGoogleText = '';
-                    }
+                    yield* flushGoogleBuffer();
 
                     if (TERMINATION_SIGNAL) break;
 
@@ -3311,7 +3330,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block with </think> if opened\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff";
+                                const recoveryText = "[[SYSTEM]]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block with </think> if opened\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
@@ -3449,9 +3468,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } else {
                 if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure` });
+                    modifiedHistory.push({ role: 'user', text: `[[SYSTEM]] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`}` });
+                    modifiedHistory.push({ role: 'user', text: `[[SYSTEM]] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`}` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;
@@ -3463,9 +3482,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // [JIT CLEANUP] - Clean up JIT instruction injection markers from the persistent history
         if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google") {
             modifiedHistory.forEach(msg => {
-                if (msg.role === 'user' && msg.text && msg.text.startsWith('[TOOL RESULT]')) {
-                    const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn`;
-                    const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**`;
+                if (msg.role === 'user' && msg.text && msg.text.startsWith('[[TOOL RESULT]]')) {
+                    const jitInstructionFast = `\n[[SYSTEM]] Tool result received. Analyze output and proceed with your turn`;
+                    const jitInstructionThinking = `\n[[SYSTEM]] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**`;
                     msg.text = msg.text.replace(jitInstructionThinking, '').replace(jitInstructionFast, '').trim();
                 }
             });
@@ -3477,6 +3496,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const agentErrDir = path.join(LOGS_DIR, 'agent');
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
         fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err instanceof Error ? err.stack : err}\n\n----------------------------------------------------------------------\n\n`);
+
+        if (typeof flushGoogleBuffer === 'function') {
+            yield* flushGoogleBuffer();
+        }
 
         yield { type: 'tool_result', content: `ERROR: [INTERNAL CRITICAL] ${errorMsg}` };
     } finally {

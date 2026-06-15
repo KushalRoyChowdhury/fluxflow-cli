@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 // Simple XOR Key - In a real app, this would be more complex
 const XOR_KEY = 0x42;
-const bypass = false;
+const bypass = true;
 
 const xorTransform = (data) => {
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
