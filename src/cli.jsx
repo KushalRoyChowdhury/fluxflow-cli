@@ -88,6 +88,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /reset                                   Wipe all project data
   /about                                   Project info & credits
   /changelog                               View latest updates
+  /docs                                    View documentation
   /fluxflow init                           Create FluxFlow.md template
   /update check                            Check for new version
   /update latest                           Install latest release`);
@@ -154,7 +155,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                             const CustomItem = ({ label, isSelected }) => {
                                 return (
                                     <Box width="100%">
-                                        <Text color={isSelected ? 'cyan' : 'gray'} bold={isSelected}>
+                                        <Text bold={isSelected}>
                                             └─ {isSelected ? '\x1b[32m●\x1b[0m' : '○'} {label}
                                         </Text>
                                     </Box>
@@ -236,7 +237,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                         // settings.js not found or failed to load
                     }
 
-                    if (!manager) {
+                    if (true) {
                         const result = await promptPackageManager();
                         manager = result.manager;
                         customCommand = result.customCommand;

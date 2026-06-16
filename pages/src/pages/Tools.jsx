@@ -13,26 +13,26 @@ export default function Tools() {
         <DocPage headings={headings}>
             <h1 id="tools-capabilities">Tools & Capabilities</h1>
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
-                FluxFlow provides a robust set of tools that allow the AI agent to interact 
+                FluxFlow provides a robust set of tools that allow the AI agent to interact
                 with your file system, execute code, and research the web autonomously.
             </p>
 
             <h2 id="protocol">Tool Protocol</h2>
             <p>
-                FluxFlow uses a transparent, string-based protocol for tool dispatching. 
-                When the agent needs to perform an action, it emits a specifically 
+                FluxFlow uses a transparent, string-based protocol for tool dispatching.
+                When the agent needs to perform an action, it emits a specifically
                 formatted string in its response:
             </p>
             <pre><code>[[tool:functions.ToolName(arg1="value", arg2=123)]]</code></pre>
             <p>
-                The agent core utilizes a custom bracket-balancing parser to detect these 
-                calls, pauses the reasoning loop, executes the tool, and returns the 
+                The agent core utilizes a custom bracket-balancing parser to detect these
+                calls, pauses the reasoning loop, executes the tool, and returns the
                 result to the model as a <code>[TOOL RESULT]</code> block.
             </p>
 
             <h2 id="availability">Availability by Mode</h2>
             <p>
-                To ensure safety and performance, tool availability is strictly enforced 
+                To ensure safety and performance, tool availability is strictly enforced
                 based on the active operating mode:
             </p>
             <table>
@@ -87,7 +87,7 @@ export default function Tools() {
                 <li><strong><code>ReadFolder</code></strong> — Lists directory contents with detailed statistics and metadata.</li>
                 <li><strong><code>SearchKeyword</code></strong> — Performs global project search with line-number precision.</li>
                 <li><strong><code>Run</code></strong> — Executes shell commands directly in the terminal (PowerShell/Bash).</li>
-                <li><strong><code>Todo</code></strong> — Manages a persistent <code>todo.md</code> plan for the session. Supports <code>create</code>, <code>append</code>, and <code>check</code>.</li>
+                <li><strong><code>Todo</code></strong> — Manages a persistent <code>todo.md</code> plan for the session. Supports <code>create</code>, <code>append</code>, and <code>read</code>.</li>
             </ul>
 
             <h2 id="web-tools">Web & Research Tools</h2>

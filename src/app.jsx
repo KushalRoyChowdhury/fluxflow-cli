@@ -99,10 +99,10 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
             <Box marginBottom={1} width={Math.min(80, width - 4)} justifyContent="flex-start">
                 <Text>{getFluxLogo(versionFluxflow)}</Text>
             </Box>
-            <Box flexDirection="column" borderStyle="double" borderColor="cyan" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
-                <Text bold color="cyan" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
+            <Box flexDirection="column" borderStyle="double" borderColor="grey" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
+                <Text bold color="white" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
                 <Box marginY={1} flexDirection="column" alignItems="left">
-                    <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="magenta">FluxFlow-CLI Companion</Text> is not installed.</Text>
+                    <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="white">FluxFlow-CLI Companion</Text> is not installed.</Text>
                     <Box flexDirection="column" marginY={1}>
                         <Text color="gray">  ✅ Real-time file & cursor tracking</Text>
                         <Text color="gray">  ✅ Auto-open files created by agent</Text>
@@ -137,6 +137,7 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
+const DOCS_URL = '';
 let linesAdded = 0;
 let linesRemoved = 0;
 
@@ -2149,6 +2150,23 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
+                    });
+                    break;
+                }
+                case '/docs': {
+                    if (!DOCS_URL) {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Documentation URL is not configured.`, isMeta: true }];
+                        });
+                        break;
+                    }
+                    const platform = process.platform;
+                    const command = platform === 'win32' ? 'start' : platform === 'darwin' ? 'open' : 'xdg-open';
+                    exec(`${command} ${DOCS_URL}`);
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening documentation: ${DOCS_URL}`, isMeta: true }];
                     });
                     break;
                 }

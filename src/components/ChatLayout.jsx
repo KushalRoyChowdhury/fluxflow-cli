@@ -767,6 +767,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/reset', desc: 'Wipe all project data' },
             { cmd: '/about', desc: 'Project info & credits' },
             { cmd: '/changelog', desc: 'View latest updates' },
+            { cmd: '/docs', desc: 'View documentation' },
             { cmd: '/fluxflow', desc: 'Project management' },
             { cmd: '/update', desc: 'Check/Install updates' }
         ];
