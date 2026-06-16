@@ -91,7 +91,7 @@ var XOR_KEY, bypass, xorTransform, AES_ALGORITHM, AES_KEY, encryptAes, decryptAe
 var init_crypto = __esm({
   "src/utils/crypto.js"() {
     XOR_KEY = 66;
-    bypass = true;
+    bypass = false;
     xorTransform = (data) => {
       const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
       const result = Buffer.alloc(buffer.length);
@@ -2166,7 +2166,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT FOR RUN**
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS, NO MD CHECKBOXES], markDone=[ARRAY OF TASK STRINGS, NO MD CHECKBOXES])]. Internal TODO List. Usage: LONG MULTISTEP TASKS TO KEEP GOAL CONSISTENT. 'tasks' & 'markDone' are OPTIONAL WITH method 'get'. TO MARK DONE USE 'get' method WITH 'markDone'. MUST UPDATE TASKS AS SOON AS COMPLETION`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS, NO MD CHECKBOXES], markDone=[ARRAY OF TASK STRINGS, NO MD CHECKBOXES])]. Internal TODO List. Usage: MUST FOR LONG MULTISTEP TASKS TO KEEP GOAL CONSISTENT. 'tasks' & 'markDone' are OPTIONAL WITH method 'get'. TO MARK DONE USE 'get' method WITH 'markDone'. MUST UPDATE TASKS AS SOON AS COMPLETION`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -6292,8 +6292,7 @@ var init_ai = __esm({
         model,
         messages,
         stream: true,
-        stream_options: { include_usage: true },
-        temperature: mode === "Flux" ? 0.85 : 1.2
+        stream_options: { include_usage: true }
       };
       if (thinkingLevel !== "Fast") {
         const reasoningEffortMap = {
@@ -6437,7 +6436,6 @@ var init_ai = __esm({
       const body = {
         model,
         messages,
-        temperature: mode === "Flux" ? 0.8 : 1.2,
         max_tokens: maxTokens,
         stream: true,
         stream_options: { include_usage: true }
@@ -6590,8 +6588,7 @@ var init_ai = __esm({
       const requestPayload = {
         model,
         messages,
-        stream: true,
-        temperature: mode === "Flux" ? 0.75 : 1.2
+        stream: true
       };
       const effort = reasoningEffortMap[thinkingLevel];
       if (effort && thinkingLevel !== "Fast") {
@@ -8004,7 +8001,6 @@ ${activeSummaryBlock}${thinkingLevel != "Fast" && aiProvider === "Google" ? `${m
                   contents: activeContents,
                   config: {
                     systemInstruction: currentSystemInstruction,
-                    temperature: mode === "Flux" ? 0.95 : 1.2,
                     mediaResolution: "MEDIA_RESOLUTION_MEDIUM",
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
