@@ -4,7 +4,7 @@ import { navItems } from '../data/navigation'
 
 export default function Sidebar() {
     return (
-        <aside className="hidden lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300">
+        <aside className="hidden select-none lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300">
             <div className="p-8">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -18,7 +18,7 @@ export default function Sidebar() {
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">FluxFlow</h1>
-                        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest -mt-1">Framework</p>
+                        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest -mt-1">CLI Agent</p>
                     </div>
                 </motion.div>
                 <nav className="space-y-8">
@@ -59,7 +59,7 @@ export default function Sidebar() {
                     ))}
                 </nav>
 
-                <div className="mt-12 pt-8 border-t border-slate-100 dark:border-white/5">
+                <div className="pt-3.5 border-t border-slate-100 dark:border-white/5 absolute bottom-3.5 w-[80%]">
                     <a
                         href="/changelog"
                         className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"

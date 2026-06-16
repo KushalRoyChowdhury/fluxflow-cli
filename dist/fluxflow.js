@@ -1847,6 +1847,7 @@ var init_ChatLayout = __esm({
           { cmd: "/reset", desc: "Wipe all project data" },
           { cmd: "/about", desc: "Project info & credits" },
           { cmd: "/changelog", desc: "View latest updates" },
+          { cmd: "/docs", desc: "View documentation" },
           { cmd: "/fluxflow", desc: "Project management" },
           { cmd: "/update", desc: "Check/Install updates" }
         ];
@@ -11315,6 +11316,7 @@ function App({ args = [] }) {
     { cmd: "/reset", desc: "Wipe all project data" },
     { cmd: "/about", desc: "Project info & credits" },
     { cmd: "/changelog", desc: "View latest updates" },
+    { cmd: "/docs", desc: "View Documentation" },
     {
       cmd: "/fluxflow",
       desc: "Project management",
@@ -11817,6 +11819,23 @@ ${list || "No saved chats found."}`, isMeta: true }];
           setMessages((prev) => {
             setCompletedIndex(prev.length + 1);
             return [...prev, { id: Date.now(), role: "system", text: `[BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
+          });
+          break;
+        }
+        case "/docs": {
+          if (!DOCS_URL) {
+            setMessages((prev) => {
+              setCompletedIndex(prev.length + 1);
+              return [...prev, { id: Date.now(), role: "system", text: `[BROWSER] Documentation URL is not configured.`, isMeta: true }];
+            });
+            break;
+          }
+          const platform = process.platform;
+          const command = platform === "win32" ? "start" : platform === "darwin" ? "open" : "xdg-open";
+          exec2(`${command} ${DOCS_URL}`);
+          setMessages((prev) => {
+            setCompletedIndex(prev.length + 1);
+            return [...prev, { id: Date.now(), role: "system", text: `[BROWSER] Opening documentation: ${DOCS_URL}`, isMeta: true }];
           });
           break;
         }
@@ -13237,7 +13256,7 @@ Selection: ${val}`,
     return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, chatId)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", sessionToolSuccess), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", sessionToolFailure), " )")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, successRate, "%")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 16 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var getIDEName, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles;
+var getIDEName, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_MultilineInput();
@@ -13314,11 +13333,12 @@ var init_app = __esm({
           height
         },
         /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React14.createElement(Text14, null, getFluxLogo(versionFluxflow))),
-        /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "cyan", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React14.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React14.createElement(Text14, null, "You're in ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "magenta" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Real-time file & cursor tracking"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native DIFF viewer for AI edits"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React14.createElement(Box14, { key: i }, /* @__PURE__ */ React14.createElement(Text14, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
+        /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React14.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React14.createElement(Text14, null, "You're in ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Real-time file & cursor tracking"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native DIFF viewer for AI edits"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React14.createElement(Box14, { key: i }, /* @__PURE__ */ React14.createElement(Text14, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
       );
     };
     SESSION_START_TIME = Date.now();
-    CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog.html";
+    CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog";
+    DOCS_URL = "https://fluxflow-cli.onrender.com/";
     linesAdded = 0;
     linesRemoved = 0;
     packageJsonPath = path20.join(path20.dirname(fileURLToPath(import.meta.url)), "../package.json");
@@ -13522,6 +13542,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   /reset                                   Wipe all project data
   /about                                   Project info & credits
   /changelog                               View latest updates
+  /docs                                    View documentation
   /fluxflow init                           Create FluxFlow.md template
   /update check                            Check for new version
   /update latest                           Install latest release`);

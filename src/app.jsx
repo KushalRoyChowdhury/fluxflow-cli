@@ -136,8 +136,8 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
 
 // 1. RAW JS SESSION TRACKER (Vanilla JS for zero-render overhead)
 const SESSION_START_TIME = Date.now();
-const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog.html';
-const DOCS_URL = '';
+const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog';
+const DOCS_URL = 'https://fluxflow-cli.onrender.com/';
 let linesAdded = 0;
 let linesRemoved = 0;
 
@@ -1608,6 +1608,7 @@ export default function App({ args = [] }) {
         { cmd: '/reset', desc: 'Wipe all project data' },
         { cmd: '/about', desc: 'Project info & credits' },
         { cmd: '/changelog', desc: 'View latest updates' },
+        { cmd: '/docs', desc: 'View Documentation' },
         {
             cmd: '/fluxflow', desc: 'Project management', subs: [
                 { cmd: 'init', desc: 'Create FluxFlow.md template' }

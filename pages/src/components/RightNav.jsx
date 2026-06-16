@@ -35,7 +35,7 @@ export default function RightNav() {
     if (headings.length === 0) return null
 
     return (
-        <aside className="w-64 sticky top-0 h-screen overflow-y-auto py-12 pr-6">
+        <aside className="w-64 select-none sticky top-0 h-screen overflow-y-auto py-12 pr-6">
             <p className="text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em] mb-4 ml-4">
                 On this page
             </p>

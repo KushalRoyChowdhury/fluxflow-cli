@@ -7,7 +7,7 @@ export default function MobileNav() {
     const [open, setOpen] = useState(false)
 
     return (
-        <div className="lg:hidden sticky top-0 z-40 transition-colors duration-300">
+        <div className="lg:hidden sticky top-0 z-40 transition-colors duration-300 select-none">
             <div className="flex items-center justify-between px-4 py-3 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-slate-200 dark:border-white/10">
                 <div className="flex items-center gap-2">
                     <div className="w-7 h-7 bg-blue-600 rounded flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -96,7 +96,7 @@ export default function MobileNav() {
                                 ))}
                             </nav>
 
-                            <div className="mt-12 pt-8 border-t border-slate-100 dark:border-white/5">
+                            <div className="pt-3.5 w-[80%] absolute bottom-3.5 border-t border-slate-100 dark:border-white/5">
                                 <a
                                     href="/changelog"
                                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"
