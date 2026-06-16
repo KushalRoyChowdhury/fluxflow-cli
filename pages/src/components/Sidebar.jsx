@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { navItems } from '../data/navigation'
+import Search from './Search'
 
 export default function Sidebar() {
     return (
-        <aside className="hidden select-none lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300">
+        <aside className="hidden lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300">
             <div className="p-8">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -18,9 +19,12 @@ export default function Sidebar() {
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">FluxFlow</h1>
-                        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest -mt-1">CLI Agent</p>
+                        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest -mt-1">Framework</p>
                     </div>
                 </motion.div>
+
+                <Search />
+
                 <nav className="space-y-8">
                     {navItems.map((section, sIdx) => (
                         <motion.div

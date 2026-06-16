@@ -1534,7 +1534,7 @@ export default function App({ args = [] }) {
                             },
                             {
                                 cmd: 'google/diffusiongemma-26b-a4b-it',
-                                desc: ''
+                                desc: 'Mega Fast [Experimental]'
                             },
                             {
                                 cmd: 'minimaxai/minimax-m3',
@@ -2027,6 +2027,8 @@ export default function App({ args = [] }) {
                                 .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
                                 .replace(/\[\[END\]\]/gi, '')
                                 .replace(/\[\[TOOL RESULTS\]\]/gi, '')
+                                .replace(/\[TOOL RESULTS\]/gi, '')
+                                .replace(/\[TOOL RESULT\]/gi, '')
                                 .trim();
                             if (cleanThinkText) {
                                 exportLines.push('[thoughts]');
@@ -2046,13 +2048,15 @@ export default function App({ args = [] }) {
                                         .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
                                         .replace(/\[\[END\]\]/gi, '')
                                         .replace(/\[\[TOOL RESULTS\]\]/gi, '')
+                                        .replace(/\[TOOL RESULTS\]/gi, '')
+                                        .replace(/\[TOOL RESULT\]/gi, '')
                                         .trim();
                                     if (cleanContent) {
                                         exportLines.push('[output]');
                                         exportLines.push(cleanContent);
                                     }
                                 } else if (block.type === 'tool') {
-                                    exportLines.push('[[tool]]');
+                                    exportLines.push('[tool]');
                                     exportLines.push(`${block.toolName} ${block.args}`);
                                 }
                             }
@@ -2343,9 +2347,9 @@ export default function App({ args = [] }) {
                         }
 
                         // Group consecutive tool results
-                        if (m.role === 'system' && text?.startsWith('[[TOOL RESULT]]')) {
+                        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
                             const prev = cleanHistoryForAI[cleanHistoryForAI.length - 1];
-                            if (prev && prev.role === 'system' && prev.text?.startsWith('[[TOOL RESULT]]')) {
+                            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
                                 prev.text += '\n\n' + text;
                                 return;
                             }
@@ -2626,11 +2630,11 @@ export default function App({ args = [] }) {
                                 let removed = 0;
                                 let insideDiff = false;
                                 for (const line of diffLines) {
-                                    if (line.includes('[[DIFF_START]]')) {
+                                    if (line.includes('[DIFF_START]')) {
                                         insideDiff = true;
                                         continue;
                                     }
-                                    if (line.includes('[[DIFF_END]]')) {
+                                    if (line.includes('[DIFF_END]')) {
                                         insideDiff = false;
                                         continue;
                                     }
@@ -2688,7 +2692,7 @@ export default function App({ args = [] }) {
                             // [HARDENING] Reset balance and look for outer bracket in context
                             toolCallBalance = 0;
                             inToolCallString = null;
-                            if (chunkText.includes('[[tool:functions.')) toolCallBalance = 0; // The '[' will be counted in the loop
+                            if (chunkText.includes('[tool:functions.')) toolCallBalance = 0; // The '[' will be counted in the loop
                         }
 
                         if (inToolCall) {

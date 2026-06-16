@@ -23,11 +23,11 @@ export default function Tools() {
                 When the agent needs to perform an action, it emits a specifically
                 formatted string in its response:
             </p>
-            <pre><code>[[tool:functions.ToolName(arg1="value", arg2=123)]]</code></pre>
+            <pre><code>[tool:functions.ToolName(arg1="value", arg2=123)]</code></pre>
             <p>
                 The agent core utilizes a custom bracket-balancing parser to detect these
                 calls, pauses the reasoning loop, executes the tool, and returns the
-                result to the model as a <code>[TOOL RESULT]</code> block.
+                result to the model as a <code>[[TOOL RESULT]]</code> block.
             </p>
 
             <h2 id="availability">Availability by Mode</h2>

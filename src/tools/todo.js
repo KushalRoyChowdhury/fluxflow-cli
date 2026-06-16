@@ -8,7 +8,7 @@ import { DATA_DIR } from '../utils/paths.js';
  * Manages a persistent markdown checkbox list for a specific chat.
  * Location: DATA_DIR/plan/<chat-id>/todo.md
  * 
- * [[tool:functions.Todo(method="create/append/get", tasks=["task 1", "task 2"], markDone=["task 1"])]]
+ * [tool:functions.Todo(method="create/append/get", tasks=["task 1", "task 2"], markDone=["task 1"])]
  */
 export const todo = async (args, context = {}) => {
     const { method, tasks, markDone } = parseArgs(args);

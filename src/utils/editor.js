@@ -108,8 +108,8 @@ export const highlightDiffInEditor = (filePath, diffText) => {
 
     let inDiffBlock = false;
     for (const line of lines) {
-        if (line.includes('[[DIFF_START]]')) { inDiffBlock = true; continue; }
-        if (line.includes('[[DIFF_END]]')) { inDiffBlock = false; continue; }
+        if (line.includes('[DIFF_START]')) { inDiffBlock = true; continue; }
+        if (line.includes('[DIFF_END]')) { inDiffBlock = false; continue; }
 
         if (inDiffBlock) {
             // More robust matching: handle whitespace and ensure we get the full number

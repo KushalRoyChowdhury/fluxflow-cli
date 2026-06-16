@@ -278,7 +278,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     const allLinesOriginal = originalContent.split(/\r?\n/);
     const allLinesFinal = finalContent.split(/\r?\n/);
 
-    let diffText = `[[DIFF_START]]\n`;
+    let diffText = `[DIFF_START]\n`;
     const separatorLine = '═'.repeat(88);
 
     // We track where we are in the final content to ensure line numbers are smooth
@@ -295,7 +295,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             const contextStart = Math.max(0, res.originalStartLine - 4);
             currentFinalLineIdx = contextStart;
             while (currentFinalLineIdx < res.originalStartLine - 1) {
-                diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                 currentFinalLineIdx++;
             }
         } else {
@@ -307,22 +307,22 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
                 // Large gap: Show 3 lines of context after prev, then separator, then 3 lines before current
                 let afterLimit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
                 while (currentFinalLineIdx < afterLimit) {
-                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
-                diffText += `[[UI_CONTEXT]] ${separatorLine}\n`;
+                diffText += `[UI_CONTEXT] ${separatorLine}\n`;
 
                 // Jump to context before current patch
                 const beforeStart = Math.max(currentFinalLineIdx, res.originalStartLine - 4);
                 currentFinalLineIdx = beforeStart;
                 while (currentFinalLineIdx < res.originalStartLine - 1) {
-                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             } else {
                 // Small gap: Simply fill the lines between patches
                 while (currentFinalLineIdx < res.originalStartLine - 1) {
-                    diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             }
@@ -368,11 +368,11 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     if (lastSuccessfulHunk !== null) {
         let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
         while (currentFinalLineIdx < limit) {
-            diffText += `[[UI_CONTEXT]]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+            diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
             currentFinalLineIdx++;
         }
     }
 
-    diffText += `[[DIFF_END]]`;
+    diffText += `[DIFF_END]`;
     return diffText;
 };

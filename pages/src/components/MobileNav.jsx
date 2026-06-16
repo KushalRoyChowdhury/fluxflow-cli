@@ -96,7 +96,7 @@ export default function MobileNav() {
                                 ))}
                             </nav>
 
-                            <div className="pt-3.5 w-[80%] absolute bottom-3.5 border-t border-slate-100 dark:border-white/5">
+                            <div className="mt-12 pt-8 border-t border-slate-100 dark:border-white/5">
                                 <a
                                     href="/changelog"
                                     className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white"

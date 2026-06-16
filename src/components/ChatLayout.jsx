@@ -38,10 +38,8 @@ const cleanSignals = (text) => {
 
     let result = text
         .replace(/<\/think>(\r?\n){2}/gi, '</think>')
-        .replace(/(\r?\n){2}(?=\[\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
-
-    // Use the full protocol prefix with double brackets
-    const trigger = '[[tool:functions.';
+        .replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
+    const trigger = 'tool:functions.';
 
     // Greedy loop to strip all tool calls
     while (true) {
@@ -49,7 +47,18 @@ const cleanSignals = (text) => {
         let triggerIdx = lowerResult.indexOf(trigger);
         if (triggerIdx === -1) break;
 
+        // [HARDENING] Check for outer bracket
         let startIdx = triggerIdx;
+        let hasOuterBracket = false;
+
+        // Look back for '[' (ignoring whitespace)
+        let k = triggerIdx - 1;
+        while (k >= 0 && /\s/.test(result[k])) k--;
+        if (k >= 0 && result[k] === '[') {
+            startIdx = k;
+            hasOuterBracket = true;
+        }
+
         let balance = 0;
         let foundStart = false;
         let inString = null;
@@ -75,14 +84,15 @@ const cleanSignals = (text) => {
             }
 
             if (foundStart && balance === 0 && !inString) {
-                // Look for closing ']]'
+                // If we have outer bracket, look for closing ']'
                 let endIdx = j;
-                let m = j + 1;
-                while (m < result.length && /\s/.test(result[m])) m++;
-                if (m < result.length && result[m] === ']' && result[m + 1] === ']') {
-                    endIdx = m + 1;
+                if (hasOuterBracket) {
+                    let m = j + 1;
+                    while (m < result.length && /\s/.test(result[m])) m++;
+                    if (m < result.length && result[m] === ']') {
+                        endIdx = m;
+                    }
                 }
-
                 result = result.substring(0, startIdx) + result.substring(endIdx + 1);
                 break;
             }
@@ -100,15 +110,15 @@ const cleanSignals = (text) => {
 
     // Secondary cleanup for protocol signals and success/error markers
     return result
-        .replace(/\[\[TOOL RESULT\]\]:?\s*/gi, '')
+        .replace(/\[TOOL RESULT\]:?\s*/gi, '')
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')
-        .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
+        .replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
         .replace(/\[\[END\]\]/gi, '')
-        .replace(/\[\[\s*turn\s*:?.*?$/gi, '')
+        .replace(/\[\s*turn\s*:?.*?$/gi, '')
         .replace(/\n\s*turn\s*:?.*?$/gi, '')
-        .replace(/\[\[\s*$/gi, '')
+        .replace(/\[\s*$/gi, '')
         .replace(/\n\nResponded on .*/g, '')
         .replace(/\n\n\[Prompted on: .*\]/g, '')
         .replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
@@ -424,14 +434,14 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
 });
 
 const DiffLine = React.memo(({ line, columns = 80 }) => {
-    const isContext = line.includes('[[UI_CONTEXT]]');
-    const cleanLine = line.replace('[[UI_CONTEXT]]', '');
+    const isContext = line.includes('[UI_CONTEXT]');
+    const cleanLine = line.replace('[UI_CONTEXT]', '');
 
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
         return (
             <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
-                <Text color="gray" dimColor>{'═'.repeat(Math.max(10, columns - 4))}</Text>
+                <Text color="gray">{'═'.repeat(Math.max(10, columns - 4))}</Text>
             </Box>
         );
     }
@@ -445,19 +455,11 @@ const DiffLine = React.memo(({ line, columns = 80 }) => {
     const rest = cleanLine.substring(1);
     const splitIdx = rest.indexOf('|');
 
-    // If no separator is found, treat the whole line as content (unless it's just a marker)
-    let lineNum = '';
-    let content = cleanLine;
-
-    if (splitIdx !== -1) {
-        lineNum = rest.substring(0, splitIdx).trim();
-        content = rest.substring(splitIdx + 1);
-    } else if (isRemoval || isAddition) {
-        content = rest;
-    }
+    const lineNum = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
+    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
 
     const bgColor = isRemoval ? '#3a0c0c' : isAddition ? '#0c3a1a' : '#1a1a1a';
-    const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : isContext ? 'gray' : 'white';
+    const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : isContext ? 'white' : 'white';
     const numColor = isRemoval ? '#cf3a3a' : isAddition ? '#3acf65' : 'gray';
 
     return (
@@ -476,12 +478,12 @@ const DiffLine = React.memo(({ line, columns = 80 }) => {
 });
 
 const DiffBlock = React.memo(({ text, columns = 80 }) => {
-    const match = text.match(/\[\[DIFF_START\]\]([\s\S]*?)\[\[DIFF_END\]\]/);
-    const diffBody = match ? match[1].trim() : text.replace('[[DIFF_START]]', '').trim();
+    const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
+    const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
     return (
-        <Box flexDirection="column" width={columns - 3} marginBottom={1} marginTop={1}>
+        <Box flexDirection="column" width={columns - 3} marginBottom={0}>
             <Box flexDirection="column" backgroundColor="#1a1a1a" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
                     <DiffLine key={i} line={line} columns={columns - 3} />
@@ -494,21 +496,9 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
 const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     if (!text) return null;
 
-    // SCENARIO 1: Surgical Diff [[DIFF_START]] (Now multi-part aware)
-    if (text.includes('[[DIFF_START]]')) {
-        const parts = text.split(/(\[\[DIFF_START\]\][\s\S]*?\[\[DIFF_END\]\])/g);
-        return (
-            <Box flexDirection="column" width={columns - 3}>
-                {parts.map((part, i) => {
-                    if (part.includes('[[DIFF_START]]')) {
-                        return <DiffBlock key={i} text={part} columns={columns} />;
-                    }
-                    if (!part.trim()) return null;
-                    // Pass the remaining text back through CodeRenderer logic (Scenarios 2-4)
-                    return <CodeRenderer key={i} text={part} columns={columns} />;
-                })}
-            </Box>
-        );
+    // SCENARIO 1: Surgical Diff [DIFF_START]
+    if (text.includes('[DIFF_START]')) {
+        return <DiffBlock text={text} columns={columns} />;
     }
 
     // SCENARIO 2: Write File Content Preview
@@ -518,7 +508,7 @@ const CodeRenderer = React.memo(({ text, columns = 80 }) => {
         const contentPart = mainParts[1] || '';
 
         // Split content from footer
-        const footerMarker = '[[SYSTEM]] Check if Starting and Ending matches';
+        const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
         const contentAndFooter = contentPart.split(footerMarker);
         const content = contentAndFooter[0]?.trim() || '';
         const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
@@ -613,10 +603,10 @@ const formatThinkingDuration = (ms) => {
 };
 
 export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, aiProvider, version }) => {
-    // Show tool results ONLY if they contain high-fidelity markers like [[DIFF_START]] or Content Preview
-    const isDiffResult = msg.role === 'system' && (msg.text?.includes('[[DIFF_START]]') || msg.text?.includes('- Content Preview:'));
-    const isPatchError = msg.role === 'system' && msg.text?.includes('[[TOOL RESULT]]: ERROR:') &&
-        !msg.text?.includes('[[DIFF_START]]') &&
+    // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
+    const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
+    const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
+        !msg.text?.includes('[DIFF_START]') &&
         (msg.toolName === 'update_file' || msg.text?.includes('Could not find exact match'));
     const isTerminalRecord = msg.isTerminalRecord;
     const isHomeWarning = msg.isHomeWarning;
@@ -628,7 +618,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                     <Box paddingX={1} backgroundColor="#3a0000">
                         <Text color="red" bold>{msg.text}</Text>
                     </Box>
-                    <Box paddingX={1} marginTop={1} marginBottom={1}>
+                    <Box paddingX={1} marginTop={0} marginBottom={0}>
                         <Text color="white">{msg.subText}</Text>
                     </Box>
                 </Box>
@@ -676,14 +666,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         );
     }
 
-    if (msg.role === 'system' && msg.text?.includes('[[TOOL RESULT]]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
+    if (msg.role === 'system' && msg.text?.includes('[TOOL RESULT]') && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
 
     if (msg.isImageStats) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={0} width="100%">
                     <Box paddingX={1} backgroundColor="#0e1b21">
-                        <Text color="cyan" bold>💳  IMAGE STATS</Text>
+                        <Text color="cyan" bold>💳 IMAGE STATS</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1} flexDirection="column">
                         {msg.text.split('\n').map((line, i) => (
@@ -701,7 +691,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         const s = emojiSpace(2);
 
         return (
-            <Box marginBottom={1} paddingX={1} width="100%">
+            <Box marginBottom={0} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
                         <Text color="cyan" bold>💬 AGENT REQUEST: RESOLVED</Text>
@@ -716,7 +706,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 
     if (msg.isAboutRecord) {
         return (
-            <Box marginBottom={1} paddingX={1} width="100%">
+            <Box marginBottom={0} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
                         <Text color="white" bold>ABOUT FLUX FLOW</Text>
@@ -801,7 +791,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         const outputList = outputMatch ? outputMatch[1] : '';
 
         return (
-            <Box marginBottom={1} paddingX={1} width="100%">
+            <Box marginBottom={0} paddingX={1} width="100%">
                 <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} isPty={isPty} />
             </Box>
         );
@@ -825,7 +815,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 
     return (
         // [SPACE POINT]
-        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 1} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
+        <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
                 <Box flexDirection="column" width="100%">
                     <Box width="100%" height={1} overflow="hidden">
