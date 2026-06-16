@@ -4,6 +4,8 @@ export const navItems = [
         children: [
             { title: 'Introduction', path: '/' },
             { title: 'Getting Started', path: '/getting-started' },
+            { title: 'Startup Arguments', path: '/startup-args' },
+            { title: 'App Commands', path: '/app-commands' },
         ],
     },
     {
@@ -11,6 +13,7 @@ export const navItems = [
         children: [
             { title: 'Architecture', path: '/architecture' },
             { title: 'Tools', path: '/tools' },
+            { title: 'Stable Models', path: '/models' },
         ],
     },
 ]
