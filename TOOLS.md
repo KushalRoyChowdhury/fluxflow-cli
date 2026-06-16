@@ -4,64 +4,92 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 
 ## Tool Availability by Mode
 
-| Tool | Flux Mode (Dev) | Flow Mode (Chat) |
+| Tool Category | Flux Mode (Dev) | Flow Mode (Chat) |
 | :--- | :---: | :---: |
-| **Web Search** | ✅ | ✅ |
-| **Web Scrape** | ✅ | ✅ |
-| **Write PDF** | ✅ | ❌ |
-| **Write DOCX** | ✅ | ❌ |
-| **View/Read Files** | ✅ | ❌ |
-| **Write/Update Files** | ✅ | ❌ |
-| **Execute Commands** | ✅ | ❌ |
+| **Communication (Ask)** | ✅ | ✅ |
+| **Web Search & Scrape** | ✅ | ✅ |
+| **File System (Read/Write)** | ✅ | ❌ |
+| **Terminal Execution** | ✅ | ❌ |
 | **Search Keyword** | ✅ | ❌ |
 | **File Map** | ✅ | ❌ |
+| **Todo (Planning)** | ✅ | ❌ |
+| **Creative (PDF/DOCX/Image)** | ❌ | ✅ |
 
 ---
 
-## Core Tools
+## Tool Protocol
 
-### 🌐 Web & Research
-- **`WebSearch`**: Uses DuckDuckGo to find up-to-date information on the internet. Crucial for answering questions about recent events or unlearned documentation.
-- **`WebScrape`**: Extracts the detailed text content from a specific URL, allowing the agent to read documentation or articles.
+FluxFlow uses a transparent, string-based protocol for tool dispatching:
+`[[tool:functions.ToolName(arg1="value", arg2=123)]]`
 
-### 📄 Document Engineering (The Office Suite)
-- **`WritePDF`**: Generates high-fidelity, branded PDF documents from HTML/CSS. Features automatic watermarking and page-aware layout management.
-- **`WriteDOCX`**: Generates professional Word documents (.docx) from HTML. Supports multi-page layouts, automatic page numbering, and native styling.
+---
 
-### 🎨 Creative & Visual
-- **`GenerateImage`**: Generates high-fidelity images using Pollinations AI.
-  - **Customization**: Supports customizable models (Flux, ZImage, Qwen, Nanobanana-Pro, etc.), aspect ratios, custom prompt generation, and random seeds.
-  - **Telemetry**: Tracks hourly credit usage (Low, Medium, Ultra, Premium tiers) with built-in daily limit checks and interactive dashboard displays.
+## Communication Tools
 
-### 📁 File System Operations
-- **`ListFiles`**: Lists the contents of a directory to help the agent understand the project structure.
-- **`ReadFolder`**: Provides detailed statistics and metadata about a directory's contents.
-- **`ViewFile`**: Reads the content of a file.
-  - **Native Multimodality**: Supports analyzing images (JPG, PNG, WEBP) and PDF documents. The tool automatically detects binary formats and encodes them for AI analysis.
-  - **Text Reading**: Supports specific line ranges (`start_line`, `end_line`) to manage context size efficiently.
-- **`FileMap`**: Generates a high-level structural map of a code file using Tree-Sitter.
-  - **Structural Insight**: Identifies classes, functions, methods, and control flow blocks without reading the entire file content.
-  - **Multi-Language**: Supports JS, TS, TSX, Python, C, C++, Java, and HTML.
-- **`SearchKeyword`**: Performs a global project search for a specific string or keyword. Returns file paths and line numbers where matches are found, making it essential for navigation and impact analysis.
+### `Ask`
+- **Purpose**: Ambiguity Resolution.
+- **Triggers**: Mandatory for Path Divergence, Security concerns, or Risk Mitigation.
+- **Usage**: Suggests up to 4 best options; does not ask for open-ended preferences.
 
-### ✍️ Code Editing
-- **`WriteFile`**: Creates a new file or completely overwrites an existing one with new content.
-- **`UpdateFile` (Smart Patching)**: Surgically replaces a specific block of text within a file.
-  - *Diff Generation*: It returns a high-fidelity visual diff (Red/Green changes with context lines) to the UI, allowing the user to see exactly what the agent modified.
+---
 
-### 💻 Terminal Execution
-- **`Run`**: Runs a shell command directly in the terminal using Node's `child_process.spawn` or `node-pty` when available.
-  - *Context Aware*: Runs in the current working directory.
-  - *Cross-Platform*: Uses `shell: true` to handle Windows `.cmd`/`.bat` files natively.
+## Web Tools
+
+### `WebSearch`
+- **Purpose**: Proactive search for unknown topics.
+- **Limit**: 3-10 results.
+
+### `WebScrape`
+- **Purpose**: Deep-dive research into specific webpages, documentation, or APIs.
+
+---
+
+## Workspace Tools (Flux Mode Only)
+
+### `ReadFile`
+- **Purpose**: Reads file content with support for line ranges.
+- **Multimodal**: Supports images and documents.
+
+### `FileMap`
+- **Purpose**: Shows file structure, dependencies, functions, and variable maps. More token-efficient than ReadFile.
+
+### `ReadFolder`
+- **Purpose**: Provides detailed directory statistics.
+
+### `PatchFile` (UpdateFile)
+- **Purpose**: Surgical patching of code.
+- **Usage**: Supports multiple patches in a single call to prevent spam. MUST VERIFY DIFF.
+
+### `WriteFile`
+- **Purpose**: Creates or overwrites files.
+- **Safety**: Prefers PatchFile if the file already exists.
+
+### `SearchKeyword`
+- **Purpose**: Global project search for definitions or logic.
+
+### `Run` (exec_command)
+- **Purpose**: Runs shell commands (PowerShell/CMD on Windows, Bash on Unix).
+- **Safety**: Restricted to workspace directory unless explicitly allowed. Irreversible operations require user approval.
+
+### `Todo`
+- **Purpose**: Manages an internal task list (`todo.md`) to keep goals consistent during long tasks.
+- **Methods**: `create`, `append`, `check`.
+
+---
+
+## Creative Tools (Flow Mode Only)
+
+### `WritePDF`
+- **Purpose**: Generates high-fidelity, branded PDF documents from HTML/CSS.
+
+### `WriteDoc`
+- **Purpose**: Creates professional Word documents (.docx).
+
+### `GenerateImage`
+- **Purpose**: Creates high-fidelity images via AI.
 
 ---
 
 ## Memory Management
 
-The memory tool (`memory.js`) is primarily used by the background **Janitor** model, but can be accessed by the main agent if necessary.
-
-- **Temporary Context (`action='temp'`)**: Saves a rolling summary of the current session to maintain conversational context without bloating the main prompt history.
-- **Persistent User Memory (`action='user'`)**:
-  - The Janitor analyzes conversations to detect user preferences, hobbies, or instructions.
-  - It uses `add`, `update`, or `delete` methods to manage facts in the encrypted `memories.json` vault.
-  - These memories are injected into the system prompt of *future* sessions, allowing Flux Flow to learn and adapt to the user over time.
+Managed primarily by the background **Janitor** model to maintain persistent user context and session summaries without bloating the reasoning loop.

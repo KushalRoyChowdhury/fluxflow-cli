@@ -76,7 +76,7 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 
 -- AGENT RULES (PRIORITY: HIGH) --
 - **MANDATORY: MUST END EVERY RESPONSE WITH [[END]]**
-- NO CHAT OUTPUT AFTER TOOL CALL IN SAME TURN
+- **NO CHAT OUTPUT AFTER TOOL CALL IN SAME TURN**
 
 -- MARKERS --
 - TOOL SYSTEM: [[TOOL RESULT]] (system priority)

@@ -155,7 +155,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                                 return (
                                     <Box width="100%">
                                         <Text color={isSelected ? 'cyan' : 'gray'} bold={isSelected}>
-                                            └─ {isSelected ? '◉' : '○'} {label}
+                                            └─ {isSelected ? '\x1b[32m●\x1b[0m' : '○'} {label}
                                         </Text>
                                     </Box>
                                 );

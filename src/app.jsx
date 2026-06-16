@@ -1924,7 +1924,7 @@ export default function App({ args = [] }) {
                         }
 
                         // Strict Mode Validation
-                        if (!isBypass && mode === 'Flow' && (formattedLevel === 'Medium' || formattedLevel === 'High' || formattedLevel === 'xHigh')) {
+                        if (!isBypass && mode === 'Flow' && (formattedLevel === 'High' || formattedLevel === 'xHigh')) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];

@@ -15,6 +15,7 @@ import { generate_image } from '../tools/generate_image.js';
 import { saveSummary } from '../tools/saveSummary.js';
 import { addMemScore } from '../tools/addMemScore.js';
 import { file_map } from '../tools/file_map.js';
+import { todo } from '../tools/todo.js';
 
 const TOOL_MAP = {
     web_search,
@@ -33,6 +34,7 @@ const TOOL_MAP = {
     saveSummary,
     addMemScore,
     file_map,
+    todo,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -57,7 +59,9 @@ const TOOL_MAP = {
     AddMemScore: addMemScore,
     addMemoryScore: addMemScore,
     AddMemoryScore: addMemScore,
-    FileMap: file_map
+    FileMap: file_map,
+    Todo: todo,
+    TODO: todo
 };
 
 /**
@@ -67,11 +71,27 @@ const TOOL_MAP = {
  * @returns {Promise<string>} The result of the tool execution.
  */
 export const dispatchTool = async (toolName, args, context = {}) => {
-    if (context.mode && context.mode.toLowerCase() === 'flow') {
-        const normalized = toolName.toLowerCase();
-        const isWebOrAsk = normalized.startsWith('web') || normalized.startsWith('ask');
-        if (!isWebOrAsk) {
-            return `ERROR: Tool [${toolName}] is restricted in Flow mode.`;
+    const mode = context.mode ? context.mode.toLowerCase() : 'flux';
+    const normalized = toolName.toLowerCase();
+
+    // 1. SYSTEM & COMMON TOOLS (Always Allowed)
+    const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape'];
+    const isSystem = systemTools.some(t => normalized.includes(t)) || normalized === 'ask';
+
+    if (!isSystem) {
+        // 2. MODE-SPECIFIC RESTRICTIONS
+        if (mode === 'flow') {
+            // Flow Mode: Only Creative tools allowed beyond common tools
+            const isCreative = normalized.includes('write_pdf') || normalized.includes('write_docx') || normalized.includes('generate_image');
+            if (!isCreative) {
+                return `ERROR: Tool [${toolName}] is a Workspace Tool and NOT available in Flow mode. Tell user to switch (\`/mode flux\`) to use this tool.`;
+            }
+        } else {
+            // Flux Mode: Workspace tools allowed, Creative tools restricted
+            const isCreative = normalized.includes('write_pdf') || normalized.includes('write_docx') || normalized.includes('generate_image');
+            if (isCreative) {
+                return `ERROR: Tool [${toolName}] is not available in Flux mode. Tell user to switch (\`/mode flow\`) for document generation.`;
+            }
         }
     }
 
