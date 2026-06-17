@@ -824,7 +824,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             if (fullContent) {
                 finalSynthesis = fullContent;
-                if (lastUsage) await addToUsage('tokens', lastUsage.totalTokenCount || 0, aiProvider, janitorModel || 'gemini-3.1-flash-lite');
+                if (lastUsage) {
+                    const total = lastUsage.totalTokenCount || 0;
+                    const cached = lastUsage.cachedContentTokenCount || 0;
+                    const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
+                    const jModel = janitorModel || 'gemini-3.1-flash-lite';
+                    await addToUsage('tokens', total, aiProvider, jModel);
+                    if (cached > 0) {
+                        await addToUsage('cachedTokens', cached, aiProvider, jModel);
+                    }
+                    if (candidates > 0) {
+                        await addToUsage('candidateTokens', candidates, aiProvider, jModel);
+                    }
+                }
 
                 // const date = new Date().toLocaleString();
                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
@@ -1315,7 +1327,17 @@ Chats to process:
                 }
 
                 if (response.usageMetadata) {
-                    await addToUsage('tokens', response.usageMetadata.totalTokenCount || 0, aiProvider, targetModel);
+                    const meta = response.usageMetadata;
+                    const total = meta.totalTokenCount || 0;
+                    const cached = meta.cachedContentTokenCount || 0;
+                    const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
+                    await addToUsage('tokens', total, aiProvider, targetModel);
+                    if (cached > 0) {
+                        await addToUsage('cachedTokens', cached, aiProvider, targetModel);
+                    }
+                    if (candidates > 0) {
+                        await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
+                    }
                 }
 
                 success = true;
