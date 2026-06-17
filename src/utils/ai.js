@@ -3185,7 +3185,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             .map(line => {
                                                 const trimmed = line.trim();
                                                 const isDone = trimmed.startsWith('- [x]');
-                                                return `${isDone ? '\x1b[32m●\x1b[0m' : '○'} ${trimmed.substring(6).trim()}`;
+                                                return `${isDone ? '\x1b[32m●\x1b[0m' : '○'} ${isDone ? '\x1b[90m' : '\x1b[37m'}${trimmed.substring(6).trim()}\x1b[0m`;
                                             });
                                     }
 
@@ -3200,7 +3200,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                         const boxTitle = `│ ${uiTitle.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
                                         const boxSep = `├${'─'.repeat(boxWidth)}┤`;
-                                        const boxItems = listItems.map(item => `│ ${item.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`);
+                                        const boxItems = listItems.map(item => {
+                                            // 1. Strip ANSI codes to find the REAL visual length of the text
+                                            const visualLength = item.replace(/\x1b\[[0-9;]*m/g, '').length;
+
+                                            // 2. Calculate exactly how many spaces we need to fill the rest of the row
+                                            const targetWidth = boxWidth - 2;
+                                            const paddingNeeded = Math.max(0, targetWidth - visualLength);
+
+                                            // 3. Assemble the row with the original styled item + the correct raw spaces
+                                            return `│ ${item}${' '.repeat(paddingNeeded)} │`;
+                                        });
                                         const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
                                         yield { type: 'visual_feedback', content: [boxTop, boxTitle, boxSep, ...boxItems, boxBottom].join('\n') };
                                     }

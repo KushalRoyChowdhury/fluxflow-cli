@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { DATA_DIR } from '../utils/paths.js';
+import { RevertManager } from '../utils/revert.js';
 
 /**
  * Todo Tool
@@ -61,6 +62,7 @@ export const todo = async (args, context = {}) => {
             if (!tasks) return 'ERROR: Missing "tasks" for create method.';
             
             const content = getTasksString(tasks);
+            await RevertManager.recordFileChange(todoFile);
             fs.writeFileSync(todoFile, content, 'utf8');
 
             const total = (content.match(/^- \[ [xX ]\]/gm) || []).length;
@@ -71,6 +73,7 @@ export const todo = async (args, context = {}) => {
             if (!tasks) return 'ERROR: Missing "tasks" for append method.';
             
             const appendContent = getTasksString(tasks);
+            await RevertManager.recordFileChange(todoFile);
             fs.appendFileSync(todoFile, appendContent, 'utf8');
 
             // Read the whole file back to calculate stats
@@ -128,6 +131,7 @@ export const todo = async (args, context = {}) => {
 
                 if (fileUpdated) {
                     content = lines.join('\n');
+                    await RevertManager.recordFileChange(todoFile);
                     fs.writeFileSync(todoFile, content, 'utf8');
                 }
             }
