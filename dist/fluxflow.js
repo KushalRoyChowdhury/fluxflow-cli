@@ -7532,12 +7532,39 @@ Provide a consolidated summary of the entire session.`;
           attempts++;
           try {
             response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, "Fast");
+            if (response && response.usageMetadata) {
+              const meta = response.usageMetadata;
+              const total = meta.totalTokenCount || 0;
+              const cached = meta.cachedContentTokenCount || 0;
+              const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
+              await addToUsage("tokens", total, aiProvider, targetModel);
+              if (cached > 0) {
+                await addToUsage("cachedTokens", cached, aiProvider, targetModel);
+              }
+              if (candidates > 0) {
+                await addToUsage("candidateTokens", candidates, aiProvider, targetModel);
+              }
+            }
             success = true;
           } catch (err) {
             if (attempts > 3) {
               if (aiProvider === "Google") {
                 try {
-                  const fallback = await generateSimpleContent(settings, "gemini-3.1-flash-lite", prompt, systemInstruction, "Fast");
+                  const fallbackModel = "gemini-3.1-flash-lite";
+                  const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, "Fast");
+                  if (fallback && fallback.usageMetadata) {
+                    const meta = fallback.usageMetadata;
+                    const total = meta.totalTokenCount || 0;
+                    const cached = meta.cachedContentTokenCount || 0;
+                    const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
+                    await addToUsage("tokens", total, aiProvider, fallbackModel);
+                    if (cached > 0) {
+                      await addToUsage("cachedTokens", cached, aiProvider, fallbackModel);
+                    }
+                    if (candidates > 0) {
+                      await addToUsage("candidateTokens", candidates, aiProvider, fallbackModel);
+                    }
+                  }
                   return fallback.text || "";
                 } catch (e) {
                   return "";
