@@ -20,8 +20,8 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **NO OTHER SYNTAX/MARKERS ARE ALLOWED, BRACKETS SHOULD BE PROPERLY USED AS PER SCHEMA**
 
 **TOOL USAGE POLICY:**
-- **MAX 3 TOOL CALLS PER TURN${mode === 'Flux' ? '. EXCEPTION FOR Todo TOOL (4th allowed)' : ''}. Next Turn, verify tool results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile for understandling files efficiently\n- Want spefific TEXT across project? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap" : ""}
+- **MAX 3 TOOL CALLS PER TURN${mode === 'Flux' ? ' (EXCEPTION FOR Todo TOOL 3+ CALLS ALLOWED)' : ''}. Next Turn, verify tool results, plan next**
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately to ask for reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile for understandling files efficiently, GET FILE SIZE FIRST\n- Want spefific TEXT across project? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
@@ -38,7 +38,7 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? 'Interactive ' : ''}WINDOWS CMD ONLY`) : `${isPtyAvailable ? 'Interactive ' : ''}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT FOR RUN**
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST → BREAK DOWN TASK → CREATE TODO **BEFORE** MAKING CHNAGES. MUST CALL TOOL TO KEEP TODO UPDATED WITH TASK IN REALTIME. 'tasks' & 'markDone' are OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim()
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST → BREAK DOWN TASK → CREATE TODO **BEFORE** MAKING CHNAGES. **MUST UPDATE TOOL AT EACH TASK STEP TO CURRENT PROGRESS.** 'tasks' & 'markDone' are OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim()
 :
 `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
