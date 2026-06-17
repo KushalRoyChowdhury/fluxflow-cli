@@ -1591,8 +1591,7 @@ var init_ChatLayout = __esm({
     formatThinkText = (cleaned, columns = 80) => {
       if (!cleaned) return null;
       const availableWidth = columns - 10;
-      const wrapped = wrapText(cleaned.trim(), availableWidth);
-      return /* @__PURE__ */ React3.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { italic: true }, /* @__PURE__ */ React3.createElement(InlineMarkdown, { text: wrapped, color: "gray" })));
+      return /* @__PURE__ */ React3.createElement(Box3, { width: "100%", flexDirection: "column" }, /* @__PURE__ */ React3.createElement(MarkdownText, { text: cleaned.trim(), color: "gray", columns: availableWidth, italic: true }));
     };
     parseMathSymbols = (content) => {
       return content.replace(/\\multiply|\\mul|\\times/g, "\xD7").replace(/\\div/g, "\xF7").replace(/\\cdot/g, "\u22C5").replace(/\\infty/g, "\u221E").replace(/\\pm/g, "\xB1").replace(/\\leq/g, "\u2264").replace(/\\geq/g, "\u2265").replace(/\\neq/g, "\u2260").replace(/\\sqrt\s*\{([^}]+)\}/g, "\u221A($1)").replace(/\\sqrt\s*(\w+|\d+)/g, "\u221A($1)").replace(/\\alpha/g, "\u03B1").replace(/\\beta/g, "\u03B2").replace(/\\theta/g, "\u03B8").replace(/\\pi/g, "\u03C0").replace(/\\approx/g, "\u2248").replace(/\\Delta/g, "\u0394").replace(/\\sigma/g, "\u03C3").replace(/\\sum/g, "\u03A3").replace(/\\prod/g, "\u03A0").replace(/\\rightarrow|\\to/g, "\u2192").replace(/\\left\b|\\right\b/g, "").replace(/\\left\(|\\right\)/g, (match) => match.includes("left") ? "(" : ")").replace(/\\left\[|\\right\]/g, (match) => match.includes("left") ? "[" : "]").replace(/\\\{|\\\}/g, (match) => match.includes("{") ? "{" : "}").replace(/\\text\s*\{([^}]+)\}/g, "$1").replace(/\\text\s+(\w+)/g, "$1").replace(/\\%/g, "%");
@@ -1618,10 +1617,10 @@ var init_ChatLayout = __esm({
         return p;
       }));
     };
-    InlineMarkdown = React3.memo(({ text, color }) => {
+    InlineMarkdown = React3.memo(({ text, color, italic }) => {
       if (!text) return null;
       const parts = text.split(/(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
-      return /* @__PURE__ */ React3.createElement(Text3, { color, wrap: "anywhere" }, parts.map((part, j) => {
+      return /* @__PURE__ */ React3.createElement(Text3, { color, wrap: "anywhere", italic }, parts.map((part, j) => {
         if (!part) return null;
         if (part.startsWith("```") && part.endsWith("```")) {
           const content = part.slice(3, -3);
@@ -1682,7 +1681,7 @@ var init_ChatLayout = __esm({
         /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React3.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React3.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React3.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React3.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
       );
     });
-    MarkdownText = React3.memo(({ text, color = "white", columns = 80 }) => {
+    MarkdownText = React3.memo(({ text, color = "white", columns = 80, italic = false }) => {
       if (!text) return null;
       const lines = text.split("\n");
       const result = [];
@@ -1695,7 +1694,7 @@ var init_ChatLayout = __esm({
         }
         if (quoteBuffer.length > 0) {
           result.push(
-            /* @__PURE__ */ React3.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: "gray", paddingLeft: 1, marginY: 1, flexDirection: "column" }, quoteBuffer.map((line, qi) => /* @__PURE__ */ React3.createElement(InlineMarkdown, { key: qi, text: line, color: "gray" })))
+            /* @__PURE__ */ React3.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: "gray", paddingLeft: 1, marginY: 1, flexDirection: "column" }, quoteBuffer.map((line, qi) => /* @__PURE__ */ React3.createElement(InlineMarkdown, { key: qi, text: line, color: "gray", italic })))
           );
           quoteBuffer = [];
         }
@@ -1729,7 +1728,7 @@ var init_ChatLayout = __esm({
             );
             return;
           }
-          const isUnordered = trimmed.startsWith("* ") || trimmed.startsWith("- ");
+          const isUnordered = /^[\*\-\+]\s/.test(trimmed);
           const isOrdered = /^\d+\.\s/.test(trimmed);
           const isAsciiArt = line.includes("\u2588") || line.includes("\u2554") || line.includes("\u255A") || line.includes("\u2550");
           let content = "";
@@ -1744,7 +1743,7 @@ var init_ChatLayout = __esm({
             content = wrapText(trimmed, columns - 4);
           }
           result.push(
-            /* @__PURE__ */ React3.createElement(Box3, { key: i, width: "100%" }, /* @__PURE__ */ React3.createElement(InlineMarkdown, { text: content, color }))
+            /* @__PURE__ */ React3.createElement(Box3, { key: i, width: "100%" }, /* @__PURE__ */ React3.createElement(InlineMarkdown, { text: content, color, italic }))
           );
         }
       });
@@ -3328,7 +3327,7 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue within <think>...</think>. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? What happens under resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach. Search for, off by one errors, integer overflow, null/undefined propagation, unhandled promises, resource leaks, SQL injection vectors, XSS vulnerabilities, CSRF holes, timing attacks, and privilege escalation paths\nReason about observability, what metrics matter? Where are the logging gaps? How will this be debugged in production at 3am?\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing a single line\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Dense, unbroken stream of consciousness that reads like an internal monologue\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings (verify context, check for hidden complexity)",
+      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? What happens under resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach. Search for, off by one errors, integer overflow, null/undefined propagation, unhandled promises, resource leaks, SQL injection vectors, XSS vulnerabilities, CSRF holes, timing attacks, and privilege escalation paths\nReason about observability, what metrics matter? Where are the logging gaps? How will this be debugged in production at 3am?\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing a single line\nTHINK FORMAT RULES OVERRIDE:\n- NO HEADINGS/MARKERS/LISTS/BULLET POINTS\n- Dense, unbroken stream of consciousness that reads like an internal monologue\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings (verify context, check for hidden complexity)",
       High: "EFFORT LEVEL: HIGH\nThink in a rigorous, technically grounded monologue within <think>...</think>. Treat this as a design review where every decision must be justified:\nBreak the objective into verifiable steps with clear success criteria. Identify the critical path and potential bottlenecks\nMentally compile and execute your approach. Check for: missing imports, undefined behavior, type mismatches, unhandled errors, and resource cleanup. Trace data flow from input to output, noting transformations\nRecognize design patterns and anti patterns. If you see God objects, tight coupling, or premature optimization, call it out and refactor mentally before committing\nEvaluate performance characteristics. Will this scale? Are there O(n\xB2) operations hiding in innocent looking code? Where are the allocation hotspots?\nConsider the error surface, what can fail and how? Design error handling that preserves invariants and provides actionable feedback\nReview your architecture for, separation of concerns, single responsibility, dependency inversion, and interface segregation. Ensure clean abstractions with minimal coupling\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Continuous analytical flow\n- Verify correctness through first principles reasoning, not pattern matching\n- Actively search for ways your solution could fail or degrade\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full technical verification for all tasks/greetings",
       Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technically-aware monologue within <think>...</think>\nIdentify the most direct path that satisfies requirements without over-engineering\nQuickly scan for obvious issues, missing error handling, incorrect input assumptions, forgotten edge cases, or missing dependencies\nVerify the solution is appropriately modular with cohesive changes\nOutline the concrete changes, which files, which functions, what the key logic looks like\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Clean logical stream\n- Efficient but deliberate. Focus energy on actionable implementation details\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
       Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Just verify the basics:\nConfirm what the user wants and whether it's straightforward or has hidden complexity\nIdentify the specific tool, file, or action needed\nCheck for any obvious correctness issues before acting\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Few lines of clear thought\n- Just enough thinking to avoid obvious mistakes\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- Suitable for simple requests/greetings",
@@ -3415,11 +3414,9 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 ${aiProvider === "Google" ? `${thinkingLevel !== "GEM" ? `
 -- THINKING RULES --
 ${thinkingConfig}
-${thinkingLevel !== "Fast" ? `
+${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" ? `
 CRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings
-- ${thinkingLevel === "Low" || thinkingLevel === "Medium" || thinkingLevel === "Fast" ? "C" : "Interrogate approaches adversarially, but c"}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point
-- Thinking should scale with task complexity` : ""}` : ""}` : ``}
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings` : ""}` : ""}` : ``}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider)}
 ${projectContextBlock}
 -- MEMORY RULES --
@@ -8014,7 +8011,7 @@ ${ideCtx.warnings}
 CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel != "Fast" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [USER] ${cleanAgentText}[/USER]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [USER] ${cleanAgentText}[/USER]`.trim();
         modifiedHistory.push({ role: "user", text: firstUserMsg });
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
@@ -8052,7 +8049,7 @@ ${activeSummaryBlock}${thinkingLevel != "Fast" && aiProvider === "Google" ? `${m
 
 [STEERING HINT]: ${hint}`;
               } else {
-                modifiedHistory.push({ role: "user", text: `${thinkingLevel != "Fast" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [STEERING HINT]: ${hint}` });
+                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [STEERING HINT]: ${hint}` });
               }
               yield { type: "status", content: "Steering Hint Injected." };
             }
@@ -8182,7 +8179,7 @@ ${activeSummaryBlock}${thinkingLevel != "Fast" && aiProvider === "Google" ? `${m
               const lastUserMsg = contents[contents.length - 1];
               if (isGemma) {
                 const jitInstruction = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != "Fast" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""}[/SYSTEM]`;
+[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""}[/SYSTEM]`;
                 if (lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
                   lastUserMsg.parts[0].text += jitInstruction;
                 }
@@ -8256,7 +8253,8 @@ ${activeSummaryBlock}${thinkingLevel != "Fast" && aiProvider === "Google" ? `${m
                       const isGemini3 = modelLower.includes("gemini-3");
                       if (isGemma4 || isGemini3) {
                         if (isGemma4) {
-                          return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                          if (thinkingLevel.toLowerCase() !== "xhigh" || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                          else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
                         }
                         return {
                           includeThoughts: true,
@@ -9424,7 +9422,7 @@ ${boxBottom}` };
                   const waitTime = Math.min(1e3 * Math.pow(2, inStreamRetryCount - 1), 24e3);
                   if (turnText.trim().length > 0) {
                     modifiedHistory.push({ role: "agent", text: turnText });
-                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block with </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
+                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
                     if (toolResults.length > 0) {
                       toolResults.forEach((tr, idx) => {
                         if (idx === toolResults.length - 1) {

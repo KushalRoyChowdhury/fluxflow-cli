@@ -134,13 +134,10 @@ const cleanSignals = (text) => {
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
     const availableWidth = columns - 10;
-    const wrapped = wrapText(cleaned.trim(), availableWidth);
 
     return (
-        <Box width="100%">
-            <Text italic>
-                <InlineMarkdown text={wrapped} color="gray" />
-            </Text>
+        <Box width="100%" flexDirection="column">
+            <MarkdownText text={cleaned.trim()} color="gray" columns={availableWidth} italic={true} />
         </Box>
     );
 };
@@ -213,14 +210,14 @@ const renderLatexText = (content, key) => {
     );
 };
 
-const InlineMarkdown = React.memo(({ text, color }) => {
+const InlineMarkdown = React.memo(({ text, color, italic }) => {
     if (!text) return null;
 
     // Split by the outer-most markdown groups (check triple backticks BEFORE single ones, use non-greedy matching)
     const parts = text.split(/(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
 
     return (
-        <Text color={color} wrap="anywhere">
+        <Text color={color} wrap="anywhere" italic={italic}>
             {parts.map((part, j) => {
                 if (!part) return null;
 
@@ -341,7 +338,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     );
 });
 
-const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
+const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic = false }) => {
     if (!text) return null;
 
     const lines = text.split('\n');
@@ -358,7 +355,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
             result.push(
                 <Box key={`quote-${key}`} borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor="gray" paddingLeft={1} marginY={1} flexDirection="column">
                     {quoteBuffer.map((line, qi) => (
-                        <InlineMarkdown key={qi} text={line} color="gray" />
+                        <InlineMarkdown key={qi} text={line} color="gray" italic={italic} />
                     ))}
                 </Box>
             );
@@ -405,7 +402,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
                 return;
             }
 
-            const isUnordered = trimmed.startsWith('* ') || trimmed.startsWith('- ');
+            const isUnordered = /^[\*\-\+]\s/.test(trimmed);
             const isOrdered = /^\d+\.\s/.test(trimmed);
             const isAsciiArt = line.includes('█') || line.includes('╔') || line.includes('╚') || line.includes('═');
 
@@ -423,7 +420,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80 }) => {
 
             result.push(
                 <Box key={i} width="100%">
-                    <InlineMarkdown text={content} color={color} />
+                    <InlineMarkdown text={content} color={color} italic={italic} />
                 </Box>
             );
         }

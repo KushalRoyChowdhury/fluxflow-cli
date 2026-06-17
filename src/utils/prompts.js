@@ -79,8 +79,8 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 - SYSTEM NOTIFICATION: [SYSTEM] in user turn
 ${aiProvider === 'Google' ? `${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
 ${thinkingConfig}
-${thinkingLevel !== 'Fast' ? `\nCRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n- ${thinkingLevel === 'Low' || thinkingLevel === 'Medium' || thinkingLevel === 'Fast' ? 'C' : 'Interrogate approaches adversarially, but c'}ommit once best solution is determined through analysis. Avoid spiraling after reaching decision point\n- Thinking should scale with task complexity` : ''}` : ''}` : ``}
+${thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh' ? `\nCRITICAL THINKING POLICY
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings` : ''}` : ''}` : ``}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider)}
 ${projectContextBlock}
 -- MEMORY RULES --

@@ -1842,7 +1842,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [USER] ${cleanAgentText}[/USER]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [USER] ${cleanAgentText}[/USER]`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
@@ -1892,7 +1892,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -2048,7 +2048,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel != 'Fast' && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}[/SYSTEM]`;
+                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}[/SYSTEM]`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
@@ -2131,7 +2131,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (isGemma4 || isGemini3) {
                                         if (isGemma4) {
-                                            return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                            if (thinkingLevel.toLowerCase() !== 'xhigh' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                            else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
                                         }
                                         return {
                                             includeThoughts: true,
@@ -3481,7 +3482,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block with </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
+                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
