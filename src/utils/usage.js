@@ -41,6 +41,20 @@ const defaultStats = {
     imageCalls: []
 };
 
+const purgeOldHistory = (history, todayStr) => {
+    if (!history) return {};
+    const keys = Object.keys(history);
+    const thirtyDaysAgo = new Date(new Date(todayStr).getTime() - 30 * 24 * 60 * 60 * 1000);
+    const purged = {};
+    for (const key of keys) {
+        const keyDate = new Date(key);
+        if (keyDate >= thirtyDaysAgo) {
+            purged[key] = history[key];
+        }
+    }
+    return purged;
+};
+
 /**
  * Loads usage from file into memory
  */
@@ -138,19 +152,41 @@ const loadUsageFromFile = async () => {
         } catch (e) {}
     }
 
-    if (resolvedData && resolvedData.date === today && resolvedData.stats) {
-        // [RESILIENCE] Merge with defaults to ensure new keys (like toolDenied) are present
-        const mergedStats = { ...defaultStats, ...resolvedData.stats };
+    if (resolvedData) {
+        const stats = resolvedData.stats || { ...defaultStats };
+        const mergedStats = { ...defaultStats, ...stats };
         if (!Array.isArray(mergedStats.imageCalls)) {
             mergedStats.imageCalls = [];
         }
-        return {
-            ...resolvedData,
-            stats: mergedStats
-        };
+
+        const history = resolvedData.history || {};
+
+        if (resolvedData.date === today) {
+            return {
+                ...resolvedData,
+                stats: mergedStats,
+                history: history
+            };
+        } else {
+            const oldDate = resolvedData.date;
+            const oldStats = mergedStats;
+            const updatedHistory = { ...history };
+            if (oldDate) {
+                updatedHistory[oldDate] = oldStats;
+            }
+            return {
+                date: today,
+                stats: { ...defaultStats },
+                history: purgeOldHistory(updatedHistory, today)
+            };
+        }
     }
 
-    return { date: today, stats: { ...defaultStats } };
+    return {
+        date: today,
+        stats: { ...defaultStats },
+        history: {}
+    };
 };
 
 /**
@@ -195,6 +231,32 @@ const flushUsage = async () => {
                     }
                 }
             }
+        }
+
+        if (diskData && diskData.history) {
+            const mergedHistory = { ...(cachedUsage.history || {}) };
+            for (const dateKey in diskData.history) {
+                if (mergedHistory[dateKey]) {
+                    for (const key in mergedHistory[dateKey]) {
+                        if (key === 'imageCalls') {
+                            const diskArr = Array.isArray(diskData.history[dateKey].imageCalls) ? diskData.history[dateKey].imageCalls : [];
+                            const memArr = Array.isArray(mergedHistory[dateKey].imageCalls) ? mergedHistory[dateKey].imageCalls : [];
+                            const uniqueMap = new Map();
+                            for (const item of [...diskArr, ...memArr]) {
+                                if (item && item.timestamp) {
+                                    uniqueMap.set(item.timestamp, item);
+                                }
+                            }
+                            mergedHistory[dateKey].imageCalls = Array.from(uniqueMap.values());
+                        } else if (typeof mergedHistory[dateKey][key] === 'number') {
+                            mergedHistory[dateKey][key] = Math.max(mergedHistory[dateKey][key], Number(diskData.history[dateKey][key]) || 0);
+                        }
+                    }
+                } else {
+                    mergedHistory[dateKey] = diskData.history[dateKey];
+                }
+            }
+            cachedUsage.history = mergedHistory;
         }
 
         // Append unique save ID to verify alignment during boot sequence
@@ -270,9 +332,18 @@ export const getDailyUsage = async () => {
         cachedUsage = await loadUsageFromFile();
     } else if (cachedUsage.date !== today) {
         // Roll over to new day
+        const oldDate = cachedUsage.date;
+        const oldStats = cachedUsage.stats;
+        const history = cachedUsage.history || {};
+
+        if (oldStats) {
+            history[oldDate] = oldStats;
+        }
+
         cachedUsage = {
             date: today,
-            stats: { ...defaultStats }
+            stats: { ...defaultStats },
+            history: purgeOldHistory(history, today)
         };
         isDirty = true;
         await flushUsage(); // Immediate flush for day rollover
@@ -283,6 +354,69 @@ export const getDailyUsage = async () => {
     }
 
     return cachedUsage.stats;
+};
+
+/**
+ * Gets the 30-day usage stats from memory
+ */
+export const getMonthlyUsage = async () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    if (!cachedUsage) {
+        cachedUsage = await loadUsageFromFile();
+    }
+
+    // Rollover check
+    if (cachedUsage.date !== today) {
+        await getDailyUsage();
+    }
+
+    const history = cachedUsage.history || {};
+    const purgedHistory = purgeOldHistory(history, today);
+    cachedUsage.history = purgedHistory;
+
+    const todayStats = cachedUsage.stats || { ...defaultStats };
+    const summed = { ...defaultStats };
+    summed.imageCalls = [];
+    summed.models = {};
+
+    const addStats = (target, source) => {
+        for (const key in target) {
+            if (key === 'imageCalls') {
+                target.imageCalls = [...(target.imageCalls || []), ...(source.imageCalls || [])];
+            } else if (key === 'models') {
+                const srcModels = source.models || {};
+                for (const provider in srcModels) {
+                    if (!target.models[provider]) {
+                        target.models[provider] = {};
+                    }
+                    for (const model in srcModels[provider]) {
+                        if (!target.models[provider][model]) {
+                            target.models[provider][model] = {
+                                tokens: 0,
+                                cachedTokens: 0,
+                                candidateTokens: 0
+                            };
+                        }
+                        const tM = target.models[provider][model];
+                        const sM = srcModels[provider][model];
+                        tM.tokens += sM.tokens || 0;
+                        tM.cachedTokens += sM.cachedTokens || 0;
+                        tM.candidateTokens += sM.candidateTokens || 0;
+                    }
+                }
+            } else if (typeof target[key] === 'number') {
+                target[key] += source[key] || 0;
+            }
+        }
+    };
+
+    addStats(summed, todayStats);
+    for (const dateKey in purgedHistory) {
+        addStats(summed, purgedHistory[dateKey]);
+    }
+
+    return summed;
 };
 
 /**
@@ -299,12 +433,33 @@ export const incrementUsage = async (key) => {
 /**
  * Adds a specific amount to a usage key in memory
  */
-export const addToUsage = async (key, amount) => {
+export const addToUsage = async (key, amount, provider, model) => {
     const stats = await getDailyUsage();
     if (stats[key] !== undefined) {
         stats[key] += Math.floor(amount);
-        queueFlush();
     }
+
+    if (provider && model && (key === 'tokens' || key === 'cachedTokens' || key === 'candidateTokens')) {
+        if (!stats.models) {
+            stats.models = {};
+        }
+        if (!stats.models[provider]) {
+            stats.models[provider] = {};
+        }
+        if (!stats.models[provider][model]) {
+            stats.models[provider][model] = {
+                tokens: 0,
+                cachedTokens: 0,
+                candidateTokens: 0
+            };
+        }
+        const mObj = stats.models[provider][model];
+        if (key === 'tokens') mObj.tokens += Math.floor(amount);
+        if (key === 'cachedTokens') mObj.cachedTokens += Math.floor(amount);
+        if (key === 'candidateTokens') mObj.candidateTokens += Math.floor(amount);
+    }
+
+    queueFlush();
 };
 
 /**

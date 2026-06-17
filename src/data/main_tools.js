@@ -21,7 +21,7 @@ Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **N
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === 'Flux' ? ' (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED)' : ''}. Next Turn, verify tool results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap\n- MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON EACH TURN" : ""}
+${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON EACH TURN outside 3 call limit" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
 

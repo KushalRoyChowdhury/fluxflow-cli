@@ -824,7 +824,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             if (fullContent) {
                 finalSynthesis = fullContent;
-                if (lastUsage) await addToUsage('tokens', lastUsage.totalTokenCount || 0);
+                if (lastUsage) await addToUsage('tokens', lastUsage.totalTokenCount || 0, aiProvider, janitorModel || 'gemini-3.1-flash-lite');
 
                 // const date = new Date().toLocaleString();
                 // const janitorLogDir = path.join(LOGS_DIR, 'janitor');
@@ -1315,7 +1315,7 @@ Chats to process:
                 }
 
                 if (response.usageMetadata) {
-                    await addToUsage('tokens', response.usageMetadata.totalTokenCount || 0);
+                    await addToUsage('tokens', response.usageMetadata.totalTokenCount || 0, aiProvider, targetModel);
                 }
 
                 success = true;
@@ -3490,12 +3490,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 const cached = lastUsage.cachedContentTokenCount || 0;
                 const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
 
-                await addToUsage('tokens', total);
+                await addToUsage('tokens', total, aiProvider, targetModel);
                 if (cached > 0) {
-                    await addToUsage('cachedTokens', cached);
+                    await addToUsage('cachedTokens', cached, aiProvider, targetModel);
                 }
                 if (candidates > 0) {
-                    await addToUsage('candidateTokens', candidates);
+                    await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
                 }
 
                 yield { type: 'usage', content: lastUsage };

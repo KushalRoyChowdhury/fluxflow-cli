@@ -26,7 +26,7 @@ import { RevertManager } from './utils/revert.js';
 import { GEMINI_QUOTES } from './data/gemini_quotes.js';
 import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import RevertModal from './components/RevertModal.jsx';
-import { getDailyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
+import { getDailyUsage, getMonthlyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -569,6 +569,8 @@ export default function App({ args = [] }) {
     const [sessionImageCount, setSessionImageCount] = useState(0);
     const [sessionImageCredits, setSessionImageCredits] = useState(0);
     const [dailyUsage, setDailyUsage] = useState(null);
+    const [monthlyUsage, setMonthlyUsage] = useState(null);
+    const [statsMode, setStatsMode] = useState('daily');
     const [chatId, setChatId] = useState(generateChatId());
 
     useEffect(() => {
@@ -838,6 +840,20 @@ export default function App({ args = [] }) {
         // Aggressively swallow focus reporting artifacts
         if (inputText === '\x1b[I' || inputText === '\x1b[O' || inputText === '[I' || inputText === '[O') {
             return;
+        }
+
+        if (activeView === 'stats') {
+            if (key.tab && !key.shift) {
+                setStatsMode(prev => {
+                    if (prev === 'modelBreakdown') return 'daily';
+                    return prev === 'daily' ? 'monthly' : 'daily';
+                });
+                return;
+            }
+            if (key.space || inputText === ' ') {
+                setStatsMode(prev => prev === 'modelBreakdown' ? 'daily' : 'modelBreakdown');
+                return;
+            }
         }
 
         if (showBridgePromo) {
@@ -1980,7 +1996,10 @@ export default function App({ args = [] }) {
                 case '/stats': {
                     const run = async () => {
                         const usage = await getDailyUsage();
+                        const mUsage = await getMonthlyUsage();
                         setDailyUsage(usage);
+                        setMonthlyUsage(mUsage);
+                        setStatsMode('daily');
                         setActiveView('stats');
                     };
                     run();
@@ -3141,159 +3160,215 @@ export default function App({ args = [] }) {
                     </Box>
                 );
 
-            case 'stats':
+            case 'stats': {
+                const u = statsMode === 'monthly' ? monthlyUsage : dailyUsage;
+                const trackerTitle = statsMode === 'monthly' ? 'LAST 30 DAYS USAGE TRACKER' : 'DAILY USAGE TRACKER';
+                const timeLabel = statsMode === 'monthly' ? 'Wall Time (30d):' : 'Wall Time Today:';
+                const tokensLabel = statsMode === 'monthly' ? 'Tokens Used (30d):' : 'Tokens Used Today:';
+                const imagesLabel = statsMode === 'monthly' ? 'Images Made (30d):' : 'Images Made Today:';
+                const imageCreditsLabel = statsMode === 'monthly' ? 'Image Credits (30d):' : 'Image Credits Today:';
+                const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes (30d):' : 'Code Changes Today:';
+                const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls (30d):' : 'Tool Calls Today:';
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor={'grey'} paddingX={3} paddingY={1} width={Math.min(100, (stdout?.columns || 100) - 2)}>
-                        <Box marginBottom={1}>
-                            <Text color="white" bold underline>SESSION TELEMETRY</Text>
-                        </Box>
+                    <Box flexDirection="column" borderStyle="round" borderColor={'grey'} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
+                        {statsMode === 'modelBreakdown' ? (
+                            <Box flexDirection="column">
+                                <Text color="white" bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
+                                {(!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) ? (
+                                    <Box marginTop={1}>
+                                        <Text color="grey" italic>No model token usage recorded in the last 30 days.</Text>
+                                    </Box>
+                                ) : (
+                                    Object.entries(monthlyUsage.models).map(([provider, models]) => {
+                                        const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
+                                        return (
+                                            <Box key={provider} flexDirection="column" marginTop={1}>
+                                                <Box>
+                                                    <Box width={25}><Text color="cyan" bold>{provider}:</Text></Box>
+                                                    <Text color="white" bold>{formatTokens(providerTotalTokens)}</Text>
+                                                </Box>
+                                                {Object.entries(models).map(([modelName, stats]) => (
+                                                    <Box key={modelName} flexDirection="column" marginLeft={4}>
+                                                        <Box>
+                                                            <Box width={21}><Text color="blue">» {modelName}:</Text></Box>
+                                                            <Text color="white">{formatTokens(stats.tokens || 0)}</Text>
+                                                        </Box>
+                                                        <Box marginLeft={4}>
+                                                            <Box width={17}><Text color="grey">» Input Tokens:</Text></Box>
+                                                            <Text color="white">{formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0))}</Text>
+                                                        </Box>
+                                                        {(stats.cachedTokens || 0) > 0 && (
+                                                            <Box marginLeft={5}>
+                                                                <Box width={16}><Text color="grey">» Cached:</Text></Box>
+                                                                <Text color="white">{formatTokens(stats.cachedTokens)}</Text>
+                                                            </Box>
+                                                        )}
+                                                        <Box marginLeft={4}>
+                                                            <Box width={17}><Text color="grey">» Output Tokens:</Text></Box>
+                                                            <Text color="white">{formatTokens(stats.candidateTokens || 0)}</Text>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        );
+                                    })
+                                )}
+                            </Box>
+                        ) : (
+                            <>
+                                <Box marginBottom={1}>
+                                    <Text color="white" bold underline>SESSION TELEMETRY</Text>
+                                </Box>
 
-                        <Box flexDirection="column">
-                            <Box>
-                                <Box width={25}><Text color="blue">Session Duration:</Text></Box>
-                                <Text color="white">{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
-                                <Text color="white">{sessionAgentCalls}</Text>
-                            </Box>
-                            <Box marginLeft={2}>
-                                <Box width={23}><Text color="grey">» API Time:</Text></Box>
-                                <Text color="white">{formatMsDuration(sessionApiTime)}</Text>
-                            </Box>
-                            <Box marginLeft={2}>
-                                <Box width={23}><Text color="grey">» Tool Time:</Text></Box>
-                                <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
-                                <Text color="white">{sessionBackgroundCalls}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
-                                <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Active Context:</Text></Box>
-                                <Text color="white">{formatTokens(sessionStats.tokens)}</Text>
-                            </Box>
-                            {sessionTotalTokens > 0 && (
-                                <>
+                                <Box flexDirection="column">
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Session Duration:</Text></Box>
+                                        <Text color="white">{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                        <Text color="white">{sessionAgentCalls}</Text>
+                                    </Box>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
-                                        <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                        <Box width={23}><Text color="grey">» API Time:</Text></Box>
+                                        <Text color="white">{formatMsDuration(sessionApiTime)}</Text>
                                     </Box>
-                                    {sessionTotalCachedTokens > 0 && (
-                                        <Box marginLeft={4}>
-                                            <Box width={21}><Text color="grey">» Cached:</Text></Box>
-                                            <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
-                                        </Box>
-                                    )}
-                                    {sessionTotalCandidateTokens > 0 && (
-                                        <Box marginLeft={2}>
-                                            <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
-                                            <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
-                                        </Box>
-                                    )}
-                                </>
-                            )}
-                            {sessionImageCount > 0 && (
-                                <>
-                                    <Box>
-                                        <Box width={25}><Text color="blue">Images Made:</Text></Box>
-                                        <Text color="white">{sessionImageCount}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color="blue">Image Credits:</Text></Box>
-                                        <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
-                                    </Box>
-                                </>
-                            )}
-                            <Box>
-                                <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
-                                <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
-                                <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
-                                <Text color="green">✓ {sessionToolSuccess}</Text>
-                                <Text color="white"> </Text>
-                                <Text color="yellow">⊘ {sessionToolDenied}</Text>
-                                <Text color="white"> </Text>
-                                <Text color="red">✕ {sessionToolFailure}</Text>
-                                <Text color="white"> )</Text>
-                            </Box>
-                        </Box>
-
-                        <Box flexDirection="column" marginTop={1}>
-                            <Text color="white" bold underline>DAILY USAGE TRACKER</Text>
-                            <Box marginTop={1}>
-                                <Box width={25}><Text color="blue">Wall Time Today:</Text></Box>
-                                <Text color="white">{formatDuration(dailyUsage?.duration || 0)}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
-                                <Text color="white">{dailyUsage?.agent || 0}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
-                                <Text color="white">{dailyUsage?.background || 0}</Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Tokens Used Today:</Text></Box>
-                                <Text color="white">{formatTokens(dailyUsage?.tokens || 0)}</Text>
-                            </Box>
-                            {(dailyUsage?.tokens || 0) > 0 && (
-                                <>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
-                                        <Text color="white">{formatTokens((dailyUsage?.tokens || 0) - (dailyUsage?.candidateTokens || 0))}</Text>
-                                    </Box>
-                                    {(dailyUsage?.cachedTokens || 0) > 0 && (
-                                        <Box marginLeft={4}>
-                                            <Box width={21}><Text color="grey">» Cached:</Text></Box>
-                                            <Text color="white">{formatTokens(dailyUsage.cachedTokens)}</Text>
-                                        </Box>
-                                    )}
-                                    {(dailyUsage?.candidateTokens || 0) > 0 && (
-                                        <Box marginLeft={2}>
-                                            <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
-                                            <Text color="white">{formatTokens(dailyUsage.candidateTokens)}</Text>
-                                        </Box>
-                                    )}
-                                </>
-                            )}
-                            {(dailyUsage?.imageCalls?.length || 0) > 0 && (
-                                <>
-                                    <Box>
-                                        <Box width={25}><Text color="blue">Images Made Today:</Text></Box>
-                                        <Text color="white">{dailyUsage.imageCalls.length}</Text>
+                                        <Box width={23}><Text color="grey">» Tool Time:</Text></Box>
+                                        <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Image Credits Today:</Text></Box>
-                                        <Text color="white">{Number(((dailyUsage.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
+                                        <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                        <Text color="white">{sessionBackgroundCalls}</Text>
                                     </Box>
-                                </>
-                            )}
-                            <Box>
-                                <Box width={25}><Text color="blue">Code Changes Today:</Text></Box>
-                                <Text color="white"><Text color="green">+{dailyUsage?.linesAdded || 0}</Text> <Text color="red">-{dailyUsage?.linesRemoved || 0}</Text></Text>
-                            </Box>
-                            <Box>
-                                <Box width={25}><Text color="blue">Tool Calls Today:</Text></Box>
-                                <Text color="white">{(dailyUsage?.toolSuccess || 0) + (dailyUsage?.toolFailure || 0) + (dailyUsage?.toolDenied || 0)} ( </Text>
-                                <Text color="green">✓ {dailyUsage?.toolSuccess || 0}</Text>
-                                <Text color="white"> </Text>
-                                <Text color="yellow">⊘ {dailyUsage?.toolDenied || 0}</Text>
-                                <Text color="white"> </Text>
-                                <Text color="red">✕ {dailyUsage?.toolFailure || 0}</Text>
-                                <Text color="white"> )</Text>
-                            </Box>
-                        </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
+                                        <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Active Context:</Text></Box>
+                                        <Text color="white">{formatTokens(sessionStats.tokens)}</Text>
+                                    </Box>
+                                    {sessionTotalTokens > 0 && (
+                                        <>
+                                            <Box marginLeft={2}>
+                                                <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
+                                                <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                            </Box>
+                                            {sessionTotalCachedTokens > 0 && (
+                                                <Box marginLeft={4}>
+                                                    <Box width={21}><Text color="grey">» Cached:</Text></Box>
+                                                    <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                                </Box>
+                                            )}
+                                            {sessionTotalCandidateTokens > 0 && (
+                                                <Box marginLeft={2}>
+                                                    <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
+                                                    <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                                </Box>
+                                            )}
+                                        </>
+                                    )}
+                                    {sessionImageCount > 0 && (
+                                        <>
+                                            <Box>
+                                                <Box width={25}><Text color="blue">Images Made:</Text></Box>
+                                                <Text color="white">{sessionImageCount}</Text>
+                                            </Box>
+                                            <Box>
+                                                <Box width={25}><Text color="blue">Image Credits:</Text></Box>
+                                                <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                            </Box>
+                                        </>
+                                    )}
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
+                                        <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
+                                        <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
+                                        <Text color="green">✓ {sessionToolSuccess}</Text>
+                                        <Text color="white"> </Text>
+                                        <Text color="yellow">⊘ {sessionToolDenied}</Text>
+                                        <Text color="white"> </Text>
+                                        <Text color="red">✕ {sessionToolFailure}</Text>
+                                        <Text color="white"> )</Text>
+                                    </Box>
+                                </Box>
 
-                        <Text dimColor marginTop={1} italic>(Press ESC to return to chat)</Text>
+                                <Box flexDirection="column" marginTop={1}>
+                                    <Text color="white" bold underline>{trackerTitle}</Text>
+                                    <Box marginTop={1}>
+                                        <Box width={25}><Text color="blue">{timeLabel}</Text></Box>
+                                        <Text color="white">{formatDuration(u?.duration || 0)}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                        <Text color="white">{u?.agent || 0}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                        <Text color="white">{u?.background || 0}</Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">{tokensLabel}</Text></Box>
+                                        <Text color="white">{formatTokens(u?.tokens || 0)}</Text>
+                                    </Box>
+                                    {(u?.tokens || 0) > 0 && (
+                                        <>
+                                            <Box marginLeft={2}>
+                                                <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
+                                                <Text color="white">{formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0))}</Text>
+                                            </Box>
+                                            {(u?.cachedTokens || 0) > 0 && (
+                                                <Box marginLeft={4}>
+                                                    <Box width={21}><Text color="grey">» Cached:</Text></Box>
+                                                    <Text color="white">{formatTokens(u.cachedTokens)}</Text>
+                                                </Box>
+                                            )}
+                                            {(u?.candidateTokens || 0) > 0 && (
+                                                <Box marginLeft={2}>
+                                                    <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
+                                                    <Text color="white">{formatTokens(u.candidateTokens)}</Text>
+                                                </Box>
+                                            )}
+                                        </>
+                                    )}
+                                    {(u?.imageCalls?.length || 0) > 0 && (
+                                        <>
+                                            <Box>
+                                                <Box width={25}><Text color="blue">{imagesLabel}</Text></Box>
+                                                <Text color="white">{u.imageCalls.length}</Text>
+                                            </Box>
+                                            <Box>
+                                                <Box width={25}><Text color="blue">{imageCreditsLabel}</Text></Box>
+                                                <Text color="white">{Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
+                                            </Box>
+                                        </>
+                                    )}
+                                    <Box>
+                                        <Box width={25}><Text color="blue">{codeChangesLabel}</Text></Box>
+                                        <Text color="white"><Text color="green">+{u?.linesAdded || 0}</Text> <Text color="red">-{u?.linesRemoved || 0}</Text></Text>
+                                    </Box>
+                                    <Box>
+                                        <Box width={25}><Text color="blue">{toolCallsLabel}</Text></Box>
+                                        <Text color="white">{(u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0)} ( </Text>
+                                        <Text color="green">✓ {u?.toolSuccess || 0}</Text>
+                                        <Text color="white"> </Text>
+                                        <Text color="yellow">⊘ {u?.toolDenied || 0}</Text>
+                                        <Text color="white"> </Text>
+                                        <Text color="red">✕ {u?.toolFailure || 0}</Text>
+                                        <Text color="white"> )</Text>
+                                    </Box>
+                                </Box>
+                            </>
+                        )}
+
+                        <Text dimColor marginTop={1} italic>(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
                     </Box>
                 );
+            }
             case 'autoExecDanger':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
