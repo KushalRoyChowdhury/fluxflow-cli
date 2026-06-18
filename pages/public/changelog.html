@@ -203,15 +203,7 @@
         const MASK_PATH = "changelog.html";
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Modify the path visually to hide complex routing on hosts like Render
-            try {
-                // We use replaceState so it doesn't push a new history entry
-                window.history.replaceState(null, '', '/' + MASK_PATH);
-            } catch (e) {
-                console.warn("URL masking failed (likely cross-origin restrictions):", e);
-            }
-
-            renderChangelog();
+             renderChangelog();
         });
 
         // Attempt to restore original URL before refresh so 404s don't happen
@@ -228,12 +220,20 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.8.6"]
+        const stableVersions = ["2.8.9"]
         const changelogData = {
+            "2.8.9": {
+                "note": "JUNE 19 -  Flux Flow CLI.",
+                "added": [
+                    "Added auto set keybinds for IDEs if SHIFT+ENTER is not binded for new line."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "2.8.6": {
                 "note": "JUNE 18 - Improved Reasoning.",
                 "added": [
-                    "Added Realtime error auto-steering if Agent write broken syntax (Available ONLY with IDE Companion)."
+                    "Added Realtime error auto-steering if Agent write broken syntax (IDE Companion REQUIRED)."
                 ],
                 "changed": [
                     "Huge improvement in Google Gemma-4 xHigh reasoning (may consume 30% more tokens & significantly longer reasoning times in xHigh)."

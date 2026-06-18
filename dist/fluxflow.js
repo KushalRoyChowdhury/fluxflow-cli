@@ -10649,6 +10649,56 @@ function App({ args = [] }) {
   const lastFocusEventTime = useRef3(0);
   const [apiKey, setApiKey] = useState11(null);
   const [tempKey, setTempKey] = useState11("");
+  const addShiftEnterBinding = async (ideName) => {
+    const kbPath = getKeybindingsPath(ideName);
+    if (!kbPath) return;
+    try {
+      await fs22.ensureDir(path20.dirname(kbPath));
+      let bindings = [];
+      if (fs22.existsSync(kbPath)) {
+        const content = fs22.readFileSync(kbPath, "utf8").trim();
+        if (content) {
+          try {
+            bindings = parseJsonc(content);
+          } catch (e) {
+            bindings = [];
+          }
+        }
+      }
+      if (!Array.isArray(bindings)) {
+        bindings = [];
+      }
+      bindings.push({
+        "key": "shift+enter",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+          "text": "\x1B[13;2u"
+        },
+        "when": "terminalFocus"
+      });
+      fs22.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      cachedShortcut = "Shift + Enter";
+      setMessages((prev) => {
+        setCompletedIndex(prev.length + 1);
+        return [...prev, {
+          id: "kb-success-" + Date.now(),
+          role: "system",
+          text: `\u2705 Successfully configured Shift+Enter in your ${ideName} keybindings!`,
+          isMeta: true
+        }];
+      });
+    } catch (err) {
+      setMessages((prev) => {
+        setCompletedIndex(prev.length + 1);
+        return [...prev, {
+          id: "kb-error-" + Date.now(),
+          role: "system",
+          text: `\u274C Failed to update keybindings: ${err.message}`,
+          isMeta: true
+        }];
+      });
+    }
+  };
   const [activeView, setActiveView] = useState11("chat");
   const [apiTier, setApiTier] = useState11("Free");
   const [quotas, setQuotas] = useState11({ agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
@@ -10771,7 +10821,9 @@ function App({ args = [] }) {
     const isIDE = !["Terminal", "Windows Terminal"].includes(ideName) || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
     return {
       isIDE,
-      shortcut: isIDE ? "Shift + Enter" : "Ctrl + Enter"
+      get shortcut() {
+        return cachedShortcut;
+      }
     };
   }, []);
   const activeCommandRef = useRef3(null);
@@ -11235,6 +11287,28 @@ function App({ args = [] }) {
           });
         } else {
           setMessages((prev) => [...prev, { id: "sys-err-" + Date.now(), role: "system", text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+        }
+      }
+      const detectedIde = getIDEName();
+      const isIDE = !["Terminal", "Windows Terminal"].includes(detectedIde);
+      if (isIDE) {
+        const kbPath = getKeybindingsPath(detectedIde);
+        if (kbPath) {
+          try {
+            let bindings = [];
+            if (fs22.existsSync(kbPath)) {
+              const content = fs22.readFileSync(kbPath, "utf8").trim();
+              if (content) {
+                bindings = parseJsonc(content);
+              }
+            }
+            if (!hasShiftEnterBinding(bindings)) {
+              setActiveView("keybindingsPrompt");
+            } else {
+              cachedShortcut = "Shift + Enter";
+            }
+          } catch (e) {
+          }
         }
       }
       setIsInitializing(false);
@@ -13222,6 +13296,25 @@ Selection: ${val}`,
             onClose: () => setActiveView("chat")
           }
         ));
+      case "keybindingsPrompt":
+        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "cyan", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "cyan", bold: true, underline: true }, "\u2328\uFE0F CONFIGURE SHIFT+ENTER NEWLINE"), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "To support multi-line inputs with ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "Shift + Enter"), " for newline, a terminal sequence keybinding needs to be added to your IDE configuration."), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "Would you like FluxFlow to automatically add this to your ", getIDEName(), " keybindings?"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
+          CommandMenu,
+          {
+            title: "Add Keybinding?",
+            items: [
+              { label: "Yes, configure automatically", value: "yes" },
+              { label: "No, skip", value: "no" }
+            ],
+            onSelect: async (item) => {
+              if (item.value === "yes") {
+                await addShiftEnterBinding(getIDEName());
+              } else {
+                cachedShortcut = "\\ + Enter";
+              }
+              setActiveView("chat");
+            }
+          }
+        )));
       case "memory":
         return /* @__PURE__ */ React14.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React14.createElement(MemoryModal, { onClose: () => setActiveView("chat") }));
       case "parserDownload":
@@ -13554,7 +13647,7 @@ Selection: ${val}`,
     return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, chatId)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", sessionToolSuccess), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", sessionToolFailure), " )")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, successRate, "%")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 16 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var getIDEName, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles;
+var getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_MultilineInput();
@@ -13602,9 +13695,45 @@ var init_app = __esm({
       if (termProgram === "trae" || inEnvVars("trae")) return "Trae";
       if (termProgram === "codium" || inEnvVars("codium") || inEnvVars("vscode-oss")) return "VSCodium";
       if (inEnvVars("positron")) return "Positron";
+      if (termProgram === "vscode-insiders" || inEnvVars("insiders")) return "VS Code Insiders";
       if (termProgram === "vscode" || process.env.VSCODE_GIT_IPC_HANDLE || inEnvVars("vscode")) return "VS Code";
       if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || inEnvVars("intellij")) return "JetBrains";
       return "Terminal";
+    };
+    getIDEDirName = (ideName) => {
+      switch (ideName) {
+        case "VS Code":
+          return "Code";
+        case "VS Code Insiders":
+          return "Code - Insiders";
+        case "Antigravity":
+          return "Antigravity IDE";
+        default:
+          return ideName;
+      }
+    };
+    getKeybindingsPath = (ideName) => {
+      const dirName = getIDEDirName(ideName);
+      const home = os4.homedir();
+      if (process.platform === "win32") {
+        const appData = process.env.APPDATA;
+        if (!appData) return null;
+        return path20.join(appData, dirName, "User", "keybindings.json");
+      } else if (process.platform === "darwin") {
+        return path20.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
+      } else {
+        return path20.join(home, ".config", dirName, "User", "keybindings.json");
+      }
+    };
+    parseJsonc = (content) => {
+      const clean = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, "$1");
+      return JSON.parse(clean);
+    };
+    hasShiftEnterBinding = (bindings) => {
+      if (!Array.isArray(bindings)) return false;
+      return bindings.some(
+        (b) => b && typeof b.key === "string" && b.key.toLowerCase().replace(/\s+/g, "") === "shift+enter" && b.command === "workbench.action.terminal.sendSequence" && b.args && b.args.text === "\x1B[13;2u" && typeof b.when === "string" && b.when.includes("terminalFocus")
+      );
     };
     getPromoOptions = (ideName) => {
       const isStandardVSCode = ideName === "VS Code";
@@ -13761,6 +13890,7 @@ var init_app = __esm({
         return fileList;
       };
     })();
+    cachedShortcut = "\\ + Enter";
   }
 });
 

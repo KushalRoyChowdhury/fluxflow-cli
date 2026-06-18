@@ -60,13 +60,56 @@ const getIDEName = () => {
     if (termProgram === 'codium' || inEnvVars('codium') || inEnvVars('vscode-oss')) return 'VSCodium';
     if (inEnvVars('positron')) return 'Positron';
 
-    // 4. Standard VS Code
+    // 4. Standard VS Code & Insiders
+    if (termProgram === 'vscode-insiders' || inEnvVars('insiders')) return 'VS Code Insiders';
     if (termProgram === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || inEnvVars('vscode')) return 'VS Code';
 
     // 5. Other
     if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || inEnvVars('intellij')) return 'JetBrains';
 
     return 'Terminal';
+};
+
+const getIDEDirName = (ideName) => {
+    switch (ideName) {
+        case 'VS Code': return 'Code';
+        case 'VS Code Insiders': return 'Code - Insiders';
+        case 'Antigravity': return 'Antigravity IDE';
+        default: return ideName;
+    }
+};
+
+const getKeybindingsPath = (ideName) => {
+    const dirName = getIDEDirName(ideName);
+    const home = os.homedir();
+    if (process.platform === 'win32') {
+        const appData = process.env.APPDATA;
+        if (!appData) return null;
+        return path.join(appData, dirName, 'User', 'keybindings.json');
+    } else if (process.platform === 'darwin') {
+        return path.join(home, 'Library', 'Application Support', dirName, 'User', 'keybindings.json');
+    } else {
+        return path.join(home, '.config', dirName, 'User', 'keybindings.json');
+    }
+};
+
+const parseJsonc = (content) => {
+    const clean = content.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
+    return JSON.parse(clean);
+};
+
+const hasShiftEnterBinding = (bindings) => {
+    if (!Array.isArray(bindings)) return false;
+    return bindings.some(b => 
+        b &&
+        typeof b.key === 'string' &&
+        b.key.toLowerCase().replace(/\s+/g, '') === 'shift+enter' &&
+        b.command === 'workbench.action.terminal.sendSequence' &&
+        b.args &&
+        b.args.text === '\u001b[13;2u' &&
+        typeof b.when === 'string' &&
+        b.when.includes('terminalFocus')
+    );
 };
 
 const getPromoOptions = (ideName) => {
@@ -313,6 +356,8 @@ const getProjectFiles = (() => {
     };
 })();
 
+let cachedShortcut = '\\ + Enter';
+
 export default function App({ args = [] }) {
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
@@ -545,6 +590,58 @@ export default function App({ args = [] }) {
     const [apiKey, setApiKey] = useState(null);
     const [tempKey, setTempKey] = useState('');
 
+    const addShiftEnterBinding = async (ideName) => {
+        const kbPath = getKeybindingsPath(ideName);
+        if (!kbPath) return;
+        try {
+            await fs.ensureDir(path.dirname(kbPath));
+            let bindings = [];
+            if (fs.existsSync(kbPath)) {
+                const content = fs.readFileSync(kbPath, 'utf8').trim();
+                if (content) {
+                    try {
+                        bindings = parseJsonc(content);
+                    } catch (e) {
+                        bindings = [];
+                    }
+                }
+            }
+            if (!Array.isArray(bindings)) {
+                bindings = [];
+            }
+            // Add the binding
+            bindings.push({
+                "key": "shift+enter",
+                "command": "workbench.action.terminal.sendSequence",
+                "args": {
+                    "text": "\u001b[13;2u"
+                },
+                "when": "terminalFocus"
+            });
+            fs.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), 'utf8');
+            cachedShortcut = 'Shift + Enter';
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'kb-success-' + Date.now(),
+                    role: 'system',
+                    text: `✅ Successfully configured Shift+Enter in your ${ideName} keybindings!`,
+                    isMeta: true
+                }];
+            });
+        } catch (err) {
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'kb-error-' + Date.now(),
+                    role: 'system',
+                    text: `❌ Failed to update keybindings: ${err.message}`,
+                    isMeta: true
+                }];
+            });
+        }
+    };
+
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [apiTier, setApiTier] = useState('Free');
     const [quotas, setQuotas] = useState({ agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
@@ -680,7 +777,9 @@ export default function App({ args = [] }) {
         const isIDE = !['Terminal', 'Windows Terminal'].includes(ideName) || !!process.env.VSC_TERMINAL_URL || !!process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS;
         return {
             isIDE,
-            shortcut: isIDE ? 'Shift + Enter' : 'Ctrl + Enter'
+            get shortcut() {
+                return cachedShortcut;
+            }
         };
     }, []);
 
@@ -1226,6 +1325,31 @@ export default function App({ args = [] }) {
                     });
                 } else {
                     setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+                }
+            }
+
+            // Check keybindings configuration
+            const detectedIde = getIDEName();
+            const isIDE = !['Terminal', 'Windows Terminal'].includes(detectedIde);
+            if (isIDE) {
+                const kbPath = getKeybindingsPath(detectedIde);
+                if (kbPath) {
+                    try {
+                        let bindings = [];
+                        if (fs.existsSync(kbPath)) {
+                            const content = fs.readFileSync(kbPath, 'utf8').trim();
+                            if (content) {
+                                bindings = parseJsonc(content);
+                            }
+                        }
+                        if (!hasShiftEnterBinding(bindings)) {
+                            setActiveView('keybindingsPrompt');
+                        } else {
+                            cachedShortcut = 'Shift + Enter';
+                        }
+                    } catch (e) {
+                        // Ignore parse errors or check failures
+                    }
                 }
             }
 
@@ -3621,6 +3745,35 @@ export default function App({ args = [] }) {
                             }}
                             onClose={() => setActiveView('chat')}
                         />
+                    </Box>
+                );
+            case 'keybindingsPrompt':
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1} width="100%">
+                        <Text color="cyan" bold underline>⌨️ CONFIGURE SHIFT+ENTER NEWLINE</Text>
+                        <Text marginTop={1}>
+                            To support multi-line inputs with <Text bold color="white">Shift + Enter</Text> for newline, a terminal sequence keybinding needs to be added to your IDE configuration.
+                        </Text>
+                        <Text marginTop={1}>
+                            Would you like FluxFlow to automatically add this to your {getIDEName()} keybindings?
+                        </Text>
+                        <Box marginTop={1}>
+                            <CommandMenu
+                                title="Add Keybinding?"
+                                items={[
+                                    { label: 'Yes, configure automatically', value: 'yes' },
+                                    { label: 'No, skip', value: 'no' }
+                                ]}
+                                onSelect={async (item) => {
+                                    if (item.value === 'yes') {
+                                        await addShiftEnterBinding(getIDEName());
+                                    } else {
+                                        cachedShortcut = '\\ + Enter';
+                                    }
+                                    setActiveView('chat');
+                                }}
+                            />
+                        </Box>
                     </Box>
                 );
             case 'memory':
