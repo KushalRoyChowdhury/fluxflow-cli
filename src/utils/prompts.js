@@ -92,7 +92,8 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- NO CHAT OUTPUT AFTER TOOL CALL IN SAME TURN
+- NO CHAT RESPONSE **AFTER** CALLING TOOLS IN SAME TURN
+- ONE THINKING BLOCK PER TURN
 - Basic LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 === END SYSTEM PROMPT ===`.trim();
 };

@@ -110,6 +110,7 @@ const cleanSignals = (text) => {
 
     // Secondary cleanup for protocol signals and success/error markers
     return result
+        .replace(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
         .replace(/\[TOOL RESULT\]:?\s*/gi, '')
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
@@ -134,10 +135,43 @@ const cleanSignals = (text) => {
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
     const availableWidth = columns - 10;
+    const trimmed = cleaned.trim();
+
+    if (!trimmed.includes('```')) {
+        return (
+            <Box width="100%" flexDirection="column">
+                <MarkdownText text={trimmed} color="gray" columns={availableWidth} italic={true} />
+            </Box>
+        );
+    }
+
+    const parts = trimmed.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
 
     return (
         <Box width="100%" flexDirection="column">
-            <MarkdownText text={cleaned.trim()} color="gray" columns={availableWidth} italic={true} />
+            {parts.map((part, i) => {
+                if (part.startsWith('```')) {
+                    const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
+                    const code = match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '');
+                    const wrappedCode = wrapText(code.trimEnd(), availableWidth);
+                    return (
+                        <Box key={i} flexDirection="column" width="100%">
+                            {wrappedCode.split('\n').map((line, idx) => (
+                                <Text key={idx} color="cyan">{line}</Text>
+                            ))}
+                        </Box>
+                    );
+                }
+                let cleanPart = part;
+                if (i > 0) {
+                    cleanPart = cleanPart.replace(/^[\r\n]+/, '');
+                }
+                if (i < parts.length - 1) {
+                    cleanPart = cleanPart.replace(/[\r\n]+$/, '');
+                }
+                if (!cleanPart) return null;
+                return <MarkdownText key={i} text={cleanPart} color="gray" columns={availableWidth} italic={true} />;
+            })}
         </Box>
     );
 };

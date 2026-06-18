@@ -3298,7 +3298,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().split(/\r?\n/).filter(line => !line.includes('[[UI_CONTEXT]]')).join('\n')}`;
+                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().replaceAll('[UI_CONTEXT]', '[CONTEXT]')}`;
                                 toolResults.push({ role: 'user', text: aiContent, binaryPart });
                                 anyToolExecutedInThisTurn = true;
 

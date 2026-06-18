@@ -1586,12 +1586,33 @@ var init_ChatLayout = __esm({
           }
         }
       }
-      return result.replace(/\[TOOL RESULT\]:?\s*/gi, "").split("\n").filter((line) => !line.trim().startsWith("SUCCESS:") && !line.trim().startsWith("ERROR:")).join("\n").replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\s*turn\s*:?.*?$/gi, "").replace(/\n\s*turn\s*:?.*?$/gi, "").replace(/\[\s*$/gi, "").replace(/\n\nResponded on .*/g, "").replace(/\n\n\[Prompted on: .*\]/g, "").replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, "\u2192").replace(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, "\u2190").replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, "\u2191").replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, "\u2193").replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, "\u2194").replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, "").replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
+      return result.replace(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, "").replace(/\[TOOL RESULT\]:?\s*/gi, "").split("\n").filter((line) => !line.trim().startsWith("SUCCESS:") && !line.trim().startsWith("ERROR:")).join("\n").replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\s*turn\s*:?.*?$/gi, "").replace(/\n\s*turn\s*:?.*?$/gi, "").replace(/\[\s*$/gi, "").replace(/\n\nResponded on .*/g, "").replace(/\n\n\[Prompted on: .*\]/g, "").replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, "\u2192").replace(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, "\u2190").replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, "\u2191").replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, "\u2193").replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, "\u2194").replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, "").replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
     };
     formatThinkText = (cleaned, columns = 80) => {
       if (!cleaned) return null;
       const availableWidth = columns - 10;
-      return /* @__PURE__ */ React3.createElement(Box3, { width: "100%", flexDirection: "column" }, /* @__PURE__ */ React3.createElement(MarkdownText, { text: cleaned.trim(), color: "gray", columns: availableWidth, italic: true }));
+      const trimmed = cleaned.trim();
+      if (!trimmed.includes("```")) {
+        return /* @__PURE__ */ React3.createElement(Box3, { width: "100%", flexDirection: "column" }, /* @__PURE__ */ React3.createElement(MarkdownText, { text: trimmed, color: "gray", columns: availableWidth, italic: true }));
+      }
+      const parts = trimmed.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
+      return /* @__PURE__ */ React3.createElement(Box3, { width: "100%", flexDirection: "column" }, parts.map((part, i) => {
+        if (part.startsWith("```")) {
+          const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
+          const code = match ? match[2] : part.replace(/^```\w*\n?/, "").replace(/```$/, "");
+          const wrappedCode = wrapText(code.trimEnd(), availableWidth);
+          return /* @__PURE__ */ React3.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, wrappedCode.split("\n").map((line, idx) => /* @__PURE__ */ React3.createElement(Text3, { key: idx, color: "cyan" }, line)));
+        }
+        let cleanPart = part;
+        if (i > 0) {
+          cleanPart = cleanPart.replace(/^[\r\n]+/, "");
+        }
+        if (i < parts.length - 1) {
+          cleanPart = cleanPart.replace(/[\r\n]+$/, "");
+        }
+        if (!cleanPart) return null;
+        return /* @__PURE__ */ React3.createElement(MarkdownText, { key: i, text: cleanPart, color: "gray", columns: availableWidth, italic: true });
+      }));
     };
     parseMathSymbols = (content) => {
       return content.replace(/\\multiply|\\mul|\\times/g, "\xD7").replace(/\\div/g, "\xF7").replace(/\\cdot/g, "\u22C5").replace(/\\infty/g, "\u221E").replace(/\\pm/g, "\xB1").replace(/\\leq/g, "\u2264").replace(/\\geq/g, "\u2265").replace(/\\neq/g, "\u2260").replace(/\\sqrt\s*\{([^}]+)\}/g, "\u221A($1)").replace(/\\sqrt\s*(\w+|\d+)/g, "\u221A($1)").replace(/\\alpha/g, "\u03B1").replace(/\\beta/g, "\u03B2").replace(/\\theta/g, "\u03B8").replace(/\\pi/g, "\u03C0").replace(/\\approx/g, "\u2248").replace(/\\Delta/g, "\u0394").replace(/\\sigma/g, "\u03C3").replace(/\\sum/g, "\u03A3").replace(/\\prod/g, "\u03A0").replace(/\\rightarrow|\\to/g, "\u2192").replace(/\\left\b|\\right\b/g, "").replace(/\\left\(|\\right\)/g, (match) => match.includes("left") ? "(" : ")").replace(/\\left\[|\\right\]/g, (match) => match.includes("left") ? "[" : "]").replace(/\\\{|\\\}/g, (match) => match.includes("{") ? "{" : "}").replace(/\\text\s*\{([^}]+)\}/g, "$1").replace(/\\text\s+(\w+)/g, "$1").replace(/\\%/g, "%");
@@ -3427,7 +3448,8 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- NO CHAT OUTPUT AFTER TOOL CALL IN SAME TURN
+- NO CHAT RESPONSE **AFTER** CALLING TOOLS IN SAME TURN
+- ONE THINKING BLOCK PER TURN
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
     };
@@ -9283,7 +9305,7 @@ ${boxBottom}` };
                       await incrementUsage("toolFailure");
                       if (settings.onToolResult) settings.onToolResult("failure", normToolName);
                     }
-                    const aiContent = `[TOOL RESULT]: ${(result || "").toString().split(/\r?\n/).filter((line) => !line.includes("[[UI_CONTEXT]]")).join("\n")}`;
+                    const aiContent = `[TOOL RESULT]: ${(result || "").toString().replaceAll("[UI_CONTEXT]", "[CONTEXT]")}`;
                     toolResults.push({ role: "user", text: aiContent, binaryPart });
                     anyToolExecutedInThisTurn = true;
                     let uiContent = `[TOOL RESULT]: ${result || ""}`;
