@@ -1842,7 +1842,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ''}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
@@ -1876,7 +1876,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
             if (loop > 0) {
-                yield { type: 'status', content: 'Working....' };
+                yield { type: 'status', content: 'Working...' };
             }
             if (TERMINATION_SIGNAL) {
                 yield { type: 'status', content: 'Request Cancelled' };
@@ -1892,7 +1892,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -2049,7 +2049,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                         if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
-                            lastUserMsg.parts[0].text += `\n[COMPILE ERROR] ${ideErr} [/ERROR]`;
+                            lastUserMsg.parts[0].text += `\n${ideErr} [/ERROR]`;
                         }
                     }
 
@@ -2057,7 +2057,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const isGemma = modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google";
 
                     if (isGemma) {
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}[/SYSTEM]`;
+                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''} [/SYSTEM]`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
@@ -2069,7 +2069,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
                         const currentStep = loop + 1;
                         if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly.[/SYSTEM]`;
+                            lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
                         }
                     }
 
@@ -2315,7 +2315,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (done) break;
 
                         if (isFirstChunk) {
-                            yield { type: 'status', content: 'Working...' };
+                            yield { type: 'status', content: 'Thinking...' };
                             isFirstChunk = false;
                         }
 
@@ -3493,7 +3493,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
+                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
@@ -3578,7 +3578,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-            yield { type: 'status', content: 'Working...' };
+            yield { type: 'status', content: 'Thinking...' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, '')
                 .trim();
@@ -3631,7 +3631,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 }
             } else {
                 if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure[/SYSTEM]` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure [/SYSTEM]` });
                 } else {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`} [/SYSTEM]` });
                 }

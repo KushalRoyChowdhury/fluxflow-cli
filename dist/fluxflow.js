@@ -4922,9 +4922,7 @@ ${tail}`;
 
 - Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]
 ${ancestry}- Content Preview:
-${snippet}
-
-[SYSTEM] Check the content preview for verification [/SYSTEM]`;
+${snippet}`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to write file [${targetPath}]: ${errorMsg}`;
@@ -8034,7 +8032,7 @@ ${ideCtx.warnings}
 CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
         modifiedHistory.push({ role: "user", text: firstUserMsg });
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
@@ -8057,7 +8055,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
           }
           if (loop > 0) {
-            yield { type: "status", content: "Working...." };
+            yield { type: "status", content: "Working..." };
           }
           if (TERMINATION_SIGNAL) {
             yield { type: "status", content: "Request Cancelled" };
@@ -8072,7 +8070,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 
 [STEERING HINT]: ${hint}`;
               } else {
-                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[STEERING HINT]: ${hint}` });
+                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT]: ${hint}` });
               }
               yield { type: "status", content: "Steering Hint Injected." };
             }
@@ -8205,13 +8203,13 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                 const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                 if (ideErr && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text) {
                   lastUserMsg.parts[0].text += `
-[COMPILE ERROR] ${ideErr} [/ERROR]`;
+${ideErr} [/ERROR]`;
                 }
               }
               const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
               if (isGemma) {
                 const jitInstruction = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""}[/SYSTEM]`;
+[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""} [/SYSTEM]`;
                 if (lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
                   lastUserMsg.parts[0].text += jitInstruction;
                 }
@@ -8221,7 +8219,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                 const currentStep = loop + 1;
                 if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                   lastUserMsg.parts[0].text += `
-[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly.[/SYSTEM]`;
+[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
                 }
               }
               const abortPromise = new Promise((_, reject) => {
@@ -8432,7 +8430,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                 ]);
                 if (done) break;
                 if (isFirstChunk) {
-                  yield { type: "status", content: "Working..." };
+                  yield { type: "status", content: "Thinking..." };
                   isFirstChunk = false;
                 }
                 if (TERMINATION_SIGNAL) {
@@ -9455,7 +9453,7 @@ ${boxBottom}` };
                   const waitTime = Math.min(1e3 * Math.pow(2, inStreamRetryCount - 1), 24e3);
                   if (turnText.trim().length > 0) {
                     modifiedHistory.push({ role: "agent", text: turnText });
-                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff[/SYSTEM]";
+                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
                     if (toolResults.length > 0) {
                       toolResults.forEach((tr, idx) => {
                         if (idx === toolResults.length - 1) {
@@ -9528,7 +9526,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
           const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase()) || /\[\[END\]\]/i.test(signalSafeText.toLowerCase()) || true;
           const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
           const shouldContinue = toolCallPointer > 0;
-          yield { type: "status", content: "Working..." };
+          yield { type: "status", content: "Thinking..." };
           const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, "").trim();
           let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
           isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
@@ -9561,7 +9559,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
             }
           } else {
             if (wasToolCalledInLastLoop) {
-              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure[/SYSTEM]` });
+              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure [/SYSTEM]` });
             } else {
               modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task use [[END]]"}`} [/SYSTEM]` });
             }
