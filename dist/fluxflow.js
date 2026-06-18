@@ -9549,17 +9549,18 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
           }
           wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
-        if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google") {
-          modifiedHistory.forEach((msg) => {
-            if (msg.role === "user" && msg.text && msg.text.startsWith("[TOOL RESULT]")) {
+        modifiedHistory.forEach((msg) => {
+          if (msg.role === "user" && msg.text) {
+            msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, "");
+            if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
               const jitInstructionFast = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
               const jitInstructionThinking = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
               msg.text = msg.text.replace(jitInstructionThinking, "").replace(jitInstructionFast, "").trim();
             }
-          });
-        }
+          }
+        });
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();

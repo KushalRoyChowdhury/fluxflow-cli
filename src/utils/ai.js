@@ -3642,16 +3642,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
 
-        // [JIT CLEANUP] - Clean up JIT instruction injection markers from the persistent history
-        if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google") {
-            modifiedHistory.forEach(msg => {
-                if (msg.role === 'user' && msg.text && msg.text.startsWith('[TOOL RESULT]')) {
+        // [JIT CLEANUP] - Clean up JIT instruction injection markers and compile errors from the persistent history
+        modifiedHistory.forEach(msg => {
+            if (msg.role === 'user' && msg.text) {
+                msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, '');
+
+                if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google" && msg.text.startsWith('[TOOL RESULT]')) {
                     const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
                     const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
                     msg.text = msg.text.replace(jitInstructionThinking, '').replace(jitInstructionFast, '').trim();
                 }
-            });
-        }
+            }
+        });
 
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
