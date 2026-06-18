@@ -47,7 +47,7 @@ const connect = () => {
             } else if (msg.command === 'securityResponse' && securityListener) {
                 securityListener(msg.result);
             }
-        } catch (e) {}
+        } catch (e) { }
     });
     socket.on('error', () => { isConnecting = false; ws = null; });
     socket.on('close', () => { isConnecting = false; ws = null; });

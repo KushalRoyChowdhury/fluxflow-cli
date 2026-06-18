@@ -7,7 +7,7 @@ try {
     const ptyModule = await import('node-pty');
     pty = ptyModule.default || ptyModule;
     pty = false;
-} catch (err) {}
+} catch (err) { }
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -61,13 +61,13 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                             setLog(prev => {
                                 const lines = prev.split('\n');
                                 const lastLine = lines[lines.length - 1];
-                                
+
                                 // Deduplicate progress updates (pnpm/npm style)
                                 if (lastLine?.startsWith('Progress:') && cleanStr.startsWith('Progress:')) {
                                     lines[lines.length - 1] = cleanStr;
                                     return lines.slice(-5).join('\n');
                                 }
-                                
+
                                 return (prev + '\n' + cleanStr).split('\n').slice(-5).join('\n');
                             });
                         }
@@ -163,7 +163,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                     } else if (typeof child.kill === 'function') {
                         child.kill();
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
         };
     }, []);

@@ -81,19 +81,19 @@ const loadUsageFromFile = async () => {
                 primaryData = parsed;
                 try {
                     await fs.rename(tempFile, USAGE_FILE);
-                } catch (e) {}
+                } catch (e) { }
             } else {
                 // Invalid structure inside .tmp - remove corrupted file safely
                 try {
                     await fs.remove(tempFile);
-                } catch (e) {}
+                } catch (e) { }
             }
         }
     } catch (err) {
         // Tmp file parsing or decryption failed (corrupted) - safely clean it up
         try {
             await fs.remove(tempFile);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // 1. Try reading primary usage file (if not already recovered from .tmp)
@@ -107,7 +107,7 @@ const loadUsageFromFile = async () => {
                     primaryData = JSON.parse(decryptAes(rawContent));
                 }
             }
-        } catch (err) {}
+        } catch (err) { }
     }
 
     // 2. Try reading backup redundancy file
@@ -120,7 +120,7 @@ const loadUsageFromFile = async () => {
                 backupData = JSON.parse(decryptAes(rawContent));
             }
         }
-    } catch (err) {}
+    } catch (err) { }
 
     let resolvedData = null;
 
@@ -132,7 +132,7 @@ const loadUsageFromFile = async () => {
             try {
                 await fs.ensureDir(path.dirname(BACKUP_FILE));
                 await fs.copy(USAGE_FILE, BACKUP_FILE);
-            } catch (e) {}
+            } catch (e) { }
         } else {
             resolvedData = primaryData;
         }
@@ -142,14 +142,14 @@ const loadUsageFromFile = async () => {
         try {
             await fs.ensureDir(path.dirname(BACKUP_FILE));
             await fs.copy(USAGE_FILE, BACKUP_FILE);
-        } catch (e) {}
+        } catch (e) { }
     } else if (!primaryData && backupData) {
         // Primary got wiped or deleted - Restore from backup redundancy!
         resolvedData = backupData;
         try {
             await fs.ensureDir(path.dirname(USAGE_FILE));
             await fs.copy(BACKUP_FILE, USAGE_FILE);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     if (resolvedData) {
@@ -210,7 +210,7 @@ const flushUsage = async () => {
                     diskData = JSON.parse(decryptAes(rawContent));
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
 
         if (diskData && diskData.date === cachedUsage.date && diskData.stats) {
             // Merge: Take the maximum of memory vs disk to prevent "Zero-Reset"
@@ -284,7 +284,7 @@ const flushUsage = async () => {
 
         isDirty = false;
         lastWriteTime = Date.now();
-    } catch (e) {}
+    } catch (e) { }
 };
 
 /**

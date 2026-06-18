@@ -103,7 +103,7 @@ export default function SettingsMenu({
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
                     { label: 'API Tier', value: 'apiTier', status: apiTier },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
-                ];            default:
+                ]; default:
                 return [];
         }
     };
@@ -344,8 +344,8 @@ export default function SettingsMenu({
 
                                 const isEditingThis = isSelected && editingItem &&
                                     ((editingItem === 'alwaysAskCommands' && item.value === 'alwaysAsk') ||
-                                     (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
-                                     (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow'));
+                                        (editingItem === 'autoApproveCommands' && item.value === 'autoApprove') ||
+                                        (editingItem === 'autoDisallowCommands' && item.value === 'autoDisallow'));
                                 const isCommandListItem = item.value === 'alwaysAsk' || item.value === 'autoApprove' || item.value === 'autoDisallow';
                                 const isParserDownload = item.value === 'parserDownload';
 

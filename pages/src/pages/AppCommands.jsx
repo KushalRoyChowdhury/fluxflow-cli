@@ -12,7 +12,7 @@ export default function AppCommands() {
         <DocPage headings={headings}>
             <h1 id="app-commands">App Commands</h1>
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
-                FluxFlow features a rich set of in-app slash commands to control the agent, 
+                FluxFlow features a rich set of in-app slash commands to control the agent,
                 manage your session, and configure settings on the fly without leaving the terminal.
             </p>
 

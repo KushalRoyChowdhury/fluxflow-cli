@@ -46,7 +46,7 @@ export const loadSettings = async () => {
     try {
         if (await fs.exists(SETTINGS_FILE)) {
             const saved = readAesEncryptedJson(SETTINGS_FILE);
-            
+
             // SECURITY SELF-HEALING MIGRATION:
             // Extract and migrate custom Pollinations API Key from settings.json to encrypted secrets.json
             if (saved.imageSettings && saved.imageSettings.apiKey) {
@@ -54,11 +54,11 @@ export const loadSettings = async () => {
                     const legacyKey = saved.imageSettings.apiKey;
                     const { saveSecret } = await import('./secrets.js');
                     await saveSecret('POLLINATIONS_API_KEY', legacyKey);
-                    
+
                     // Scrub immediately from settings file on disk
                     saved.imageSettings.apiKey = '';
                     writeAesEncryptedJson(SETTINGS_FILE, saved);
-                } catch (e) {}
+                } catch (e) { }
             }
 
             settingsObj = {
@@ -81,14 +81,14 @@ export const loadSettings = async () => {
         if (customApiKey) {
             settingsObj.imageSettings.apiKey = customApiKey;
         }
-    } catch (e) {}
+    } catch (e) { }
 
-    // [MIGRATION LOCK]: Always force showFullThinking to true. 
+    // [MIGRATION LOCK]: Always force showFullThinking to true.
     if (settingsObj.showFullThinking === false) {
         settingsObj.showFullThinking = true;
         try {
             writeAesEncryptedJson(SETTINGS_FILE, settingsObj);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     return settingsObj;
@@ -120,7 +120,7 @@ const migrateToExternal = async (newPath) => {
 export const saveSettings = async (settings) => {
     try {
         const current = await loadSettings();
-        
+
         // MIGRATION TRIGGER: If useExternalData is being turned ON
         if (!current.systemSettings.useExternalData && settings.systemSettings?.useExternalData && settings.systemSettings?.externalDataPath) {
             await migrateToExternal(settings.systemSettings.externalDataPath);

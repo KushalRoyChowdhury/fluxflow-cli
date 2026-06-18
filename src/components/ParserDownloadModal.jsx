@@ -4,14 +4,14 @@ import { emojiSpace } from '../utils/terminal.js';
 import { downloadWasm, isParserInstalled, deleteParser } from '../utils/parsers.js';
 
 const EXTENSIONS = [
-  { label: 'JavaScript', file: 'tree-sitter-javascript.wasm', exts: ['js', 'jsx'] },
-  { label: 'TypeScript', file: 'tree-sitter-typescript.wasm', exts: ['ts'] },
-  { label: 'TSX', file: 'tree-sitter-tsx.wasm', exts: ['tsx'] },
-  { label: 'Python', file: 'tree-sitter-python.wasm', exts: ['py'] },
-  { label: 'C', file: 'tree-sitter-c.wasm', exts: ['c'] },
-  { label: 'C++', file: 'tree-sitter-cpp.wasm', exts: ['cpp'] },
-  { label: 'Java', file: 'tree-sitter-java.wasm', exts: ['java'] },
-  { label: 'HTML', file: 'tree-sitter-html.wasm', exts: ['html'] }
+    { label: 'JavaScript', file: 'tree-sitter-javascript.wasm', exts: ['js', 'jsx'] },
+    { label: 'TypeScript', file: 'tree-sitter-typescript.wasm', exts: ['ts'] },
+    { label: 'TSX', file: 'tree-sitter-tsx.wasm', exts: ['tsx'] },
+    { label: 'Python', file: 'tree-sitter-python.wasm', exts: ['py'] },
+    { label: 'C', file: 'tree-sitter-c.wasm', exts: ['c'] },
+    { label: 'C++', file: 'tree-sitter-cpp.wasm', exts: ['cpp'] },
+    { label: 'Java', file: 'tree-sitter-java.wasm', exts: ['java'] },
+    { label: 'HTML', file: 'tree-sitter-html.wasm', exts: ['html'] }
 ];
 
 export default function ParserDownloadModal({ onClose }) {

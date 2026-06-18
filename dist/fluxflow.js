@@ -2209,7 +2209,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT FOR RUN**
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -3311,14 +3311,13 @@ ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON C
 
 Explicit Triggers for permanent memory:
 - User explicitly asks to 'remember' something.
-- User mentions something important that should be remembered.
-- User provides information that could be useful for future reference.
+- User mentions something important long-term that should be remembered.
+- User provides information that could be useful for long-term reference.
 - User shares personal information or preferences.
-- User talks about a specific topic that should be remembered.
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
-- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT THE ADD METHOD` : ""}`.trim();
+- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD` : ""}`.trim();
   }
 });
 
@@ -6064,7 +6063,7 @@ var init_todo = __esm({
           const content = getTasksString(tasks);
           await RevertManager.recordFileChange(todoFile);
           fs19.writeFileSync(todoFile, content, "utf8");
-          const total = (content.match(/^- \[ [xX ]\]/gm) || []).length;
+          const total = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           return `SUCCESS: TASK LIST CREATED (${total} total)
 ${content}`;
         }
@@ -6074,9 +6073,10 @@ ${content}`;
           await RevertManager.recordFileChange(todoFile);
           fs19.appendFileSync(todoFile, appendContent, "utf8");
           const fullContent = fs19.readFileSync(todoFile, "utf8");
-          const total = (fullContent.match(/^- \[ [xX ]\]/gm) || []).length;
-          const completed = (fullContent.match(/^- \[x\]/gim) || []).length;
-          const added = (appendContent.match(/^- \[ [xX ]\]/gm) || []).length;
+          const lines = fullContent.split(/\r?\n/).map((l) => l.trim());
+          const total = lines.filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
+          const completed = lines.filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
+          const added = appendContent.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           return `SUCCESS: TASK APPENDED (${completed} completed, ${total - completed} left, ${added} added)
 ${fullContent}`;
         }
@@ -6120,8 +6120,9 @@ ${fullContent}`;
               fs19.writeFileSync(todoFile, content, "utf8");
             }
           }
-          const total = (content.match(/^- \[ [xX ]\]/gm) || []).length;
-          const completed = (content.match(/^- \[x\]/gim) || []).length;
+          const totalLines = content.split(/\r?\n/).map((l) => l.trim());
+          const total = totalLines.filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
+          const completed = totalLines.filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           const prefix = markedCount > 0 ? `SUCCESS: ${markedCount} TASK(S) MARKED DONE` : `TODO GET`;
           return `${prefix}: ${completed} Completed, ${total - completed} left
 ${content}`;
@@ -8011,7 +8012,7 @@ ${ideCtx.warnings}
 CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText}[/USER]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
         modifiedHistory.push({ role: "user", text: firstUserMsg });
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
@@ -8049,7 +8050,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 
 [STEERING HINT]: ${hint}`;
               } else {
-                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [STEERING HINT]: ${hint}` });
+                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[STEERING HINT]: ${hint}` });
               }
               yield { type: "status", content: "Steering Hint Injected." };
             }
@@ -8201,10 +8202,6 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly.[/SYSTEM]`;
                 }
               }
-              fs20.writeFileSync(`contents.txt`, `${currentSystemInstruction}
-
-${firstUserMsg}`);
-              fs20.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));

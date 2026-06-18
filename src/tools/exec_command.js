@@ -555,9 +555,9 @@ export const exec_command = async (args, options = {}) => {
                         cols: options.cols || 120,
                         rows: options.rows || 30,
                         cwd: process.cwd(),
-                        env: { 
-                            ...process.env, 
-                            CI: 'false', 
+                        env: {
+                            ...process.env,
+                            CI: 'false',
                             TERM: 'xterm-256color',
                             FORCE_COLOR: '1',
                             ...netEnv
