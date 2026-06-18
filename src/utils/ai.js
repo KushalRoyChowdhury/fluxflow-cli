@@ -1842,7 +1842,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [USER] ${cleanAgentText}[/USER]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ''}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
         modifiedHistory.push({ role: 'user', text: firstUserMsg });
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
@@ -1892,7 +1892,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                         modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ''} [STEERING HINT]: ${hint}` });
+                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
                     }
                     yield { type: 'status', content: 'Steering Hint Injected.' };
                 }
@@ -2043,9 +2043,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
                     currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
 
+                    const lastUserMsg = contents[contents.length - 1];
+                    if (isBridgeConnected()) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        const ideCtxJIT = await getIDEContext();
+                        const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
+                        if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
+                            lastUserMsg.parts[0].text += `\n[COMPILE ERROR] ${ideErr} [/ERROR]`;
+                        }
+                    }
+
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const isGemma = modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google";
-                    const lastUserMsg = contents[contents.length - 1];
 
                     if (isGemma) {
                         const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''}[/SYSTEM]`;
@@ -2064,7 +2073,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
-                    // fs.writeFileSync(`contents_${thinkingLevel}.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
+                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     const abortPromise = new Promise((_, reject) => {
@@ -2670,6 +2679,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // END VISUAL FEEDBACK
 
+                                yield* flushGoogleBuffer();
+
                                 // EXECUTION LOGIC
                                 if (normToolName === 'exec_command') {
                                     const { command } = parseArgs(toolCall.args);
@@ -3146,7 +3157,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                                 yield { type: 'spinner', content: true };
 
-                                if (normToolName === 'write_file' && result.startsWith('SUCCESS')) {
+                                if ((normToolName === 'write_file' || normToolName === 'update_file') && result.startsWith('SUCCESS')) {
                                     const { path: filePath } = parseArgs(toolCall.args);
                                     if (filePath) {
                                         const absPath = path.resolve(process.cwd(), filePath);

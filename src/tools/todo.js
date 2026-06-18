@@ -8,7 +8,7 @@ import { RevertManager } from '../utils/revert.js';
  * Todo Tool
  * Manages a persistent markdown checkbox list for a specific chat.
  * Location: DATA_DIR/plan/<chat-id>/todo.md
- * 
+ *
  * [tool:functions.Todo(method="create/append/get", tasks=["task 1", "task 2"], markDone=["task 1"])]
  */
 export const todo = async (args, context = {}) => {
@@ -39,7 +39,7 @@ export const todo = async (args, context = {}) => {
     const getTasksString = (input) => {
         const rawItems = parseMessyArray(input);
         if (!rawItems) return '';
-        
+
         const items = Array.isArray(rawItems) ? rawItems : String(rawItems).split('\n');
         return items
             .map(item => {
@@ -60,28 +60,28 @@ export const todo = async (args, context = {}) => {
 
         if (method === 'create') {
             if (!tasks) return 'ERROR: Missing "tasks" for create method.';
-            
+
             const content = getTasksString(tasks);
             await RevertManager.recordFileChange(todoFile);
             fs.writeFileSync(todoFile, content, 'utf8');
 
-            const total = (content.match(/^- \[ [xX ]\]/gm) || []).length;
+            const total = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             return `SUCCESS: TASK LIST CREATED (${total} total)\n${content}`;
         }
 
         if (method === 'append') {
             if (!tasks) return 'ERROR: Missing "tasks" for append method.';
-            
+
             const appendContent = getTasksString(tasks);
             await RevertManager.recordFileChange(todoFile);
             fs.appendFileSync(todoFile, appendContent, 'utf8');
 
-            // Read the whole file back to calculate stats
             const fullContent = fs.readFileSync(todoFile, 'utf8');
-            const total = (fullContent.match(/^- \[ [xX ]\]/gm) || []).length;
-            const completed = (fullContent.match(/^- \[x\]/gim) || []).length;
-            const added = (appendContent.match(/^- \[ [xX ]\]/gm) || []).length;
-            
+            const lines = fullContent.split(/\r?\n/).map(l => l.trim());
+            const total = lines.filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+            const completed = lines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+            const added = appendContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+
             return `SUCCESS: TASK APPENDED (${completed} completed, ${total - completed} left, ${added} added)\n${fullContent}`;
         }
 
@@ -114,7 +114,7 @@ export const todo = async (args, context = {}) => {
                             break;
                         }
                     }
-                    
+
                     // Second pass: Case-insensitive fallback
                     if (!updatedThisTarget) {
                         for (let i = 0; i < lines.length; i++) {
@@ -136,9 +136,10 @@ export const todo = async (args, context = {}) => {
                 }
             }
 
-            const total = (content.match(/^- \[ [xX ]\]/gm) || []).length;
-            const completed = (content.match(/^- \[x\]/gim) || []).length;
-            
+            const totalLines = content.split(/\r?\n/).map(l => l.trim());
+            const total = totalLines.filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+            const completed = totalLines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+
             const prefix = markedCount > 0 ? `SUCCESS: ${markedCount} TASK(S) MARKED DONE` : `TODO GET`;
             return `${prefix}: ${completed} Completed, ${total - completed} left\n${content}`;
         }

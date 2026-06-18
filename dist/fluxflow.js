@@ -2193,7 +2193,7 @@ Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **N
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED)" : ""}. Next Turn, verify tool results, plan next**
-${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON EACH TURN outside 3 call limit" : ""}
+${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EACH TURN***" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
 
@@ -2205,7 +2205,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps
-4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
+4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT FOR RUN**
@@ -3327,7 +3327,7 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? What happens under resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach. Search for, off by one errors, integer overflow, null/undefined propagation, unhandled promises, resource leaks, SQL injection vectors, XSS vulnerabilities, CSRF holes, timing attacks, and privilege escalation paths\nReason about observability, what metrics matter? Where are the logging gaps? How will this be debugged in production at 3am?\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing a single line\nTHINK FORMAT RULES OVERRIDE:\n- NO HEADINGS/MARKERS/LISTS/BULLET POINTS\n- Dense, unbroken stream of consciousness that reads like an internal monologue\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings (verify context, check for hidden complexity)",
+      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? What happens under resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach. Search for, off by one errors, integer overflow, null/undefined propagation, unhandled promises, resource leaks, SQL injection vectors, XSS vulnerabilities, CSRF holes, timing attacks, and privilege escalation paths\nReason about observability, what metrics matter? Where are the logging gaps? How will this be debugged in production at 3am?\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing a single line\nRULES:\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings (verify context, check for hidden complexity)",
       High: "EFFORT LEVEL: HIGH\nThink in a rigorous, technically grounded monologue within <think>...</think>. Treat this as a design review where every decision must be justified:\nBreak the objective into verifiable steps with clear success criteria. Identify the critical path and potential bottlenecks\nMentally compile and execute your approach. Check for: missing imports, undefined behavior, type mismatches, unhandled errors, and resource cleanup. Trace data flow from input to output, noting transformations\nRecognize design patterns and anti patterns. If you see God objects, tight coupling, or premature optimization, call it out and refactor mentally before committing\nEvaluate performance characteristics. Will this scale? Are there O(n\xB2) operations hiding in innocent looking code? Where are the allocation hotspots?\nConsider the error surface, what can fail and how? Design error handling that preserves invariants and provides actionable feedback\nReview your architecture for, separation of concerns, single responsibility, dependency inversion, and interface segregation. Ensure clean abstractions with minimal coupling\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Continuous analytical flow\n- Verify correctness through first principles reasoning, not pattern matching\n- Actively search for ways your solution could fail or degrade\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full technical verification for all tasks/greetings",
       Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technically-aware monologue within <think>...</think>\nIdentify the most direct path that satisfies requirements without over-engineering\nQuickly scan for obvious issues, missing error handling, incorrect input assumptions, forgotten edge cases, or missing dependencies\nVerify the solution is appropriately modular with cohesive changes\nOutline the concrete changes, which files, which functions, what the key logic looks like\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Clean logical stream\n- Efficient but deliberate. Focus energy on actionable implementation details\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
       Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Just verify the basics:\nConfirm what the user wants and whether it's straightforward or has hidden complexity\nIdentify the specific tool, file, or action needed\nCheck for any obvious correctness issues before acting\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Few lines of clear thought\n- Just enough thinking to avoid obvious mistakes\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- Suitable for simple requests/greetings",
@@ -8011,7 +8011,7 @@ ${ideCtx.warnings}
 CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]" : ""}` : ""} [USER] ${cleanAgentText}[/USER]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\n[/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText}[/USER]`.trim();
         modifiedHistory.push({ role: "user", text: firstUserMsg });
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
@@ -8175,8 +8175,17 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                 yield { type: "model_update", content: null };
               }
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
-              const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
               const lastUserMsg = contents[contents.length - 1];
+              if (isBridgeConnected()) {
+                await new Promise((resolve) => setTimeout(resolve, 2e3));
+                const ideCtxJIT = await getIDEContext();
+                const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
+                if (ideErr && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text) {
+                  lastUserMsg.parts[0].text += `
+[COMPILE ERROR] ${ideErr} [/ERROR]`;
+                }
+              }
+              const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
               if (isGemma) {
                 const jitInstruction = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""}[/SYSTEM]`;
@@ -8192,6 +8201,10 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly.[/SYSTEM]`;
                 }
               }
+              fs20.writeFileSync(`contents.txt`, `${currentSystemInstruction}
+
+${firstUserMsg}`);
+              fs20.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));
@@ -8727,6 +8740,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                     } else {
                       label = `Executed: ${toolCall.toolName}`;
                     }
+                    yield* flushGoogleBuffer2();
                     if (normToolName === "exec_command") {
                       const { command } = parseArgs(toolCall.args);
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
@@ -9157,7 +9171,7 @@ ${boxBottom}` };
                     }
                     let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                     yield { type: "spinner", content: true };
-                    if (normToolName === "write_file" && result.startsWith("SUCCESS")) {
+                    if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
                         const absPath = path19.resolve(process.cwd(), filePath);

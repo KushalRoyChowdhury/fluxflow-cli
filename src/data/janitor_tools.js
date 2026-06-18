@@ -16,11 +16,10 @@ ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON C
 
 Explicit Triggers for permanent memory:
 - User explicitly asks to 'remember' something.
-- User mentions something important that should be remembered.
-- User provides information that could be useful for future reference.
+- User mentions something important long-term that should be remembered.
+- User provides information that could be useful for long-term reference.
 - User shares personal information or preferences.
-- User talks about a specific topic that should be remembered.
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
-- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT THE ADD METHOD` : ''}`.trim();
+- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD` : ''}`.trim();
