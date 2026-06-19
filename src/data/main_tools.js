@@ -30,7 +30,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
+1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**

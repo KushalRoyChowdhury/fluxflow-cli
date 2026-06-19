@@ -1852,7 +1852,7 @@ var init_ChatLayout = __esm({
       const isTerminalRecord = msg.isTerminalRecord;
       const isHomeWarning = msg.isHomeWarning;
       if (isHomeWarning) {
-        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "red", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, backgroundColor: "#3a0000" }, /* @__PURE__ */ React3.createElement(Text3, { color: "red", bold: true }, msg.text)), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, msg.subText))));
+        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "yellow", dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, backgroundColor: "#3a0000" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, msg.text)), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, msg.subText))));
       }
       if (msg.isLogo) {
         return /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React3.createElement(Text3, null, getFluxLogo(version, aiProvider)));
@@ -2223,7 +2223,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. User gives image/doc: VIEW FIRST` : `No Multimodal support`}` : `Supports images/docs. User gives image/doc: VIEW FIRST`}
+1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, dependency, functions, variable maps
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
@@ -6370,6 +6370,7 @@ var init_ai = __esm({
     await init_tools();
     init_crypto();
     init_arg_parser();
+    init_view_file();
     init_terminal();
     init_text();
     init_paths();
@@ -8028,12 +8029,133 @@ ${ideCtx.warnings}
           }
         }
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
+        const tagRegex = /@\[([^\]]+)\]/g;
+        let match;
+        const tagsFound = [];
+        tagRegex.lastIndex = 0;
+        while ((match = tagRegex.exec(cleanAgentText)) !== null) {
+          tagsFound.push(match[1]);
+        }
+        let taggedContextBlocks = [];
+        let attachedBinaryPart = null;
+        for (const tag of tagsFound) {
+          try {
+            let tagClean = tag.trim().replace(/^["']|["']$/g, "");
+            const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
+            const matchRange = tagClean.match(lineRangeRegex);
+            let filePath = tagClean;
+            let startLine = null;
+            let endLine = null;
+            if (matchRange) {
+              startLine = parseInt(matchRange[1], 10);
+              endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
+              filePath = tagClean.slice(0, matchRange.index);
+            }
+            const absPath = path19.resolve(process.cwd(), filePath);
+            if (fs20.existsSync(absPath)) {
+              const stats = fs20.statSync(absPath);
+              if (stats.isFile()) {
+                const pathLower = filePath.toLowerCase();
+                const isPdf = pathLower.endsWith(".pdf");
+                const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
+                const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                const isMultimodalFile = isImage || isPdf || isOfficeFile;
+                const isSupported = aiProvider === "Google" || MULTIMODAL_MODELS.includes(modelName);
+                if (isMultimodalFile && !isSupported) {
+                  let terminalWidth = 115;
+                  if (process.stdout.isTTY) {
+                    terminalWidth = process.stdout.columns - 10 || 120;
+                  }
+                  const boxLines = [`${isImage ? "\u{1F4F8}" : "\u{1F4C4}"} UNSUPPORTED MODALITY FOR THIS MODEL`];
+                  const maxLen = Math.max(...boxLines.map((l) => l.length));
+                  const boxWidth = Math.min(maxLen + 4, terminalWidth);
+                  const boxTop = `\u256D${"\u2500".repeat(boxWidth)}\u256E`;
+                  const boxMid = boxLines.map((line) => `\u2502 ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} \u2502`).join("\n");
+                  const boxBottom = `\u2570${"\u2500".repeat(boxWidth)}\u256F`;
+                  yield { type: "visual_feedback", content: `${boxTop}
+${boxMid}
+${boxBottom}` };
+                  continue;
+                }
+                const finalStart = startLine !== null ? startLine : 1;
+                let finalEnd = endLine !== null ? endLine : startLine !== null ? startLine : finalStart + 499;
+                if (finalEnd - finalStart > 500) {
+                  finalEnd = finalStart + 500;
+                }
+                const argsStr = `path=${JSON.stringify(filePath)}, startLine=${finalStart}, endLine=${finalEnd}`;
+                const result = await view_file(argsStr, { isMultiModal: isSupported });
+                let isError = false;
+                let textResult = "";
+                let binPart = null;
+                if (typeof result === "string") {
+                  if (result.trim().startsWith("ERROR")) {
+                    isError = true;
+                  } else {
+                    textResult = result;
+                  }
+                } else if (result && typeof result === "object") {
+                  if (result.binaryPart) {
+                    binPart = result.binaryPart;
+                    textResult = result.text || "";
+                  } else {
+                    isError = true;
+                  }
+                } else {
+                  isError = true;
+                }
+                if (!isError) {
+                  let label = "";
+                  if (isImage) {
+                    label = `\u{1F4F8} Viewed: ${filePath}`;
+                    attachedBinaryPart = binPart;
+                  } else if (isPdf || isOfficeFile) {
+                    label = `\u{1F4C4} Viewed: ${filePath}`;
+                    attachedBinaryPart = binPart;
+                  } else {
+                    let totalLines = "...";
+                    try {
+                      const content = fs20.readFileSync(absPath, "utf8");
+                      totalLines = content.split("\n").length;
+                    } catch (e) {
+                    }
+                    label = `\u{1F4C4} Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                    taggedContextBlocks.push(textResult);
+                  }
+                  if (label) {
+                    let terminalWidth = 115;
+                    if (process.stdout.isTTY) {
+                      terminalWidth = process.stdout.columns - 10 || 120;
+                    }
+                    const boxLines = [label];
+                    const maxLen = Math.max(...boxLines.map((l) => l.length));
+                    const boxWidth = Math.min(maxLen + 4, terminalWidth);
+                    const boxTop = `\u256D${"\u2500".repeat(boxWidth)}\u256E`;
+                    const boxMid = boxLines.map((line) => `\u2502 ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} \u2502`).join("\n");
+                    const boxBottom = `\u2570${"\u2500".repeat(boxWidth)}\u256F`;
+                    yield { type: "visual_feedback", content: `${boxTop}
+${boxMid}
+${boxBottom}` };
+                  }
+                }
+              }
+            }
+          } catch (e) {
+          }
+        }
+        let taggedContextStr = "";
+        if (taggedContextBlocks.length > 0) {
+          taggedContextStr = "[TAGGED CONTEXT]\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED CONTEXT]\n";
+        }
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
 CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
-        modifiedHistory.push({ role: "user", text: firstUserMsg });
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+        const userMsgObj = { role: "user", text: firstUserMsg };
+        if (attachedBinaryPart) {
+          userMsgObj.binaryPart = attachedBinaryPart;
+        }
+        modifiedHistory.push(userMsgObj);
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
         }
@@ -8353,14 +8475,14 @@ ${ideErr} [/ERROR]`;
                       { type: "end", idx: endIdx, start: "[[END]]", end: "[[END]]" }
                     ].filter((i) => i.idx !== -1).sort((a, b) => a.idx - b.idx);
                     if (indices.length > 0) {
-                      const match = indices[0];
-                      if (match.idx > 0) {
-                        msgs.push({ type: "text", content: remaining.substring(0, match.idx) });
+                      const match2 = indices[0];
+                      if (match2.idx > 0) {
+                        msgs.push({ type: "text", content: remaining.substring(0, match2.idx) });
                       }
                       isBufferingToolCall = true;
-                      activeBufferType = match.type;
+                      activeBufferType = match2.type;
                       toolCallBuffer = "";
-                      remaining = remaining.substring(match.idx);
+                      remaining = remaining.substring(match2.idx);
                     } else {
                       const potentialStarts = ["[tool", "[[END]]"];
                       let splitPoint = -1;
@@ -12594,7 +12716,7 @@ Selection: ${val}`,
             }
             if (packet.type === "visual_feedback") {
               setMessages((prev) => [...prev, {
-                id: "feedback-" + Date.now(),
+                id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
                 role: "system",
                 text: packet.content,
                 isVisualFeedback: true
@@ -13295,7 +13417,7 @@ Selection: ${val}`,
           }
         ));
       case "keybindingsPrompt":
-        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "cyan", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "cyan", bold: true, underline: true }, "\u2328\uFE0F CONFIGURE SHIFT+ENTER NEWLINE"), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "To support multi-line inputs with ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "Shift + Enter"), " for newline, a terminal sequence keybinding needs to be added to your IDE configuration."), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "Would you like FluxFlow to automatically add this to your ", getIDEName(), " keybindings?"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
+        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "\u2328 CONFIGURE SHIFT+ENTER NEWLINE"), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "To support multi-line inputs with ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "Shift + Enter"), " for newline, a terminal sequence keybinding needs to be added to your IDE configuration."), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "Would you like FluxFlow to automatically add this to your ", getIDEName(), " keybindings?"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
           CommandMenu,
           {
             title: "Add Keybinding?",

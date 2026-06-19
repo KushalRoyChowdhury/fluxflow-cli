@@ -8,6 +8,7 @@ import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
+import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
 
@@ -1842,8 +1843,139 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
-        modifiedHistory.push({ role: 'user', text: firstUserMsg });
+
+        // Tagged files parsing and attaching
+        const tagRegex = /@\[([^\]]+)\]/g;
+        let match;
+        const tagsFound = [];
+        tagRegex.lastIndex = 0;
+        while ((match = tagRegex.exec(cleanAgentText)) !== null) {
+            tagsFound.push(match[1]);
+        }
+
+        let taggedContextBlocks = [];
+        let attachedBinaryPart = null;
+
+        for (const tag of tagsFound) {
+            try {
+                let tagClean = tag.trim().replace(/^["']|["']$/g, '');
+                const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
+                const matchRange = tagClean.match(lineRangeRegex);
+                let filePath = tagClean;
+                let startLine = null;
+                let endLine = null;
+                if (matchRange) {
+                    startLine = parseInt(matchRange[1], 10);
+                    endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
+                    filePath = tagClean.slice(0, matchRange.index);
+                }
+
+                const absPath = path.resolve(process.cwd(), filePath);
+                if (fs.existsSync(absPath)) {
+                    const stats = fs.statSync(absPath);
+                    if (stats.isFile()) {
+                        const pathLower = filePath.toLowerCase();
+                        const isPdf = pathLower.endsWith('.pdf');
+                        const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
+                        const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                        const isMultimodalFile = isImage || isPdf || isOfficeFile;
+                        const isSupported = aiProvider === 'Google' || MULTIMODAL_MODELS.includes(modelName);
+
+                        if (isMultimodalFile && !isSupported) {
+                            let terminalWidth = 115;
+                            if (process.stdout.isTTY) {
+                                terminalWidth = process.stdout.columns - 10 || 120;
+                            }
+                            const boxLines = [`${isImage ? '📸' : '📄'} UNSUPPORTED MODALITY FOR THIS MODEL`];
+                            const maxLen = Math.max(...boxLines.map(l => l.length));
+                            const boxWidth = Math.min(maxLen + 4, terminalWidth);
+                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                            const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
+                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                            continue;
+                        }
+
+                        const finalStart = startLine !== null ? startLine : 1;
+                        let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 499);
+                        if (finalEnd - finalStart > 500) {
+                            finalEnd = finalStart + 500;
+                        }
+
+                        const argsStr = `path=${JSON.stringify(filePath)}, startLine=${finalStart}, endLine=${finalEnd}`;
+                        const result = await view_file(argsStr, { isMultiModal: isSupported });
+
+                        let isError = false;
+                        let textResult = '';
+                        let binPart = null;
+
+                        if (typeof result === 'string') {
+                            if (result.trim().startsWith('ERROR')) {
+                                isError = true;
+                            } else {
+                                textResult = result;
+                            }
+                        } else if (result && typeof result === 'object') {
+                            if (result.binaryPart) {
+                                binPart = result.binaryPart;
+                                textResult = result.text || '';
+                            } else {
+                                isError = true;
+                            }
+                        } else {
+                            isError = true;
+                        }
+
+                        if (!isError) {
+                            let label = '';
+                            if (isImage) {
+                                label = `📸 Viewed: ${filePath}`;
+                                attachedBinaryPart = binPart;
+                            } else if (isPdf || isOfficeFile) {
+                                label = `📄 Viewed: ${filePath}`;
+                                attachedBinaryPart = binPart;
+                            } else {
+                                let totalLines = '...';
+                                try {
+                                    const content = fs.readFileSync(absPath, 'utf8');
+                                    totalLines = content.split('\n').length;
+                                } catch (e) {}
+                                label = `📄 Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                                taggedContextBlocks.push(textResult);
+                            }
+
+                            if (label) {
+                                let terminalWidth = 115;
+                                if (process.stdout.isTTY) {
+                                    terminalWidth = process.stdout.columns - 10 || 120;
+                                }
+                                const boxLines = [label];
+                                const maxLen = Math.max(...boxLines.map(l => l.length));
+                                const boxWidth = Math.min(maxLen + 4, terminalWidth);
+                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
+                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore errors, keep silent
+            }
+        }
+
+        let taggedContextStr = '';
+        if (taggedContextBlocks.length > 0) {
+            taggedContextStr = '[TAGGED CONTEXT]\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED CONTEXT]\n';
+        }
+
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+        const userMsgObj = { role: 'user', text: firstUserMsg };
+        if (attachedBinaryPart) {
+            userMsgObj.binaryPart = attachedBinaryPart;
+        }
+        modifiedHistory.push(userMsgObj);
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
             yield { type: 'summary_injected', content: { id: history[history.length - 1].id, text: firstUserMsg } };

@@ -645,9 +645,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (isHomeWarning) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="red" padding={0} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="yellow" dimColor padding={0} width="100%">
                     <Box paddingX={1} backgroundColor="#3a0000">
-                        <Text color="red" bold>{msg.text}</Text>
+                        <Text color="white" bold>{msg.text}</Text>
                     </Box>
                     <Box paddingX={1} marginTop={0} marginBottom={0}>
                         <Text color="white">{msg.subText}</Text>

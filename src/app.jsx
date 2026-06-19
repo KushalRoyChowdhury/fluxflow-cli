@@ -100,7 +100,7 @@ const parseJsonc = (content) => {
 
 const hasShiftEnterBinding = (bindings) => {
     if (!Array.isArray(bindings)) return false;
-    return bindings.some(b => 
+    return bindings.some(b =>
         b &&
         typeof b.key === 'string' &&
         b.key.toLowerCase().replace(/\s+/g, '') === 'shift+enter' &&
@@ -2723,7 +2723,7 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'visual_feedback') {
                             setMessages(prev => [...prev, {
-                                id: 'feedback-' + Date.now(),
+                                id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
                                 role: 'system',
                                 text: packet.content,
                                 isVisualFeedback: true
@@ -3749,8 +3749,8 @@ export default function App({ args = [] }) {
                 );
             case 'keybindingsPrompt':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1} width="100%">
-                        <Text color="cyan" bold underline>⌨️ CONFIGURE SHIFT+ENTER NEWLINE</Text>
+                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
+                        <Text color="white" bold underline>⌨ CONFIGURE SHIFT+ENTER NEWLINE</Text>
                         <Text marginTop={1}>
                             To support multi-line inputs with <Text bold color="white">Shift + Enter</Text> for newline, a terminal sequence keybinding needs to be added to your IDE configuration.
                         </Text>
