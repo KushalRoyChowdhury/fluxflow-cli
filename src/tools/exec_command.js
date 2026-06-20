@@ -264,6 +264,9 @@ export const adjustWindowsCommand = (command, usePowerShell = false) => {
         // Ignore URLs
         if (/^(https?|file|ftp):\/\//i.test(str)) return false;
 
+        // Ignore scoped npm packages (e.g. @types/inquirer)
+        if (str.startsWith('@')) return false;
+
         // Ignore Windows command-line switches (starts with / and contains no other slashes)
         // e.g. /s, /q, /y, /?, /A, /help
         if (str.startsWith('/') && (str.match(/\//g) || []).length === 1) {

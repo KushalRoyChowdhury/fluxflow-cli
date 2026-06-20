@@ -110,25 +110,29 @@ const cleanSignals = (text) => {
 
     // Secondary cleanup for protocol signals and success/error markers
     return result
-        .replace(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
-        .replace(/\[TOOL RESULT\]:?\s*/gi, '')
+        .replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
+        .replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, '')
+        .replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, '')
+        // .replaceAll('[ANSWER]', '')
+        // .replaceAll('[/ANSWER]', '')
+        .replaceAll(/\[TOOL RESULT\]:?\s*/gi, '')
         .split('\n')
         .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
         .join('\n')
-        .replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
-        .replace(/\[\[END\]\]/gi, '')
-        .replace(/\[\s*turn\s*:?.*?$/gi, '')
-        .replace(/\n\s*turn\s*:?.*?$/gi, '')
-        .replace(/\[\s*$/gi, '')
-        .replace(/\n\nResponded on .*/g, '')
-        .replace(/\n\n\[Prompted on: .*\]/g, '')
-        .replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
-        .replace(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
-        .replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
-        .replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
-        .replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
-        .replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
+        .replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
+        .replaceAll(/\[\[END\]\]/gi, '')
+        .replaceAll(/\[\s*turn\s*:?.*?$/gi, '')
+        .replaceAll(/\n\s*turn\s*:?.*?$/gi, '')
+        .replaceAll(/\[\s*$/gi, '')
+        .replaceAll(/\n\nResponded on .*/g, '')
+        .replaceAll(/\n\n\[Prompted on: .*\]/g, '')
+        .replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
+        .replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
+        .replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
+        .replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
+        .replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
+        .replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
+        .replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
 };
 
@@ -524,7 +528,7 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     );
 });
 
-const CodeRenderer = React.memo(({ text, columns = 80 }) => {
+export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     if (!text) return null;
 
     // SCENARIO 1: Surgical Diff [DIFF_START]
@@ -776,6 +780,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/save', desc: 'Force save current chat' },
             { cmd: '/export', desc: 'Export current chat in a .txt file' },
             { cmd: '/chats', desc: 'List all chat sessions' },
+            { cmd: '/btw', desc: 'Send raw inquiry mid-turn' },
             { cmd: '/image', desc: 'Generate images' },
             { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
             { cmd: '/thinking', desc: 'Set AI reasoning depth' },

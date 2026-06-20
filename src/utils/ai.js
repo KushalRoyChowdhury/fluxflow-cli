@@ -2016,17 +2016,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 break;
             }
 
+            // Here.. LOL.. Seeing THIS??!!! **LOOOL**
+
             // Check for incoming Steering Hints
             if (steeringCallback) {
                 const hint = await steeringCallback();
                 if (hint) {
-                    // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
-                    if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
-                        modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT]: ${hint}`;
+                    if (hint.startsWith('/btw')) {
+                        if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]`;
+                        } else {
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
+                        }
                     } else {
-                        modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT]: ${hint}` });
+                        // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
+                        if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
+                        } else {
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                        }
                     }
-                    yield { type: 'status', content: 'Steering Hint Injected.' };
+                    yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
                 }
             }
 
@@ -2177,12 +2187,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected()) {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        yield { type: 'status', content: 'Checking Code...' };
+                        await new Promise(resolve => setTimeout(resolve, 2500)); // Buffer for IDE to parse the code
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                         if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
                             lastUserMsg.parts[0].text += `\n${ideErr} [/ERROR]`;
                         }
+                        yield { type: 'status', content: 'Working...' };
                     }
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
@@ -2819,13 +2831,131 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
                                         const currentDrive = path.resolve(process.cwd()).substring(0, 3).toLowerCase();
-                                        const isViolating = riskyPatterns.some(pattern => {
-                                            if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
-                                                const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
-                                                return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+
+                                        // Split command line into commands by operators (&&, ||, ;, |, &) respecting quotes
+                                        const splitCommands = (cmdString) => {
+                                            const commands = [];
+                                            let current = '';
+                                            let inQuote = null;
+                                            for (let i = 0; i < cmdString.length; i++) {
+                                                const char = cmdString[i];
+                                                if (inQuote) {
+                                                    if (char === inQuote) inQuote = null;
+                                                    current += char;
+                                                } else {
+                                                    if (char === '"' || char === "'") {
+                                                        inQuote = char;
+                                                        current += char;
+                                                    } else if (
+                                                        (char === '&' && cmdString[i + 1] === '&') ||
+                                                        (char === '|' && cmdString[i + 1] === '|')
+                                                    ) {
+                                                        if (current.trim()) {
+                                                            commands.push(current.trim());
+                                                            current = '';
+                                                        }
+                                                        i++; // skip next char
+                                                    } else if (char === ';' || char === '|' || char === '&') {
+                                                        if (current.trim()) {
+                                                            commands.push(current.trim());
+                                                            current = '';
+                                                        }
+                                                    } else {
+                                                        current += char;
+                                                    }
+                                                }
                                             }
-                                            return pattern.test(command);
+                                            if (current.trim()) {
+                                                commands.push(current.trim());
+                                            }
+                                            return commands;
+                                        };
+
+                                        // Tokenize a command command part into arguments respecting quotes
+                                        const tokenizeCommand = (cmd) => {
+                                            const tokens = [];
+                                            let current = '';
+                                            let inQuote = null;
+                                            for (let i = 0; i < cmd.length; i++) {
+                                                const char = cmd[i];
+                                                if (inQuote) {
+                                                    if (char === inQuote) {
+                                                        inQuote = null;
+                                                        current += char;
+                                                    } else {
+                                                        current += char;
+                                                    }
+                                                } else {
+                                                    if (char === '"' || char === "'") {
+                                                        inQuote = char;
+                                                        current += char;
+                                                    } else if (/\s/.test(char)) {
+                                                        if (current) {
+                                                            tokens.push(current);
+                                                            current = '';
+                                                        }
+                                                    } else {
+                                                        current += char;
+                                                    }
+                                                }
+                                            }
+                                            if (current) {
+                                                tokens.push(current);
+                                            }
+                                            return tokens;
+                                        };
+
+                                        const checkToken = (token) => {
+                                            const cleanToken = token.replace(/^['"]|['"]$/g, '').trim();
+                                            if (!cleanToken) return false;
+
+                                            // Ignore Windows command-line switches like /s, /y, /?
+                                            if (process.platform === 'win32' && /^\/[a-zA-Z0-9?]+$/.test(cleanToken)) {
+                                                return false;
+                                            }
+
+                                            return riskyPatterns.some(pattern => {
+                                                if (pattern.source === '[a-zA-Z]:[\\\\\\/]') {
+                                                    const driveMatch = cleanToken.match(/[a-zA-Z]:[\\\/]/i);
+                                                    return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+                                                }
+                                                return pattern.test(cleanToken);
+                                            });
+                                        };
+
+                                        const commandParts = splitCommands(command);
+                                        const isViolating = commandParts.some(cmdPart => {
+                                            const tokens = tokenizeCommand(cmdPart);
+                                            if (tokens.length === 0) return false;
+
+                                            const exe = tokens[0].replace(/^['"]|['"]$/g, '').toLowerCase();
+                                            const isSafePrint = ['echo', 'printf', 'write-output'].includes(exe);
+
+                                            if (isSafePrint) {
+                                                // For echo/printf, only check redirection operators or redirection targets
+                                                let checkNext = false;
+                                                return tokens.some(token => {
+                                                    const clean = token.replace(/^['"]|['"]$/g, '');
+                                                    if (clean === '>' || clean === '>>' || clean === '<') {
+                                                        checkNext = true;
+                                                        return false;
+                                                    }
+                                                    if (clean.startsWith('>') || clean.startsWith('<')) {
+                                                        const pathPart = clean.replace(/^[><]+/, '');
+                                                        return checkToken(pathPart);
+                                                    }
+                                                    if (checkNext) {
+                                                        checkNext = false;
+                                                        return checkToken(token);
+                                                    }
+                                                    return false;
+                                                });
+                                            }
+
+                                            // Check all tokens for other commands
+                                            return tokens.some(token => checkToken(token));
                                         });
+
                                         if (isViolating) {
                                             const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
                                             if (settings.onExecStart) settings.onExecStart(command || 'Unknown');

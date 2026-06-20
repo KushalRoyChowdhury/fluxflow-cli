@@ -7,7 +7,7 @@ import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { MultilineInput } from './components/MultilineInput.jsx';
 import TextInput from 'ink-text-input';
-import ChatLayout, { MessageItem } from './components/ChatLayout.jsx';
+import ChatLayout, { MessageItem, CodeRenderer } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
 import SettingsMenu from './components/SettingsMenu.jsx';
@@ -147,9 +147,9 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
                 <Box marginY={1} flexDirection="column" alignItems="left">
                     <Text>You're in <Text bold color="cyan">{ideName}</Text>, but the <Text bold color="white">FluxFlow-CLI Companion</Text> is not installed.</Text>
                     <Box flexDirection="column" marginY={1}>
-                        <Text color="gray">  ✅ Real-time file & cursor tracking</Text>
+                        <Text color="gray">  ✅ Real-time IDE context & Error Resolution</Text>
                         <Text color="gray">  ✅ Auto-open files created by agent</Text>
-                        <Text color="gray">  ✅ Native DIFF viewer for AI edits</Text>
+                        <Text color="gray">  ✅ Native DIFFing for AI edits</Text>
                         <Text color="gray">  ✅ Direct IDE context sharing</Text>
                         <Text color="gray">  ✅ Surgical Diagnostic Sync</Text>
                         <Text color="gray">  ✅ Native Right-Click ❯ Chat integration</Text>
@@ -204,18 +204,18 @@ const StatusSpinner = () => {
 };
 
 const ResolutionModal = ({ data, onResolve, onEdit }) => (
-    <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+    <Box flexDirection="column" borderStyle="round" borderColor="grey" padding={0} width="100%">
         <Box paddingX={1}>
-            <Text color="magenta" bold underline>🟣 STEERING HINT RESOLUTION</Text>
+            <Text color="white" bold underline>{data.startsWith('/btw') ? 'QUESTION' : 'STEERING HINT'} RESOLUTION</Text>
         </Box>
         <Box paddingX={1} marginTop={1}>
-            <Text>The agent already finished the task before your hint was consumed.</Text>
+            <Text>The agent already finished the task before your {data.startsWith('/btw') ? 'question' : 'hint'} was consumed.</Text>
         </Box>
         <Box marginTop={1} backgroundColor="#222" paddingX={2} width="100%">
-            <Text italic color="gray">"{data}"</Text>
+            <Text italic color="gray">"{data.replace('/btw', '').trim()}"</Text>
         </Box>
         <Box paddingX={1} marginTop={1}>
-            <Text color="cyan">How would you like to proceed?</Text>
+            <Text color="grey">How would you like to proceed?</Text>
         </Box>
         <Box marginTop={0}>
             <CommandMenu
@@ -674,12 +674,13 @@ export default function App({ args = [] }) {
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
         setChatTokens(nextTokens);
         if (chatId) {
-            saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => {});
+            saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => { });
         }
     }, [sessionTotalTokens, chatId, sessionStats.tokens]);
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
+
     const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
     const isFirstRender = useRef(true);
     const isSecondRender = useRef(true);
@@ -886,6 +887,30 @@ export default function App({ args = [] }) {
         return msgs;
     });
     const queuedPromptRef = useRef(null);
+    const [btwResponse, setBtwResponse] = useState('');
+    const [showBtwBox, setShowBtwBox] = useState(false);
+    const btwResponseRef = useRef('');
+    const btwClosedRef = useRef(null);
+
+    useEffect(() => {
+        if (messages.length === 0) return;
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && (lastMsg.role === 'agent' || lastMsg.role === 'assistant')) {
+            const text = lastMsg.text || '';
+            const match = text.match(/\[ANSWER\]([\s\S]*?)(?:\[\/ANSWER\]|$)/i);
+            if (match) {
+                const content = match[1].trim();
+                if (content && content !== btwResponseRef.current) {
+                    setBtwResponse(content);
+                    btwResponseRef.current = content;
+                    if (btwClosedRef.current !== lastMsg.id) {
+                        setShowBtwBox(true);
+                    }
+                }
+            }
+        }
+    }, [messages]);
+
     const [completedIndex, setCompletedIndex] = useState(messages.length);
 
     const windowedHistory = useMemo(() => {
@@ -1021,6 +1046,16 @@ export default function App({ args = [] }) {
 
         // 1. ESC Logic
         if (key.escape) {
+            if (showBtwBox) {
+                setShowBtwBox(false);
+                if (messages.length > 0) {
+                    const lastMsg = messages[messages.length - 1];
+                    if (lastMsg) {
+                        btwClosedRef.current = lastMsg.id;
+                    }
+                }
+                return;
+            }
             if (suggestions.length > 0 && activeView === 'chat') {
                 setIsFilePickerDismissed(true);
                 return;
@@ -1478,6 +1513,7 @@ export default function App({ args = [] }) {
         { cmd: '/save', desc: 'Force save current chat' },
         { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
+        { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         // {
         //     cmd: '/image', desc: 'Generate images using Pollinations', subs: [
         //         {
@@ -1804,7 +1840,17 @@ export default function App({ args = [] }) {
         if (isProcessing) {
             // STEERING HINT ENGINE
             const hintText = absoluteClean.trim();
-            if (hintText.startsWith('/')) {
+            if (hintText.startsWith('/btw')) {
+                const question = hintText.replace(/^\/btw\s*/, '').trim();
+                if (question.length <= 3) {
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '[RESTRICTED] Inquiry question must be more than 3 characters.', isMeta: true }];
+                    });
+                    setInput('');
+                    return;
+                }
+            } else if (hintText.startsWith('/')) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
                     return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '[RESTRICTED] Steering Hints cannot start with /', isMeta: true }];
@@ -1817,7 +1863,10 @@ export default function App({ args = [] }) {
             queuedPromptRef.current = hintText;
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
-                return [...prev, { id: 'hint-' + Date.now(), role: 'user', text: `[STEERING HINT: QUEUED] \n${hintText}`, color: 'magenta' }];
+                const isBtw = hintText.startsWith('/btw');
+                const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, '') : hintText;
+                const prefix = isBtw ? '[QUESTION: QUEUED]' : '[STEERING HINT: QUEUED]';
+                return [...prev, { id: 'hint-' + Date.now(), role: 'user', text: `${prefix} \n${cleanText}`, color: 'magenta' }];
             });
             setInput('');
             return;
@@ -2618,13 +2667,19 @@ export default function App({ args = [] }) {
 
                                 // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
                                 setMessages(prev => {
-                                    const index = [...prev].reverse().findIndex(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                                    const index = [...prev].reverse().findIndex(m => m.text?.includes('[STEERING HINT: QUEUED]') || m.text?.includes('[QUESTION: QUEUED]'));
                                     if (index !== -1) {
                                         const actualIndex = prev.length - 1 - index;
                                         const newMsgs = [...prev];
+                                        let text = newMsgs[actualIndex].text;
+                                        if (text.includes('[STEERING HINT: QUEUED]')) {
+                                            text = text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
+                                        } else if (text.includes('[QUESTION: QUEUED]')) {
+                                            text = text.replace('[QUESTION: QUEUED]', '[QUESTION: ASKED]');
+                                        }
                                         newMsgs[actualIndex] = {
                                             ...newMsgs[actualIndex],
-                                            text: newMsgs[actualIndex].text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]'),
+                                            text,
                                             color: 'cyan'
                                         };
                                         return newMsgs;
@@ -2862,12 +2917,30 @@ export default function App({ args = [] }) {
                         const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
 
                         if (hasThinkTag && canThink) {
+                            const match = chunkText.match(/<(think|thought)/i);
+                            const tagIndex = match.index;
+                            const beforeText = chunkText.substring(0, tagIndex);
+                            const afterText = chunkText.substring(tagIndex);
+
+                            if (beforeText) {
+                                if (!currentAgentId) {
+                                    currentAgentId = 'agent-' + Date.now();
+                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: beforeText, isStreaming: true }]);
+                                } else {
+                                    setMessages(prev => prev.map(m =>
+                                        m.id === currentAgentId
+                                            ? { ...m, text: m.text + beforeText, isStreaming: true }
+                                            : m
+                                    ));
+                                }
+                            }
+
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
-                            // Clean up any partial tags from the visible text
-                            chunkText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, '').replace(/<(think|thought)>/gi, '');
+                            let thinkStartText = afterText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() }]);
+                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: thinkStartText, isStreaming: true, startTime: Date.now() }]);
+                            continue;
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
@@ -2970,9 +3043,13 @@ export default function App({ args = [] }) {
                         // [SYNC] Mark as "BUFFERED" (waiting for resolution)
                         setMessages(prev => {
                             const newMsgs = [...prev];
-                            const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]'));
+                            const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]') || m.text?.includes('[QUESTION: QUEUED]'));
                             if (hintMsg) {
-                                hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: FINISHED_TURN]');
+                                if (hintMsg.text.includes('[STEERING HINT: QUEUED]')) {
+                                    hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: FINISHED_TURN]');
+                                } else if (hintMsg.text.includes('[QUESTION: QUEUED]')) {
+                                    hintMsg.text = hintMsg.text.replace('[QUESTION: QUEUED]', '[QUESTION: FINISHED_TURN]');
+                                }
                             }
                             return newMsgs.reverse();
                         });
@@ -3995,6 +4072,17 @@ export default function App({ args = [] }) {
             default:
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
+                        {showBtwBox && btwResponse && (
+                            <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%" marginBottom={1}>
+                                <Box justifyContent="space-between" width="100%">
+                                    <Text color="white" bold underline>INQUIRY RESPONSE</Text>
+                                    <Text color="gray">[ ESC to Close ]</Text>
+                                </Box>
+                                <Box marginTop={1} width="100%">
+                                    <CodeRenderer text={btwResponse} columns={terminalSize.columns - 6} />
+                                </Box>
+                            </Box>
+                        )}
                         {/* 🏗️ INPUT HEADER BAR */}
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                             <Box>

@@ -74,6 +74,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /save                                    Force save current chat
   /export                                  Export current chat in a .txt file
   /chats                                   List all chat sessions
+  /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
   /image setup quality <low...premium>     Configure default image generation quality
   /image stats                             Show image quota stats

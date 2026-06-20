@@ -220,8 +220,20 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.9.0"]
+        const stableVersions = ["2.10.0", "2.9.0"]
         const changelogData = {
+            "2.10.0": {
+                "note": "JUNE 20 - Inquiry support /btw command.",
+                "added": [
+                    "Added /btw command to ask agent questions while working without interrupting."
+                ],
+                "changed": [
+                    "Improved & more contexual sandboxing."
+                ],
+                "fixes": [
+                    "Fixed scoped npm packages (like @types/inquirer) being parsed as Windows filesystem paths in Terminal Execution."
+                ]
+            },
             "2.9.0": {
                 "note": "JUNE 19 -  Flux Flow CLI.",
                 "added": [

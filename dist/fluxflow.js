@@ -1586,7 +1586,7 @@ var init_ChatLayout = __esm({
           }
         }
       }
-      return result.replace(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, "").replace(/\[TOOL RESULT\]:?\s*/gi, "").split("\n").filter((line) => !line.trim().startsWith("SUCCESS:") && !line.trim().startsWith("ERROR:")).join("\n").replace(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\s*turn\s*:?.*?$/gi, "").replace(/\n\s*turn\s*:?.*?$/gi, "").replace(/\[\s*$/gi, "").replace(/\n\nResponded on .*/g, "").replace(/\n\n\[Prompted on: .*\]/g, "").replace(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, "\u2192").replace(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, "\u2190").replace(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, "\u2191").replace(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, "\u2193").replace(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, "\u2194").replace(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, "").replace(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
+      return result.replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, "").replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, "").replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, "").replaceAll(/\[TOOL RESULT\]:?\s*/gi, "").split("\n").filter((line) => !line.trim().startsWith("SUCCESS:") && !line.trim().startsWith("ERROR:")).join("\n").replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, "").replaceAll(/\[\[END\]\]/gi, "").replaceAll(/\[\s*turn\s*:?.*?$/gi, "").replaceAll(/\n\s*turn\s*:?.*?$/gi, "").replaceAll(/\[\s*$/gi, "").replaceAll(/\n\nResponded on .*/g, "").replaceAll(/\n\n\[Prompted on: .*\]/g, "").replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, "\u2192").replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, "\u2190").replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, "\u2191").replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, "\u2193").replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, "\u2194").replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, "").replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
     };
     formatThinkText = (cleaned, columns = 80) => {
       if (!cleaned) return null;
@@ -1896,6 +1896,7 @@ var init_ChatLayout = __esm({
           { cmd: "/save", desc: "Force save current chat" },
           { cmd: "/export", desc: "Export current chat in a .txt file" },
           { cmd: "/chats", desc: "List all chat sessions" },
+          { cmd: "/btw", desc: "Send raw inquiry mid-turn" },
           { cmd: "/image", desc: "Generate images" },
           { cmd: "/mode", desc: "Toggle Flux/Flow modes" },
           { cmd: "/thinking", desc: "Set AI reasoning depth" },
@@ -2462,6 +2463,7 @@ var init_exec_command = __esm({
       const looksLikePath = (str) => {
         if (!str.includes("/")) return false;
         if (/^(https?|file|ftp):\/\//i.test(str)) return false;
+        if (str.startsWith("@")) return false;
         if (str.startsWith("/") && (str.match(/\//g) || []).length === 1) {
           return false;
         }
@@ -3448,8 +3450,7 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- NO CHAT RESPONSE **AFTER** CALLING TOOLS IN SAME TURN
-- ONE THINKING BLOCK PER TURN
+- NO CHAT **AFTER** FIRING TOOLS IN THIS TURN
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
     };
@@ -8187,14 +8188,25 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           if (steeringCallback) {
             const hint = await steeringCallback();
             if (hint) {
-              if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
-                modifiedHistory[modifiedHistory.length - 1].text += `
+              if (hint.startsWith("/btw")) {
+                if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
+                  modifiedHistory[modifiedHistory.length - 1].text += `
 
-[STEERING HINT]: ${hint}`;
+[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
+[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]`;
+                } else {
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
+                }
               } else {
-                modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT]: ${hint}` });
+                if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
+                  modifiedHistory[modifiedHistory.length - 1].text += `
+
+[STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
+                } else {
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                }
               }
-              yield { type: "status", content: "Steering Hint Injected." };
+              yield { type: "status", content: `${hint.startsWith("/btw") ? "Question Forwarded..." : "Steering Hint Injected..."}` };
             }
           }
           let stream;
@@ -8320,13 +8332,15 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected()) {
-                await new Promise((resolve) => setTimeout(resolve, 2e3));
+                yield { type: "status", content: "Checking Code..." };
+                await new Promise((resolve) => setTimeout(resolve, 2500));
                 const ideCtxJIT = await getIDEContext();
                 const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                 if (ideErr && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text) {
                   lastUserMsg.parts[0].text += `
 ${ideErr} [/ERROR]`;
                 }
+                yield { type: "status", content: "Working..." };
               }
               const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
               if (isGemma) {
@@ -8885,12 +8899,112 @@ ${ideErr} [/ERROR]`;
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
                         const currentDrive = path19.resolve(process.cwd()).substring(0, 3).toLowerCase();
-                        const isViolating = riskyPatterns.some((pattern) => {
-                          if (pattern.source === "[a-zA-Z]:[\\\\\\/]") {
-                            const driveMatch = command.match(/[a-zA-Z]:[\\\/]/i);
-                            return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+                        const splitCommands = (cmdString) => {
+                          const commands = [];
+                          let current = "";
+                          let inQuote = null;
+                          for (let i = 0; i < cmdString.length; i++) {
+                            const char = cmdString[i];
+                            if (inQuote) {
+                              if (char === inQuote) inQuote = null;
+                              current += char;
+                            } else {
+                              if (char === '"' || char === "'") {
+                                inQuote = char;
+                                current += char;
+                              } else if (char === "&" && cmdString[i + 1] === "&" || char === "|" && cmdString[i + 1] === "|") {
+                                if (current.trim()) {
+                                  commands.push(current.trim());
+                                  current = "";
+                                }
+                                i++;
+                              } else if (char === ";" || char === "|" || char === "&") {
+                                if (current.trim()) {
+                                  commands.push(current.trim());
+                                  current = "";
+                                }
+                              } else {
+                                current += char;
+                              }
+                            }
                           }
-                          return pattern.test(command);
+                          if (current.trim()) {
+                            commands.push(current.trim());
+                          }
+                          return commands;
+                        };
+                        const tokenizeCommand = (cmd) => {
+                          const tokens = [];
+                          let current = "";
+                          let inQuote = null;
+                          for (let i = 0; i < cmd.length; i++) {
+                            const char = cmd[i];
+                            if (inQuote) {
+                              if (char === inQuote) {
+                                inQuote = null;
+                                current += char;
+                              } else {
+                                current += char;
+                              }
+                            } else {
+                              if (char === '"' || char === "'") {
+                                inQuote = char;
+                                current += char;
+                              } else if (/\s/.test(char)) {
+                                if (current) {
+                                  tokens.push(current);
+                                  current = "";
+                                }
+                              } else {
+                                current += char;
+                              }
+                            }
+                          }
+                          if (current) {
+                            tokens.push(current);
+                          }
+                          return tokens;
+                        };
+                        const checkToken = (token) => {
+                          const cleanToken = token.replace(/^['"]|['"]$/g, "").trim();
+                          if (!cleanToken) return false;
+                          if (process.platform === "win32" && /^\/[a-zA-Z0-9?]+$/.test(cleanToken)) {
+                            return false;
+                          }
+                          return riskyPatterns.some((pattern) => {
+                            if (pattern.source === "[a-zA-Z]:[\\\\\\/]") {
+                              const driveMatch = cleanToken.match(/[a-zA-Z]:[\\\/]/i);
+                              return driveMatch && driveMatch[0].toLowerCase() !== currentDrive;
+                            }
+                            return pattern.test(cleanToken);
+                          });
+                        };
+                        const commandParts = splitCommands(command);
+                        const isViolating = commandParts.some((cmdPart) => {
+                          const tokens = tokenizeCommand(cmdPart);
+                          if (tokens.length === 0) return false;
+                          const exe = tokens[0].replace(/^['"]|['"]$/g, "").toLowerCase();
+                          const isSafePrint = ["echo", "printf", "write-output"].includes(exe);
+                          if (isSafePrint) {
+                            let checkNext = false;
+                            return tokens.some((token) => {
+                              const clean = token.replace(/^['"]|['"]$/g, "");
+                              if (clean === ">" || clean === ">>" || clean === "<") {
+                                checkNext = true;
+                                return false;
+                              }
+                              if (clean.startsWith(">") || clean.startsWith("<")) {
+                                const pathPart = clean.replace(/^[><]+/, "");
+                                return checkToken(pathPart);
+                              }
+                              if (checkNext) {
+                                checkNext = false;
+                                return checkToken(token);
+                              }
+                              return false;
+                            });
+                          }
+                          return tokens.some((token) => checkToken(token));
                         });
                         if (isViolating) {
                           const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
@@ -11041,6 +11155,28 @@ function App({ args = [] }) {
     return msgs;
   });
   const queuedPromptRef = useRef3(null);
+  const [btwResponse, setBtwResponse] = useState11("");
+  const [showBtwBox, setShowBtwBox] = useState11(false);
+  const btwResponseRef = useRef3("");
+  const btwClosedRef = useRef3(null);
+  useEffect8(() => {
+    if (messages.length === 0) return;
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && (lastMsg.role === "agent" || lastMsg.role === "assistant")) {
+      const text = lastMsg.text || "";
+      const match = text.match(/\[ANSWER\]([\s\S]*?)(?:\[\/ANSWER\]|$)/i);
+      if (match) {
+        const content = match[1].trim();
+        if (content && content !== btwResponseRef.current) {
+          setBtwResponse(content);
+          btwResponseRef.current = content;
+          if (btwClosedRef.current !== lastMsg.id) {
+            setShowBtwBox(true);
+          }
+        }
+      }
+    }
+  }, [messages]);
   const [completedIndex, setCompletedIndex] = useState11(messages.length);
   const windowedHistory = useMemo2(() => {
     const MAX_HISTORY_LINES = 2e3;
@@ -11151,6 +11287,16 @@ function App({ args = [] }) {
       return;
     }
     if (key.escape) {
+      if (showBtwBox) {
+        setShowBtwBox(false);
+        if (messages.length > 0) {
+          const lastMsg = messages[messages.length - 1];
+          if (lastMsg) {
+            btwClosedRef.current = lastMsg.id;
+          }
+        }
+        return;
+      }
       if (suggestions.length > 0 && activeView === "chat") {
         setIsFilePickerDismissed(true);
         return;
@@ -11537,6 +11683,7 @@ function App({ args = [] }) {
     { cmd: "/save", desc: "Force save current chat" },
     { cmd: "/export", desc: "Export current chat in a .txt file" },
     { cmd: "/chats", desc: "List all chat sessions" },
+    { cmd: "/btw", desc: "Ask a question without intefering with ongoing tasks" },
     // {
     //     cmd: '/image', desc: 'Generate images using Pollinations', subs: [
     //         {
@@ -11833,7 +11980,17 @@ function App({ args = [] }) {
     if (!absoluteClean.trim()) return;
     if (isProcessing) {
       const hintText = absoluteClean.trim();
-      if (hintText.startsWith("/")) {
+      if (hintText.startsWith("/btw")) {
+        const question = hintText.replace(/^\/btw\s*/, "").trim();
+        if (question.length <= 3) {
+          setMessages((prev) => {
+            setCompletedIndex(prev.length + 1);
+            return [...prev, { id: "hint-err-" + Date.now(), role: "system", text: "[RESTRICTED] Inquiry question must be more than 3 characters.", isMeta: true }];
+          });
+          setInput("");
+          return;
+        }
+      } else if (hintText.startsWith("/")) {
         setMessages((prev) => {
           setCompletedIndex(prev.length + 1);
           return [...prev, { id: "hint-err-" + Date.now(), role: "system", text: "[RESTRICTED] Steering Hints cannot start with /", isMeta: true }];
@@ -11845,8 +12002,11 @@ function App({ args = [] }) {
       queuedPromptRef.current = hintText;
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
-        return [...prev, { id: "hint-" + Date.now(), role: "user", text: `[STEERING HINT: QUEUED] 
-${hintText}`, color: "magenta" }];
+        const isBtw = hintText.startsWith("/btw");
+        const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, "") : hintText;
+        const prefix = isBtw ? "[QUESTION: QUEUED]" : "[STEERING HINT: QUEUED]";
+        return [...prev, { id: "hint-" + Date.now(), role: "user", text: `${prefix} 
+${cleanText}`, color: "magenta" }];
       });
       setInput("");
       return;
@@ -12619,13 +12779,19 @@ Selection: ${val}`,
                 setQueuedPrompt(null);
                 queuedPromptRef.current = null;
                 setMessages((prev) => {
-                  const index = [...prev].reverse().findIndex((m) => m.text?.includes("[STEERING HINT: QUEUED]"));
+                  const index = [...prev].reverse().findIndex((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
                   if (index !== -1) {
                     const actualIndex = prev.length - 1 - index;
                     const newMsgs = [...prev];
+                    let text = newMsgs[actualIndex].text;
+                    if (text.includes("[STEERING HINT: QUEUED]")) {
+                      text = text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: INJECTED]");
+                    } else if (text.includes("[QUESTION: QUEUED]")) {
+                      text = text.replace("[QUESTION: QUEUED]", "[QUESTION: ASKED]");
+                    }
                     newMsgs[actualIndex] = {
                       ...newMsgs[actualIndex],
-                      text: newMsgs[actualIndex].text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: INJECTED]"),
+                      text,
                       color: "cyan"
                     };
                     return newMsgs;
@@ -12843,11 +13009,26 @@ Selection: ${val}`,
             const hasThinkTag = chunkLower.includes("<think") || chunkLower.includes("<thought");
             const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
             if (hasThinkTag && canThink) {
+              const match = chunkText.match(/<(think|thought)/i);
+              const tagIndex = match.index;
+              const beforeText = chunkText.substring(0, tagIndex);
+              const afterText = chunkText.substring(tagIndex);
+              if (beforeText) {
+                if (!currentAgentId) {
+                  currentAgentId = "agent-" + Date.now();
+                  setMessages((prev) => [...prev, { id: currentAgentId, role: "agent", text: beforeText, isStreaming: true }]);
+                } else {
+                  setMessages((prev) => prev.map(
+                    (m) => m.id === currentAgentId ? { ...m, text: m.text + beforeText, isStreaming: true } : m
+                  ));
+                }
+              }
               inThinkMode = true;
               thinkConsumedInTurn = true;
-              chunkText = chunkText.replace(/<(think|thought)>[\s\S]*?<\/(think|thought)>/gi, "").replace(/<(think|thought)>/gi, "");
+              let thinkStartText = afterText.replace(/<(think|thought)>/gi, "");
               currentThinkId = "think-" + Date.now();
-              setMessages((prev) => [...prev, { id: currentThinkId, role: "think", text: "", isStreaming: true, startTime: Date.now() }]);
+              setMessages((prev) => [...prev, { id: currentThinkId, role: "think", text: thinkStartText, isStreaming: true, startTime: Date.now() }]);
+              continue;
             }
             if ((chunkLower.includes("</think>") || chunkLower.includes("</thought>")) && currentThinkId) {
               const parts = chunkText.split(/<\/(think|thought)>/gi);
@@ -12932,9 +13113,13 @@ Selection: ${val}`,
             queuedPromptRef.current = null;
             setMessages((prev) => {
               const newMsgs = [...prev];
-              const hintMsg = newMsgs.reverse().find((m) => m.text?.includes("[STEERING HINT: QUEUED]"));
+              const hintMsg = newMsgs.reverse().find((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
               if (hintMsg) {
-                hintMsg.text = hintMsg.text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: FINISHED_TURN]");
+                if (hintMsg.text.includes("[STEERING HINT: QUEUED]")) {
+                  hintMsg.text = hintMsg.text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: FINISHED_TURN]");
+                } else if (hintMsg.text.includes("[QUESTION: QUEUED]")) {
+                  hintMsg.text = hintMsg.text.replace("[QUESTION: QUEUED]", "[QUESTION: FINISHED_TURN]");
+                }
               }
               return newMsgs.reverse();
             });
@@ -13604,7 +13789,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, null, statusText ? /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true, italic: true }, statusText)) : /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : "Waiting for input...")), /* @__PURE__ */ React14.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React14.createElement(Text14, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React14.createElement(
+        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, null, statusText ? /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true, italic: true }, statusText)) : /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : "Waiting for input...")), /* @__PURE__ */ React14.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React14.createElement(Text14, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React14.createElement(
           Box14,
           {
             backgroundColor: "#555555",
@@ -13880,7 +14065,7 @@ var init_app = __esm({
           height
         },
         /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React14.createElement(Text14, null, getFluxLogo(versionFluxflow))),
-        /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React14.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React14.createElement(Text14, null, "You're in ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Real-time file & cursor tracking"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native DIFF viewer for AI edits"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React14.createElement(Box14, { key: i }, /* @__PURE__ */ React14.createElement(Text14, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
+        /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React14.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React14.createElement(Text14, null, "You're in ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Real-time IDE context & Error Resolution"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native DIFFing for AI edits"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React14.createElement(Box14, { key: i }, /* @__PURE__ */ React14.createElement(Text14, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
       );
     };
     SESSION_START_TIME = Date.now();
@@ -13892,7 +14077,7 @@ var init_app = __esm({
     packageJson = JSON.parse(fs22.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
-    ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "magenta", bold: true, underline: true }, "\u{1F7E3} STEERING HINT RESOLUTION")), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, null, "The agent already finished the task before your hint was consumed.")), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: "gray" }, '"', data, '"')), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "cyan" }, "How would you like to proceed?")), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React14.createElement(
+    ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React14.createElement(
       CommandMenu,
       {
         title: "Select Action",
@@ -14076,6 +14261,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   /save                                    Force save current chat
   /export                                  Export current chat in a .txt file
   /chats                                   List all chat sessions
+  /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
   /image setup quality <low...premium>     Configure default image generation quality
   /image stats                             Show image quota stats

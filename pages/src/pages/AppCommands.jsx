@@ -50,6 +50,9 @@ export default function AppCommands() {
                         <li><code>xHigh</code>: Extended reasoning for complex logic.</li>
                     </ul>
                 </li>
+                <li>
+                    <strong><code>/btw &lt;question&gt;</code></strong> — Sends a raw inquiry/question to the agent mid-turn during processing without interrupting.
+                </li>
             </ul>
 
             <h2 id="system-configuration">System & Configuration</h2>
