@@ -8169,7 +8169,8 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
         let wasToolCalledInLastLoop = false;
         modifiedHistory.forEach((msg) => {
           if (msg.text && msg.role === "agent") {
-            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "").trim();
+            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "");
+            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, "").trim();
           }
         });
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
@@ -8331,7 +8332,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
               }
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
               const lastUserMsg = contents[contents.length - 1];
-              if (isBridgeConnected()) {
+              if (isBridgeConnected() & loop > 0) {
                 yield { type: "status", content: "Checking Code..." };
                 await new Promise((resolve) => setTimeout(resolve, 2500));
                 const ideCtxJIT = await getIDEContext();
@@ -9766,6 +9767,9 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
           const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, "").trim();
           let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
           isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
+          if (turnText && turnText.trim().endsWith('")]') && toolResults.length === 0) {
+            isActuallyFinished = false;
+          }
           if (isActuallyFinished) {
             const fullAgentTextRaw = fullAgentResponseChunks.join("\n");
             const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, "").trim();
@@ -9795,7 +9799,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
             }
           } else {
             if (wasToolCalledInLastLoop) {
-              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to verify tool execution, Verify tool syntax, proper escaping or ask user if tool worked when unsure [/SYSTEM]` });
+              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to verify tool execution, MUST check if executed or failed. On failure try again [/SYSTEM]` });
             } else {
               modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task use [[END]]"}`} [/SYSTEM]` });
             }
@@ -9808,6 +9812,13 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         modifiedHistory.forEach((msg) => {
           if (msg.role === "user" && msg.text) {
             msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, "");
+            msg.text = msg.text.replace(`
+
+[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
+`, "").replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
+**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+`, "").replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+`, "");
             if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
               const jitInstructionFast = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
