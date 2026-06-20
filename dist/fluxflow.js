@@ -2711,8 +2711,20 @@ var init_exec_command = __esm({
       return new Promise((resolve) => {
         const attempt = (usePowerShell) => {
           const command = adjustWindowsCommand(rawCommand, usePowerShell);
-          const shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
-          const shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
+          let shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
+          let shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
+          if (systemSettings.networkAccess === false && !isWin) {
+            const originalShell = shell;
+            const originalArgs = [...shellArgs];
+            if (process.platform === "linux") {
+              shell = "unshare";
+              shellArgs = ["-n", "-r", originalShell, ...originalArgs];
+            } else if (process.platform === "darwin") {
+              const sbProfile = '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-outbound (remote ip "127.0.0.1:*"))\n';
+              shell = "sandbox-exec";
+              shellArgs = ["-p", sbProfile, originalShell, ...originalArgs];
+            }
+          }
           if (pty) {
             try {
               const ptyProcess = pty.spawn(shell, shellArgs, {
@@ -2765,11 +2777,11 @@ ${finalOutput}`);
               if (isWin && usePowerShell && err.code === "ENOENT") {
                 return false;
               }
-              runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+              runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
               return true;
             }
           } else {
-            runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+            runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
             return true;
           }
         };
@@ -2782,12 +2794,23 @@ ${finalOutput}`);
         }
       });
     };
-    runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true) => {
+    runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true, systemSettings = {}) => {
       const isWin = process.platform === "win32";
-      const shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
-      const shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
-      const child = isWin ? spawn(shell, shellArgs, { cwd: process.cwd(), env: { ...process.env, ...netEnv } }) : spawn(command, {
-        shell: true,
+      let shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
+      let shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
+      if (systemSettings.networkAccess === false && !isWin) {
+        const originalShell = shell;
+        const originalArgs = [...shellArgs];
+        if (process.platform === "linux") {
+          shell = "unshare";
+          shellArgs = ["-n", "-r", originalShell, ...originalArgs];
+        } else if (process.platform === "darwin") {
+          const sbProfile = '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-outbound (remote ip "127.0.0.1:*"))\n';
+          shell = "sandbox-exec";
+          shellArgs = ["-p", sbProfile, originalShell, ...originalArgs];
+        }
+      }
+      const child = isWin ? spawn(shell, shellArgs, { cwd: process.cwd(), env: { ...process.env, ...netEnv } }) : spawn(shell, shellArgs, {
         cwd: process.cwd(),
         env: {
           ...process.env,
@@ -2854,7 +2877,7 @@ ${finalOutput}`);
       child.on("error", (err) => {
         if (isWin && usePowerShell && err.code === "ENOENT") {
           const cmdCommand = adjustWindowsCommand(rawCommand, false);
-          return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false);
+          return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false, systemSettings);
         }
         activeChildProcess = null;
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -9083,7 +9106,7 @@ ${boxBottom}` };
                           }
                           if (!forcePrompt && !decision) {
                             if (systemSettings2.networkAccess === false) {
-                              const networkCmdRegex = /\b(curl|wget|npm|yarn|pnpm|pip|pip3|ssh|docker|git\s+(clone|push|pull|fetch))\b/i;
+                              const networkCmdRegex = /\b(curl|wget|httpie|fetch|axial|yarn|npm|pnpm|bun|deno|pip|pip3|poetry|uv|gem|cargo|go\s+(get|install)|composer|nuget|ssh|scp|ping|sftp|rsync|docker|podman|kubectl|helm|git\s+(clone|push|pull|fetch)|ftp|telnet|nc|netcat|socat|traceroute|tracert|dig|nslookup|host|nmap|gcloud|aws|az|terraform|ansible-playbook|nix|nix-env)\b/i;
                               if (networkCmdRegex.test(cmdTrimmed)) {
                                 decision = "deny";
                                 isNetworkDeny = true;

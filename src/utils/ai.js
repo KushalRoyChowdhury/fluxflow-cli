@@ -3046,7 +3046,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (!forcePrompt && !decision) {
                                                 // Network access check
                                                 if (systemSettings.networkAccess === false) {
-                                                    const networkCmdRegex = /\b(curl|wget|npm|yarn|pnpm|pip|pip3|ssh|docker|git\s+(clone|push|pull|fetch))\b/i;
+                                                    // const networkCmdRegex = '';
+                                                    // const networkCmdRegex = /\b(fetch|axial|yarn)\b/i;
+                                                    const networkCmdRegex = /\b(curl|wget|httpie|fetch|axial|yarn|npm|pnpm|bun|deno|pip|pip3|poetry|uv|gem|cargo|go\s+(get|install)|composer|nuget|ssh|scp|ping|sftp|rsync|docker|podman|kubectl|helm|git\s+(clone|push|pull|fetch)|ftp|telnet|nc|netcat|socat|traceroute|tracert|dig|nslookup|host|nmap|gcloud|aws|az|terraform|ansible-playbook|nix|nix-env)\b/i;
                                                     if (networkCmdRegex.test(cmdTrimmed)) {
                                                         decision = 'deny';
                                                         isNetworkDeny = true;

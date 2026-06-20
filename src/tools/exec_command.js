@@ -548,8 +548,24 @@ export const exec_command = async (args, options = {}) => {
     return new Promise((resolve) => {
         const attempt = (usePowerShell) => {
             const command = adjustWindowsCommand(rawCommand, usePowerShell);
-            const shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
-            const shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+            let shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
+            let shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+
+            // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING 🔒 ---
+            if (systemSettings.networkAccess === false && !isWin) {
+                const originalShell = shell;
+                const originalArgs = [...shellArgs];
+
+                if (process.platform === 'linux') {
+                    shell = 'unshare';
+                    shellArgs = ['-n', '-r', originalShell, ...originalArgs];
+                }
+                else if (process.platform === 'darwin') {
+                    const sbProfile = '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-outbound (remote ip "127.0.0.1:*"))\n';
+                    shell = 'sandbox-exec';
+                    shellArgs = ['-p', sbProfile, originalShell, ...originalArgs];
+                }
+            }
 
             if (pty) {
                 try {
@@ -603,11 +619,11 @@ export const exec_command = async (args, options = {}) => {
                         return false; // Trigger CMD attempt
                     }
                     // Fallback to child_process if pty fails for other reasons
-                    runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+                    runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
                     return true;
                 }
             } else {
-                runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell);
+                runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
                 return true;
             }
         };
@@ -625,15 +641,29 @@ export const exec_command = async (args, options = {}) => {
 /**
  * Standard child_process.spawn fallback
  */
-const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true) => {
+const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true, systemSettings = {}) => {
     const isWin = process.platform === 'win32';
-    const shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
-    const shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+    let shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
+    let shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+
+    // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING FOR FALLBACK ---
+    if (systemSettings.networkAccess === false && !isWin) {
+        const originalShell = shell;
+        const originalArgs = [...shellArgs];
+
+        if (process.platform === 'linux') {
+            shell = 'unshare';
+            shellArgs = ['-n', '-r', originalShell, ...originalArgs];
+        } else if (process.platform === 'darwin') {
+            const sbProfile = '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n(allow network-outbound (remote ip "127.0.0.1:*"))\n';
+            shell = 'sandbox-exec';
+            shellArgs = ['-p', sbProfile, originalShell, ...originalArgs];
+        }
+    }
 
     const child = isWin
         ? spawn(shell, shellArgs, { cwd: process.cwd(), env: { ...process.env, ...netEnv } })
-        : spawn(command, {
-            shell: true,
+        : spawn(shell, shellArgs, {
             cwd: process.cwd(),
             env: {
                 ...process.env,
@@ -705,7 +735,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
         if (isWin && usePowerShell && err.code === 'ENOENT') {
             // PowerShell missing, retry with CMD
             const cmdCommand = adjustWindowsCommand(rawCommand, false);
-            return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false);
+            return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false, systemSettings);
         }
         activeChildProcess = null;
         const errorMsg = err instanceof Error ? err.message : String(err);
