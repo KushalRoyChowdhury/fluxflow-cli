@@ -552,11 +552,37 @@ export const checkQuota = async (key, settings) => {
     const quotas = settings.quotas || {};
 
     if (tier === 'Free') {
-        if (key === 'agent' || key === 'background') {
-            const daily = await getDailyUsage();
-            return (daily.agent + daily.background) < 999999;
+        if (key === 'agent') {
+            const reqLimit = quotas.agentLimit || 99999999;
+            const tokenLimit = quotas.tokenLimit || 99999999999999;
+            const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+
+            const dailyUsage = await getDailyUsage();
+            
+            // Hard constraint for free tier
+            if ((dailyUsage.agent + dailyUsage.background) >= 999999) return false;
+
+            const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+            if (!dailyOk) return false;
+
+            let monthlyUsage;
+            if (quotas.resetMode === 'Custom') {
+                monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+            } else {
+                monthlyUsage = await getMonthlyUsage();
+            }
+
+            return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
         }
-        if (key === 'search') return true;
+        if (key === 'background') {
+            const dailyUsage = await getDailyUsage();
+            if ((dailyUsage.agent + dailyUsage.background) >= 999999) return false;
+            return dailyUsage.background < (quotas.backgroundLimit || 999999);
+        }
+        if (key === 'search') {
+            const dailyUsage = await getDailyUsage();
+            return dailyUsage.search < (quotas.searchLimit || 100);
+        }
     }
 
     if (tier === 'Paid' || tier === 'Custom') {

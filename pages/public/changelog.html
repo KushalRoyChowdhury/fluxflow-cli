@@ -231,12 +231,23 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.11.0"]
+        const stableVersions = ["2.11.1"]
         const changelogData = {
+            "2.11.1": {
+                "note": "JUNE 22 - Happy Coding!",
+                "added": [
+                    "Added \"Budgets\" on Non-Billing API Keys, cuz numbers goo BRRR",
+                    "Added new command `/budgets` to set and view limits easily than checking from settings."
+                ],
+                "changed": [
+                    "Changed \"API Tier\" term to \"Budgets\" to reflect practical meaning of the feature."
+                ],
+                "fixes": []
+            },
             "2.11.0": {
                 "note": "JUNE 22",
                 "added": [
-                    "New & Improved budgeting for Billing API Keys with Daily/Monthly token limits & visual usage trackers. Set /settings → Others → API Tier → Custom Budgets (Only token count limits, not per model/cost, Premium models cost more per token than lighter models, but token is token... Cost handling is your duty, I'll handle tokens.. \"efficiently\".. 😜).",
+                    "New & Improved budgeting for Billing API Keys with Daily/Monthly token limits & visual usage trackers. Set /settings → Others → Budgets → Custom Budgets (Only token count limits, not per model/cost, Premium models cost more per token than lighter models, but token is token... Absolute cost handling is your duty, I'll handle token counts... \"efficiently\".. probably... maybe... 😜).",
                     "Better Error Messages in UI for API failures."
                 ],
                 "changed": [

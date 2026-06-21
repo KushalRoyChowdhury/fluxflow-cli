@@ -1,6 +1,6 @@
 {
 	"name": "fluxflow-cli",
-	"version": "2.11.0",
+	"version": "2.11.1",
 	"date": "2026-06-22",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [

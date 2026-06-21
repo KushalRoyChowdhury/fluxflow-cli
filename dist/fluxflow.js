@@ -1898,6 +1898,7 @@ var init_ChatLayout = __esm({
           { cmd: "/chats", desc: "List all chat sessions" },
           { cmd: "/btw", desc: "Send raw inquiry mid-turn" },
           { cmd: "/image", desc: "Generate images" },
+          { cmd: "/budget", desc: "Set or View budget limits" },
           { cmd: "/mode", desc: "Toggle Flux/Flow modes" },
           { cmd: "/thinking", desc: "Set AI reasoning depth" },
           { cmd: "/model", desc: "Switch AI model" },
@@ -2935,7 +2936,7 @@ function SettingsMenu({
       case "other":
         return [
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
-          { label: "API Tier", value: "apiTier", status: apiTier === "Free" ? "Provider Limits" : "Custom Budget" },
+          { label: "Budgets", value: "apiTier", status: apiTier === "Free" ? "Provider Limits" : "Custom Budget" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -4394,11 +4395,31 @@ var init_usage = __esm({
       const tier = settings.apiTier || "Free";
       const quotas = settings.quotas || {};
       if (tier === "Free") {
-        if (key === "agent" || key === "background") {
-          const daily = await getDailyUsage();
-          return daily.agent + daily.background < 999999;
+        if (key === "agent") {
+          const reqLimit = quotas.agentLimit || 99999999;
+          const tokenLimit = quotas.tokenLimit || 99999999999999;
+          const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+          const dailyUsage = await getDailyUsage();
+          if (dailyUsage.agent + dailyUsage.background >= 999999) return false;
+          const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+          if (!dailyOk) return false;
+          let monthlyUsage;
+          if (quotas.resetMode === "Custom") {
+            monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+          } else {
+            monthlyUsage = await getMonthlyUsage();
+          }
+          return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
         }
-        if (key === "search") return true;
+        if (key === "background") {
+          const dailyUsage = await getDailyUsage();
+          if (dailyUsage.agent + dailyUsage.background >= 999999) return false;
+          return dailyUsage.background < (quotas.backgroundLimit || 999999);
+        }
+        if (key === "search") {
+          const dailyUsage = await getDailyUsage();
+          return dailyUsage.search < (quotas.searchLimit || 100);
+        }
       }
       if (tier === "Paid" || tier === "Custom") {
         if (key === "agent") {
@@ -12293,6 +12314,14 @@ function App({ args = [] }) {
       ]
     },
     {
+      cmd: "/budget",
+      desc: "Set or View budget limits",
+      subs: [
+        { cmd: "Set", desc: "Configure budgets (Daily/Monthly limits)" },
+        { cmd: "View", desc: "View current usage budget bars" }
+      ]
+    },
+    {
       cmd: "/update",
       desc: "Check/Install updates",
       subs: [
@@ -12821,6 +12850,50 @@ ${list || "No saved chats found."}`, isMeta: true }];
             setCompletedIndex(prev.length + 1);
             return [...prev, { id: Date.now(), role: "system", text: `[BROWSER] Opening documentation: ${DOCS_URL}`, isMeta: true }];
           });
+          break;
+        }
+        case "/budget": {
+          const sub = parts[1]?.toLowerCase();
+          if (sub === "set") {
+            setInputConfig({
+              label: "Enter Agent daily budget (requests made):",
+              key: "quotas",
+              subKey: "agentLimit",
+              value: getPrefilledValue(quotas.agentLimit),
+              returnView: "chat",
+              next: (newQuotas) => ({
+                label: "Enter Agent daily budget (tokens used):",
+                key: "quotas",
+                subKey: "tokenLimit",
+                value: getPrefilledValue(newQuotas.tokenLimit),
+                returnView: "chat",
+                next: (q2) => ({
+                  label: "Enter Agent monthly budget (tokens used):",
+                  key: "quotas",
+                  subKey: "monthlyTokenLimit",
+                  value: getPrefilledValue(q2.monthlyTokenLimit),
+                  returnView: "budgetResetMode"
+                })
+              })
+            });
+            setActiveView("input");
+          } else if (sub === "view") {
+            const run = async () => {
+              const usage = await getDailyUsage();
+              const mUsage = await getMonthlyUsage();
+              const cUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+              setDailyUsage(usage);
+              setMonthlyUsage(mUsage);
+              setCustomPeriodUsage(cUsage);
+              setActiveView("budgetView");
+            };
+            run();
+          } else {
+            setMessages((prev) => {
+              setCompletedIndex(prev.length + 1);
+              return [...prev, { id: Date.now(), role: "system", text: `Usage: /budget <Set|View>`, isMeta: true }];
+            });
+          }
           break;
         }
         case "/fluxflow": {
@@ -13569,7 +13642,10 @@ Selection: ${val}`,
     } else if (percent > 80) {
       barColor = "red";
     }
-    return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, label, ": ")), /* @__PURE__ */ React14.createElement(Text14, { color: barColor }, barStr), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, " ", percent, "% (", current, "/", limit >= 99999999 ? "\u221E" : limit, ")"));
+    const isTokens = label.toLowerCase().includes("token");
+    const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
+    const displayCurrent = isTokens ? formatTokens(current) : current;
+    return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, label, ": ")), /* @__PURE__ */ React14.createElement(Text14, { color: barColor }, barStr), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
@@ -13683,19 +13759,19 @@ Selection: ${val}`,
                   label: "Enter Agent daily budget (requests made):",
                   key: "quotas",
                   subKey: "agentLimit",
-                  value: quotas.agentLimit >= 99999999 ? "" : String(quotas.agentLimit),
+                  value: getPrefilledValue(quotas.agentLimit),
                   returnView: "settings",
                   next: (newQuotas) => ({
                     label: "Enter Agent daily budget (tokens used):",
                     key: "quotas",
                     subKey: "tokenLimit",
-                    value: newQuotas.tokenLimit >= 99999999999999 || newQuotas.tokenLimit === 0 ? "" : String(newQuotas.tokenLimit),
+                    value: getPrefilledValue(newQuotas.tokenLimit),
                     returnView: "settings",
                     next: (q2) => ({
                       label: "Enter Agent monthly budget (tokens used):",
                       key: "quotas",
                       subKey: "monthlyTokenLimit",
-                      value: q2.monthlyTokenLimit >= 99999999999999 || q2.monthlyTokenLimit === 0 ? "" : String(q2.monthlyTokenLimit),
+                      value: getPrefilledValue(q2.monthlyTokenLimit),
                       returnView: "resetMode"
                     })
                   })
@@ -13748,6 +13824,64 @@ Selection: ${val}`,
             onClose: () => setActiveView("apiTier")
           }
         );
+      case "budgetResetMode":
+        return /* @__PURE__ */ React14.createElement(
+          CommandMenu,
+          {
+            title: "SELECT MONTHLY RESET MODE",
+            items: [
+              { label: "Default (Rolling 30-Day Window)", value: "Rolling" },
+              { label: "Custom (Set reset day of month)", value: "Custom" },
+              { label: "Back", value: "chat" }
+            ],
+            onSelect: (item) => {
+              if (item.value === "chat" || item.value === "Back") {
+                setActiveView("chat");
+                return;
+              }
+              const selectedMode = item.value;
+              const updatedQuotas = { ...quotas, resetMode: selectedMode };
+              setQuotas(updatedQuotas);
+              if (selectedMode === "Custom") {
+                setInputConfig({
+                  label: "Enter monthly reset day (1-30):",
+                  key: "quotas",
+                  subKey: "resetDay",
+                  value: String(quotas.resetDay || 1),
+                  returnView: "chat"
+                });
+                setActiveView("input");
+              } else {
+                saveSettings({ apiTier, quotas: updatedQuotas });
+                setActiveView("chat");
+              }
+            },
+            onClose: () => setActiveView("chat")
+          }
+        );
+      case "budgetView": {
+        const reqCurrent = dailyUsage?.agent || 0;
+        const reqLimit = quotas.agentLimit || 99999999;
+        const tokenCurrent = dailyUsage?.tokens || 0;
+        const tokenLimit = quotas.tokenLimit || 99999999999999;
+        const monthlyCurrent = quotas.resetMode === "Custom" ? customPeriodUsage?.tokens || 0 : monthlyUsage?.tokens || 0;
+        const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
+        const isFreeTier = apiTier !== "Paid";
+        const limitsNotSet = isFreeTier && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
+        let resetInfo = "";
+        if (quotas.resetMode === "Custom") {
+          const today = /* @__PURE__ */ new Date();
+          const resetDay = quotas.resetDay || 1;
+          let resetMonth = today.getMonth();
+          if (today.getDate() >= resetDay) {
+            resetMonth += 1;
+          }
+          const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
+          const monthName = resetDate.toLocaleString("default", { month: "short" });
+          resetInfo = `Resets on: ${resetDay}-${monthName}`;
+        }
+        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS", isFreeTier ? " (Isn't it fun to see numbers go BRRRR)" : ""), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React14.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "yellow", bold: true }, "LIMITS NOT SET")) : /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React14.createElement(Text14, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React14.createElement(Text14, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
+      }
       case "input":
         return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, inputConfig.note)), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React14.createElement(
           TextInput4,
@@ -14309,7 +14443,7 @@ Selection: ${val}`,
         setSetupStep(1);
       }
     }
-  ))) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set Tier to paid in /settings \u2192 other \u2192 API Tier)."), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React14.createElement(
+  ))) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set budgets in /settings \u2192 Others \u2192 Budgets to avoid runaway spending)."), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React14.createElement(
     TextInput4,
     {
       value: tempKey,
@@ -14403,7 +14537,7 @@ Selection: ${val}`,
     return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, chatId)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", sessionToolSuccess), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", sessionToolFailure), " )")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, successRate, "%")), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 16 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 20 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut;
+var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_MultilineInput();
@@ -14434,6 +14568,16 @@ var init_app = __esm({
     init_setup();
     init_text();
     init_editor();
+    shouldClearValue = (val) => {
+      const s = String(val);
+      return s.startsWith("999") && s.endsWith("9");
+    };
+    getPrefilledValue = (val) => {
+      if (val === void 0 || val === null || val === 0 || shouldClearValue(val)) {
+        return "";
+      }
+      return String(val);
+    };
     getIDEName = () => {
       const termProgram = (process.env.TERM_PROGRAM || "").toLowerCase();
       if (process.env.WT_SESSION) return "Windows Terminal";
@@ -14714,6 +14858,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   /chats                                   List all chat sessions
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
+  /budget                                  Set or View budget limits
   /image setup quality <low...premium>     Configure default image generation quality
   /image stats                             Show image quota stats
   /mode <flux|flow>                        Toggle Flux/Flow modes

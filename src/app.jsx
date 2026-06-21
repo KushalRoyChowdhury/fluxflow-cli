@@ -36,6 +36,17 @@ import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, clean
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
+const shouldClearValue = (val) => {
+    const s = String(val);
+    return s.startsWith('999') && s.endsWith('9');
+};
+
+const getPrefilledValue = (val) => {
+    if (val === undefined || val === null || val === 0 || shouldClearValue(val)) {
+        return '';
+    }
+    return String(val);
+};
 
 const getIDEName = () => {
     const termProgram = (process.env.TERM_PROGRAM || '').toLowerCase();
@@ -1805,6 +1816,12 @@ export default function App({ args = [] }) {
             ]
         },
         {
+            cmd: '/budget', desc: 'Set or View budget limits', subs: [
+                { cmd: 'Set', desc: 'Configure budgets (Daily/Monthly limits)' },
+                { cmd: 'View', desc: 'View current usage budget bars' }
+            ]
+        },
+        {
             cmd: '/update', desc: 'Check/Install updates', subs: [
                 { cmd: 'check', desc: 'Check for new version' },
                 { cmd: 'latest', desc: 'Install latest release' }
@@ -2379,6 +2396,50 @@ export default function App({ args = [] }) {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening documentation: ${DOCS_URL}`, isMeta: true }];
                     });
+                    break;
+                }
+                case '/budget': {
+                    const sub = parts[1]?.toLowerCase();
+                    if (sub === 'set') {
+                        setInputConfig({
+                            label: "Enter Agent daily budget (requests made):",
+                            key: 'quotas',
+                            subKey: 'agentLimit',
+                            value: getPrefilledValue(quotas.agentLimit),
+                            returnView: 'chat',
+                            next: (newQuotas) => ({
+                                label: "Enter Agent daily budget (tokens used):",
+                                key: 'quotas',
+                                subKey: 'tokenLimit',
+                                value: getPrefilledValue(newQuotas.tokenLimit),
+                                returnView: 'chat',
+                                next: (q2) => ({
+                                    label: "Enter Agent monthly budget (tokens used):",
+                                    key: 'quotas',
+                                    subKey: 'monthlyTokenLimit',
+                                    value: getPrefilledValue(q2.monthlyTokenLimit),
+                                    returnView: 'budgetResetMode'
+                                })
+                            })
+                        });
+                        setActiveView('input');
+                    } else if (sub === 'view') {
+                        const run = async () => {
+                            const usage = await getDailyUsage();
+                            const mUsage = await getMonthlyUsage();
+                            const cUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+                            setDailyUsage(usage);
+                            setMonthlyUsage(mUsage);
+                            setCustomPeriodUsage(cUsage);
+                            setActiveView('budgetView');
+                        };
+                        run();
+                    } else {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `Usage: /budget <Set|View>`, isMeta: true }];
+                        });
+                    }
                     break;
                 }
                 case '/fluxflow': {
@@ -3189,13 +3250,17 @@ export default function App({ args = [] }) {
             barColor = 'red';
         }
 
+        const isTokens = label.toLowerCase().includes('token');
+        const displayLimit = shouldClearValue(limit) ? '∞' : (isTokens ? formatTokens(limit) : limit);
+        const displayCurrent = isTokens ? formatTokens(current) : current;
+
         return (
             <Box flexDirection="row" paddingLeft={4} key={label}>
                 <Box width={18}>
                     <Text color="gray">{label}: </Text>
                 </Box>
                 <Text color={barColor}>{barStr}</Text>
-                <Text color="gray"> {percent}% ({current}/{limit >= 99999999 ? '∞' : limit})</Text>
+                <Text color="gray"> {percent}% ({displayCurrent}/{displayLimit})</Text>
             </Box>
         );
     };
@@ -3322,19 +3387,19 @@ export default function App({ args = [] }) {
                                         label: "Enter Agent daily budget (requests made):",
                                         key: 'quotas',
                                         subKey: 'agentLimit',
-                                        value: quotas.agentLimit >= 99999999 ? '' : String(quotas.agentLimit),
+                                        value: getPrefilledValue(quotas.agentLimit),
                                         returnView: 'settings',
                                         next: (newQuotas) => ({
                                             label: "Enter Agent daily budget (tokens used):",
                                             key: 'quotas',
                                             subKey: 'tokenLimit',
-                                            value: (newQuotas.tokenLimit >= 99999999999999 || newQuotas.tokenLimit === 0) ? '' : String(newQuotas.tokenLimit),
+                                            value: getPrefilledValue(newQuotas.tokenLimit),
                                             returnView: 'settings',
                                             next: (q2) => ({
                                                 label: "Enter Agent monthly budget (tokens used):",
                                                 key: 'quotas',
                                                 subKey: 'monthlyTokenLimit',
-                                                value: (q2.monthlyTokenLimit >= 99999999999999 || q2.monthlyTokenLimit === 0) ? '' : String(q2.monthlyTokenLimit),
+                                                value: getPrefilledValue(q2.monthlyTokenLimit),
                                                 returnView: 'resetMode'
                                             })
                                         })
@@ -3416,6 +3481,99 @@ export default function App({ args = [] }) {
                         onClose={() => setActiveView('apiTier')}
                     />
                 );
+
+            case 'budgetResetMode':
+                return (
+                    <CommandMenu
+                        title="SELECT MONTHLY RESET MODE"
+                        items={[
+                            { label: 'Default (Rolling 30-Day Window)', value: 'Rolling' },
+                            { label: 'Custom (Set reset day of month)', value: 'Custom' },
+                            { label: 'Back', value: 'chat' }
+                        ]}
+                        onSelect={(item) => {
+                            if (item.value === 'chat' || item.value === 'Back') {
+                                setActiveView('chat');
+                                return;
+                            }
+
+                            const selectedMode = item.value;
+                            const updatedQuotas = { ...quotas, resetMode: selectedMode };
+                            setQuotas(updatedQuotas);
+
+                            if (selectedMode === 'Custom') {
+                                setInputConfig({
+                                    label: "Enter monthly reset day (1-30):",
+                                    key: 'quotas',
+                                    subKey: 'resetDay',
+                                    value: String(quotas.resetDay || 1),
+                                    returnView: 'chat'
+                                });
+                                setActiveView('input');
+                            } else {
+                                saveSettings({ apiTier, quotas: updatedQuotas });
+                                setActiveView('chat');
+                            }
+                        }}
+                        onClose={() => setActiveView('chat')}
+                    />
+                );
+
+            case 'budgetView': {
+                const reqCurrent = dailyUsage?.agent || 0;
+                const reqLimit = quotas.agentLimit || 99999999;
+                const tokenCurrent = dailyUsage?.tokens || 0;
+                const tokenLimit = quotas.tokenLimit || 99999999999999;
+                const monthlyCurrent = quotas.resetMode === 'Custom' ? (customPeriodUsage?.tokens || 0) : (monthlyUsage?.tokens || 0);
+                const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
+
+                const isFreeTier = apiTier !== 'Paid';
+                const limitsNotSet = isFreeTier && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
+
+                let resetInfo = '';
+                if (quotas.resetMode === 'Custom') {
+                    const today = new Date();
+                    const resetDay = quotas.resetDay || 1;
+                    let resetMonth = today.getMonth();
+                    if (today.getDate() >= resetDay) {
+                        resetMonth += 1;
+                    }
+                    const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
+                    const monthName = resetDate.toLocaleString('default', { month: 'short' });
+                    resetInfo = `Resets on: ${resetDay}-${monthName}`;
+                }
+
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={1} width="100%">
+                        <Box marginBottom={1} justifyContent="space-between" width="100%">
+                            <Text color="white" bold underline>BUDGET LIMIT STATUS{isFreeTier ? " (Isn't it fun to see numbers go BRRRR)" : ""}</Text>
+                            <Text color="gray">[ ESC to Close ]</Text>
+                        </Box>
+                        {limitsNotSet ? (
+                            <Box padding={1} justifyContent="center" alignItems="center" width="100%">
+                                <Text color="yellow" bold>LIMITS NOT SET</Text>
+                            </Box>
+                        ) : (
+                            <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} width="100%">
+                                {renderProgressBar('Daily Requests', reqCurrent, reqLimit, 'cyan')}
+                                {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
+                                {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
+                                {resetInfo ? (
+                                    <Box marginLeft={4} marginTop={1}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="magenta" bold>{resetInfo}</Text>
+                                    </Box>
+                                ) : (
+                                    <Box marginLeft={4} marginTop={1}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
+                );
+            }
 
             case 'input':
                 return (
@@ -4403,7 +4561,7 @@ export default function App({ args = [] }) {
                                         </>
                                     ) : (
                                         <>
-                                            <Text color="white">Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set Tier to paid in /settings → other → API Tier).</Text>
+                                            <Text color="white">Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set budgets in /settings → Others → Budgets to avoid runaway spending).</Text>
                                             <Box marginTop={1}>
                                                 <Text color="gray" bold> {'>'} </Text>
                                                 <TextInput

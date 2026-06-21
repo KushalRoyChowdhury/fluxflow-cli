@@ -58,6 +58,7 @@ export default function AppCommands() {
             <h2 id="system-configuration">System & Configuration</h2>
             <ul>
                 <li><strong><code>/settings</code></strong> — Opens the main configuration menu for system preferences and sandbox presets.</li>
+                <li><strong><code>/budget</code></strong> — Set or view budget limits (Daily/Monthly request and token quotas).</li>
                 <li><strong><code>/key</code></strong> — Manage API keys for various providers securely.</li>
                 <li><strong><code>/profile</code></strong> — Edit the developer persona and global instructions.</li>
                 <li><strong><code>/memory</code></strong> — Manage, view, or delete long-term agent memories.</li>

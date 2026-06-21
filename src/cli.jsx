@@ -76,6 +76,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /chats                                   List all chat sessions
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
+  /budget                                  Set or View budget limits
   /image setup quality <low...premium>     Configure default image generation quality
   /image stats                             Show image quota stats
   /mode <flux|flow>                        Toggle Flux/Flow modes

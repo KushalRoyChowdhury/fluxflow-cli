@@ -782,6 +782,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/chats', desc: 'List all chat sessions' },
             { cmd: '/btw', desc: 'Send raw inquiry mid-turn' },
             { cmd: '/image', desc: 'Generate images' },
+            { cmd: '/budget', desc: 'Set or View budget limits' },
             { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
             { cmd: '/thinking', desc: 'Set AI reasoning depth' },
             { cmd: '/model', desc: 'Switch AI model' },
