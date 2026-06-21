@@ -465,22 +465,127 @@ export const addToUsage = async (key, amount, provider, model) => {
 /**
  * Checks if a call is allowed based on settings and tier
  */
+/**
+ * Gets the custom period usage stats from memory (from custom reset day to today)
+ */
+export const getCustomPeriodUsage = async (resetDay = 1) => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (!cachedUsage) {
+        cachedUsage = await loadUsageFromFile();
+    }
+
+    // Rollover check
+    if (cachedUsage.date !== todayStr) {
+        await getDailyUsage();
+    }
+
+    let startYear = today.getFullYear();
+    let startMonth = today.getMonth();
+    const todayDay = today.getDate();
+
+    if (todayDay < resetDay) {
+        startMonth -= 1;
+        if (startMonth < 0) {
+            startMonth = 11;
+            startYear -= 1;
+        }
+    }
+
+    const startDate = new Date(startYear, startMonth, resetDay);
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    const history = cachedUsage.history || {};
+    const todayStats = cachedUsage.stats || { ...defaultStats };
+    const summed = { ...defaultStats };
+    summed.imageCalls = [];
+    summed.models = {};
+
+    const addStats = (target, source) => {
+        for (const key in target) {
+            if (key === 'imageCalls') {
+                target.imageCalls = [...(target.imageCalls || []), ...(source.imageCalls || [])];
+            } else if (key === 'models') {
+                const srcModels = source.models || {};
+                for (const provider in srcModels) {
+                    if (!target.models[provider]) {
+                        target.models[provider] = {};
+                    }
+                    for (const model in srcModels[provider]) {
+                        if (!target.models[provider][model]) {
+                            target.models[provider][model] = {
+                                tokens: 0,
+                                cachedTokens: 0,
+                                candidateTokens: 0
+                            };
+                        }
+                        const tM = target.models[provider][model];
+                        const sM = srcModels[provider][model];
+                        tM.tokens += sM.tokens || 0;
+                        tM.cachedTokens += sM.cachedTokens || 0;
+                        tM.candidateTokens += sM.candidateTokens || 0;
+                    }
+                }
+            } else if (typeof target[key] === 'number') {
+                target[key] += source[key] || 0;
+            }
+        }
+    };
+
+    addStats(summed, todayStats);
+
+    for (const dateKey in history) {
+        if (dateKey >= startDateStr && dateKey < todayStr) {
+            addStats(summed, history[dateKey]);
+        }
+    }
+
+    return summed;
+};
+
+/**
+ * Checks if a call is allowed based on settings and tier
+ */
 export const checkQuota = async (key, settings) => {
-    const usage = await getDailyUsage();
     const tier = settings.apiTier || 'Free';
     const quotas = settings.quotas || {};
 
     if (tier === 'Free') {
         if (key === 'agent' || key === 'background') {
-            return (usage.agent + usage.background) < 999999;
+            const daily = await getDailyUsage();
+            return (daily.agent + daily.background) < 999999;
         }
         if (key === 'search') return true;
     }
 
     if (tier === 'Paid' || tier === 'Custom') {
-        if (key === 'agent') return usage.agent < (quotas.agentLimit || 999999);
-        if (key === 'background') return usage.background < (quotas.backgroundLimit || 999999);
-        if (key === 'search') return usage.search < (quotas.searchLimit || 100);
+        if (key === 'agent') {
+            const reqLimit = quotas.agentLimit || 99999999;
+            const tokenLimit = quotas.tokenLimit || 99999999999999;
+            const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+
+            const dailyUsage = await getDailyUsage();
+            const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+            if (!dailyOk) return false;
+
+            let monthlyUsage;
+            if (quotas.resetMode === 'Custom') {
+                monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+            } else {
+                monthlyUsage = await getMonthlyUsage();
+            }
+
+            return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
+        }
+        if (key === 'background') {
+            const dailyUsage = await getDailyUsage();
+            return dailyUsage.background < (quotas.backgroundLimit || 999999);
+        }
+        if (key === 'search') {
+            const dailyUsage = await getDailyUsage();
+            return dailyUsage.search < (quotas.searchLimit || 100);
+        }
     }
 
     return true;

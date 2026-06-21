@@ -15,6 +15,7 @@ const lastKnownStates = new Map<string, string>();
 const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
 const newFilesCreatedByBridge = new Set<string>();
+const accumulatedEdits = new Map<string, Map<number, string>>();
 
 class FluxFlowDiffProvider implements vscode.TextDocumentContentProvider {
     provideTextDocumentContent(uri: vscode.Uri): string {
@@ -268,6 +269,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if (message.command === 'requestContext') {
                     const ctx = await getIDEContext();
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
+                    accumulatedEdits.clear();
                 } else if (message.command === 'status') {
                     updateStatusBar(message.status);
                 } else if (message.command === 'version') {
@@ -325,7 +327,51 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }));
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(cleanup));
-    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(cleanup));
+
+    // Initialize lastKnownStates for currently open documents
+    vscode.workspace.textDocuments.forEach(doc => {
+        if (!doc.isUntitled && !doc.fileName.includes('.git')) {
+            lastKnownStates.set(doc.fileName, doc.getText());
+        }
+    });
+
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(doc => {
+        if (!doc.isUntitled && !doc.fileName.includes('.git')) {
+            lastKnownStates.set(doc.fileName, doc.getText());
+        }
+    }));
+
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
+        cleanup();
+
+        const doc = e.document;
+        if (doc.isUntitled || doc.fileName.includes('.git')) {
+            return;
+        }
+        const docPath = doc.fileName;
+        const currentContent = doc.getText();
+        const lastContent = lastKnownStates.get(docPath);
+        if (lastContent !== undefined && lastContent !== currentContent) {
+            const currentLines = currentContent.split(/\r?\n/);
+            const lastLines = lastContent.split(/\r?\n/);
+            
+            let fileMap = accumulatedEdits.get(docPath);
+            if (!fileMap) {
+                fileMap = new Map<number, string>();
+            }
+
+            currentLines.forEach((line, idx) => {
+                if (line !== lastLines[idx]) {
+                    fileMap!.set(idx + 1, line.trim());
+                }
+            });
+
+            // Move the file map to the end to maintain insertion order of most recent edits
+            accumulatedEdits.delete(docPath);
+            accumulatedEdits.set(docPath, fileMap);
+        }
+        lastKnownStates.set(docPath, currentContent);
+    }));
 
     // Terminal Link Provider (Clickable File Paths)
     context.subscriptions.push(vscode.window.registerTerminalLinkProvider({
@@ -469,22 +515,24 @@ async function getIDEContext() {
             context.warnings = `[WORKSPACE WARNINGS/LINT]:\n${workspaceWarnings.join('\n\n')}`;
         }
 
-        const currentContent = activeEditor.document.getText();
-        context.full_content = currentContent;
-        const lastContent = lastKnownStates.get(filePath);
+        context.full_content = activeEditor.document.getText();
 
-        if (lastContent && lastContent !== currentContent) {
-            const currentLines = currentContent.split(/\r?\n/);
-            const lastLines = lastContent.split(/\r?\n/);
-            const edits: string[] = [];
-            currentLines.forEach((line, idx) => {
-                if (line !== lastLines[idx]) {
-                    edits.push(`Line ${idx + 1}: ${line}`);
+        if (accumulatedEdits.size > 0) {
+            const manualEditsParts: string[] = [];
+            accumulatedEdits.forEach((fileMap, docPath) => {
+                if (fileMap.size > 0) {
+                    const fileEdits: string[] = [];
+                    // Sort lines by line number
+                    const sortedLines = Array.from(fileMap.keys()).sort((a, b) => a - b);
+                    sortedLines.forEach(lineNum => {
+                        fileEdits.push(`    Line ${lineNum}: ${fileMap.get(lineNum)}`);
+                    });
+                    const relPath = vscode.workspace.asRelativePath(docPath);
+                    manualEditsParts.push(`${relPath}:\n${fileEdits.join('\n')}`);
                 }
             });
-            context.manual_edits = edits.join('\n');
+            context.manual_edits = manualEditsParts.join('\n');
         }
-        lastKnownStates.set(filePath, currentContent);
     }
 
     return context;

@@ -101,7 +101,7 @@ export default function SettingsMenu({
             case 'other':
                 return [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    { label: 'API Tier', value: 'apiTier', status: apiTier },
+                    { label: 'API Tier', value: 'apiTier', status: apiTier === 'Free' ? 'Provider Limits' : 'Custom Budget' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ]; default:
                 return [];

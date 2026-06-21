@@ -15,6 +15,7 @@ import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
+import { type } from 'os';
 
 let client = null;
 let globalSettings = {};
@@ -910,16 +911,17 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
             }
 
             break; // Success! Break retry loop.
-        } catch (janitorErr) {
+        } catch (err) {
             attempts++;
             const date = new Date().toLocaleString();
             if (process.stdout.isTTY) {
                 process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
             }
+            const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
             await new Promise(resolve => setTimeout(resolve, 1000));
             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
             if (!fs.existsSync(janitorErrDir)) fs.mkdirSync(janitorErrDir, { recursive: true });
-            fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${String(janitorErr)}\n\n`);
+            fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}\n\n`);
 
             if (attempts > MAX_JANITOR_RETRIES) break;
 
@@ -929,7 +931,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     }
     if (attempts) {
         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
-        fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n\n`)
+        fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
 
         if (attempts >= MAX_JANITOR_RETRIES) {
             if (process.stdout.isTTY) {
@@ -1351,11 +1353,12 @@ Chats to process:
 
     } catch (err) {
         // Silently log failures to the janitor log directory so it never disrupts user chat
+        const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);;
         const janitorLogDir = path.join(LOGS_DIR, 'janitor');
         if (!fs.existsSync(janitorLogDir)) fs.mkdirSync(janitorLogDir, { recursive: true });
         fs.appendFileSync(
             path.join(janitorLogDir, 'error.log'),
-            `[${new Date().toLocaleString()}] Past memory batch consolidation error: ${err.message}\n`
+            `[${new Date().toLocaleString()}] Past memory batch consolidation error: ${errLog}\n`
         );
     }
 };
@@ -1813,18 +1816,123 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
                 if (ideCtx.manual_edits) {
                     let edits = ideCtx.manual_edits;
-                    const CHAR_LIMIT = 4 * 512; // 2048 chars
-                    const LINE_LIMIT = 50;
-
                     const lines = edits.split('\n');
-                    if (lines.length > LINE_LIMIT) {
-                        edits = lines.slice(0, LINE_LIMIT).join('\n') + `\n... (${lines.length - LINE_LIMIT} more lines truncated)`;
-                    }
-                    if (edits.length > CHAR_LIMIT) {
-                        edits = edits.substring(0, CHAR_LIMIT) + `\n... (Character limit reached, truncated)`;
+                    const files = [];
+                    let currentFile = null;
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        if (line.startsWith('    Line ')) {
+                            if (currentFile) {
+                                currentFile.edits.push(line);
+                            }
+                        } else {
+                            const filePath = line.endsWith(':') ? line.slice(0, -1) : line;
+                            currentFile = { path: filePath, edits: [] };
+                            files.push(currentFile);
+                        }
                     }
 
-                    ideBlock += `Recent Manual Edits:\n${edits}\n`;
+                    // 1. Initial per-file 80 lines cap (FIFO) & record original counts
+                    for (const file of files) {
+                        if (file.edits.length > 80) {
+                            file.edits = file.edits.slice(-80);
+                        }
+                        file.originalEditsCount = file.edits.length;
+                    }
+
+                    // 2. Adjust per-file limit dynamically to accommodate 300 total lines (min 10)
+                    const getSumForLimit = (limit, activeFiles) => {
+                        return activeFiles.reduce((sum, f) => {
+                            const isFocused = ideCtx.file_focused &&
+                                (f.path === ideCtx.file_focused ||
+                                    path.resolve(process.cwd(), f.path) === path.resolve(ideCtx.file_focused));
+                            const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
+                            return sum + Math.min(f.edits.length, fileLimit);
+                        }, 0);
+                    };
+
+                    let chosenLimit = 80;
+                    if (getSumForLimit(80, files) > 300) {
+                        let found = false;
+                        for (let L = 80; L >= 10; L--) {
+                            if (getSumForLimit(L, files) <= 300) {
+                                chosenLimit = L;
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            chosenLimit = 10;
+                        }
+                    }
+
+                    let activeFiles = [...files];
+                    // If even at min limit 10, total lines > 500, remove files with minimum original line count
+                    if (chosenLimit === 10 && getSumForLimit(10, activeFiles) > 500) {
+                        while (activeFiles.length > 0 && getSumForLimit(10, activeFiles) > 500) {
+                            let minIndex = 0;
+                            let minVal = activeFiles[0].originalEditsCount;
+                            for (let i = 1; i < activeFiles.length; i++) {
+                                if (activeFiles[i].originalEditsCount < minVal) {
+                                    minVal = activeFiles[i].originalEditsCount;
+                                    minIndex = i;
+                                }
+                            }
+                            activeFiles.splice(minIndex, 1);
+                        }
+                    }
+
+                    // Apply the chosen limit to the active files (FIFO)
+                    for (const file of activeFiles) {
+                        const isFocused = ideCtx.file_focused &&
+                            (file.path === ideCtx.file_focused ||
+                                path.resolve(process.cwd(), file.path) === path.resolve(ideCtx.file_focused));
+                        const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
+                        if (file.edits.length > fileLimit) {
+                            file.edits = file.edits.slice(-fileLimit);
+                        }
+                    }
+
+                    // 3. Limit per-file character limit to 4 * 768 (FIFO)
+                    for (const file of activeFiles) {
+                        let fileString = `${file.path}:\n${file.edits.join('\n')}`;
+                        while (file.edits.length > 0 && fileString.length > 4 * 768) {
+                            file.edits.shift();
+                            fileString = `${file.path}:\n${file.edits.join('\n')}`;
+                        }
+                        if (fileString.length > 4 * 768) {
+                            file.stringRepresentation = '... ' + fileString.slice(-(4 * 768 - 4));
+                        } else {
+                            file.stringRepresentation = fileString;
+                        }
+                    }
+
+                    // 4. Limit total character limit to 4 * 2048 (FIFO)
+                    let finalEdits = activeFiles.map(f => f.stringRepresentation).join('\n');
+                    while (activeFiles.length > 0 && finalEdits.length > 4 * 2048) {
+                        if (activeFiles[0].edits.length > 0) {
+                            activeFiles[0].edits.shift();
+                        } else {
+                            activeFiles.shift();
+                        }
+                        // Re-calculate representations
+                        for (const file of activeFiles) {
+                            let fileString = `${file.path}:\n${file.edits.join('\n')}`;
+                            if (fileString.length > 4 * 768) {
+                                file.stringRepresentation = '... ' + fileString.slice(-(4 * 768 - 4));
+                            } else {
+                                file.stringRepresentation = fileString;
+                            }
+                        }
+                        finalEdits = activeFiles.map(f => f.stringRepresentation).join('\n');
+                    }
+
+                    if (finalEdits.length > 4 * 2048) {
+                        finalEdits = '... ' + finalEdits.slice(-(4 * 2048 - 4));
+                    }
+
+                    ideBlock += `Recent Manual Edits:\n${finalEdits}\n`;
                 }
                 if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(', ')}`;
 
@@ -1939,7 +2047,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 try {
                                     const content = fs.readFileSync(absPath, 'utf8');
                                     totalLines = content.split('\n').length;
-                                } catch (e) {}
+                                } catch (e) { }
                                 label = `📄 Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                                 taggedContextBlocks.push(textResult);
                             }
@@ -3401,7 +3509,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
-                                                const action = normToolName === 'write_file' ? 'WRITE DENIED' : 'UPDATE DENIED';
+                                                const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
                                                 const deniedLabel = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
@@ -3559,7 +3667,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         uiTitle = '📥 Added Plan';
                                         listItems = normalizeList(tasks).map(item => `○ ${item}`);
                                     } else if (method === 'get') {
-                                        uiTitle = markDone ? '📌 Updated Plan' : '📝 Reviewed Plan';
+                                        uiTitle = markDone ? '🔄 Updated Plan' : '📝 Reviewed Plan';
                                         const content = (result || '').split('\n').slice(1).join('\n');
                                         listItems = content.split('\n')
                                             .filter(line => line.trim().startsWith('- ['))
@@ -3779,8 +3887,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         dedupeBuffer = '';
                     }
 
-                    const errMsg = err.status || (err.error && err.error.message) || String(err);
-                    const errLog = String(err);
+                    // const errMsg = err.status || (err.error && err.error.message) || String(err);
+                    const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);;
                     // Log error in /logs/agent/error.log
                     const date = new Date().toLocaleString();
                     const agentErrDir = path.join(LOGS_DIR, 'agent');
@@ -3802,6 +3910,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (retryCount < MAX_RETRIES - 3) {
                             throw err;
                         }
+                        yield { type: 'text', content: errLog };
+                        yield { type: 'status', content: 'Error Occured' };
                     }
 
                     if (turnText.trim().length > 0 || inStreamRetryCount > 1) {
@@ -3986,17 +4096,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         });
 
     } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
+        yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog}` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err instanceof Error ? err.stack : err}\n\n----------------------------------------------------------------------\n\n`);
+        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
 
         if (typeof flushGoogleBuffer === 'function') {
             yield* flushGoogleBuffer();
         }
 
-        yield { type: 'tool_result', content: `ERROR: [INTERNAL CRITICAL] ${errorMsg}` };
+        yield { type: 'tool_result', content: `ERROR: [INTERNAL CRITICAL] ${errLog}` };
     } finally {
         if (connectionPollInterval) {
             clearInterval(connectionPollInterval);

@@ -7,6 +7,7 @@ import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { MultilineInput } from './components/MultilineInput.jsx';
 import TextInput from 'ink-text-input';
+import SelectInput from 'ink-select-input';
 import ChatLayout, { MessageItem, CodeRenderer } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
@@ -26,7 +27,7 @@ import { RevertManager } from './utils/revert.js';
 import { GEMINI_QUOTES } from './data/gemini_quotes.js';
 import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import RevertModal from './components/RevertModal.jsx';
-import { getDailyUsage, getMonthlyUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
+import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -644,7 +645,7 @@ export default function App({ args = [] }) {
 
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [apiTier, setApiTier] = useState('Free');
-    const [quotas, setQuotas] = useState({ agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
+    const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
     const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
@@ -667,6 +668,7 @@ export default function App({ args = [] }) {
     const [sessionImageCredits, setSessionImageCredits] = useState(0);
     const [dailyUsage, setDailyUsage] = useState(null);
     const [monthlyUsage, setMonthlyUsage] = useState(null);
+    const [customPeriodUsage, setCustomPeriodUsage] = useState(null);
     const [statsMode, setStatsMode] = useState('daily');
     const [chatId, setChatId] = useState(generateChatId());
 
@@ -677,6 +679,20 @@ export default function App({ args = [] }) {
             saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => { });
         }
     }, [sessionTotalTokens, chatId, sessionStats.tokens]);
+
+    useEffect(() => {
+        if (activeView === 'apiTier') {
+            const load = async () => {
+                const d = await getDailyUsage();
+                setDailyUsage(d);
+                const m = await getMonthlyUsage();
+                setMonthlyUsage(m);
+                const c = await getCustomPeriodUsage(quotas.resetDay || 1);
+                setCustomPeriodUsage(c);
+            };
+            load();
+        }
+    }, [activeView, quotas.resetDay]);
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
@@ -1269,7 +1285,7 @@ export default function App({ args = [] }) {
 
             setShowFullThinking(saved.showFullThinking);
             setApiTier(saved.apiTier || 'Free');
-            setQuotas(saved.quotas || { agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
+            setQuotas(saved.quotas || { limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
             const freshSettings = {
                 memory: true,
                 compression: 0.0,
@@ -3144,6 +3160,46 @@ export default function App({ args = [] }) {
         setSelectedIndex(0);
     }, [suggestions]);
 
+    const CustomMenuItem = ({ label, isSelected }) => {
+        const isCancel = label === 'Cancel' || label === 'Back' || label.toLowerCase().includes('exit') || label.toLowerCase().includes('back');
+        return (
+            <Box
+                marginTop={isCancel ? 1 : 0}
+                backgroundColor={isSelected ? "#2a2a2a" : undefined}
+                paddingX={1}
+                width="100%"
+            >
+                <Text color={isSelected ? 'white' : 'gray'} bold={isSelected}>
+                    {isSelected ? '❯ ' : '  '}{label}
+                </Text>
+            </Box>
+        );
+    };
+
+    const renderProgressBar = (label, current, limit) => {
+        const percent = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+        const barWidth = 15;
+        const filledCount = Math.round((percent / 100) * barWidth);
+        const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
+
+        let barColor = 'gray';
+        if (percent >= 40 && percent <= 80) {
+            barColor = 'yellow';
+        } else if (percent > 80) {
+            barColor = 'red';
+        }
+
+        return (
+            <Box flexDirection="row" paddingLeft={4} key={label}>
+                <Box width={18}>
+                    <Text color="gray">{label}: </Text>
+                </Box>
+                <Text color={barColor}>{barStr}</Text>
+                <Text color="gray"> {percent}% ({current}/{limit >= 99999999 ? '∞' : limit})</Text>
+            </Box>
+        );
+    };
+
     const renderActiveView = () => {
         switch (activeView) {
             case 'settings':
@@ -3167,9 +3223,9 @@ export default function App({ args = [] }) {
                         title="SELECT AI PROVIDER"
                         items={[
                             { label: 'Google (Free/Paid)', value: 'Google' },
+                            { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                            { label: 'NVIDIA (Free/Paid)', value: 'NVIDIA' },
                             { label: 'Back', value: 'settings' }
                         ]}
                         onSelect={async (item) => {
@@ -3199,7 +3255,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✅ Switched to ${selectedProvider}! Key loaded from Vault. Model set to ${defaultModel}.`,
+                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.`,
                                         isMeta: true
                                     }
                                 ]);
@@ -3219,42 +3275,145 @@ export default function App({ args = [] }) {
                     />
                 );
 
-            case 'apiTier':
+            case 'apiTier': {
+                const reqCurrent = dailyUsage?.agent || 0;
+                const reqLimit = quotas.agentLimit || 99999999;
+                const tokenCurrent = dailyUsage?.tokens || 0;
+                const tokenLimit = quotas.tokenLimit || 99999999999999;
+                const monthlyCurrent = quotas.resetMode === 'Custom' ? (customPeriodUsage?.tokens || 0) : (monthlyUsage?.tokens || 0);
+                const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
+
+                let resetInfo = '';
+                if (quotas.resetMode === 'Custom') {
+                    const today = new Date();
+                    const resetDay = quotas.resetDay || 1;
+                    let resetMonth = today.getMonth();
+                    if (today.getDate() >= resetDay) {
+                        resetMonth += 1;
+                    }
+                    const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
+                    const monthName = resetDate.toLocaleString('default', { month: 'short' });
+                    resetInfo = `Resets on: ${resetDay}-${monthName}`;
+                }
+
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
+                        <Box paddingX={1} marginBottom={1}>
+                            <Text color="gray" bold>SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: { aiProvider })</Text>
+                        </Box>
+
+                        <SelectInput
+                            items={[
+                                { label: 'Provider Limits', value: 'Free' },
+                                { label: `Set Budgets (API with Billing Account) ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
+                                { label: 'Back', value: 'settings' }
+                            ]}
+                            onSelect={(item) => {
+                                if (item.value === 'settings' || item.value === 'Back') {
+                                    setActiveView('settings');
+                                    return;
+                                }
+
+                                const newTier = item.value;
+                                setApiTier(newTier);
+
+                                if (newTier === 'Paid') {
+                                    setInputConfig({
+                                        label: "Enter Agent daily budget (requests made):",
+                                        key: 'quotas',
+                                        subKey: 'agentLimit',
+                                        value: quotas.agentLimit >= 99999999 ? '' : String(quotas.agentLimit),
+                                        returnView: 'settings',
+                                        next: (newQuotas) => ({
+                                            label: "Enter Agent daily budget (tokens used):",
+                                            key: 'quotas',
+                                            subKey: 'tokenLimit',
+                                            value: (newQuotas.tokenLimit >= 99999999999999 || newQuotas.tokenLimit === 0) ? '' : String(newQuotas.tokenLimit),
+                                            returnView: 'settings',
+                                            next: (q2) => ({
+                                                label: "Enter Agent monthly budget (tokens used):",
+                                                key: 'quotas',
+                                                subKey: 'monthlyTokenLimit',
+                                                value: (q2.monthlyTokenLimit >= 99999999999999 || q2.monthlyTokenLimit === 0) ? '' : String(q2.monthlyTokenLimit),
+                                                returnView: 'resetMode'
+                                            })
+                                        })
+                                    });
+                                    setActiveView('input');
+                                } else {
+                                    const newQuotas = { ...quotas, agentLimit: 99999999, tokenLimit: 99999999999999, monthlyTokenLimit: 99999999999999 };
+                                    setQuotas(newQuotas);
+                                    saveSettings({ apiTier: newTier, quotas: newQuotas });
+                                    setActiveView('settings');
+                                }
+                            }}
+                            itemComponent={CustomMenuItem}
+                            indicatorComponent={() => null}
+                        />
+
+                        {apiTier === 'Paid' && (
+                            <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} width="100%">
+                                <Box marginBottom={1}>
+                                    <Text color="white" bold>USAGE BUDGET STATUS</Text>
+                                </Box>
+                                {renderProgressBar('Daily Requests', reqCurrent, reqLimit, 'cyan')}
+                                {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
+                                {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
+                                {resetInfo ? (
+                                    <Box marginLeft={4} marginTop={1}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="magenta" bold>{resetInfo}</Text>
+                                    </Box>
+                                ) : (
+                                    <Box marginLeft={4} marginTop={1}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
+
+                        <Box paddingX={1} marginTop={1}>
+                            <Text color="gray" italic>(Arrows to select • Enter to confirm)</Text>
+                        </Box>
+                    </Box>
+                );
+            }
+
+            case 'resetMode':
                 return (
                     <CommandMenu
-                        title={
-                            <Text>
-                                SELECT YOUR CURRENT API TIER BASED ON <Text color="cyan" underline bold>{"\u001b]8;;https://aistudio.google.com/projects\u0007AI STUDIO\u001b]8;;\u0007"}</Text>. (CURRENT: {apiTier.toUpperCase()})
-                            </Text>
-                        }
+                        title="SELECT MONTHLY RESET MODE"
                         items={[
-                            { label: 'Free Tier (Gemini API Free Tier)', value: 'Free' },
-                            { label: `Paid Tier (API with Billing Account)`, value: 'Paid' },
-                            { label: 'Back', value: 'settings' }
+                            { label: 'Default (Rolling 30-Day Window)', value: 'Rolling' },
+                            { label: 'Custom (Set reset day of month)', value: 'Custom' },
+                            { label: 'Back', value: 'apiTier' }
                         ]}
                         onSelect={(item) => {
-                            if (item.value === 'settings' || item.value === 'Back') {
-                                setActiveView('settings');
+                            if (item.value === 'apiTier' || item.value === 'Back') {
+                                setActiveView('apiTier');
                                 return;
                             }
 
-                            const newTier = item.value;
-                            setApiTier(newTier);
+                            const selectedMode = item.value;
+                            const updatedQuotas = { ...quotas, resetMode: selectedMode };
+                            setQuotas(updatedQuotas);
 
-                            if (newTier === 'Paid') {
+                            if (selectedMode === 'Custom') {
                                 setInputConfig({
-                                    label: "Enter Agent daily budget (requests made):",
+                                    label: "Enter monthly reset day (1-30):",
                                     key: 'quotas',
-                                    subKey: 'agentLimit',
-                                    value: String(quotas.agentLimit),
+                                    subKey: 'resetDay',
+                                    value: String(quotas.resetDay || 1),
+                                    returnView: 'settings'
                                 });
                                 setActiveView('input');
                             } else {
-                                saveSettings({ apiTier: newTier, quotas });
+                                saveSettings({ apiTier, quotas: updatedQuotas });
                                 setActiveView('settings');
                             }
                         }}
-                        onClose={() => setActiveView('settings')}
+                        onClose={() => setActiveView('apiTier')}
                     />
                 );
 
@@ -3285,7 +3444,10 @@ export default function App({ args = [] }) {
                                     let newSettings = {};
 
                                     if (key === 'quotas') {
-                                        const parsedValue = subKey.toLowerCase().includes('limit') ? parseInt(val) || 0 : val;
+                                        let parsedValue = (subKey.toLowerCase().includes('limit') || subKey === 'resetDay') ? parseInt(val) || 0 : val;
+                                        if (subKey === 'resetDay') {
+                                            parsedValue = Math.max(1, Math.min(30, parsedValue));
+                                        }
                                         newQuotas[subKey] = parsedValue;
                                         setQuotas(newQuotas);
                                         newSettings.quotas = newQuotas;
@@ -3365,13 +3527,13 @@ export default function App({ args = [] }) {
 
             case 'stats': {
                 const u = statsMode === 'monthly' ? monthlyUsage : dailyUsage;
-                const trackerTitle = statsMode === 'monthly' ? 'LAST 30 DAYS USAGE TRACKER' : 'DAILY USAGE TRACKER';
-                const timeLabel = statsMode === 'monthly' ? 'Wall Time (30d):' : 'Wall Time Today:';
-                const tokensLabel = statsMode === 'monthly' ? 'Tokens Used (30d):' : 'Tokens Used Today:';
-                const imagesLabel = statsMode === 'monthly' ? 'Images Made (30d):' : 'Images Made Today:';
-                const imageCreditsLabel = statsMode === 'monthly' ? 'Image Credits (30d):' : 'Image Credits Today:';
-                const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes (30d):' : 'Code Changes Today:';
-                const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls (30d):' : 'Tool Calls Today:';
+                const trackerTitle = statsMode === 'monthly' ? 'LAST 30 DAYS USAGE' : 'TODAY\'s USAGE';
+                const timeLabel = statsMode === 'monthly' ? 'Wall Time:' : 'Wall Time:';
+                const tokensLabel = statsMode === 'monthly' ? 'Tokens Used:' : 'Tokens Used:';
+                const imagesLabel = statsMode === 'monthly' ? 'Images Made:' : 'Images Made:';
+                const imageCreditsLabel = statsMode === 'monthly' ? 'Image Credits:' : 'Image Credits:';
+                const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes:' : 'Code Changes:';
+                const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls:' : 'Tool Calls:';
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={'grey'} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
                         {statsMode === 'modelBreakdown' ? (
@@ -3387,27 +3549,27 @@ export default function App({ args = [] }) {
                                         return (
                                             <Box key={provider} flexDirection="column" marginTop={1}>
                                                 <Box>
-                                                    <Box width={25}><Text color="cyan" bold>{provider}:</Text></Box>
+                                                    <Box width={40}><Text color="cyan" bold>{provider}:</Text></Box>
                                                     <Text color="white" bold>{formatTokens(providerTotalTokens)}</Text>
                                                 </Box>
                                                 {Object.entries(models).map(([modelName, stats]) => (
-                                                    <Box key={modelName} flexDirection="column" marginLeft={4}>
+                                                    <Box key={modelName} flexDirection="column" marginLeft={4} marginTop={1}>
                                                         <Box>
-                                                            <Box width={21}><Text color="blue">» {modelName}:</Text></Box>
+                                                            <Box width={36}><Text color="blue">» {modelName}:</Text></Box>
                                                             <Text color="white">{formatTokens(stats.tokens || 0)}</Text>
                                                         </Box>
                                                         <Box marginLeft={4}>
-                                                            <Box width={17}><Text color="grey">» Input Tokens:</Text></Box>
+                                                            <Box width={32}><Text color="grey">» Input Tokens:</Text></Box>
                                                             <Text color="white">{formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0))}</Text>
                                                         </Box>
                                                         {(stats.cachedTokens || 0) > 0 && (
                                                             <Box marginLeft={5}>
-                                                                <Box width={16}><Text color="grey">» Cached:</Text></Box>
+                                                                <Box width={31}><Text color="grey">» Cached:</Text></Box>
                                                                 <Text color="white">{formatTokens(stats.cachedTokens)}</Text>
                                                             </Box>
                                                         )}
                                                         <Box marginLeft={4}>
-                                                            <Box width={17}><Text color="grey">» Output Tokens:</Text></Box>
+                                                            <Box width={32}><Text color="grey">» Output Tokens:</Text></Box>
                                                             <Text color="white">{formatTokens(stats.candidateTokens || 0)}</Text>
                                                         </Box>
                                                     </Box>
@@ -3429,7 +3591,7 @@ export default function App({ args = [] }) {
                                         <Text color="white">{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                        <Box width={25}><Text color="blue">Model Requests:</Text></Box>
                                         <Text color="white">{sessionAgentCalls}</Text>
                                     </Box>
                                     <Box marginLeft={2}>
@@ -3441,7 +3603,7 @@ export default function App({ args = [] }) {
                                         <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                        <Box width={25}><Text color="blue">Memory Agent:</Text></Box>
                                         <Text color="white">{sessionBackgroundCalls}</Text>
                                     </Box>
                                     <Box>
@@ -3507,11 +3669,11 @@ export default function App({ args = [] }) {
                                         <Text color="white">{formatDuration(u?.duration || 0)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Agent Interactions:</Text></Box>
+                                        <Box width={25}><Text color="blue">Model Requests:</Text></Box>
                                         <Text color="white">{u?.agent || 0}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Background Tasks:</Text></Box>
+                                        <Box width={25}><Text color="blue">Memory Agent:</Text></Box>
                                         <Text color="white">{u?.background || 0}</Text>
                                     </Box>
                                     <Box>
@@ -4228,9 +4390,9 @@ export default function App({ args = [] }) {
                                                 <CommandMenu
                                                     items={[
                                                         { label: 'Google (Free/Paid)', value: 'Google' },
+                                                        { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
                                                         { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                                                         { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                                                        { label: 'NVIDIA (Free/Paid)', value: 'NVIDIA' }
                                                     ]}
                                                     onSelect={(item) => {
                                                         setAiProvider(item.value);

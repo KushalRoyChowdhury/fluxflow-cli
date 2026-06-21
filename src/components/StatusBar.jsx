@@ -56,7 +56,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Box marginLeft={1}>
                     <Text color="gray" italic> {chatId}</Text>
                     {(apiTier === 'Custom' || apiTier === 'Paid') && (
-                        <Text color="gray" dimColor> | <Text color="gray" bold>PAID</Text></Text>
+                        <Text color="white"> | <Text color="gray" bold>CUSTOM</Text></Text>
                     )}
                 </Box>
             </Box>

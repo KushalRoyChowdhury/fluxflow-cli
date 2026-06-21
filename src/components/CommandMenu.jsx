@@ -23,7 +23,7 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
     return (
         <Box
             flexDirection="column"
-            // borderStyle="round"
+            borderStyle="round"
             borderColor="white"
             padding={0}
             marginTop={0}

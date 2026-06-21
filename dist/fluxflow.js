@@ -1993,7 +1993,7 @@ var init_StatusBar = __esm({
         },
         /* @__PURE__ */ React4.createElement(Box4, null, /* @__PURE__ */ React4.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, modeIcon, " ", mode.toUpperCase())), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, thinkingLevel.toUpperCase())), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "MEM: "), /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, isMemoryEnabled ? "ON" : "OFF"))),
         /* @__PURE__ */ React4.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, " ", truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React4.createElement(Box4, null, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, " ", formatTokens(tokensTotal), " ", /* @__PURE__ */ React4.createElement(Text4, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " ", chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, " | ", /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "PAID"))))
+        /* @__PURE__ */ React4.createElement(Box4, null, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, " ", formatTokens(tokensTotal), " ", /* @__PURE__ */ React4.createElement(Text4, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React4.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " ", chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, " | ", /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "CUSTOM"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -2009,6 +2009,7 @@ function CommandMenu({ title, subtitle, items, onSelect }) {
     Box5,
     {
       flexDirection: "column",
+      borderStyle: "round",
       borderColor: "white",
       padding: 0,
       marginTop: 0,
@@ -2934,7 +2935,7 @@ function SettingsMenu({
       case "other":
         return [
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
-          { label: "API Tier", value: "apiTier", status: apiTier },
+          { label: "API Tier", value: "apiTier", status: apiTier === "Free" ? "Provider Limits" : "Custom Budget" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -3951,7 +3952,7 @@ var init_history = __esm({
 import fs8 from "fs-extra";
 import path7 from "path";
 import os3 from "os";
-var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, addToUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
+var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
   "src/utils/usage.js"() {
     init_paths();
@@ -4325,20 +4326,104 @@ var init_usage = __esm({
       }
       queueFlush();
     };
+    getCustomPeriodUsage = async (resetDay = 1) => {
+      const today = /* @__PURE__ */ new Date();
+      const todayStr = today.toISOString().split("T")[0];
+      if (!cachedUsage) {
+        cachedUsage = await loadUsageFromFile();
+      }
+      if (cachedUsage.date !== todayStr) {
+        await getDailyUsage();
+      }
+      let startYear = today.getFullYear();
+      let startMonth = today.getMonth();
+      const todayDay = today.getDate();
+      if (todayDay < resetDay) {
+        startMonth -= 1;
+        if (startMonth < 0) {
+          startMonth = 11;
+          startYear -= 1;
+        }
+      }
+      const startDate = new Date(startYear, startMonth, resetDay);
+      const startDateStr = startDate.toISOString().split("T")[0];
+      const history = cachedUsage.history || {};
+      const todayStats = cachedUsage.stats || { ...defaultStats };
+      const summed = { ...defaultStats };
+      summed.imageCalls = [];
+      summed.models = {};
+      const addStats = (target, source) => {
+        for (const key in target) {
+          if (key === "imageCalls") {
+            target.imageCalls = [...target.imageCalls || [], ...source.imageCalls || []];
+          } else if (key === "models") {
+            const srcModels = source.models || {};
+            for (const provider in srcModels) {
+              if (!target.models[provider]) {
+                target.models[provider] = {};
+              }
+              for (const model in srcModels[provider]) {
+                if (!target.models[provider][model]) {
+                  target.models[provider][model] = {
+                    tokens: 0,
+                    cachedTokens: 0,
+                    candidateTokens: 0
+                  };
+                }
+                const tM = target.models[provider][model];
+                const sM = srcModels[provider][model];
+                tM.tokens += sM.tokens || 0;
+                tM.cachedTokens += sM.cachedTokens || 0;
+                tM.candidateTokens += sM.candidateTokens || 0;
+              }
+            }
+          } else if (typeof target[key] === "number") {
+            target[key] += source[key] || 0;
+          }
+        }
+      };
+      addStats(summed, todayStats);
+      for (const dateKey in history) {
+        if (dateKey >= startDateStr && dateKey < todayStr) {
+          addStats(summed, history[dateKey]);
+        }
+      }
+      return summed;
+    };
     checkQuota = async (key, settings) => {
-      const usage = await getDailyUsage();
       const tier = settings.apiTier || "Free";
       const quotas = settings.quotas || {};
       if (tier === "Free") {
         if (key === "agent" || key === "background") {
-          return usage.agent + usage.background < 999999;
+          const daily = await getDailyUsage();
+          return daily.agent + daily.background < 999999;
         }
         if (key === "search") return true;
       }
       if (tier === "Paid" || tier === "Custom") {
-        if (key === "agent") return usage.agent < (quotas.agentLimit || 999999);
-        if (key === "background") return usage.background < (quotas.backgroundLimit || 999999);
-        if (key === "search") return usage.search < (quotas.searchLimit || 100);
+        if (key === "agent") {
+          const reqLimit = quotas.agentLimit || 99999999;
+          const tokenLimit = quotas.tokenLimit || 99999999999999;
+          const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+          const dailyUsage = await getDailyUsage();
+          const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+          if (!dailyOk) return false;
+          let monthlyUsage;
+          if (quotas.resetMode === "Custom") {
+            monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+          } else {
+            monthlyUsage = await getMonthlyUsage();
+          }
+          return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
+        }
+        if (key === "background") {
+          const dailyUsage = await getDailyUsage();
+          return dailyUsage.background < (quotas.backgroundLimit || 999999);
+        }
+        if (key === "search") {
+          const dailyUsage = await getDailyUsage();
+          return dailyUsage.search < (quotas.searchLimit || 100);
+        }
       }
       return true;
     };
@@ -7153,16 +7238,23 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             }
           }
           break;
-        } catch (janitorErr) {
+        } catch (err) {
           attempts++;
           const date = (/* @__PURE__ */ new Date()).toLocaleString();
           if (process.stdout.isTTY) {
             process.stdout.write(`\x1B]0;Finalizing Error\x07`);
           }
+          const errLog = err instanceof Error ? (() => {
+            try {
+              return JSON.parse(JSON.parse(err.message).error.message).error.message;
+            } catch {
+              return String(err);
+            }
+          })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
           const janitorErrDir = path19.join(LOGS_DIR, "janitor");
           if (!fs20.existsSync(janitorErrDir)) fs20.mkdirSync(janitorErrDir, { recursive: true });
-          fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${String(janitorErr)}
+          fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -7173,7 +7265,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       if (attempts) {
         const janitorErrDir = path19.join(LOGS_DIR, "janitor");
         fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
-
 
 `);
         if (attempts >= MAX_JANITOR_RETRIES) {
@@ -7531,11 +7622,19 @@ ${newMemoryListStr}
           }
         }
       } catch (err) {
+        const errLog = err instanceof Error ? (() => {
+          try {
+            return JSON.parse(JSON.parse(err.message).error.message).error.message;
+          } catch {
+            return String(err);
+          }
+        })() : String(err);
+        ;
         const janitorLogDir = path19.join(LOGS_DIR, "janitor");
         if (!fs20.existsSync(janitorLogDir)) fs20.mkdirSync(janitorLogDir, { recursive: true });
         fs20.appendFileSync(
           path19.join(janitorLogDir, "error.log"),
-          `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${err.message}
+          `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
         );
       }
@@ -8020,19 +8119,106 @@ Cursor Line: ${ideCtx.cursor_line}
 `;
             if (ideCtx.manual_edits) {
               let edits = ideCtx.manual_edits;
-              const CHAR_LIMIT = 4 * 512;
-              const LINE_LIMIT = 50;
               const lines = edits.split("\n");
-              if (lines.length > LINE_LIMIT) {
-                edits = lines.slice(0, LINE_LIMIT).join("\n") + `
-... (${lines.length - LINE_LIMIT} more lines truncated)`;
+              const files = [];
+              let currentFile = null;
+              for (const line of lines) {
+                if (!line.trim()) continue;
+                if (line.startsWith("    Line ")) {
+                  if (currentFile) {
+                    currentFile.edits.push(line);
+                  }
+                } else {
+                  const filePath = line.endsWith(":") ? line.slice(0, -1) : line;
+                  currentFile = { path: filePath, edits: [] };
+                  files.push(currentFile);
+                }
               }
-              if (edits.length > CHAR_LIMIT) {
-                edits = edits.substring(0, CHAR_LIMIT) + `
-... (Character limit reached, truncated)`;
+              for (const file of files) {
+                if (file.edits.length > 80) {
+                  file.edits = file.edits.slice(-80);
+                }
+                file.originalEditsCount = file.edits.length;
+              }
+              const getSumForLimit = (limit, activeFiles2) => {
+                return activeFiles2.reduce((sum, f) => {
+                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path19.resolve(process.cwd(), f.path) === path19.resolve(ideCtx.file_focused));
+                  const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
+                  return sum + Math.min(f.edits.length, fileLimit);
+                }, 0);
+              };
+              let chosenLimit = 80;
+              if (getSumForLimit(80, files) > 300) {
+                let found = false;
+                for (let L = 80; L >= 10; L--) {
+                  if (getSumForLimit(L, files) <= 300) {
+                    chosenLimit = L;
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  chosenLimit = 10;
+                }
+              }
+              let activeFiles = [...files];
+              if (chosenLimit === 10 && getSumForLimit(10, activeFiles) > 500) {
+                while (activeFiles.length > 0 && getSumForLimit(10, activeFiles) > 500) {
+                  let minIndex = 0;
+                  let minVal = activeFiles[0].originalEditsCount;
+                  for (let i = 1; i < activeFiles.length; i++) {
+                    if (activeFiles[i].originalEditsCount < minVal) {
+                      minVal = activeFiles[i].originalEditsCount;
+                      minIndex = i;
+                    }
+                  }
+                  activeFiles.splice(minIndex, 1);
+                }
+              }
+              for (const file of activeFiles) {
+                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path19.resolve(process.cwd(), file.path) === path19.resolve(ideCtx.file_focused));
+                const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
+                if (file.edits.length > fileLimit) {
+                  file.edits = file.edits.slice(-fileLimit);
+                }
+              }
+              for (const file of activeFiles) {
+                let fileString = `${file.path}:
+${file.edits.join("\n")}`;
+                while (file.edits.length > 0 && fileString.length > 4 * 768) {
+                  file.edits.shift();
+                  fileString = `${file.path}:
+${file.edits.join("\n")}`;
+                }
+                if (fileString.length > 4 * 768) {
+                  file.stringRepresentation = "... " + fileString.slice(-(4 * 768 - 4));
+                } else {
+                  file.stringRepresentation = fileString;
+                }
+              }
+              let finalEdits = activeFiles.map((f) => f.stringRepresentation).join("\n");
+              while (activeFiles.length > 0 && finalEdits.length > 4 * 2048) {
+                if (activeFiles[0].edits.length > 0) {
+                  activeFiles[0].edits.shift();
+                } else {
+                  activeFiles.shift();
+                }
+                for (const file of activeFiles) {
+                  let fileString = `${file.path}:
+${file.edits.join("\n")}`;
+                  if (fileString.length > 4 * 768) {
+                    file.stringRepresentation = "... " + fileString.slice(-(4 * 768 - 4));
+                  } else {
+                    file.stringRepresentation = fileString;
+                  }
+                }
+                finalEdits = activeFiles.map((f) => f.stringRepresentation).join("\n");
+              }
+              if (finalEdits.length > 4 * 2048) {
+                finalEdits = "... " + finalEdits.slice(-(4 * 2048 - 4));
               }
               ideBlock += `Recent Manual Edits:
-${edits}
+${finalEdits}
 `;
             }
             if (relOpened.length > 0) ideBlock += `All Opened Editors: ${relOpened.join(", ")}`;
@@ -9471,7 +9657,7 @@ ${boxBottom}` };
                             denyMsg = "Permission Denied: Prohibited Command in User Policy";
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
-                            const action = normToolName === "write_file" ? "WRITE DENIED" : "UPDATE DENIED";
+                            const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
                             const deniedLabel = `\u{1F4BE} ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
@@ -9617,7 +9803,7 @@ ${boxBottom}` };
                         uiTitle = "\u{1F4E5} Added Plan";
                         listItems = normalizeList(tasks).map((item) => `\u25CB ${item}`);
                       } else if (method === "get") {
-                        uiTitle = markDone ? "\u{1F4CC} Updated Plan" : "\u{1F4DD} Reviewed Plan";
+                        uiTitle = markDone ? "\u{1F504} Updated Plan" : "\u{1F4DD} Reviewed Plan";
                         const content = (result || "").split("\n").slice(1).join("\n");
                         listItems = content.split("\n").filter((line) => line.trim().startsWith("- [")).map((line) => {
                           const trimmed = line.trim();
@@ -9786,8 +9972,14 @@ ${boxBottom}` };
                 isDedupeActive = false;
                 dedupeBuffer = "";
               }
-              const errMsg = err.status || err.error && err.error.message || String(err);
-              const errLog = String(err);
+              const errLog = err instanceof Error ? (() => {
+                try {
+                  return JSON.parse(JSON.parse(err.message).error.message).error.message;
+                } catch {
+                  return String(err);
+                }
+              })() : String(err);
+              ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
               const agentErrDir = path19.join(LOGS_DIR, "agent");
               if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
@@ -9802,6 +9994,8 @@ ${boxBottom}` };
                 if (retryCount < MAX_RETRIES - 3) {
                   throw err;
                 }
+                yield { type: "text", content: errLog };
+                yield { type: "status", content: "Error Occured" };
               }
               if (turnText.trim().length > 0 || inStreamRetryCount > 1) {
                 if (inStreamRetryCount <= MAX_RETRIES) {
@@ -9948,11 +10142,18 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
           }
         });
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errLog = err instanceof Error ? (() => {
+          try {
+            return JSON.parse(JSON.parse(err.message).error.message).error.message;
+          } catch {
+            return String(err);
+          }
+        })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path19.join(LOGS_DIR, "agent");
+        yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
         if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
-        fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err instanceof Error ? err.stack : err}
+        fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -9960,7 +10161,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         if (typeof flushGoogleBuffer === "function") {
           yield* flushGoogleBuffer();
         }
-        yield { type: "tool_result", content: `ERROR: [INTERNAL CRITICAL] ${errorMsg}` };
+        yield { type: "tool_result", content: `ERROR: [INTERNAL CRITICAL] ${errLog}` };
       } finally {
         if (connectionPollInterval) {
           clearInterval(connectionPollInterval);
@@ -10799,6 +11000,7 @@ import path20 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath } from "url";
 import TextInput4 from "ink-text-input";
+import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
   const [confirmExit, setConfirmExit] = useState11(false);
@@ -11065,7 +11267,7 @@ function App({ args = [] }) {
   };
   const [activeView, setActiveView] = useState11("chat");
   const [apiTier, setApiTier] = useState11("Free");
-  const [quotas, setQuotas] = useState11({ agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+  const [quotas, setQuotas] = useState11({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
   const [inputConfig, setInputConfig] = useState11(null);
   const [systemSettings, setSystemSettings] = useState11({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
   const [profileData, setProfileData] = useState11({ name: null, nickname: null, instructions: null });
@@ -11087,6 +11289,7 @@ function App({ args = [] }) {
   const [sessionImageCredits, setSessionImageCredits] = useState11(0);
   const [dailyUsage, setDailyUsage] = useState11(null);
   const [monthlyUsage, setMonthlyUsage] = useState11(null);
+  const [customPeriodUsage, setCustomPeriodUsage] = useState11(null);
   const [statsMode, setStatsMode] = useState11("daily");
   const [chatId, setChatId] = useState11(generateChatId());
   useEffect8(() => {
@@ -11097,6 +11300,19 @@ function App({ args = [] }) {
       });
     }
   }, [sessionTotalTokens, chatId, sessionStats.tokens]);
+  useEffect8(() => {
+    if (activeView === "apiTier") {
+      const load = async () => {
+        const d = await getDailyUsage();
+        setDailyUsage(d);
+        const m = await getMonthlyUsage();
+        setMonthlyUsage(m);
+        const c = await getCustomPeriodUsage(quotas.resetDay || 1);
+        setCustomPeriodUsage(c);
+      };
+      load();
+    }
+  }, [activeView, quotas.resetDay]);
   const [activeCommand, setActiveCommand] = useState11(null);
   const [execOutput, setExecOutput] = useState11("");
   const [isTerminalFocused, setIsTerminalFocused] = useState11(false);
@@ -11608,7 +11824,7 @@ function App({ args = [] }) {
       }
       setShowFullThinking(saved.showFullThinking);
       setApiTier(saved.apiTier || "Free");
-      setQuotas(saved.quotas || { agentLimit: 999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+      setQuotas(saved.quotas || { limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
       const freshSettings = {
         memory: true,
         compression: 0,
@@ -13329,6 +13545,32 @@ Selection: ${val}`,
   useEffect8(() => {
     setSelectedIndex(0);
   }, [suggestions]);
+  const CustomMenuItem = ({ label, isSelected }) => {
+    const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
+    return /* @__PURE__ */ React14.createElement(
+      Box14,
+      {
+        marginTop: isCancel ? 1 : 0,
+        backgroundColor: isSelected ? "#2a2a2a" : void 0,
+        paddingX: 1,
+        width: "100%"
+      },
+      /* @__PURE__ */ React14.createElement(Text14, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
+    );
+  };
+  const renderProgressBar = (label, current, limit) => {
+    const percent = limit > 0 ? Math.min(100, Math.round(current / limit * 100)) : 0;
+    const barWidth = 15;
+    const filledCount = Math.round(percent / 100 * barWidth);
+    const barStr = "\u2588".repeat(filledCount) + "\u2591".repeat(Math.max(0, barWidth - filledCount));
+    let barColor = "gray";
+    if (percent >= 40 && percent <= 80) {
+      barColor = "yellow";
+    } else if (percent > 80) {
+      barColor = "red";
+    }
+    return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React14.createElement(Box14, { width: 18 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, label, ": ")), /* @__PURE__ */ React14.createElement(Text14, { color: barColor }, barStr), /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, " ", percent, "% (", current, "/", limit >= 99999999 ? "\u221E" : limit, ")"));
+  };
   const renderActiveView = () => {
     switch (activeView) {
       case "settings":
@@ -13353,9 +13595,9 @@ Selection: ${val}`,
             title: "SELECT AI PROVIDER",
             items: [
               { label: "Google (Free/Paid)", value: "Google" },
+              { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
               { label: "DeepSeek (Paid)", value: "DeepSeek" },
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
-              { label: "NVIDIA (Free/Paid)", value: "NVIDIA" },
               { label: "Back", value: "settings" }
             ],
             onSelect: async (item) => {
@@ -13383,7 +13625,7 @@ Selection: ${val}`,
                   ...prev,
                   {
                     role: "system",
-                    text: `\u2705 Switched to ${selectedProvider}! Key loaded from Vault. Model set to ${defaultModel}.`,
+                    text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.`,
                     isMeta: true
                   }
                 ]);
@@ -13402,14 +13644,31 @@ Selection: ${val}`,
             onClose: () => setActiveView("settings")
           }
         );
-      case "apiTier":
-        return /* @__PURE__ */ React14.createElement(
-          CommandMenu,
+      case "apiTier": {
+        const reqCurrent = dailyUsage?.agent || 0;
+        const reqLimit = quotas.agentLimit || 99999999;
+        const tokenCurrent = dailyUsage?.tokens || 0;
+        const tokenLimit = quotas.tokenLimit || 99999999999999;
+        const monthlyCurrent = quotas.resetMode === "Custom" ? customPeriodUsage?.tokens || 0 : monthlyUsage?.tokens || 0;
+        const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
+        let resetInfo = "";
+        if (quotas.resetMode === "Custom") {
+          const today = /* @__PURE__ */ new Date();
+          const resetDay = quotas.resetDay || 1;
+          let resetMonth = today.getMonth();
+          if (today.getDate() >= resetDay) {
+            resetMonth += 1;
+          }
+          const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
+          const monthName = resetDate.toLocaleString("default", { month: "short" });
+          resetInfo = `Resets on: ${resetDay}-${monthName}`;
+        }
+        return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, "SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: ", aiProvider, ")")), /* @__PURE__ */ React14.createElement(
+          SelectInput2,
           {
-            title: /* @__PURE__ */ React14.createElement(Text14, null, "SELECT YOUR CURRENT API TIER BASED ON ", /* @__PURE__ */ React14.createElement(Text14, { color: "cyan", underline: true, bold: true }, "\x1B]8;;https://aistudio.google.com/projects\x07AI STUDIO\x1B]8;;\x07"), ". (CURRENT: ", apiTier.toUpperCase(), ")"),
             items: [
-              { label: "Free Tier (Gemini API Free Tier)", value: "Free" },
-              { label: `Paid Tier (API with Billing Account)`, value: "Paid" },
+              { label: "Provider Limits", value: "Free" },
+              { label: `Set Budgets (API with Billing Account) ${apiTier === "Paid" ? "\u25CF" : ""}`, value: "Paid" },
               { label: "Back", value: "settings" }
             ],
             onSelect: (item) => {
@@ -13424,15 +13683,69 @@ Selection: ${val}`,
                   label: "Enter Agent daily budget (requests made):",
                   key: "quotas",
                   subKey: "agentLimit",
-                  value: String(quotas.agentLimit)
+                  value: quotas.agentLimit >= 99999999 ? "" : String(quotas.agentLimit),
+                  returnView: "settings",
+                  next: (newQuotas) => ({
+                    label: "Enter Agent daily budget (tokens used):",
+                    key: "quotas",
+                    subKey: "tokenLimit",
+                    value: newQuotas.tokenLimit >= 99999999999999 || newQuotas.tokenLimit === 0 ? "" : String(newQuotas.tokenLimit),
+                    returnView: "settings",
+                    next: (q2) => ({
+                      label: "Enter Agent monthly budget (tokens used):",
+                      key: "quotas",
+                      subKey: "monthlyTokenLimit",
+                      value: q2.monthlyTokenLimit >= 99999999999999 || q2.monthlyTokenLimit === 0 ? "" : String(q2.monthlyTokenLimit),
+                      returnView: "resetMode"
+                    })
+                  })
                 });
                 setActiveView("input");
               } else {
-                saveSettings({ apiTier: newTier, quotas });
+                const newQuotas = { ...quotas, agentLimit: 99999999, tokenLimit: 99999999999999, monthlyTokenLimit: 99999999999999 };
+                setQuotas(newQuotas);
+                saveSettings({ apiTier: newTier, quotas: newQuotas });
                 setActiveView("settings");
               }
             },
-            onClose: () => setActiveView("settings")
+            itemComponent: CustomMenuItem,
+            indicatorComponent: () => null
+          }
+        ), apiTier === "Paid" && /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1, borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, "USAGE BUDGET STATUS")), renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React14.createElement(Text14, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React14.createElement(Text14, { color: "blue", bold: true }, "Rolling 30-Day Window"))), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)")));
+      }
+      case "resetMode":
+        return /* @__PURE__ */ React14.createElement(
+          CommandMenu,
+          {
+            title: "SELECT MONTHLY RESET MODE",
+            items: [
+              { label: "Default (Rolling 30-Day Window)", value: "Rolling" },
+              { label: "Custom (Set reset day of month)", value: "Custom" },
+              { label: "Back", value: "apiTier" }
+            ],
+            onSelect: (item) => {
+              if (item.value === "apiTier" || item.value === "Back") {
+                setActiveView("apiTier");
+                return;
+              }
+              const selectedMode = item.value;
+              const updatedQuotas = { ...quotas, resetMode: selectedMode };
+              setQuotas(updatedQuotas);
+              if (selectedMode === "Custom") {
+                setInputConfig({
+                  label: "Enter monthly reset day (1-30):",
+                  key: "quotas",
+                  subKey: "resetDay",
+                  value: String(quotas.resetDay || 1),
+                  returnView: "settings"
+                });
+                setActiveView("input");
+              } else {
+                saveSettings({ apiTier, quotas: updatedQuotas });
+                setActiveView("settings");
+              }
+            },
+            onClose: () => setActiveView("apiTier")
           }
         );
       case "input":
@@ -13446,7 +13759,10 @@ Selection: ${val}`,
               let newQuotas = { ...quotas };
               let newSettings = {};
               if (key === "quotas") {
-                const parsedValue = subKey.toLowerCase().includes("limit") ? parseInt(val) || 0 : val;
+                let parsedValue = subKey.toLowerCase().includes("limit") || subKey === "resetDay" ? parseInt(val) || 0 : val;
+                if (subKey === "resetDay") {
+                  parsedValue = Math.max(1, Math.min(30, parsedValue));
+                }
                 newQuotas[subKey] = parsedValue;
                 setQuotas(newQuotas);
                 newSettings.quotas = newQuotas;
@@ -13518,17 +13834,17 @@ Selection: ${val}`,
         )), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", dimColor: true, italic: true }, "(Press Enter to confirm selection)")));
       case "stats": {
         const u = statsMode === "monthly" ? monthlyUsage : dailyUsage;
-        const trackerTitle = statsMode === "monthly" ? "LAST 30 DAYS USAGE TRACKER" : "DAILY USAGE TRACKER";
-        const timeLabel = statsMode === "monthly" ? "Wall Time (30d):" : "Wall Time Today:";
-        const tokensLabel = statsMode === "monthly" ? "Tokens Used (30d):" : "Tokens Used Today:";
-        const imagesLabel = statsMode === "monthly" ? "Images Made (30d):" : "Images Made Today:";
-        const imageCreditsLabel = statsMode === "monthly" ? "Image Credits (30d):" : "Image Credits Today:";
-        const codeChangesLabel = statsMode === "monthly" ? "Code Changes (30d):" : "Code Changes Today:";
-        const toolCallsLabel = statsMode === "monthly" ? "Tool Calls (30d):" : "Tool Calls Today:";
+        const trackerTitle = statsMode === "monthly" ? "LAST 30 DAYS USAGE" : "TODAY's USAGE";
+        const timeLabel = statsMode === "monthly" ? "Wall Time:" : "Wall Time:";
+        const tokensLabel = statsMode === "monthly" ? "Tokens Used:" : "Tokens Used:";
+        const imagesLabel = statsMode === "monthly" ? "Images Made:" : "Images Made:";
+        const imageCreditsLabel = statsMode === "monthly" ? "Image Credits:" : "Image Credits:";
+        const codeChangesLabel = statsMode === "monthly" ? "Code Changes:" : "Code Changes:";
+        const toolCallsLabel = statsMode === "monthly" ? "Tool Calls:" : "Tool Calls:";
         return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
           const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-          return /* @__PURE__ */ React14.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React14.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 21 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 17 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React14.createElement(Box14, { width: 16 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 17 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Agent Interactions:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Background Tasks:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 21 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( "), /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", sessionToolSuccess), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", sessionToolDenied), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", sessionToolFailure), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " )"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, timeLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Agent Interactions:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Background Tasks:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 21 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", u?.toolSuccess || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", u?.toolDenied || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", u?.toolFailure || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " )")))), /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+          return /* @__PURE__ */ React14.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 40 }, /* @__PURE__ */ React14.createElement(Text14, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React14.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 36 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 32 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React14.createElement(Box14, { width: 31 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 32 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
+        })) : /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 21 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( "), /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", sessionToolSuccess), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", sessionToolDenied), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", sessionToolFailure), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " )"))), /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, timeLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React14.createElement(Box14, { width: 21 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React14.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React14.createElement(Box14, { width: 23 }, /* @__PURE__ */ React14.createElement(Text14, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React14.createElement(Box14, null, /* @__PURE__ */ React14.createElement(Box14, { width: 25 }, /* @__PURE__ */ React14.createElement(Text14, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React14.createElement(Text14, { color: "green" }, "\u2713 ", u?.toolSuccess || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "yellow" }, "\u2298 ", u?.toolDenied || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " "), /* @__PURE__ */ React14.createElement(Text14, { color: "red" }, "\u2715 ", u?.toolFailure || 0), /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, " )")))), /* @__PURE__ */ React14.createElement(Text14, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "autoExecDanger":
         return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React14.createElement(Text14, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React14.createElement(Text14, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React14.createElement(Text14, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
@@ -13984,9 +14300,9 @@ Selection: ${val}`,
     {
       items: [
         { label: "Google (Free/Paid)", value: "Google" },
+        { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
         { label: "DeepSeek (Paid)", value: "DeepSeek" },
-        { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
-        { label: "NVIDIA (Free/Paid)", value: "NVIDIA" }
+        { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" }
       ],
       onSelect: (item) => {
         setAiProvider(item.value);
@@ -14461,7 +14777,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
             const React16 = (await import("react")).default;
             const { useState: useState12 } = React16;
             const { render: render2, Box: Box15, Text: Text15 } = await import("ink");
-            const SelectInput2 = (await import("ink-select-input")).default;
+            const SelectInput3 = (await import("ink-select-input")).default;
             const TextInput5 = (await import("ink-text-input")).default;
             return new Promise((resolve) => {
               const items = [
@@ -14499,7 +14815,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
                   )), /* @__PURE__ */ React16.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "   (Press Enter to confirm)")));
                 }
                 return /* @__PURE__ */ React16.createElement(Box15, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React16.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text15, { color: "magenta", bold: true }, "\u{1F4E6} Select a package manager for the update:")), /* @__PURE__ */ React16.createElement(
-                  SelectInput2,
+                  SelectInput3,
                   {
                     items,
                     onSelect: handleSelect,

@@ -184,6 +184,17 @@
             color: var(--cyan);
             font-size: 0.9em;
         }
+
+        a {
+            color: var(--cyan);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a:hover {
+            color: var(--magenta);
+            text-decoration: underline;
+        }
     </style>
 </head>
 
@@ -220,17 +231,26 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.10.3"]
+        const stableVersions = ["2.11.0"]
         const changelogData = {
-            "2.10.3": {
-                "note": "JUNE 21",
-                "added": [],
+            "2.11.0": {
+                "note": "JUNE 22",
+                "added": [
+                    "New & Improved budgeting for Billing API Keys with Daily/Monthly token limits & visual usage trackers. Set /settings → Others → API Tier → Custom Budgets.",
+                    "Better Error Messages in UI for API failures."
+                ],
                 "changed": [
-                    "Improved network sandboxing for integrated terminal in linux/macos.",
-                    "Reduce false positives for local command executes when terminal network access is off."
+                    "Improved network sandboxing for integrated terminal in linux/macos with kernel level isolation.",
+                    "Reduce false positives for other command executes when terminal network access is off.",
+                    "Improved IDE connection stability.",
+                    "Better 'Recent Manual Edits' context for Agent from IDE (requires IDE Companion v1.4.0+).",
+                    "Depricated Image Generation for all previous versions.",
+                    "Updated IDE Companion to v1.4.0. Download for [VS Code](https://marketplace.visualstudio.com/items?itemName=fluxflow-cli.fluxflow-cli-companion), with [VSIX](https://github.com/KushalRoyChowdhury/fluxflow-cli/releases/tag/1.4)"
                 ],
                 "fixes": [
-                    "UI Refinement."
+                    "UI Refinement & Stability Improvements.",
+                    "More consistent UI theme.",
+                    "Better detection of Workspace Code errors (requires IDE Companion v1.2.1+)."
                 ]
             },
             "2.10.0": {
@@ -1137,7 +1157,8 @@
             return text
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>');
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
         }
 
         function renderChangelog() {
