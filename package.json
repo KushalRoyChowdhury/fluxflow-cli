@@ -1,7 +1,7 @@
 {
 	"name": "fluxflow-cli",
-	"version": "2.10.2",
-	"date": "2026-06-20",
+	"version": "2.10.3",
+	"date": "2026-06-21",
 	"description": "A high-fidelity agentic terminal assistant for the Flux Era.",
 	"keywords": [
 		"ai",
@@ -10,7 +10,8 @@
 		"cli",
 		"gemini",
 		"ink",
-		"flux"
+		"flux",
+        "fluxflow"
 	],
 	"license": "MIT",
 	"repository": {

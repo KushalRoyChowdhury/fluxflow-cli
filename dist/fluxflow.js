@@ -1745,7 +1745,7 @@ var init_ChatLayout = __esm({
             const level = headingMatch[1].length;
             const hText = headingMatch[2];
             result.push(
-              /* @__PURE__ */ React3.createElement(Box3, { key: i, marginTop: 1, marginBottom: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "magenta" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : "white", underline: true }, hText.toUpperCase()))
+              /* @__PURE__ */ React3.createElement(Box3, { key: i, marginTop: 1, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "purple" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : "white", underline: true }, hText.toUpperCase()))
             );
             return;
           }
@@ -1852,13 +1852,13 @@ var init_ChatLayout = __esm({
       const isTerminalRecord = msg.isTerminalRecord;
       const isHomeWarning = msg.isHomeWarning;
       if (isHomeWarning) {
-        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "yellow", dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, backgroundColor: "#3a0000" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, msg.text)), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, msg.subText))));
+        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "white", dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, msg.text)), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, msg.subText))));
       }
       if (msg.isLogo) {
         return /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React3.createElement(Text3, null, getFluxLogo(version, aiProvider)));
       }
       if (msg.id && String(msg.id).startsWith("welcome")) {
-        return /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", alignItems: "center", width: "100%", marginY: 1 }, /* @__PURE__ */ React3.createElement(Box3, { borderStyle: "round", borderColor: "gray", paddingX: 3, paddingY: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "cyan", bold: true }, msg.text.trim())));
+        return /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", alignItems: "center", width: "100%", marginY: 1 }, /* @__PURE__ */ React3.createElement(Box3, { borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 0 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, msg.text.trim())));
       }
       if (msg.isVisualFeedback) {
         return (
@@ -1871,13 +1871,13 @@ var init_ChatLayout = __esm({
       }
       if (msg.role === "system" && msg.text?.includes("[TOOL RESULT]") && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
       if (msg.isImageStats) {
-        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "cyan", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, backgroundColor: "#0e1b21" }, /* @__PURE__ */ React3.createElement(Text3, { color: "cyan", bold: true }, "\u{1F4B3} IMAGE STATS")), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1, flexDirection: "column" }, msg.text.split("\n").map((line, i) => /* @__PURE__ */ React3.createElement(Text3, { key: i, color: "white" }, line)))));
+        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, backgroundColor: "#0e1b21" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, "IMAGE STATS")), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1, flexDirection: "column" }, msg.text.split("\n").map((line, i) => /* @__PURE__ */ React3.createElement(Text3, { key: i, color: "grey" }, line)))));
       }
       if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : "No selection";
         const s = emojiSpace(2);
-        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "cyan", bold: true }, "\u{1F4AC} AGENT REQUEST: RESOLVED")), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, "Selection: ", /* @__PURE__ */ React3.createElement(Text3, { color: "yellow", bold: true }, selection)))));
+        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, "AGENT REQUEST: RESOLVED")), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, "Selection: ", /* @__PURE__ */ React3.createElement(Text3, { color: "grey", bold: true }, selection)))));
       }
       if (msg.isAboutRecord) {
         return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, "ABOUT FLUX FLOW")), /* @__PURE__ */ React3.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, null, msg.text))));
@@ -1913,7 +1913,7 @@ var init_ChatLayout = __esm({
           { cmd: "/fluxflow", desc: "Project management" },
           { cmd: "/update", desc: "Check/Install updates" }
         ];
-        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "magenta", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta", bold: true, underline: true }, "\u{1F4DC} COMMAND REFERENCE"), /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", marginTop: 1 }, commandList.map((c, i) => /* @__PURE__ */ React3.createElement(Box3, { key: i, flexDirection: "row" }, /* @__PURE__ */ React3.createElement(Box3, { width: 15 }, /* @__PURE__ */ React3.createElement(Text3, { color: "cyan", bold: true }, c.cmd)), /* @__PURE__ */ React3.createElement(Text3, { color: "gray" }, " - ", c.desc))))));
+        return /* @__PURE__ */ React3.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true, underline: true }, "COMMAND REFERENCE"), /* @__PURE__ */ React3.createElement(Box3, { flexDirection: "column", marginTop: 1 }, commandList.map((c, i) => /* @__PURE__ */ React3.createElement(Box3, { key: i, flexDirection: "row" }, /* @__PURE__ */ React3.createElement(Box3, { width: 15 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, c.cmd)), /* @__PURE__ */ React3.createElement(Text3, { color: "gray" }, " - ", c.desc))))));
       }
       if (msg.isTerminalRecord) {
         const cmdMatch = msg.text.match(/COMMAND: (.*)/);
@@ -2009,14 +2009,13 @@ function CommandMenu({ title, subtitle, items, onSelect }) {
     Box5,
     {
       flexDirection: "column",
-      borderStyle: "round",
       borderColor: "white",
       padding: 0,
-      marginTop: 1,
+      marginTop: 0,
       flexShrink: 0,
       width: "100%"
     },
-    /* @__PURE__ */ React5.createElement(Box5, { paddingX: 1, paddingY: 0, marginBottom: subtitle ? 0 : 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "\u{1F527} ", typeof title === "string" ? title.toUpperCase() : title)),
+    title && /* @__PURE__ */ React5.createElement(Box5, { paddingX: 1, paddingY: 0, marginBottom: subtitle ? 0 : 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, typeof title === "string" ? title.toUpperCase() : title)),
     subtitle && /* @__PURE__ */ React5.createElement(Box5, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", italic: true }, "   ", subtitle)),
     /* @__PURE__ */ React5.createElement(Box5, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React5.createElement(
       SelectInput,
@@ -2211,10 +2210,10 @@ var init_main_tools = __esm({
     };
     TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
-Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **NEVER USE OTHER SYNTAX/MARKERS, BRACKETS SHOULD BE PROPERLY USED AS PER SCHEMA**
+Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **NO OTHER SYNTAX/MARKERS ALLOWED, BRACKETS SHOULD BE PROPERLY USED AS PER SCHEMA**
 
 **TOOL USAGE POLICY:**
-- **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED)" : ""}. Next Turn, verify tool results, plan next**
+- **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run: Limit to 2 MAX)" : ""}. Next Turn, verify tool results, plan next**
 ${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use  'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EACH TURN***" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
@@ -2230,7 +2229,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user. **TOOL DENY RULE APPLIES**. **1 CALL LIMIT FOR RUN**
+7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
@@ -3256,7 +3255,7 @@ function ProfileForm({ initialData, onSave, onCancel }) {
       flexDirection: "column",
       width: "100%"
     },
-    /* @__PURE__ */ React7.createElement(Box7, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "\u{1F464} DEVELOPER PROFILE CONFIGURATION")),
+    /* @__PURE__ */ React7.createElement(Box7, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "DEVELOPER PROFILE CONFIGURATION")),
     /* @__PURE__ */ React7.createElement(Box7, { paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React7.createElement(Box7, null, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, steps[step].label), /* @__PURE__ */ React7.createElement(
       TextInput2,
       {
@@ -3314,7 +3313,7 @@ var init_AskUserModal = __esm({
           }
         )), /* @__PURE__ */ React8.createElement(Box8, { marginTop: 1, paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "gray", italic: true }, "(Press Enter to send)")));
       }
-      return /* @__PURE__ */ React8.createElement(Box8, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React8.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "white", bold: true }, "\u{1F4AC} AGENT REQUEST: ACTION REQUIRED")), /* @__PURE__ */ React8.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { bold: true, color: "white" }, question)), /* @__PURE__ */ React8.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
+      return /* @__PURE__ */ React8.createElement(Box8, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React8.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "white", bold: true }, "AGENT REQUEST: ACTION REQUIRED")), /* @__PURE__ */ React8.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { bold: true, color: "white" }, question)), /* @__PURE__ */ React8.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
         const isSelected = idx === selectedIndex;
         return /* @__PURE__ */ React8.createElement(
           Box8,
@@ -3347,7 +3346,7 @@ Your tool syntax is: '[tool:functions.ToolName(args...)]'
 [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
 ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
-- Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely to default to 0.5)
+- Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
 - Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
 - Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
 
@@ -9031,7 +9030,7 @@ ${ideErr} [/ERROR]`;
                           return tokens.some((token) => checkToken(token));
                         });
                         if (isViolating) {
-                          const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
+                          const denyMsg = `Access Denied. Prohibited from accessing external directories while "External Workspace Access" is disabled.`;
                           if (settings.onExecStart) settings.onExecStart(command || "Unknown");
                           yield { type: "exec_start" };
                           await new Promise((resolve) => setTimeout(resolve, 50));
@@ -9106,8 +9105,105 @@ ${boxBottom}` };
                           }
                           if (!forcePrompt && !decision) {
                             if (systemSettings2.networkAccess === false) {
-                              const networkCmdRegex = /\b(curl|wget|httpie|fetch|axial|yarn|npm|pnpm|bun|deno|pip|pip3|poetry|uv|gem|cargo|go\s+(get|install)|composer|nuget|ssh|scp|ping|sftp|rsync|docker|podman|kubectl|helm|git\s+(clone|push|pull|fetch)|ftp|telnet|nc|netcat|socat|traceroute|tracert|dig|nslookup|host|nmap|gcloud|aws|az|terraform|ansible-playbook|nix|nix-env)\b/i;
-                              if (networkCmdRegex.test(cmdTrimmed)) {
+                              let normalized = cmdTrimmed.trim().replace(/\s+/g, " ").replace(/^['"]+|['"]+$/g, "").toLowerCase();
+                              const tokens = normalized.split(" ");
+                              const rawCmd = tokens[0];
+                              const cmd = rawCmd.split("/").pop().split("\\").pop().replace(/\.exe$/, "");
+                              const blockedCommands = /* @__PURE__ */ new Set([
+                                "curl",
+                                "wget",
+                                "httpie",
+                                "xh",
+                                "ssh",
+                                "scp",
+                                "sftp",
+                                "rsync",
+                                "ftp",
+                                "lftp",
+                                "tftp",
+                                "telnet",
+                                "nc",
+                                "netcat",
+                                "socat",
+                                "ping",
+                                "traceroute",
+                                "tracert",
+                                "dig",
+                                "nslookup",
+                                "host",
+                                "whois",
+                                "nmap",
+                                "docker",
+                                "podman",
+                                "kubectl",
+                                "helm",
+                                "gcloud",
+                                "aws",
+                                "az",
+                                "terraform",
+                                "ansible-playbook",
+                                "nix",
+                                "nix-env",
+                                "apt",
+                                "apt-get",
+                                "dpkg",
+                                "yum",
+                                "dnf",
+                                "pacman",
+                                "zypper",
+                                "brew",
+                                "apk",
+                                "choco",
+                                "scoop",
+                                "conda",
+                                "mamba",
+                                "aria2c",
+                                "axel",
+                                "smbclient",
+                                "lynx",
+                                "w3m",
+                                "links",
+                                "elinks",
+                                "heroku",
+                                "netlify",
+                                "vercel",
+                                "firebase",
+                                "supabase",
+                                "wrangler",
+                                "flyctl",
+                                "powershell",
+                                "pwsh",
+                                "certutil",
+                                "bitsadmin",
+                                "cloudflared",
+                                "ngrok",
+                                "tailscale",
+                                "zerotier",
+                                "rclone"
+                              ]);
+                              let deny = false;
+                              if (blockedCommands.has(cmd)) {
+                                deny = true;
+                              }
+                              const hasSubcmd = (list) => tokens.slice(1).some((token) => list.includes(token));
+                              const shouldDenyPkgManager = (dangerCommands) => {
+                                const dangerIdx = tokens.findIndex((t) => dangerCommands.includes(t));
+                                const safeIdx = tokens.findIndex((t) => ["run", "exec", "test"].includes(t));
+                                return dangerIdx !== -1 && !(safeIdx !== -1 && safeIdx < dangerIdx);
+                              };
+                              if (cmd === "git" && hasSubcmd(["clone", "pull", "push", "fetch"])) deny = true;
+                              if (cmd === "go" && hasSubcmd(["get", "install"])) deny = true;
+                              if (cmd === "npm" && shouldDenyPkgManager(["install", "i", "update", "add"])) deny = true;
+                              if (cmd === "yarn" && shouldDenyPkgManager(["add", "install", "upgrade"])) deny = true;
+                              if (cmd === "pnpm" && shouldDenyPkgManager(["add", "install", "update"])) deny = true;
+                              if (cmd === "bun" && shouldDenyPkgManager(["add", "install", "update"])) deny = true;
+                              if (cmd === "deno" && hasSubcmd(["install", "add"])) deny = true;
+                              if (cmd === "pip" && hasSubcmd(["install", "download"])) deny = true;
+                              if (cmd === "pip3" && hasSubcmd(["install", "download"])) deny = true;
+                              if (cmd === "cargo" && hasSubcmd(["install", "add"])) deny = true;
+                              if (["bash", "sh", "zsh", "fish"].includes(cmd) && hasSubcmd(["-c"])) deny = true;
+                              if (cmd === "cmd" && hasSubcmd(["/c"])) deny = true;
+                              if (deny) {
                                 decision = "deny";
                                 isNetworkDeny = true;
                               }
@@ -9372,7 +9468,7 @@ ${boxBottom}` };
                           } else if (denyReason === "network") {
                             denyMsg = "Permission Denied: Sandbox Network Access Disabled by User Policy.";
                           } else if (denyReason === "prohibited" && normToolName === "exec_command") {
-                            denyMsg = "Permission Denied: Prohibited Command";
+                            denyMsg = "Permission Denied: Prohibited Command in User Policy";
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "WRITE DENIED" : "UPDATE DENIED";
@@ -10020,7 +10116,7 @@ function MemoryModal({ onClose }) {
     return "red";
   };
   const s = emojiSpace(2);
-  return /* @__PURE__ */ React10.createElement(Box10, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box10, { paddingX: 1, marginBottom: 1, justifyContent: "space-between" }, /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, "AGENT MEMORY: LONG-TERM KNOWLEDGE"), /* @__PURE__ */ React10.createElement(Box10, null, /* @__PURE__ */ React10.createElement(Text10, { color: "gray" }, "Vault: "), /* @__PURE__ */ React10.createElement(Text10, { color: getBarColor() }, barStr), /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, " ", usagePercent, "%"))), !isMemoryOn && memories.length > 0 ? /* @__PURE__ */ React10.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: "gray" }, "Memory is currently Off...")) : memories.length === 0 ? /* @__PURE__ */ React10.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: "gray" }, isMemoryOn ? "Learning..." : "Memory not available...")) : /* @__PURE__ */ React10.createElement(Box10, { flexDirection: "column" }, memories.map((mem, idx) => {
+  return /* @__PURE__ */ React10.createElement(Box10, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box10, { paddingX: 1, marginBottom: 1, justifyContent: "space-between" }, /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, "SAVED MEMORIES"), /* @__PURE__ */ React10.createElement(Box10, null, /* @__PURE__ */ React10.createElement(Text10, { color: "gray" }, "Vault: "), /* @__PURE__ */ React10.createElement(Text10, { color: getBarColor() }, barStr), /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, " ", usagePercent, "%"))), !isMemoryOn && memories.length > 0 ? /* @__PURE__ */ React10.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: "gray" }, "Memory is currently Off...")) : memories.length === 0 ? /* @__PURE__ */ React10.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: "gray" }, isMemoryOn ? "Learning..." : "Memory not available...")) : /* @__PURE__ */ React10.createElement(Box10, { flexDirection: "column" }, memories.map((mem, idx) => {
     const isSelected = idx === selectedIndex;
     return /* @__PURE__ */ React10.createElement(
       Box10,
@@ -10031,7 +10127,7 @@ function MemoryModal({ onClose }) {
         width: "100%"
       },
       /* @__PURE__ */ React10.createElement(Box10, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", idx + 1, ". ", cleanDisplay(mem.memory))),
-      isSelected && /* @__PURE__ */ React10.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "grey", bold: true }, "[X] WIPE "))
+      isSelected && /* @__PURE__ */ React10.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true }, "[ "), " ", /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true, italic: true }, mem.score), /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true }, " ]"), /* @__PURE__ */ React10.createElement(Text10, { color: "grey", bold: true }, "[X] WIPE "))
     );
   })), /* @__PURE__ */ React10.createElement(
     Box10,
@@ -11172,18 +11268,16 @@ function App({ args = [] }) {
         id: "system-warning",
         role: "system",
         text: `[CRITICAL SECURITY ALERT] SYSTEM DIRECTORY DETECTED`,
-        subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. PLEASE MOVE TO A PROJECT FOLDER FOR SAFETY.`,
-        isHomeWarning: true,
-        isMeta: true
+        subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. Open FluxFlow in project folder to work safely.`,
+        isHomeWarning: true
       });
     } else if (isHomeDir) {
       msgs.push({
         id: "home-warning",
         role: "system",
         text: `[SECURITY ALERT] HOME DIRECTORY DETECTED`,
-        subText: `You are currently in ${os4.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please move to a project folder for safety.`,
-        isHomeWarning: true,
-        isMeta: true
+        subText: `You are currently in ${os4.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
+        isHomeWarning: true
       });
     }
     return msgs;
@@ -12110,7 +12204,7 @@ ${cleanText}`, color: "magenta" }];
               const s2 = emojiSpace(2);
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
-                return [...prev, { id: "revert-empty-" + Date.now(), role: "system", text: `No revert checkpoints found for this session.`, isMeta: true }];
+                return [...prev, { id: "revert-empty-" + Date.now(), role: "system", text: `Nothing to revert to.`, isMeta: true }];
               });
             }
           });
@@ -12468,7 +12562,7 @@ ${list || "No saved chats found."}`, isMeta: true }];
             } catch (err) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
-                return [...prev, { id: Date.now(), role: "system", text: `[RESET ERROR] Failed to purge data: ${err.message}` }];
+                return [...prev, { id: Date.now(), role: "system", text: `[RESET ERROR] Failed to clear data: ${err.message}` }];
               });
             }
           };
@@ -12649,6 +12743,13 @@ ${list || "No saved chats found."}`, isMeta: true }];
           setMessages((prev) => {
             setCompletedIndex(prev.length + 1);
             return [...prev, { id: Date.now(), role: "system", isHelpRecord: true, isMeta: true }];
+          });
+          break;
+        }
+        case "/btw": {
+          setMessages((prev) => {
+            setCompletedIndex(prev.length + 1);
+            return [...prev, { id: Date.now(), role: "system", text: `[SYSTEM] /btw only available when agent is working`, isMeta: true }];
           });
           break;
         }
@@ -13487,7 +13588,7 @@ Selection: ${val}`,
             title: "API KEY MANAGEMENT",
             items: [
               { label: "Edit Current Key (Update)", value: "edit" },
-              { label: "Remove Current Key (Purge)", value: "remove" },
+              { label: "Remove Current Key (Delete)", value: "remove" },
               { label: "Cancel", value: "Cancel" }
             ],
             onSelect: (item) => {
@@ -13507,13 +13608,13 @@ Selection: ${val}`,
       case "deleteKey":
         return /* @__PURE__ */ React14.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1 }, (() => {
           const s = emojiSpace(2);
-          return /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, "DANGER: PURGE API KEY");
-        })(), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "This will permanently delete the saved API key from the project vault. You will need to enter it again to use Flux."), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
+          return /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, "DANGER: CLEAR CREDENTIALS");
+        })(), /* @__PURE__ */ React14.createElement(Text14, { marginTop: 1 }, "This will permanently delete all saved API keys in credential cache. You will need to enter it again to use Flux."), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
           CommandMenu,
           {
-            title: "Are you absolutely sure?",
+            title: "Are you sure?",
             items: [
-              { label: "YES, PURGE KEY", value: "yes" },
+              { label: "YES, CLEAR CREDENTIALS", value: "yes" },
               { label: "NO, GO BACK", value: "no" }
             ],
             onSelect: async (item) => {
@@ -13522,7 +13623,7 @@ Selection: ${val}`,
                 setApiKey(null);
                 setActiveView("chat");
                 const s = emojiSpace(2);
-                setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: `[VAULT PURGED] API Key removed successfully.` }]);
+                setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: `[CREDENTIAL CLEARED] API Key removed successfully.` }]);
               } else {
                 setActiveView("key");
               }
@@ -13878,7 +13979,7 @@ Selection: ${val}`,
       aiProvider,
       version: versionFluxflow
     }
-  ), activeCommand && /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty }))), isInitializing ? /* @__PURE__ */ React14.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React14.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, "\u{1F511}", emojiSpace(2), "API KEY REQUIRED")), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
+  ), activeCommand && /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty }))), isInitializing ? /* @__PURE__ */ React14.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React14.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React14.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React14.createElement(React14.Fragment, null, /* @__PURE__ */ React14.createElement(Text14, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React14.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React14.createElement(
     CommandMenu,
     {
       items: [

@@ -58,7 +58,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white" bold>💬 AGENT REQUEST: ACTION REQUIRED</Text>
+                <Text color="white" bold>AGENT REQUEST: ACTION REQUIRED</Text>
             </Box>
 
             <Box paddingX={1} marginBottom={1}>

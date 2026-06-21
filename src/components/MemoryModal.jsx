@@ -65,7 +65,7 @@ export default function MemoryModal({ onClose }) {
     return (
         <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
             <Box paddingX={1} marginBottom={1} justifyContent="space-between">
-                <Text color="white" bold>AGENT MEMORY: LONG-TERM KNOWLEDGE</Text>
+                <Text color="white" bold>SAVED MEMORIES</Text>
                 <Box>
                     <Text color="gray">Vault: </Text>
                     <Text color={getBarColor()}>{barStr}</Text>
@@ -99,6 +99,7 @@ export default function MemoryModal({ onClose }) {
                                 </Box>
                                 {isSelected && (
                                     <Box flexShrink={0}>
+                                        <Text color="grey" dimColor>[ </Text> <Text color="grey" dimColor italic>{mem.score}</Text><Text color="grey" dimColor> ]</Text>
                                         <Text color="grey" bold>[X] WIPE </Text>
                                     </Box>
                                 )}

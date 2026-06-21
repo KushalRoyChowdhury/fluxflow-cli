@@ -431,8 +431,8 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
                 const level = headingMatch[1].length;
                 const hText = headingMatch[2];
                 result.push(
-                    <Box key={i} marginTop={1} marginBottom={1} width="100%">
-                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : 'white'} underline>
+                    <Box key={i} marginTop={1} marginBottom={0} width="100%">
+                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'purple' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : 'white'} underline>
                             {hText.toUpperCase()}
                         </Text>
                     </Box>
@@ -649,8 +649,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (isHomeWarning) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="yellow" dimColor padding={0} width="100%">
-                    <Box paddingX={1} backgroundColor="#3a0000">
+                <Box flexDirection="column" borderStyle="round" borderColor="white" dimColor padding={0} width="100%">
+                    <Box paddingX={1}>
                         <Text color="white" bold>{msg.text}</Text>
                     </Box>
                     <Box paddingX={1} marginTop={0} marginBottom={0}>
@@ -672,8 +672,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.id && String(msg.id).startsWith('welcome')) {
         return (
             <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
-                <Box borderStyle="round" borderColor="gray" paddingX={3} paddingY={0}>
-                    <Text color="cyan" bold>{msg.text.trim()}</Text>
+                <Box borderStyle="round" borderColor="grey" paddingX={3} paddingY={0}>
+                    <Text color="white" bold>{msg.text.trim()}</Text>
                 </Box>
             </Box>
         );
@@ -706,13 +706,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isImageStats) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="cyan" padding={0} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor="grey" padding={0} width="100%">
                     <Box paddingX={1} backgroundColor="#0e1b21">
-                        <Text color="cyan" bold>💳 IMAGE STATS</Text>
+                        <Text color="white" bold>IMAGE STATS</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1} flexDirection="column">
                         {msg.text.split('\n').map((line, i) => (
-                            <Text key={i} color="white">{line}</Text>
+                            <Text key={i} color="grey">{line}</Text>
                         ))}
                     </Box>
                 </Box>
@@ -729,10 +729,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             <Box marginBottom={0} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
                     <Box paddingX={1}>
-                        <Text color="cyan" bold>💬 AGENT REQUEST: RESOLVED</Text>
+                        <Text color="white" bold>AGENT REQUEST: RESOLVED</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
-                        <Text color="white">Selection: <Text color="yellow" bold>{selection}</Text></Text>
+                        <Text color="white">Selection: <Text color="grey" bold>{selection}</Text></Text>
                     </Box>
                 </Box>
             </Box>
@@ -801,13 +801,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={2} paddingY={1} width="100%">
-                    <Text color="magenta" bold underline>📜 COMMAND REFERENCE</Text>
+                <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
+                    <Text color="white" bold underline>COMMAND REFERENCE</Text>
                     <Box flexDirection="column" marginTop={1}>
                         {commandList.map((c, i) => (
                             <Box key={i} flexDirection="row">
                                 <Box width={15}>
-                                    <Text color="cyan" bold>{c.cmd}</Text>
+                                    <Text color="white" bold>{c.cmd}</Text>
                                 </Box>
                                 <Text color="gray"> - {c.desc}</Text>
                             </Box>

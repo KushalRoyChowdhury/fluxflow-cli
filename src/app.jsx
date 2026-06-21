@@ -870,18 +870,16 @@ export default function App({ args = [] }) {
                 id: 'system-warning',
                 role: 'system',
                 text: `[CRITICAL SECURITY ALERT] SYSTEM DIRECTORY DETECTED`,
-                subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. PLEASE MOVE TO A PROJECT FOLDER FOR SAFETY.`,
-                isHomeWarning: true,
-                isMeta: true
+                subText: `You are currently in a PROTECTED SYSTEM DIRECTORY (${process.cwd()}). Operating here is EXTREMELY dangerous as the agent could accidentally corrupt your OS or installed applications. Open FluxFlow in project folder to work safely.`,
+                isHomeWarning: true
             });
         } else if (isHomeDir) {
             msgs.push({
                 id: 'home-warning',
                 role: 'system',
                 text: `[SECURITY ALERT] HOME DIRECTORY DETECTED`,
-                subText: `You are currently in ${os.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please move to a project folder for safety.`,
-                isHomeWarning: true,
-                isMeta: true
+                subText: `You are currently in ${os.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
+                isHomeWarning: true
             });
         }
         return msgs;
@@ -1949,7 +1947,7 @@ export default function App({ args = [] }) {
                             const s = emojiSpace(2);
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: `No revert checkpoints found for this session.`, isMeta: true }];
+                                return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: `Nothing to revert to.`, isMeta: true }];
                             });
                         }
                     });
@@ -2322,7 +2320,7 @@ export default function App({ args = [] }) {
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[RESET ERROR] Failed to purge data: ${err.message}` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[RESET ERROR] Failed to clear data: ${err.message}` }];
                             });
                         }
                     };
@@ -2490,6 +2488,10 @@ export default function App({ args = [] }) {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: Date.now(), role: 'system', isHelpRecord: true, isMeta: true }];
                     });
+                    break;
+                }
+                case '/btw': {
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] /btw only available when agent is working`, isMeta: true }]; });
                     break;
                 }
                 default:
@@ -3654,7 +3656,7 @@ export default function App({ args = [] }) {
                         title="API KEY MANAGEMENT"
                         items={[
                             { label: 'Edit Current Key (Update)', value: 'edit' },
-                            { label: 'Remove Current Key (Purge)', value: 'remove' },
+                            { label: 'Remove Current Key (Delete)', value: 'remove' },
                             { label: 'Cancel', value: 'Cancel' }
                         ]}
                         onSelect={(item) => {
@@ -3676,14 +3678,14 @@ export default function App({ args = [] }) {
                     <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1}>
                         {(() => {
                             const s = emojiSpace(2);
-                            return <Text color="white" bold>DANGER: PURGE API KEY</Text>;
+                            return <Text color="white" bold>DANGER: CLEAR CREDENTIALS</Text>;
                         })()}
-                        <Text marginTop={1}>This will permanently delete the saved API key from the project vault. You will need to enter it again to use Flux.</Text>
+                        <Text marginTop={1}>This will permanently delete all saved API keys in credential cache. You will need to enter it again to use Flux.</Text>
                         <Box marginTop={1}>
                             <CommandMenu
-                                title="Are you absolutely sure?"
+                                title="Are you sure?"
                                 items={[
-                                    { label: 'YES, PURGE KEY', value: 'yes' },
+                                    { label: 'YES, CLEAR CREDENTIALS', value: 'yes' },
                                     { label: 'NO, GO BACK', value: 'no' }
                                 ]}
                                 onSelect={async (item) => {
@@ -3692,7 +3694,7 @@ export default function App({ args = [] }) {
                                         setApiKey(null);
                                         setActiveView('chat');
                                         const s = emojiSpace(2);
-                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `[VAULT PURGED] API Key removed successfully.` }]);
+                                        setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `[CREDENTIAL CLEARED] API Key removed successfully.` }]);
                                     } else {
                                         setActiveView('key');
                                     }
@@ -4215,7 +4217,7 @@ export default function App({ args = [] }) {
                         ) : !apiKey ? (
                             <Box borderStyle="round" borderColor="white" padding={0} flexDirection="column" flexShrink={0} width="100%">
                                 <Box paddingX={1} marginBottom={1}>
-                                    <Text color="gray" bold>🔑{emojiSpace(2)}API KEY REQUIRED</Text>
+                                    <Text color="gray" bold>API KEY REQUIRED</Text>
                                 </Box>
 
                                 <Box paddingX={1} flexDirection="column">

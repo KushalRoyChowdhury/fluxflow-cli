@@ -23,16 +23,16 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
     return (
         <Box
             flexDirection="column"
-            borderStyle="round"
+            // borderStyle="round"
             borderColor="white"
             padding={0}
-            marginTop={1}
+            marginTop={0}
             flexShrink={0}
             width="100%"
         >
-            <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
-                <Text color="gray" bold>🔧 {typeof title === 'string' ? title.toUpperCase() : title}</Text>
-            </Box>
+            {title && <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
+                <Text color="gray" bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
+            </Box>}
 
             {subtitle && (
                 <Box paddingX={1} marginBottom={1}>

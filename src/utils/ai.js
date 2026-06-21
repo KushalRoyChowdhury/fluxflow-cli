@@ -2958,7 +2958,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         });
 
                                         if (isViolating) {
-                                            const denyMsg = `Access Denied. Terminal is prohibited from accessing system drives (C://) or external directories while "External Workspace Access" is disabled.`;
+                                            const denyMsg = `Access Denied. Prohibited from accessing external directories while "External Workspace Access" is disabled.`;
                                             if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
                                             yield { type: 'exec_start' };
                                             await new Promise(resolve => setTimeout(resolve, 50));
@@ -3046,10 +3046,65 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (!forcePrompt && !decision) {
                                                 // Network access check
                                                 if (systemSettings.networkAccess === false) {
-                                                    // const networkCmdRegex = '';
-                                                    // const networkCmdRegex = /\b(fetch|axial|yarn)\b/i;
-                                                    const networkCmdRegex = /\b(curl|wget|httpie|fetch|axial|yarn|npm|pnpm|bun|deno|pip|pip3|poetry|uv|gem|cargo|go\s+(get|install)|composer|nuget|ssh|scp|ping|sftp|rsync|docker|podman|kubectl|helm|git\s+(clone|push|pull|fetch)|ftp|telnet|nc|netcat|socat|traceroute|tracert|dig|nslookup|host|nmap|gcloud|aws|az|terraform|ansible-playbook|nix|nix-env)\b/i;
-                                                    if (networkCmdRegex.test(cmdTrimmed)) {
+                                                    let normalized = cmdTrimmed
+                                                        .trim()
+                                                        .replace(/\s+/g, ' ')
+                                                        .replace(/^['"]+|['"]+$/g, '')
+                                                        .toLowerCase();
+
+                                                    const tokens = normalized.split(' ');
+
+                                                    // 1. Extract just the executable name (handles /usr/bin/curl or .\curl)
+                                                    const rawCmd = tokens[0];
+                                                    const cmd = rawCmd
+                                                        .split('/')
+                                                        .pop()
+                                                        .split('\\')
+                                                        .pop()
+                                                        .replace(/\.exe$/, '');
+
+                                                    const blockedCommands = new Set([
+                                                        'curl', 'wget', 'httpie', 'xh', 'ssh', 'scp', 'sftp', 'rsync',
+                                                        'ftp', 'lftp', 'tftp', 'telnet', 'nc', 'netcat', 'socat',
+                                                        'ping', 'traceroute', 'tracert', 'dig', 'nslookup', 'host', 'whois', 'nmap',
+                                                        'docker', 'podman', 'kubectl', 'helm', 'gcloud', 'aws', 'az',
+                                                        'terraform', 'ansible-playbook', 'nix', 'nix-env',
+                                                        'apt', 'apt-get', 'dpkg', 'yum', 'dnf', 'pacman', 'zypper', 'brew', 'apk',
+                                                        'choco', 'scoop', 'conda', 'mamba', 'aria2c', 'axel', 'smbclient',
+                                                        'lynx', 'w3m', 'links', 'elinks', 'heroku', 'netlify', 'vercel',
+                                                        'firebase', 'supabase', 'wrangler', 'flyctl', 'powershell', 'pwsh',
+                                                        'certutil', 'bitsadmin', 'cloudflared', 'ngrok', 'tailscale', 'zerotier', 'rclone'
+                                                    ]);
+
+                                                    let deny = false;
+
+                                                    if (blockedCommands.has(cmd)) {
+                                                        deny = true;
+                                                    }
+
+                                                    // 2. Helper to check if a subcommand exists ANYWHERE after the command (ignores flags!)
+                                                    const hasSubcmd = (list) => tokens.slice(1).some(token => list.includes(token));
+                                                    const shouldDenyPkgManager = (dangerCommands) => {
+                                                        const dangerIdx = tokens.findIndex(t => dangerCommands.includes(t));
+                                                        const safeIdx = tokens.findIndex(t => ['run', 'exec', 'test'].includes(t));
+
+                                                        return dangerIdx !== -1 && !(safeIdx !== -1 && safeIdx < dangerIdx);
+                                                    };
+
+                                                    if (cmd === 'git' && hasSubcmd(['clone', 'pull', 'push', 'fetch'])) deny = true;
+                                                    if (cmd === 'go' && hasSubcmd(['get', 'install'])) deny = true;
+                                                    if (cmd === 'npm' && shouldDenyPkgManager(['install', 'i', 'update', 'add'])) deny = true;
+                                                    if (cmd === 'yarn' && shouldDenyPkgManager(['add', 'install', 'upgrade'])) deny = true;
+                                                    if (cmd === 'pnpm' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
+                                                    if (cmd === 'bun' && shouldDenyPkgManager(['add', 'install', 'update'])) deny = true;
+                                                    if (cmd === 'deno' && hasSubcmd(['install', 'add'])) deny = true;
+                                                    if (cmd === 'pip' && hasSubcmd(['install', 'download'])) deny = true;
+                                                    if (cmd === 'pip3' && hasSubcmd(['install', 'download'])) deny = true;
+                                                    if (cmd === 'cargo' && hasSubcmd(['install', 'add'])) deny = true;
+                                                    if (['bash', 'sh', 'zsh', 'fish'].includes(cmd) && hasSubcmd(['-c'])) deny = true;
+                                                    if (cmd === 'cmd' && hasSubcmd(['/c'])) deny = true;
+
+                                                    if (deny) {
                                                         decision = 'deny';
                                                         isNetworkDeny = true;
                                                     }
@@ -3342,7 +3397,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             } else if (denyReason === 'network') {
                                                 denyMsg = 'Permission Denied: Sandbox Network Access Disabled by User Policy.';
                                             } else if (denyReason === 'prohibited' && normToolName === 'exec_command') {
-                                                denyMsg = 'Permission Denied: Prohibited Command';
+                                                denyMsg = 'Permission Denied: Prohibited Command in User Policy';
                                             }
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
