@@ -1,4 +1,6 @@
 import os from 'os';
+import { DATA_DIR } from './paths';
+import fs from 'fs';
 /**
  * High-fidelity word wrapping that preserves indentation and whitespace.
  * ANSI-aware: does not count escape sequences in width calculation.
@@ -94,10 +96,12 @@ export const formatTokens = (tokens) => {
  */
 export const truncatePath = (p, maxLength = 40) => {
     // represent home dir by ~
-    p = p.replace(os.homedir(), '~');
+    let data_dir = DATA_DIR.replaceAll('\\\\', '\\');
+    // console.log('D - ' + data_dir + '\nP - ' + p);
+    p = p.replace(os.homedir(), '~').replace(data_dir, 'FluxFlow').replaceAll('\\', '/');
     if (!p || p.length <= maxLength) return p;
     const half = Math.floor((maxLength - 3) / 2);
-    return p.substring(0, half) + '...' + p.substring(p.length - half);
+    return p.substring(0, half) + '...' + p.substring(p.length - half).replaceAll('\\', '/');
 };
 
 export const parsePatchPairs = (args) => {

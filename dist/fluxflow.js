@@ -749,6 +749,7 @@ import os2 from "os";
 var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff;
 var init_text = __esm({
   "src/utils/text.js"() {
+    init_paths();
     wrapText = (text, width) => {
       if (!text) return "";
       const ansiRegex = /\x1B\[[0-?]*[ -/]*[@-~]/g;
@@ -812,10 +813,11 @@ var init_text = __esm({
       return num.toString();
     };
     truncatePath = (p, maxLength = 40) => {
-      p = p.replace(os2.homedir(), "~");
+      let data_dir = DATA_DIR.replaceAll("\\\\", "\\");
+      p = p.replace(os2.homedir(), "~").replace(data_dir, "FluxFlow").replaceAll("\\", "/");
       if (!p || p.length <= maxLength) return p;
       const half = Math.floor((maxLength - 3) / 2);
-      return p.substring(0, half) + "..." + p.substring(p.length - half);
+      return p.substring(0, half) + "..." + p.substring(p.length - half).replaceAll("\\", "/");
     };
     parsePatchPairs = (args) => {
       const patchPairs = [];
@@ -11442,6 +11444,7 @@ function App({ args = [] }) {
   const isThirdRender = useRef3(true);
   const prevProviderRef = useRef3(aiProvider);
   const originalAllowExternalAccessRef = useRef3(false);
+  const originalMemoryRef = useRef3(true);
   useEffect8(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
@@ -11901,6 +11904,7 @@ function App({ args = [] }) {
       }
       const saved = await loadSettings();
       originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
+      originalMemoryRef.current = saved.systemSettings?.memory ?? true;
       if (parsedArgs.mode) {
         setMode(parsedArgs.mode);
       } else {
@@ -11980,6 +11984,7 @@ function App({ args = [] }) {
       }
       if (parsedArgs.playground) {
         freshSettings.allowExternalAccess = false;
+        freshSettings.memory = false;
       }
       setSystemSettings(freshSettings);
       setProfileData(saved.profileData);
@@ -12059,7 +12064,7 @@ function App({ args = [] }) {
             const newMsgs = [...prev, {
               id: "playground-" + Date.now(),
               role: "system",
-              text: `[PLAYGROUND] Mode active. CWD locked to: ${playgroundDir}`,
+              text: `[PLAYGROUND] Mode active. CWD locked to: FluxFlow/playground`,
               isMeta: true
             }];
             setCompletedIndex(newMsgs.length);
@@ -12118,7 +12123,8 @@ function App({ args = [] }) {
       if (parsedArgs.playground) {
         settingsToSave = {
           ...systemSettings,
-          allowExternalAccess: originalAllowExternalAccessRef.current
+          allowExternalAccess: originalAllowExternalAccessRef.current,
+          memory: originalMemoryRef.current
         };
       }
       saveSettings({
@@ -12587,6 +12593,13 @@ ${cleanText}`, color: "magenta" }];
             { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true }
           ]);
           setCompletedIndex(1);
+          if (parsedArgs.playground) {
+            parsedArgs.playground = false;
+            deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
+            });
+            fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
+            });
+          }
           setChatId(generateChatId());
           setSessionStats({ tokens: 0 });
           setIsExpanded(false);

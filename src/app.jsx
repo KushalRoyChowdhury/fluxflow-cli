@@ -717,6 +717,7 @@ export default function App({ args = [] }) {
     const isThirdRender = useRef(true);
     const prevProviderRef = useRef(aiProvider);
     const originalAllowExternalAccessRef = useRef(false);
+    const originalMemoryRef = useRef(true);
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
     useEffect(() => {
@@ -1252,6 +1253,7 @@ export default function App({ args = [] }) {
             // 1. Load persisted settings
             const saved = await loadSettings();
             originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
+            originalMemoryRef.current = saved.systemSettings?.memory ?? true;
             if (parsedArgs.mode) {
                 setMode(parsedArgs.mode);
             } else {
@@ -1341,6 +1343,7 @@ export default function App({ args = [] }) {
 
             if (parsedArgs.playground) {
                 freshSettings.allowExternalAccess = false;
+                freshSettings.memory = false;
             }
 
             setSystemSettings(freshSettings);
@@ -1430,7 +1433,7 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const newMsgs = [...prev, {
                             id: 'playground-' + Date.now(), role: 'system',
-                            text: `[PLAYGROUND] Mode active. CWD locked to: ${playgroundDir}`,
+                            text: `[PLAYGROUND] Mode active. CWD locked to: FluxFlow/playground`,
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -1497,7 +1500,8 @@ export default function App({ args = [] }) {
             if (parsedArgs.playground) {
                 settingsToSave = {
                     ...systemSettings,
-                    allowExternalAccess: originalAllowExternalAccessRef.current
+                    allowExternalAccess: originalAllowExternalAccessRef.current,
+                    memory: originalMemoryRef.current
                 };
             }
             saveSettings({
@@ -2023,6 +2027,11 @@ export default function App({ args = [] }) {
                     ]);
                     setCompletedIndex(1);
                     // /clear always exits playground mode by resetting to a fresh session
+                    if (parsedArgs.playground) {
+                        parsedArgs.playground = false;
+                        deleteChat(PLAYGROUND_CHAT_ID).catch(() => { });
+                        fs.remove(path.join(DATA_DIR, 'playground')).catch(() => { });
+                    }
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);

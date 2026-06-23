@@ -47,7 +47,7 @@ export default function StartupArgs() {
                 </li>
                 <li>
                     <strong><code>--playground</code></strong><br />
-                    Start FluxFlow in an isolated playground/experimentation session. Pins the CWD to a dedicated playground directory and forces external workspace access OFF.
+                    Start FluxFlow in an isolated playground/experimentation session. Pins the CWD to a dedicated playground directory and forces external workspace access and memory OFF.
                 </li>
             </ul>
 
