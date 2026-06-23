@@ -57,6 +57,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   -v, --version                        Show installed version
   --help                               Show this help menu
   --help commands                      Show available /commands
+  --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
   --update latest                      Update the app to the latest version`);
@@ -304,6 +305,15 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     if (process.stdout.isTTY) {
         process.stdout.write('\x1b]0;FluxFlow\x07');
         process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow\x07');
+    }
+
+    // 5. PLAYGROUND: pin CWD before first render so StatusBar shows the right path immediately
+    if (args.includes('--playground')) {
+        const { DATA_DIR } = await import('./utils/paths.js');
+        const pathMod = await import('path');
+        const fsMod = await import('fs-extra');
+        const playgroundDir = pathMod.default.join(DATA_DIR, 'playground');
+        try { fsMod.default.ensureDirSync(playgroundDir); process.chdir(playgroundDir); } catch (e) { /* ignore */ }
     }
 
     render(<App args={process.argv.slice(2)} />, { exitOnCtrlC: false });

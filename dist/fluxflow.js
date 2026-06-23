@@ -3372,11 +3372,11 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? What happens under resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach. Search for, off by one errors, integer overflow, null/undefined propagation, unhandled promises, resource leaks, SQL injection vectors, XSS vulnerabilities, CSRF holes, timing attacks, and privilege escalation paths\nReason about observability, what metrics matter? Where are the logging gaps? How will this be debugged in production at 3am?\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing a single line\nRULES:\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings (verify context, check for hidden complexity)",
-      High: "EFFORT LEVEL: HIGH\nThink in a rigorous, technically grounded monologue within <think>...</think>. Treat this as a design review where every decision must be justified:\nBreak the objective into verifiable steps with clear success criteria. Identify the critical path and potential bottlenecks\nMentally compile and execute your approach. Check for: missing imports, undefined behavior, type mismatches, unhandled errors, and resource cleanup. Trace data flow from input to output, noting transformations\nRecognize design patterns and anti patterns. If you see God objects, tight coupling, or premature optimization, call it out and refactor mentally before committing\nEvaluate performance characteristics. Will this scale? Are there O(n\xB2) operations hiding in innocent looking code? Where are the allocation hotspots?\nConsider the error surface, what can fail and how? Design error handling that preserves invariants and provides actionable feedback\nReview your architecture for, separation of concerns, single responsibility, dependency inversion, and interface segregation. Ensure clean abstractions with minimal coupling\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Continuous analytical flow\n- Verify correctness through first principles reasoning, not pattern matching\n- Actively search for ways your solution could fail or degrade\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full technical verification for all tasks/greetings",
+      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? Resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach\nReason about observability & vulnarability\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing\nRULES:\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID errors\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings",
+      High: "EFFORT LEVEL: HIGH\nThink in a rigorous, technically grounded monologue within <think>...</think>\nBreak the objective into verifiable steps with clear success criteria. Identify the critical path and potential bottlenecks\nMentally compile and execute your approach. Check for: missing imports, undefined behavior, type mismatches, unhandled errors, and resource cleanup. Trace data flow from input to output, noting transformations\nRecognize design patterns and anti patterns. If you see God objects, tight coupling, or premature optimization, call it out and refactor mentally before committing\nEvaluate performance characteristics. Will this scale? Are there O(n\xB2) operations hiding in innocent looking code? Where are the allocation hotspots?\nConsider the error surface, what can fail and how? Design error handling that preserves invariants and provides actionable feedback\nReview your architecture for, separation of concerns, single responsibility, dependency inversion, and interface segregation. Ensure clean abstractions with minimal coupling\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Continuous analytical flow\n- Verify correctness through first principles reasoning, not pattern matching\n- Actively search for ways your solution could fail or degrade\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full technical verification for all tasks/greetings",
       Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technically-aware monologue within <think>...</think>\nIdentify the most direct path that satisfies requirements without over-engineering\nQuickly scan for obvious issues, missing error handling, incorrect input assumptions, forgotten edge cases, or missing dependencies\nVerify the solution is appropriately modular with cohesive changes\nOutline the concrete changes, which files, which functions, what the key logic looks like\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Clean logical stream\n- Efficient but deliberate. Focus energy on actionable implementation details\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
       Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Just verify the basics:\nConfirm what the user wants and whether it's straightforward or has hidden complexity\nIdentify the specific tool, file, or action needed\nCheck for any obvious correctness issues before acting\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Few lines of clear thought\n- Just enough thinking to avoid obvious mistakes\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- Suitable for simple requests/greetings",
-      Off: "EFFORT LEVEL: INSTANT\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify"
+      Off: "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify"
     };
   }
 });
@@ -7785,7 +7785,7 @@ Provide a consolidated summary of the entire session.`;
       }
     };
     getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow2) {
-      const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = "Google", apiTier } = settings;
+      const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = "Google", apiTier } = settings;
       const isMultiModal = isModelMultimodal(modelName);
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
@@ -8388,7 +8388,7 @@ ${boxBottom}` };
           taggedContextStr = "[TAGGED CONTEXT]\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED CONTEXT]\n";
         }
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
-CWD: ${process.cwd()}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
+CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
 ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
@@ -11252,6 +11252,8 @@ function App({ args = [] }) {
       } else if ((arg === "--resume" || arg === "-r") && args[i + 1]) {
         parsed.resume = args[i + 1];
         i++;
+      } else if (arg === "--playground") {
+        parsed.playground = true;
       }
     }
     return parsed;
@@ -11408,7 +11410,8 @@ function App({ args = [] }) {
   const [monthlyUsage, setMonthlyUsage] = useState11(null);
   const [customPeriodUsage, setCustomPeriodUsage] = useState11(null);
   const [statsMode, setStatsMode] = useState11("daily");
-  const [chatId, setChatId] = useState11(generateChatId());
+  const PLAYGROUND_CHAT_ID = "flow-playground";
+  const [chatId, setChatId] = useState11(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
   useEffect8(() => {
     const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
     setChatTokens(nextTokens);
@@ -11438,6 +11441,7 @@ function App({ args = [] }) {
   const isSecondRender = useRef3(true);
   const isThirdRender = useRef3(true);
   const prevProviderRef = useRef3(aiProvider);
+  const originalAllowExternalAccessRef = useRef3(false);
   useEffect8(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
@@ -11896,6 +11900,7 @@ function App({ args = [] }) {
         });
       }
       const saved = await loadSettings();
+      originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
       if (parsedArgs.mode) {
         setMode(parsedArgs.mode);
       } else {
@@ -11973,6 +11978,9 @@ function App({ args = [] }) {
       } else if (parsedArgs.externalAccess === "off") {
         freshSettings.allowExternalAccess = false;
       }
+      if (parsedArgs.playground) {
+        freshSettings.allowExternalAccess = false;
+      }
       setSystemSettings(freshSettings);
       setProfileData(saved.profileData);
       setImageSettings(saved.imageSettings || { keyType: "Default", quality: "Low-High", apiKey: "" });
@@ -11988,6 +11996,12 @@ function App({ args = [] }) {
         cleanupOldHistory(saved.systemSettings.autoDeleteHistory);
       }
       cleanupOldLogs(LOGS_DIR);
+      if (!parsedArgs.playground) {
+        deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
+        });
+        fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
+        });
+      }
       performVersionCheck(false, freshSettings);
       await initUsage();
       await RevertManager.recoverCrashedTransaction();
@@ -12014,6 +12028,43 @@ function App({ args = [] }) {
           });
         } else {
           setMessages((prev) => [...prev, { id: "sys-err-" + Date.now(), role: "system", text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+        }
+      }
+      if (parsedArgs.playground) {
+        const playgroundDir = path20.join(DATA_DIR, "playground");
+        try {
+          fs22.ensureDirSync(playgroundDir);
+          process.chdir(playgroundDir);
+        } catch (e) {
+        }
+        const playgroundHistory = await loadHistory();
+        if (playgroundHistory[PLAYGROUND_CHAT_ID]) {
+          const resumedMsgs = [...playgroundHistory[PLAYGROUND_CHAT_ID].messages];
+          if (!resumedMsgs[0]?.isLogo) {
+            resumedMsgs.unshift({ id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true });
+          }
+          setMessages(resumedMsgs);
+          setMessages((prev) => {
+            const newMsgs = [...prev, {
+              id: "playground-" + Date.now(),
+              role: "system",
+              text: `[PLAYGROUND] Session restored. CWD locked to: ${playgroundDir}`,
+              isMeta: true
+            }];
+            setCompletedIndex(newMsgs.length);
+            return newMsgs;
+          });
+        } else {
+          setMessages((prev) => {
+            const newMsgs = [...prev, {
+              id: "playground-" + Date.now(),
+              role: "system",
+              text: `[PLAYGROUND] Mode active. CWD locked to: ${playgroundDir}`,
+              isMeta: true
+            }];
+            setCompletedIndex(newMsgs.length);
+            return newMsgs;
+          });
         }
       }
       const detectedIde = getIDEName();
@@ -12063,13 +12114,20 @@ function App({ args = [] }) {
   useEffect8(() => {
     if (!isInitializing) {
       const modelToSave = parsedArgs.model && activeModel === parsedArgs.model ? persistedModelRef.current : activeModel;
+      let settingsToSave = systemSettings;
+      if (parsedArgs.playground) {
+        settingsToSave = {
+          ...systemSettings,
+          allowExternalAccess: originalAllowExternalAccessRef.current
+        };
+      }
       saveSettings({
         mode,
         thinkingLevel,
         aiProvider,
         activeModel: modelToSave || activeModel,
         showFullThinking,
-        systemSettings,
+        systemSettings: settingsToSave,
         profileData,
         imageSettings,
         apiTier
@@ -13203,6 +13261,7 @@ ${timestamp}` };
               janitorModel,
               sessionStats,
               chatId,
+              isPlayground: !!parsedArgs.playground,
               aiProvider,
               apiKey,
               apiTier,
@@ -14936,6 +14995,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   -v, --version                        Show installed version
   --help                               Show this help menu
   --help commands                      Show available /commands
+  --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
   --update latest                      Update the app to the latest version`);
@@ -15135,6 +15195,17 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   if (process.stdout.isTTY) {
     process.stdout.write("\x1B]0;FluxFlow\x07");
     process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow\x07");
+  }
+  if (args.includes("--playground")) {
+    const { DATA_DIR: DATA_DIR2 } = await Promise.resolve().then(() => (init_paths(), paths_exports));
+    const pathMod = await import("path");
+    const fsMod = await import("fs-extra");
+    const playgroundDir = pathMod.default.join(DATA_DIR2, "playground");
+    try {
+      fsMod.default.ensureDirSync(playgroundDir);
+      process.chdir(playgroundDir);
+    } catch (e) {
+    }
   }
   render(/* @__PURE__ */ React15.createElement(App2, { args: process.argv.slice(2) }), { exitOnCtrlC: false });
 }

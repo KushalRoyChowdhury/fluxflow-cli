@@ -45,6 +45,10 @@ export default function StartupArgs() {
                     <strong><code>--auto-del &lt;1d|7d|30d&gt;</code></strong><br />
                     Set the automated chat log deletion schedule.
                 </li>
+                <li>
+                    <strong><code>--playground</code></strong><br />
+                    Start FluxFlow in an isolated playground/experimentation session. Pins the CWD to a dedicated playground directory and forces external workspace access OFF.
+                </li>
             </ul>
 
             <h2 id="ai-configuration">AI & Model Configuration</h2>

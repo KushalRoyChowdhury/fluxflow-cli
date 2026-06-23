@@ -30,7 +30,7 @@ import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
-import { FLUXFLOW_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
+import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
@@ -513,6 +513,8 @@ export default function App({ args = [] }) {
             } else if ((arg === '--resume' || arg === '-r') && args[i + 1]) {
                 parsed.resume = args[i + 1];
                 i++;
+            } else if (arg === '--playground') {
+                parsed.playground = true;
             }
         }
         return parsed;
@@ -681,7 +683,8 @@ export default function App({ args = [] }) {
     const [monthlyUsage, setMonthlyUsage] = useState(null);
     const [customPeriodUsage, setCustomPeriodUsage] = useState(null);
     const [statsMode, setStatsMode] = useState('daily');
-    const [chatId, setChatId] = useState(generateChatId());
+    const PLAYGROUND_CHAT_ID = 'flow-playground';
+    const [chatId, setChatId] = useState(args.includes('--playground') ? PLAYGROUND_CHAT_ID : generateChatId());
 
     useEffect(() => {
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
@@ -713,6 +716,7 @@ export default function App({ args = [] }) {
     const isSecondRender = useRef(true);
     const isThirdRender = useRef(true);
     const prevProviderRef = useRef(aiProvider);
+    const originalAllowExternalAccessRef = useRef(false);
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
     useEffect(() => {
@@ -1247,6 +1251,7 @@ export default function App({ args = [] }) {
 
             // 1. Load persisted settings
             const saved = await loadSettings();
+            originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
             if (parsedArgs.mode) {
                 setMode(parsedArgs.mode);
             } else {
@@ -1334,6 +1339,10 @@ export default function App({ args = [] }) {
                 freshSettings.allowExternalAccess = false;
             }
 
+            if (parsedArgs.playground) {
+                freshSettings.allowExternalAccess = false;
+            }
+
             setSystemSettings(freshSettings);
             setProfileData(saved.profileData);
             setImageSettings(saved.imageSettings || { keyType: 'Default', quality: 'Low-High', apiKey: '' });
@@ -1353,6 +1362,12 @@ export default function App({ args = [] }) {
                 cleanupOldHistory(saved.systemSettings.autoDeleteHistory);
             }
             cleanupOldLogs(LOGS_DIR);
+
+            // Purge playground session + folder when starting in normal mode
+            if (!parsedArgs.playground) {
+                deleteChat(PLAYGROUND_CHAT_ID).catch(() => { });
+                fs.remove(path.join(DATA_DIR, 'playground')).catch(() => { });
+            }
 
             // 4. Check for updates
             performVersionCheck(false, freshSettings);
@@ -1385,6 +1400,42 @@ export default function App({ args = [] }) {
                     });
                 } else {
                     setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+                }
+            }
+
+            if (parsedArgs.playground) {
+                // Lock CWD to DATA_DIR/playground for the entire playground session
+                const playgroundDir = path.join(DATA_DIR, 'playground');
+                try { fs.ensureDirSync(playgroundDir); process.chdir(playgroundDir); } catch (e) { /* ignore */ }
+
+                // Auto-restore playground session history if it exists
+                const playgroundHistory = await loadHistory();
+                if (playgroundHistory[PLAYGROUND_CHAT_ID]) {
+                    const resumedMsgs = [...playgroundHistory[PLAYGROUND_CHAT_ID].messages];
+                    if (!resumedMsgs[0]?.isLogo) {
+                        resumedMsgs.unshift({ id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true });
+                    }
+                    setMessages(resumedMsgs);
+                    setMessages(prev => {
+                        const newMsgs = [...prev, {
+                            id: 'playground-' + Date.now(), role: 'system',
+                            text: `[PLAYGROUND] Session restored. CWD locked to: ${playgroundDir}`,
+                            isMeta: true
+                        }];
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
+                } else {
+                    // First-ever playground launch
+                    setMessages(prev => {
+                        const newMsgs = [...prev, {
+                            id: 'playground-' + Date.now(), role: 'system',
+                            text: `[PLAYGROUND] Mode active. CWD locked to: ${playgroundDir}`,
+                            isMeta: true
+                        }];
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
                 }
             }
 
@@ -1442,13 +1493,20 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (!isInitializing) {
             const modelToSave = (parsedArgs.model && activeModel === parsedArgs.model) ? persistedModelRef.current : activeModel;
+            let settingsToSave = systemSettings;
+            if (parsedArgs.playground) {
+                settingsToSave = {
+                    ...systemSettings,
+                    allowExternalAccess: originalAllowExternalAccessRef.current
+                };
+            }
             saveSettings({
                 mode,
                 thinkingLevel,
                 aiProvider,
                 activeModel: modelToSave || activeModel,
                 showFullThinking,
-                systemSettings,
+                systemSettings: settingsToSave,
                 profileData,
                 imageSettings,
                 apiTier
@@ -1964,6 +2022,7 @@ export default function App({ args = [] }) {
                         { id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true }
                     ]);
                     setCompletedIndex(1);
+                    // /clear always exits playground mode by resetting to a fresh session
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
@@ -2642,6 +2701,7 @@ export default function App({ args = [] }) {
                             janitorModel,
                             sessionStats,
                             chatId,
+                            isPlayground: !!parsedArgs.playground,
                             aiProvider,
                             apiKey,
                             apiTier,

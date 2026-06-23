@@ -231,8 +231,18 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.11.5"]
+        const stableVersions = ["2.12.0"]
         const changelogData = {
+            "2.12.0": {
+                "note": "JUNE 24 - Playground Mode.",
+                "added": [
+                    "**Playground Mode:** Launch FluxFlow with `fluxflow --playground` to enter a persistent, isolated session. Chat ID is fixed to `flow-playground`, CWD is pinned to `DATA_DIR/playground`, and history is automatically restored on every launch.",
+                    "Playground session is silently wiped on session end.",
+                    "`/clear` inside playground exits the mode and starts a fresh normal session."
+                ],
+                "changed": [],
+                "fixes": []
+            },
             "2.11.5": {
                 "note": "JUNE 23 - Bug Fixes!",
                 "added": [],
