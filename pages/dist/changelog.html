@@ -231,15 +231,18 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.11.2"]
+        const stableVersions = ["2.11.5"]
         const changelogData = {
-            "2.11.2": {
+            "2.11.5": {
                 "note": "JUNE 23 - Bug Fixes!",
                 "added": [],
-                "changed": [],
+                "changed": [
+                    "Tuned parameters for more stable tool calling."
+                ],
                 "fixes": [
                     "Fixed a bug where `/memory` command could occationally crash the app.",
-                    "Improved readability for dense memories."
+                    "Improved readability for dense memories.",
+                    "Resoleved a bug with array parsing inside tool calls."
                 ]
             },
             "2.11.1": {
