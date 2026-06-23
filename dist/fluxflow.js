@@ -5023,9 +5023,10 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
         }
         const strip = (t) => t.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const processedContent = strip(content);
-        const lineCount = processedContent.split(/\r?\n/).length;
-        const originalSize = Buffer.byteLength(processedContent, "utf8");
-        fs10.writeFileSync(absolutePath, processedContent, "utf8");
+        const finalContent = processedContent.endsWith("\n") ? processedContent : processedContent + "\n";
+        const lineCount = finalContent.split(/\r?\n/).length;
+        const originalSize = Buffer.byteLength(finalContent, "utf8");
+        fs10.writeFileSync(absolutePath, finalContent, "utf8");
         let verifiedContent = fs10.readFileSync(absolutePath, "utf8");
         const verifiedSize = Buffer.byteLength(verifiedContent, "utf8");
         const verifiedLines = verifiedContent.split(/\r?\n/);
@@ -9571,7 +9572,8 @@ ${boxBottom}` };
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
                                 } else if (normToolName === "write_file") {
-                                  const modifiedContent = toolArgs.content || toolArgs.newContent || "";
+                                  const rawContent = toolArgs.content || toolArgs.newContent || "";
+                                  const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
                                   if (!fs20.existsSync(absPath)) {
                                     isNewFileCreated = true;
                                     fs20.mkdirSync(path19.dirname(absPath), { recursive: true });

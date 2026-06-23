@@ -3399,7 +3399,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             diffOpened = true;
                                                             await new Promise(r => setTimeout(r, 50)); // Beat delay
                                                         } else if (normToolName === 'write_file') {
-                                                            const modifiedContent = toolArgs.content || toolArgs.newContent || '';
+                                                            const rawContent = toolArgs.content || toolArgs.newContent || '';
+                                                            // Ensure the sacred trailing \n — same guarantee as write_file.js
+                                                            const modifiedContent = rawContent.endsWith('\n') ? rawContent : rawContent + '\n';
                                                             if (!fs.existsSync(absPath)) {
                                                                 isNewFileCreated = true;
                                                                 fs.mkdirSync(path.dirname(absPath), { recursive: true });

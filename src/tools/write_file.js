@@ -50,9 +50,12 @@ export const write_file = async (args, context = {}) => {
         // 2. [/n] becomes a literal \n in the file
         const processedContent = strip(content);
 
-        const lineCount = processedContent.split(/\r?\n/).length;
-        const originalSize = Buffer.byteLength(processedContent, 'utf8');
-        fs.writeFileSync(absolutePath, processedContent, 'utf8');
+        // Ensure exactly one trailing newline (the "sacred \n") — add if missing, keep if present
+        const finalContent = processedContent.endsWith('\n') ? processedContent : processedContent + '\n';
+
+        const lineCount = finalContent.split(/\r?\n/).length;
+        const originalSize = Buffer.byteLength(finalContent, 'utf8');
+        fs.writeFileSync(absolutePath, finalContent, 'utf8');
 
         // --- HIGH-FIDELITY VERIFICATION ---
         let verifiedContent = fs.readFileSync(absolutePath, 'utf8');
