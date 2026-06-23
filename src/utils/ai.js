@@ -2534,14 +2534,55 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 }
 
-                                const endIdx = combined.indexOf(endTag);
+                                let endIdx = -1;
+                                if (activeBufferType === 'tool') {
+                                    let balance = 0;
+                                    let inString = null;
+                                    let bracketBalance = 0;
+                                    let passedParen = false;
+
+                                    for (let i = 0; i < combined.length; i++) {
+                                        const char = combined[i];
+                                        if (inString) {
+                                            if (char === inString) {
+                                                let backslashCount = 0;
+                                                for (let j = i - 1; j >= 0 && combined[j] === '\\'; j--) {
+                                                    backslashCount++;
+                                                }
+                                                if (backslashCount % 2 === 0) {
+                                                    inString = null;
+                                                }
+                                            }
+                                        } else {
+                                            if (char === '"' || char === "'" || char === '`') {
+                                                inString = char;
+                                            } else if (char === '(') {
+                                                balance++;
+                                                passedParen = true;
+                                            } else if (char === ')') {
+                                                balance--;
+                                            } else if (char === '[') {
+                                                bracketBalance++;
+                                            } else if (char === ']') {
+                                                if (passedParen && balance === 0 && bracketBalance === 1) {
+                                                    endIdx = i;
+                                                    break;
+                                                }
+                                                bracketBalance--;
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    endIdx = combined.indexOf(endTag);
+                                }
+
                                 if (endIdx !== -1) {
-                                    const fullMatch = combined.substring(0, endIdx + endTag.length);
+                                    const fullMatch = combined.substring(0, endIdx + 1);
                                     msgs.push({ type: 'text', content: fullMatch });
                                     toolCallBuffer = '';
                                     isBufferingToolCall = false;
                                     activeBufferType = null;
-                                    remaining = combined.substring(endIdx + endTag.length);
+                                    remaining = combined.substring(endIdx + 1);
                                 } else {
                                     // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
                                     // Flush current buffer if it exceeds 512 chars

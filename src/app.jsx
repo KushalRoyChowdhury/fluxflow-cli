@@ -1817,8 +1817,8 @@ export default function App({ args = [] }) {
         },
         {
             cmd: '/budget', desc: 'Set or View budget limits', subs: [
-                { cmd: 'Set', desc: 'Configure budgets (Daily/Monthly limits)' },
-                { cmd: 'View', desc: 'View current usage budget bars' }
+                { cmd: 'view', desc: 'View current usage budget bars' },
+                { cmd: 'set', desc: 'Configure budgets (Daily/Monthly limits)' }
             ]
         },
         {
