@@ -8740,7 +8740,9 @@ ${ideErr} [/ERROR]`;
                         if (splitPoint !== -1) break;
                       }
                       if (splitPoint !== -1) {
-                        if (splitPoint > 0) msgs.push({ type: "text", content: remaining.substring(0, splitPoint) });
+                        if (splitPoint > 0) {
+                          msgs.push({ type: "text", content: remaining.substring(0, splitPoint) });
+                        }
                         isBufferingToolCall = true;
                         toolCallBuffer = remaining.substring(splitPoint);
                         remaining = "";
@@ -8852,6 +8854,7 @@ ${ideErr} [/ERROR]`;
                           if (aiProvider === "Google") {
                             pendingGoogleText += dedupeClean;
                           } else {
+                            yield* flushGoogleBuffer2();
                             const msgs = getBufferedMessages(dedupeClean);
                             for (const m of msgs) yield m;
                           }
@@ -8866,6 +8869,7 @@ ${ideErr} [/ERROR]`;
                     if (aiProvider === "Google") {
                       pendingGoogleText += chunkText;
                     } else {
+                      yield* flushGoogleBuffer2();
                       const msgs = getBufferedMessages(chunkText);
                       for (const m of msgs) yield m;
                     }
@@ -9877,6 +9881,7 @@ ${boxBottom}` };
                     toolCallPointer++;
                   }
                   if (aiProvider === "Google" && pendingGoogleText && Date.now() - lastGoogleFlushTime >= 150) {
+                    yield* flushGoogleBuffer2();
                     const msgs = getBufferedMessages(pendingGoogleText);
                     for (const m of msgs) yield m;
                     pendingGoogleText = "";
@@ -9921,6 +9926,7 @@ ${boxBottom}` };
                     if (aiProvider === "Google") {
                       pendingGoogleText += dedupeClean;
                     } else {
+                      yield* flushGoogleBuffer2();
                       const msgs = getBufferedMessages(dedupeClean);
                       for (const m of msgs) yield m;
                     }

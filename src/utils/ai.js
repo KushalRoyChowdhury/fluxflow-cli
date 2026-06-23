@@ -2504,7 +2504,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
 
                                     if (splitPoint !== -1) {
-                                        if (splitPoint > 0) msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) });
+                                        if (splitPoint > 0) {
+                                            msgs.push({ type: 'text', content: remaining.substring(0, splitPoint) })
+                                        }
                                         isBufferingToolCall = true;
                                         toolCallBuffer = remaining.substring(splitPoint);
                                         remaining = '';
@@ -2637,6 +2639,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             if (aiProvider === 'Google') {
                                                 pendingGoogleText += dedupeClean;
                                             } else {
+                                                yield* flushGoogleBuffer();
                                                 const msgs = getBufferedMessages(dedupeClean);
                                                 for (const m of msgs) yield m;
                                             }
@@ -2652,6 +2655,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (aiProvider === 'Google') {
                                     pendingGoogleText += chunkText;
                                 } else {
+                                    yield* flushGoogleBuffer();
                                     const msgs = getBufferedMessages(chunkText);
                                     for (const m of msgs) yield m;
                                 }
@@ -3741,6 +3745,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 toolCallPointer++;
                             }
                             if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 150)) {
+                                yield * flushGoogleBuffer();
                                 const msgs = getBufferedMessages(pendingGoogleText);
                                 for (const m of msgs) yield m;
                                 pendingGoogleText = '';
@@ -3791,6 +3796,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if (aiProvider === 'Google') {
                                     pendingGoogleText += dedupeClean;
                                 } else {
+                                    yield* flushGoogleBuffer();
                                     const msgs = getBufferedMessages(dedupeClean);
                                     for (const m of msgs) yield m;
                                 }
