@@ -355,7 +355,6 @@ export default function SettingsMenu({
                                             <Text
                                                 color={isSelected ? 'white' : 'grey'}
                                                 bold={isSelected}
-                                                underline={isParserDownload}
                                             >
                                                 {isSelected ? '❯ ' : '  '}{item.label}
                                             </Text>

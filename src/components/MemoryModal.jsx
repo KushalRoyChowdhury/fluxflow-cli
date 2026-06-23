@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 import { readEncryptedJson, writeEncryptedJson, readAesEncryptedJson } from '../utils/crypto.js';
 import { MEMORIES_FILE, SETTINGS_FILE } from '../utils/paths.js';
 import { emojiSpace } from '../utils/terminal.js';
 
 export default function MemoryModal({ onClose }) {
+    const { stdout } = useStdout();
+    const columns = stdout?.columns || 80;
     const [memories, setMemories] = useState([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [isMemoryOn, setIsMemoryOn] = useState(true);
@@ -41,9 +43,47 @@ export default function MemoryModal({ onClose }) {
         }
     });
 
-    const cleanDisplay = (text) => {
+    const formatMemory = (text, idx, isSelected) => {
         if (!text) return '';
-        return text.replace(/\[Saved on: .*?\]/g, '').replace(/\\+'/g, "'").trim();
+        const clean = text.replace(/\[Saved on: .*?\]/g, '').replace(/\\+'/g, "'").trim();
+
+        const prefix = `${isSelected ? '❯ ' : '  '}${idx + 1}. `;
+        const prefixLen = prefix.length;
+        const rightPadding = isSelected ? 22 : 2;
+
+        const parts = clean.split('\n');
+        return parts.map((part, partIdx) => {
+            const isFirstPart = partIdx === 0;
+            const firstLineMax = Math.max(10, columns - 4 - (isFirstPart ? prefixLen : 3) - rightPadding);
+            const subLineMax = Math.max(10, columns - 4 - 3 - rightPadding);
+
+            const words = part.split(/(\s+)/);
+            const lines = [];
+            let currentLine = '';
+
+            words.forEach(word => {
+                if (word.length === 0) return;
+                const currentLimit = lines.length === 0 ? firstLineMax : subLineMax;
+                if (currentLine.length + word.length > currentLimit) {
+                    if (currentLine.trim().length > 0) {
+                        lines.push(currentLine.trimEnd());
+                        currentLine = word;
+                    } else {
+                        lines.push(word.substring(0, currentLimit));
+                        currentLine = word.substring(currentLimit);
+                    }
+                } else {
+                    currentLine += word;
+                }
+            });
+            if (currentLine.trimEnd().length > 0) {
+                lines.push(currentLine.trimEnd());
+            }
+
+            if (lines.length === 0) return '';
+            const wrapped = lines.join('\n' + '     ');
+            return isFirstPart ? wrapped : '     ' + wrapped;
+        }).join('\n');
     };
 
     const totalCapacity = 4 * 1024 * 2; // 8192 chars
@@ -94,12 +134,12 @@ export default function MemoryModal({ onClose }) {
                             >
                                 <Box flexGrow={1}>
                                     <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
-                                        {isSelected ? '❯ ' : '  '}{idx + 1}. {cleanDisplay(mem.memory)}
+                                        {isSelected ? '❯ ' : '  '}{idx + 1}. {formatMemory(mem.memory, idx, isSelected)}
                                     </Text>
                                 </Box>
                                 {isSelected && (
                                     <Box flexShrink={0}>
-                                        <Text color="grey" dimColor>[ </Text> <Text color="grey" dimColor italic>{mem.score}</Text><Text color="grey" dimColor> ]</Text>
+                                        <Text color="grey" dimColor> [<Text italic>{mem.score}</Text>] </Text>
                                         <Text color="grey" bold>[X] WIPE </Text>
                                     </Box>
                                 )}

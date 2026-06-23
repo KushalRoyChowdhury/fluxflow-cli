@@ -3146,8 +3146,7 @@ function SettingsMenu({
           Text6,
           {
             color: isSelected ? "white" : "grey",
-            bold: isSelected,
-            underline: isParserDownload
+            bold: isSelected
           },
           isSelected ? "\u276F " : "  ",
           item.label
@@ -10289,8 +10288,10 @@ var init_ResumeModal = __esm({
 
 // src/components/MemoryModal.jsx
 import React10, { useState as useState7, useEffect as useEffect5 } from "react";
-import { Box as Box10, Text as Text10, useInput as useInput5 } from "ink";
+import { Box as Box10, Text as Text10, useInput as useInput5, useStdout } from "ink";
 function MemoryModal({ onClose }) {
+  const { stdout } = useStdout();
+  const columns = stdout?.columns || 80;
   const [memories, setMemories] = useState7([]);
   const [selectedIndex, setSelectedIndex] = useState7(0);
   const [isMemoryOn, setIsMemoryOn] = useState7(true);
@@ -10322,9 +10323,42 @@ function MemoryModal({ onClose }) {
       }
     }
   });
-  const cleanDisplay = (text) => {
+  const formatMemory = (text, idx, isSelected) => {
     if (!text) return "";
-    return text.replace(/\[Saved on: .*?\]/g, "").replace(/\\+'/g, "'").trim();
+    const clean = text.replace(/\[Saved on: .*?\]/g, "").replace(/\\+'/g, "'").trim();
+    const prefix = `${isSelected ? "\u276F " : "  "}${idx + 1}. `;
+    const prefixLen = prefix.length;
+    const rightPadding = isSelected ? 22 : 2;
+    const parts = clean.split("\n");
+    return parts.map((part, partIdx) => {
+      const isFirstPart = partIdx === 0;
+      const firstLineMax = Math.max(10, columns - 4 - (isFirstPart ? prefixLen : 3) - rightPadding);
+      const subLineMax = Math.max(10, columns - 4 - 3 - rightPadding);
+      const words = part.split(/(\s+)/);
+      const lines = [];
+      let currentLine = "";
+      words.forEach((word) => {
+        if (word.length === 0) return;
+        const currentLimit = lines.length === 0 ? firstLineMax : subLineMax;
+        if (currentLine.length + word.length > currentLimit) {
+          if (currentLine.trim().length > 0) {
+            lines.push(currentLine.trimEnd());
+            currentLine = word;
+          } else {
+            lines.push(word.substring(0, currentLimit));
+            currentLine = word.substring(currentLimit);
+          }
+        } else {
+          currentLine += word;
+        }
+      });
+      if (currentLine.trimEnd().length > 0) {
+        lines.push(currentLine.trimEnd());
+      }
+      if (lines.length === 0) return "";
+      const wrapped = lines.join("\n     ");
+      return isFirstPart ? wrapped : "     " + wrapped;
+    }).join("\n");
   };
   const totalCapacity = 4 * 1024 * 2;
   const currentLength = memories.reduce((acc, m) => acc + (m.memory?.length || 0), 0);
@@ -10348,8 +10382,8 @@ function MemoryModal({ onClose }) {
         backgroundColor: isSelected ? "#2a2a2a" : void 0,
         width: "100%"
       },
-      /* @__PURE__ */ React10.createElement(Box10, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", idx + 1, ". ", cleanDisplay(mem.memory))),
-      isSelected && /* @__PURE__ */ React10.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true }, "[ "), " ", /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true, italic: true }, mem.score), /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true }, " ]"), /* @__PURE__ */ React10.createElement(Text10, { color: "grey", bold: true }, "[X] WIPE "))
+      /* @__PURE__ */ React10.createElement(Box10, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", idx + 1, ". ", formatMemory(mem.memory, idx, isSelected))),
+      isSelected && /* @__PURE__ */ React10.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "grey", dimColor: true }, " [", /* @__PURE__ */ React10.createElement(Text10, { italic: true }, mem.score), "] "), /* @__PURE__ */ React10.createElement(Text10, { color: "grey", bold: true }, "[X] WIPE "))
     );
   })), /* @__PURE__ */ React10.createElement(
     Box10,
@@ -11015,7 +11049,7 @@ __export(app_exports, {
 });
 import os4 from "os";
 import React14, { useState as useState11, useEffect as useEffect8, useRef as useRef3, useMemo as useMemo2 } from "react";
-import { Box as Box14, Text as Text14, useInput as useInput8, useStdout } from "ink";
+import { Box as Box14, Text as Text14, useInput as useInput8, useStdout as useStdout2 } from "ink";
 import fs22 from "fs-extra";
 import path20 from "path";
 import { exec as exec2 } from "child_process";
@@ -11026,7 +11060,7 @@ import gradient2 from "gradient-string";
 function App({ args = [] }) {
   const [confirmExit, setConfirmExit] = useState11(false);
   const [exitCountdown, setExitCountdown] = useState11(10);
-  const { stdout } = useStdout();
+  const { stdout } = useStdout2();
   const [input, setInput] = useState11("");
   const [inputKey, setInputKey] = useState11(0);
   const [isExpanded, setIsExpanded] = useState11(false);
