@@ -120,7 +120,7 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     return fetch(url, options);
 };
 
-const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.9) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -168,6 +168,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
+        temperature: temperature,
     };
 
     // DeepSeek Specific Reasoning
@@ -273,7 +274,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
     }
 };
 
-const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal) {
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.8) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -335,7 +336,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         messages: messages,
         max_tokens: maxTokens,
         stream: true,
-        stream_options: { include_usage: true }
+        stream_options: { include_usage: true },
+        temperature: temperature
     };
 
     if (isKimi) {
@@ -443,7 +445,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 }
 
-const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.5) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -504,6 +506,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         model: model,
         messages: messages,
         stream: true,
+        temperature: temperature,
     };
 
     const effort = reasoningEffortMap[thinkingLevel];
@@ -748,7 +751,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
-                            mode
+                            mode,
+                            false,
+                            null,
+                            0.4
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -761,7 +767,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             janitorPrompt,
                             'Fast', // Janitor always minimal
                             mode,
-                            false
+                            false,
+                            null,
+                            0.4
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -774,7 +782,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             janitorPrompt,
                             'Fast', // Janitor always minimal
                             mode,
-                            false
+                            false,
+                            null,
+                            0.4
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -786,7 +796,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             config: {
                                 systemInstruction: janitorPrompt,
                                 maxOutputTokens: 512,
-                                temperature: 0.3,
+                                temperature: 0.4,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -1204,7 +1214,7 @@ export const initAI = (apiKey, settings = {}) => {
 /**
  * Generic helper to generate non-streaming content from any provider
  */
-const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast') => {
+const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.4) => {
     const { aiProvider = 'Google', apiKey, mode } = settings;
     let fullText = '';
     let usageMetadata = null;
@@ -1216,11 +1226,11 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
 
     let stream;
     if (aiProvider === 'OpenRouter') {
-        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
     } else if (aiProvider === 'DeepSeek') {
-        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
     } else if (aiProvider === 'NVIDIA') {
-        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
     } else {
         const genStream = await client.models.generateContentStream({
             model: model,
@@ -1228,7 +1238,7 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
             config: {
                 systemInstruction: systemInstruction,
                 maxOutputTokens: 2048,
-                temperature: 0.3,
+                temperature: temperature,
                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
             }
         });
@@ -2349,7 +2359,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             thinkingLevel,
                             mode,
                             isMultiModal,
-                            abortController.signal
+                            abortController.signal,
+                            0.5
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -2360,7 +2371,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             thinkingLevel,
                             mode,
                             isMultiModal,
-                            abortController.signal
+                            abortController.signal,
+                            0.9
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         stream = getNVIDIAStream(
@@ -2371,15 +2383,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             thinkingLevel,
                             mode,
                             isMultiModal,
-                            abortController.signal
+                            abortController.signal,
+                            0.8
                         );
                     } else {
                         const apiCallPromise = client.models.generateContentStream({
-                            model: targetModel || "gemma-4-31b-it",
+                            model: targetModel || "gemini-3-flash-preview",
                             contents: activeContents,
                             config: {
                                 systemInstruction: currentSystemInstruction,
                                 mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+                                temperature: 1.05,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },

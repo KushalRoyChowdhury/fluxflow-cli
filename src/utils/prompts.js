@@ -93,6 +93,7 @@ ${projectContextBlock}
 -- FORMATTING --
 - GFM Supported
 - NO CHAT **AFTER** FIRING TOOLS IN THIS TURN
+- End final response with summary of changes made and files edited
 - Basic LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 === END SYSTEM PROMPT ===`.trim();
 };

@@ -3474,6 +3474,7 @@ ${projectContextBlock}
 -- FORMATTING --
 - GFM Supported
 - NO CHAT **AFTER** FIRING TOOLS IN THIS TURN
+- End final response with summary of changes made and files edited
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
     };
@@ -6593,7 +6594,7 @@ var init_ai = __esm({
       }
       return fetch(url, options);
     };
-    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
+    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.9) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -6632,7 +6633,8 @@ var init_ai = __esm({
         model,
         messages,
         stream: true,
-        stream_options: { include_usage: true }
+        stream_options: { include_usage: true },
+        temperature
       };
       if (thinkingLevel !== "Fast") {
         const reasoningEffortMap = {
@@ -6724,7 +6726,7 @@ var init_ai = __esm({
         }
       }
     };
-    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal) {
+    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.8) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -6778,7 +6780,8 @@ var init_ai = __esm({
         messages,
         max_tokens: maxTokens,
         stream: true,
-        stream_options: { include_usage: true }
+        stream_options: { include_usage: true },
+        temperature
       };
       if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
@@ -6875,7 +6878,7 @@ var init_ai = __esm({
         }
       }
     };
-    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal) {
+    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.5) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -6928,7 +6931,8 @@ var init_ai = __esm({
       const requestPayload = {
         model,
         messages,
-        stream: true
+        stream: true,
+        temperature
       };
       const effort = reasoningEffortMap[thinkingLevel];
       if (effort && thinkingLevel !== "Fast") {
@@ -7118,7 +7122,10 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   janitorPrompt,
                   "Fast",
                   // Janitor always minimal
-                  mode
+                  mode,
+                  false,
+                  null,
+                  0.4
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -7132,7 +7139,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   "Fast",
                   // Janitor always minimal
                   mode,
-                  false
+                  false,
+                  null,
+                  0.4
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -7146,7 +7155,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   "Fast",
                   // Janitor always minimal
                   mode,
-                  false
+                  false,
+                  null,
+                  0.4
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -7158,7 +7169,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   config: {
                     systemInstruction: janitorPrompt,
                     maxOutputTokens: 512,
-                    temperature: 0.3,
+                    temperature: 0.4,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -7518,18 +7529,18 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       client = new GoogleGenAI({ apiKey });
       return client;
     };
-    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast") => {
+    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.4) => {
       const { aiProvider = "Google", apiKey, mode } = settings;
       let fullText = "";
       let usageMetadata = null;
       const normalizedContents = typeof contents === "string" ? [{ role: "user", parts: [{ text: contents }] }] : contents;
       let stream;
       if (aiProvider === "OpenRouter") {
-        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
       } else if (aiProvider === "DeepSeek") {
-        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
       } else if (aiProvider === "NVIDIA") {
-        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false);
+        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
       } else {
         const genStream = await client.models.generateContentStream({
           model,
@@ -7537,7 +7548,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           config: {
             systemInstruction,
             maxOutputTokens: 2048,
-            temperature: 0.3,
+            temperature,
             thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
           }
         });
@@ -8605,7 +8616,8 @@ ${ideErr} [/ERROR]`;
                   thinkingLevel,
                   mode,
                   isMultiModal,
-                  abortController.signal
+                  abortController.signal,
+                  0.5
                 );
               } else if (aiProvider === "DeepSeek") {
                 stream = getDeepSeekStream(
@@ -8616,7 +8628,8 @@ ${ideErr} [/ERROR]`;
                   thinkingLevel,
                   mode,
                   isMultiModal,
-                  abortController.signal
+                  abortController.signal,
+                  0.9
                 );
               } else if (aiProvider === "NVIDIA") {
                 stream = getNVIDIAStream(
@@ -8627,15 +8640,17 @@ ${ideErr} [/ERROR]`;
                   thinkingLevel,
                   mode,
                   isMultiModal,
-                  abortController.signal
+                  abortController.signal,
+                  0.8
                 );
               } else {
                 const apiCallPromise = client.models.generateContentStream({
-                  model: targetModel || "gemma-4-31b-it",
+                  model: targetModel || "gemini-3-flash-preview",
                   contents: activeContents,
                   config: {
                     systemInstruction: currentSystemInstruction,
                     mediaResolution: "MEDIA_RESOLUTION_MEDIUM",
+                    temperature: 1.05,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
