@@ -2031,6 +2031,11 @@ export default function App({ args = [] }) {
                         parsedArgs.playground = false;
                         deleteChat(PLAYGROUND_CHAT_ID).catch(() => { });
                         fs.remove(path.join(DATA_DIR, 'playground')).catch(() => { });
+                        setSystemSettings(s => ({
+                            ...s,
+                            allowExternalAccess: originalAllowExternalAccessRef.current,
+                            memory: originalMemoryRef.current
+                        }));
                     }
                     setChatId(generateChatId());
                     setSessionStats({ tokens: 0 });

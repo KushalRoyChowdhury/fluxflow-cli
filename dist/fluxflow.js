@@ -12599,6 +12599,11 @@ ${cleanText}`, color: "magenta" }];
             });
             fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
             });
+            setSystemSettings((s2) => ({
+              ...s2,
+              allowExternalAccess: originalAllowExternalAccessRef.current,
+              memory: originalMemoryRef.current
+            }));
           }
           setChatId(generateChatId());
           setSessionStats({ tokens: 0 });
