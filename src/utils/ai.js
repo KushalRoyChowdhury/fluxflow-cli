@@ -20,6 +20,13 @@ import { type } from 'os';
 let client = null;
 let globalSettings = {};
 
+const colorMainWords = (label) => {
+    if (!label) return label;
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+        return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
+    });
+};
+
 let TERMINATION_SIGNAL = false;
 
 const MULTIMODAL_MODELS = [
@@ -2002,15 +2009,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (isMultimodalFile && !isSupported) {
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
-                                terminalWidth = process.stdout.columns - 10 || 120;
+                                terminalWidth = process.stdout.columns - 5 || 120;
                             }
-                            const boxLines = [`${isImage ? '📸' : '📄'} UNSUPPORTED MODALITY FOR THIS MODEL`];
+                            const boxLines = [label];
                             const maxLen = Math.max(...boxLines.map(l => l.length));
                             const boxWidth = Math.min(maxLen + 4, terminalWidth);
-                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                            const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
-                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                            const boxTop = `${' '.repeat(boxWidth)}`;
+                            const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
+                            const boxBottom = `${' '.repeat(boxWidth)}`;
+                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                            // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             continue;
                         }
 
@@ -2047,10 +2055,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (!isError) {
                             let label = '';
                             if (isImage) {
-                                label = `📸 Viewed: ${filePath}`;
+                                label = `✔ Viewed: ${filePath}`;
                                 attachedBinaryPart = binPart;
                             } else if (isPdf || isOfficeFile) {
-                                label = `📄 Viewed: ${filePath}`;
+                                label = `✔ Viewed: ${filePath}`;
                                 attachedBinaryPart = binPart;
                             } else {
                                 let totalLines = '...';
@@ -2058,22 +2066,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const content = fs.readFileSync(absPath, 'utf8');
                                     totalLines = content.split('\n').length;
                                 } catch (e) { }
-                                label = `📄 Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                                label = `✔ Auto-Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                                 taggedContextBlocks.push(textResult);
                             }
 
                             if (label) {
                                 let terminalWidth = 115;
                                 if (process.stdout.isTTY) {
-                                    terminalWidth = process.stdout.columns - 10 || 120;
+                                    terminalWidth = process.stdout.columns - 5 || 120;
                                 }
                                 const boxLines = [label];
                                 const maxLen = Math.max(...boxLines.map(l => l.length));
                                 const boxWidth = Math.min(maxLen + 4, terminalWidth);
-                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
-                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
+                                const boxBottom = `${' '.repeat(boxWidth)}`;
+                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                // const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
+                                // const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
+                                // const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
+                                // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             }
                         }
                     }
@@ -2206,6 +2218,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             let text = msg.text || '';
                             if (msg.role === 'agent') {
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
+                                // text = text.replaceAll('<think>', '[Previous Thoughts: ').replaceAll('</think>', ']');
                             }
                             const parts = [{ text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -2930,10 +2943,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'web_search') {
                                     const { query, limit = 10 } = parseArgs(toolCall.args);
-                                    label = `🔍 Searched: ${query}`;
+                                    label = `✔ Searched: ${query}`;
                                 } else if (normToolName === 'web_scrape') {
                                     const url = parseArgs(toolCall.args).url || '...';
-                                    label = `📖 Visited: ${url}`;
+                                    label = `✔ Visited: ${url}`;
                                 } else if (normToolName === 'view_file') {
                                     const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
 
@@ -2959,30 +2972,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                     if (isPdf || isOfficeFile) {
-                                        label = `📄 Viewed: ${targetPath}`;
+                                        label = `✔ Viewed: ${targetPath}`;
                                     } else if (isImage) {
-                                        label = `📸 Viewed: ${targetPath}`;
+                                        label = `✔ Viewed: ${targetPath}`;
                                     } else {
-                                        label = `📄 Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
+                                        label = `✔ Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Viewed';
                                     const path = parseArgs(toolCall.args).path;
-                                    label = `📂 ${action}: ${path === '.' ? './' : path}`;
+                                    label = `✔ ${action}: ${path === '.' ? './' : path}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                    label = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔ ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `📑 Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔ Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `📝 Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔ Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'file_map') {
-                                    label = `📋 Get Map: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔ Get Map: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
                                     const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                                    label = `🎨 Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
+                                    label = `✔ Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
                                 } else if (normToolName.toLowerCase() === 'exec_command' || normToolName.toLowerCase() === 'ask') {
                                     label = '';
                                 } else {
@@ -3152,17 +3165,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                                         if (normToolName === 'write_file' || normToolName === 'update_file') {
                                             const action = normToolName === 'write_file' ? 'Write Canceled' : 'Edit Canceled';
-                                            const deniedLabel = `💾 ${action}: ${parsedArgs.path || '...'}`;
+                                            const deniedLabel = `✗ ${action}: ${parsedArgs.path || '...'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
-                                                terminalWidth = process.stdout.columns - 10 || 120;
+                                                terminalWidth = process.stdout.columns - 5 || 120;
                                             }
                                             const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
-                                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                            const boxMid = `│ ${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                            const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                            const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
                                         }
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -3372,17 +3384,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
-                                                                    const errorLabel = `💾 Edited: ${path.basename(absPath)}`.toUpperCase();
+                                                                    const errorLabel = `✔ Edited: ${path.basename(absPath)}`.toUpperCase();
                                                                     // Get terminal physical width
                                                                     let terminalWidth = 115;
                                                                     if (process.stdout.isTTY) {
-                                                                        terminalWidth = process.stdout.columns - 10 || 120;
+                                                                        terminalWidth = process.stdout.columns - 5 || 120;
                                                                     }
                                                                     const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
-                                                                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                                                    const boxMid = `│ ${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                                                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                                                    yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                                                    const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
 
                                                                     toolResults.push({ role: 'user', text: errorMsg });
                                                                     await incrementUsage('toolFailure');
@@ -3529,18 +3540,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
 
                                             // Restore UI feedback
-                                            const action = normToolName === 'write_file' ? 'Written' : 'Edited';
-                                            const feedbackLabel = `💾 ${action}: ${filePath || '...'}`;
+                                            const action = normToolName === 'write_file' ? 'Created' : 'Edited';
+                                            const feedbackLabel = `✔ ${action}: ${filePath || '...'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
-                                                terminalWidth = process.stdout.columns - 10 || 120;
+                                                terminalWidth = process.stdout.columns - 5 || 120;
                                             }
                                             const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
-                                            const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                            const boxMid = `│ ${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                            const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                            yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                            const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}`) };
 
                                             const toolEnd = Date.now();
                                             lastToolFinishedAt = toolEnd;
@@ -3571,17 +3580,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `💾 ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✔ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
-                                                    terminalWidth = process.stdout.columns - 10 || 120;
+                                                    terminalWidth = process.stdout.columns - 5 || 120;
                                                 }
                                                 const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
-                                                const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                                const boxMid = `│ ${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                                const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                                yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                                const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                                const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
                                             }
                                             if (normToolName === 'exec_command') {
                                                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -3603,13 +3611,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     // Get terminal physical width
                                     let terminalWidth = 115;
                                     if (process.stdout.isTTY) {
-                                        terminalWidth = process.stdout.columns - 10 || 120;
+                                        terminalWidth = process.stdout.columns - 5 || 120;
                                     }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
-                                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                    const boxMid = `│ ${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                    yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                    const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}${boxMid.includes('Created') || boxMid.includes('Edited') || boxMid.includes('Written') ? '' : `\n${boxBottom}`}`) };
                                 }
 
                                 // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
@@ -3679,17 +3686,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const postLabel = `🔎 Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `✔ Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     // Get terminal physical width
                                     let terminalWidth = 115;
                                     if (process.stdout.isTTY) {
-                                        terminalWidth = process.stdout.columns - 10 || 120;
+                                        terminalWidth = process.stdout.columns - 5 || 120;
                                     }
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
-                                    const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                    const boxMid = `│ ${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                    const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                    yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                    const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
                                 }
 
                                 if (normToolName === 'todo') {
@@ -3722,47 +3728,35 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     };
 
                                     if (method === 'create') {
-                                        uiTitle = '📅 Created Plan';
-                                        listItems = normalizeList(tasks).map(item => `○ ${item}`);
+                                        uiTitle = '\x1b[32m→\x1b[0m Created Plan';
+                                        listItems = normalizeList(tasks).map(item => `\x1b[90m○\x1b[0m ${item}`);
                                     } else if (method === 'append') {
-                                        uiTitle = '📥 Added Plan';
-                                        listItems = normalizeList(tasks).map(item => `○ ${item}`);
+                                        uiTitle = '\x1b[34m➕\x1b[0m Added Plan';
+                                        listItems = normalizeList(tasks).map(item => `\x1b[90m○\x1b[0m ${item}`);
                                     } else if (method === 'get') {
-                                        uiTitle = markDone ? '🔄 Updated Plan' : '📝 Reviewed Plan';
+                                        uiTitle = markDone ? '\x1b[36m↻\x1b[0m Updated Plan' : '\x1b[35m•\x1b[0m Reviewed Plan';
                                         const content = (result || '').split('\n').slice(1).join('\n');
                                         listItems = content.split('\n')
                                             .filter(line => line.trim().startsWith('- ['))
                                             .map(line => {
                                                 const trimmed = line.trim();
                                                 const isDone = trimmed.startsWith('- [x]');
-                                                return `${isDone ? '\x1b[32m●\x1b[0m' : '○'} ${isDone ? '\x1b[90m' : '\x1b[37m'}${trimmed.substring(6).trim()}\x1b[0m`;
+                                                // Premium ✔ for done, ○ for pending
+                                                const icon = isDone ? '\x1b[32m✔\x1b[0m' : '\x1b[90m○\x1b[0m';
+                                                const textColor = isDone ? '\x1b[90m' : '\x1b[37m';
+                                                return `${icon} ${textColor}${trimmed.substring(6).trim()}\x1b[0m`;
                                             });
                                     }
 
                                     if (uiTitle && listItems.length > 0) {
-                                        const maxLen = Math.max(uiTitle.length, ...listItems.map(i => i.length)) + 4;
-                                        // Get terminal physical width
-                                        let terminalWidth = 100;
-                                        if (process.stdout.isTTY) {
-                                            terminalWidth = process.stdout.columns - 10 || 120;
-                                        }
-                                        const boxWidth = Math.min(maxLen, terminalWidth);
-                                        const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                        const boxTitle = `│ ${uiTitle.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`;
-                                        const boxSep = `├${'─'.repeat(boxWidth)}┤`;
-                                        const boxItems = listItems.map(item => {
-                                            // 1. Strip ANSI codes to find the REAL visual length of the text
-                                            const visualLength = item.replace(/\x1b\[[0-9;]*m/g, '').length;
+                                        // Premium, minimal layout without the boxy cage
+                                        const output = [
+                                            `${uiTitle}`, // Clean title with a slight indent aligned with other feedbacks
+                                            ...listItems.map(item => `    ${item}`), // Sub-indented items for that premium look
+                                            '' // Bottom padding spacing
+                                        ].join('\n');
 
-                                            // 2. Calculate exactly how many spaces we need to fill the rest of the row
-                                            const targetWidth = boxWidth - 2;
-                                            const paddingNeeded = Math.max(0, targetWidth - visualLength);
-
-                                            // 3. Assemble the row with the original styled item + the correct raw spaces
-                                            return `│ ${item}${' '.repeat(paddingNeeded)} │`;
-                                        });
-                                        const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                        yield { type: 'visual_feedback', content: [boxTop, boxTitle, boxSep, ...boxItems, boxBottom].join('\n') };
+                                        yield { type: 'visual_feedback', content: colorMainWords(output) };
                                     }
                                 }
 
@@ -3802,7 +3796,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 toolCallPointer++;
                             }
                             if (aiProvider === 'Google' && pendingGoogleText && (Date.now() - lastGoogleFlushTime >= 150)) {
-                                yield * flushGoogleBuffer();
+                                yield* flushGoogleBuffer();
                                 const msgs = getBufferedMessages(pendingGoogleText);
                                 for (const m of msgs) yield m;
                                 pendingGoogleText = '';

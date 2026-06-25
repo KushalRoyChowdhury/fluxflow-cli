@@ -430,3 +430,437 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     diffText += `[DIFF_END]`;
     return diffText;
 };
+
+export const parseMessageToBlocks = (msg, columns) => {
+    const text = cleanSignals(msg.text || '');
+
+    if (text.includes('- Content Preview:')) {
+        const mainParts = text.split('- Content Preview:');
+        const headerText = mainParts[0] || '';
+        const contentPart = mainParts[1] || '';
+
+        const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
+        const contentAndFooter = contentPart.split(footerMarker);
+        const content = contentAndFooter[0]?.trim() || '';
+        const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
+
+        const codeLines = content.split('\n').map(l => l.replace(/\r$/, ''));
+        const gutterWidth = String(codeLines.length).length;
+
+        const completedBlocks = [];
+        let activeBlock = null;
+
+        codeLines.forEach((line, idx) => {
+            const isLast = idx === codeLines.length - 1;
+            const block = {
+                key: `${msg.id || Date.now()}-write-line-${idx}`,
+                msg,
+                type: 'write-line',
+                text: line,
+                gutterWidth,
+                lineNum: idx + 1,
+                isLastLine: isLast
+            };
+
+            if (isLast && msg.isStreaming) {
+                activeBlock = block;
+            } else {
+                completedBlocks.push(block);
+            }
+        });
+
+        return {
+            completed: completedBlocks,
+            active: activeBlock ? [activeBlock] : []
+        };
+    }
+
+    if (text.includes('[DIFF_START]')) {
+        const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
+        const diffBody = match ? match[1].trim() : '';
+        const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
+
+        const highlightInfos = Array(diffLines.length).fill(null);
+        let idx = 0;
+
+        while (idx < diffLines.length) {
+            const removals = [];
+            const additions = [];
+
+            while (idx < diffLines.length) {
+                const line = diffLines[idx];
+                const cleanLine = line.replace('[UI_CONTEXT]', '');
+                if (cleanLine.startsWith('-')) {
+                    removals.push({ idx, line: cleanLine });
+                    idx++;
+                } else {
+                    break;
+                }
+            }
+
+            while (idx < diffLines.length) {
+                const line = diffLines[idx];
+                const cleanLine = line.replace('[UI_CONTEXT]', '');
+                if (cleanLine.startsWith('+')) {
+                    additions.push({ idx, line: cleanLine });
+                    idx++;
+                } else {
+                    break;
+                }
+            }
+
+            if (removals.length > 0 && additions.length > 0) {
+                const pairCount = Math.min(removals.length, additions.length);
+                for (let k = 0; k < pairCount; k++) {
+                    const r = removals[k];
+                    const a = additions[k];
+
+                    const rRest = r.line.substring(1);
+                    const rSplit = rRest.indexOf('|');
+                    const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
+
+                    const aRest = a.line.substring(1);
+                    const aSplit = aRest.indexOf('|');
+                    const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
+
+                    let prefixLen = 0;
+                    while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
+                        prefixLen++;
+                    }
+
+                    let suffixLen = 0;
+                    const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
+                    while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
+                        suffixLen++;
+                    }
+
+                    if (prefixLen > 0 || suffixLen > 0) {
+                        highlightInfos[r.idx] = { prefixLen, suffixLen };
+                        highlightInfos[a.idx] = { prefixLen, suffixLen };
+                    }
+                }
+            }
+
+            if (removals.length === 0 && additions.length === 0) {
+                idx++;
+            }
+        }
+
+        const completedBlocks = [];
+        let activeBlock = null;
+
+        diffLines.forEach((line, i) => {
+            const isLast = i === diffLines.length - 1;
+            const block = {
+                key: `${msg.id || Date.now()}-diff-${i}`,
+                msg,
+                type: 'diff-line',
+                text: line,
+                highlightInfo: highlightInfos[i]
+            };
+
+            if (isLast && msg.isStreaming) {
+                activeBlock = block;
+            } else {
+                completedBlocks.push(block);
+            }
+        });
+
+        return {
+            completed: completedBlocks,
+            active: activeBlock ? [activeBlock] : []
+        };
+    }
+
+    // If it's a system message, special record, user message, it's a single completed block
+    if (msg.role === 'system' || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user') {
+        return {
+            completed: [{
+                key: `${msg.id || Date.now()}-full`,
+                msg,
+                type: 'full-message',
+                text
+            }],
+            active: []
+        };
+    }
+
+    // It is a think or agent message (either streaming or completed)
+    const completedBlocks = [];
+    let activeBlock = null;
+
+    if (msg.role === 'think') {
+        completedBlocks.push({
+            key: `${msg.id}-header`,
+            msg,
+            type: 'think-header',
+            text: ''
+        });
+        const lines = text.split('\n');
+        lines.forEach((line, idx) => {
+            const isLast = idx === lines.length - 1;
+            const block = {
+                key: `${msg.id}-${idx}`,
+                msg,
+                type: 'think-line',
+                text: line
+            };
+            if (isLast && msg.isStreaming) {
+                activeBlock = block;
+            } else {
+                completedBlocks.push(block);
+            }
+        });
+        if (!msg.isStreaming) {
+            completedBlocks.push({
+                key: `${msg.id}-footer-padding`,
+                msg,
+                type: 'think-footer-padding',
+                text: ''
+            });
+        }
+    } else {
+        const lines = text.split('\n');
+        let inTable = false;
+        let tableLines = [];
+        let inCodeBlock = false;
+        let codeLines = [];
+
+        lines.forEach((line, idx) => {
+            const isLast = idx === lines.length - 1;
+            const isTableRow = line.trim().startsWith('|');
+            const isCodeBlockMarker = line.trim().startsWith('```');
+
+            if (inCodeBlock) {
+                codeLines.push(line);
+                if (isCodeBlockMarker || isLast) {
+                    inCodeBlock = !isCodeBlockMarker;
+                    if (!inCodeBlock || isLast) {
+                        const block = {
+                            key: `${msg.id}-code-${idx}`,
+                            msg,
+                            type: 'agent-line',
+                            text: codeLines.join('\n')
+                        };
+                        if (isLast && msg.isStreaming && inCodeBlock) {
+                            activeBlock = block;
+                        } else {
+                            completedBlocks.push(block);
+                        }
+                        codeLines = [];
+                    }
+                }
+            } else if (isCodeBlockMarker) {
+                inCodeBlock = true;
+                codeLines.push(line);
+                if (isLast) {
+                    const block = {
+                        key: `${msg.id}-code-${idx}`,
+                        msg,
+                        type: 'agent-line',
+                        text: codeLines.join('\n')
+                    };
+                    if (msg.isStreaming) {
+                        activeBlock = block;
+                    } else {
+                        completedBlocks.push(block);
+                    }
+                }
+            } else if (isTableRow) {
+                inTable = true;
+                tableLines.push(line);
+                if (isLast) {
+                    if (msg.isStreaming) {
+                        activeBlock = {
+                            key: `${msg.id}-table-${idx}`,
+                            msg,
+                            type: 'table',
+                            text: tableLines.join('\n'),
+                            isStreaming: true
+                        };
+                    } else {
+                        completedBlocks.push({
+                            key: `${msg.id}-table-${idx}`,
+                            msg,
+                            type: 'table',
+                            text: tableLines.join('\n'),
+                            isStreaming: false
+                        });
+                    }
+                }
+            } else {
+                if (inTable) {
+                    completedBlocks.push({
+                        key: `${msg.id}-table-${idx}`,
+                        msg,
+                        type: 'table',
+                        text: tableLines.join('\n'),
+                        isStreaming: false
+                    });
+                    inTable = false;
+                    tableLines = [];
+                }
+
+                const block = {
+                    key: `${msg.id}-${idx}`,
+                    msg,
+                    type: 'agent-line',
+                    text: line
+                };
+
+                if (isLast && msg.isStreaming) {
+                    activeBlock = block;
+                } else {
+                    completedBlocks.push(block);
+                }
+            }
+        });
+
+        if (!msg.isStreaming && msg.workedDuration) {
+            completedBlocks.push({
+                key: `${msg.id}-worked-duration`,
+                msg,
+                type: 'worked-duration',
+                text: ''
+            });
+        }
+    }
+
+    return {
+        completed: completedBlocks,
+        active: activeBlock ? [activeBlock] : []
+    };
+};
+
+export const TOOL_LABELS = {
+    'write_file': 'WriteFile',
+    'update_file': 'UpdateFile',
+    'read_folder': 'ReadFolder',
+    'view_file': 'ViewFile',
+    'exec_command': 'ExecuteCommand',
+    'web_search': 'WebSearch',
+    'web_scrape': 'ReadSite',
+    'search_keyword': 'SearchKeyword',
+    'write_pdf': 'CreatePDF',
+    'write_docx': 'CreateDocument',
+    'generate_image': 'GenerateImage',
+
+    // PascalCase Support
+    'WriteFile': 'WriteFile',
+    'PatchFile': 'PatchFile',
+    'ReadFolder': 'ReadFolder',
+    'ReadFile': 'ReadFile',
+    'Run': 'RunCommand',
+    'WebSearch': 'WebSearch',
+    'WebScrape': 'WebScrape',
+    'SearchKeyword': 'SearchKeyword',
+    'WritePDF': 'WritePDF',
+    'WriteDoc': 'WriteDoc',
+    'Memory': 'Memory',
+    'Chat': 'Chat',
+    'GenerateImage': 'GenerateImage'
+};
+
+export const cleanSignals = (text) => {
+    if (!text) return text;
+
+    let result = text
+        .replace(/<\/think>(\r?\n){2}/gi, '</think>')
+        .replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
+    const trigger = 'tool:functions.';
+
+    // Greedy loop to strip all tool calls
+    while (true) {
+        const lowerResult = result.toLowerCase();
+        let triggerIdx = lowerResult.indexOf(trigger);
+        if (triggerIdx === -1) break;
+
+        // [HARDENING] Check for outer bracket
+        let startIdx = triggerIdx;
+        let hasOuterBracket = false;
+
+        // Look back for '[' (ignoring whitespace)
+        let k = triggerIdx - 1;
+        while (k >= 0 && /\s/.test(result[k])) k--;
+        if (k >= 0 && result[k] === '[') {
+            startIdx = k;
+            hasOuterBracket = true;
+        }
+
+        let balance = 0;
+        let foundStart = false;
+        let inString = null;
+        let j = triggerIdx;
+
+        while (j < result.length) {
+            const char = result[j];
+
+            // String immunity
+            if (!inString && (char === "'" || char === '"' || char === '`')) {
+                inString = char;
+            } else if (inString && char === inString && result[j - 1] !== '\\') {
+                inString = null;
+            }
+
+            if (!inString) {
+                if (char === '(') {
+                    balance++;
+                    foundStart = true;
+                } else if (char === ')') {
+                    balance--;
+                }
+            }
+
+            if (foundStart && balance === 0 && !inString) {
+                // If we have outer bracket, look for closing ']'
+                let endIdx = j;
+                if (hasOuterBracket) {
+                    let m = j + 1;
+                    while (m < result.length && /\s/.test(result[m])) m++;
+                    if (m < result.length && result[m] === ']') {
+                        endIdx = m;
+                    }
+                }
+                result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+                break;
+            }
+
+            j++;
+
+            // [SAFETY] If we reached the end without finding a closing boundary,
+            // it's a partial call. Strip it and break to prevent infinite loop.
+            if (j === result.length) {
+                result = result.substring(0, startIdx);
+                return result; // Immediate exit
+            }
+        }
+    }
+
+    // Secondary cleanup for protocol signals and success/error markers
+    return result
+        .replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
+        .replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, '')
+        .replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, '')
+        // .replaceAll('[ANSWER]', '')
+        // .replaceAll('[/ANSWER]', '')
+        .replaceAll(/\[TOOL RESULT\]:?\s*/gi, '')
+        .split('\n')
+        .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
+        .join('\n')
+        .replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
+        .replaceAll(/\[\[END\]\]/gi, '')
+        .replaceAll(/\[\s*turn\s*:?.*?$/gi, '')
+        .replaceAll(/\n\s*turn\s*:?.*?$/gi, '')
+        .replaceAll(/\[\s*$/gi, '')
+        .replaceAll(/\n\nResponded on .*/g, '')
+        .replaceAll(/\n\n\[Prompted on: .*\]/g, '')
+        .replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
+        .replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
+        .replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
+        .replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
+        .replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
+        .replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
+        .replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
+        .trim();
+};
+

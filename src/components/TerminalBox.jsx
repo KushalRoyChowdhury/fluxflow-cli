@@ -144,7 +144,19 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
 
     return (
-        <Box flexDirection="column" borderStyle={isFocused ? 'double' : 'round'} borderColor="#555555" paddingX={2} paddingY={completed ? 0 : 1} width="100%">
+        <Box
+            flexDirection="column"
+            borderStyle={isFocused ? 'double' : 'single'}
+            borderLeft={true}
+            borderRight={false}
+            borderTop={false}
+            borderBottom={false}
+            borderColor="#555555"
+            paddingLeft={2}
+            paddingRight={0}
+            paddingY={completed ? 0 : 1}
+            width="100%"
+        >
             <Box marginBottom={1} justifyContent="space-between" width="100%">
                 <Box flexShrink={1} paddingRight={2}>
                     <Text>

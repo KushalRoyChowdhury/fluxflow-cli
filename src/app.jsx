@@ -1,6 +1,7 @@
 import os from 'os';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Box, Text, useInput, useStdout } from 'ink';
+import { Box, Text, useInput, useStdout, Static } from 'ink';
+import Spinner from 'ink-spinner';
 import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
@@ -8,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { MultilineInput } from './components/MultilineInput.jsx';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
-import ChatLayout, { MessageItem, CodeRenderer } from './components/ChatLayout.jsx';
+import ChatLayout, { MessageItem, CodeRenderer, BlockItem } from './components/ChatLayout.jsx';
 import StatusBar from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
 import SettingsMenu from './components/SettingsMenu.jsx';
@@ -26,6 +27,7 @@ import ParserDownloadModal from './components/ParserDownloadModal.jsx';
 import { RevertManager } from './utils/revert.js';
 import { GEMINI_QUOTES } from './data/gemini_quotes.js';
 import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
+import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
@@ -34,7 +36,7 @@ import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './u
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
-import { formatTokens } from './utils/text.js';
+import { formatTokens, parseMessageToBlocks } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -945,45 +947,36 @@ export default function App({ args = [] }) {
     }, [messages]);
 
     const [completedIndex, setCompletedIndex] = useState(messages.length);
+    const [clearKey, setClearKey] = useState(0);
 
-    const windowedHistory = useMemo(() => {
-        // [SCROLLBACK-SAFE SNAP-TO-BOTTOM]
-        // We keep 1536 lines of history in the render tree so the user can scroll up.
-        const MAX_HISTORY_LINES = 2000;
-        const width = terminalSize.columns || 80;
+    const parsedBlocks = useMemo(() => {
+        const completed = [];
+        const active = [];
+        const columns = terminalSize.columns || 80;
 
-        let totalLines = 0;
-        let startIdx = 0;
+        // Parse history messages (up to completedIndex)
+        messages.slice(0, completedIndex).forEach((msg) => {
+            const parsed = parseMessageToBlocks(msg, columns);
+            completed.push(...parsed.completed);
+            completed.push(...parsed.active); // since they are in history, any active part is now completed
+        });
 
-        // Step 1: Find the total line count of all messages (backwards)
-        // We go back until we hit the 1536 line scrollback limit.
-        for (let i = messages.length - 1; i >= 0; i--) {
-            const msg = messages[i];
-            if (!msg) continue;
+        // Parse current/active messages (from completedIndex onwards)
+        messages.slice(completedIndex).forEach((msg) => {
+            const parsed = parseMessageToBlocks(msg, columns);
+            completed.push(...parsed.completed);
+            active.push(...parsed.active);
+        });
 
-            const text = msg.text || '';
-            let lines = text.split(/\r?\n/).length;
-            text.split(/\r?\n/).forEach(l => {
-                lines += Math.floor(l.length / width);
-            });
-
-            if (msg.isHelpRecord) lines = 15;
-            if (msg.isUpdateNotification) lines = 8;
-            if (msg.isTerminalRecord) lines = 10;
-            lines += msg.role === 'think' ? 3 : 2;
-
-            if (totalLines + lines > MAX_HISTORY_LINES) {
-                startIdx = i + 1;
-                break;
-            }
-            totalLines += lines;
-        }
+        // Keep a scrollback limit of blocks to prevent infinite memory usage in render tree
+        const MAX_BLOCKS = 1000;
+        const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
 
         return {
-            items: messages.slice(startIdx, completedIndex),
-            isTruncated: startIdx > 0
+            completed: slicedCompleted,
+            active
         };
-    }, [messages, terminalSize.columns, terminalSize.rows]);
+    }, [messages, completedIndex, terminalSize.columns]);
 
     // Heuristic to detect if terminal is likely waiting for input (ends with ? or :)
     const isTerminalWaitingForInput = useMemo(() => {
@@ -2078,11 +2071,15 @@ export default function App({ args = [] }) {
                 }
 
                 case '/clear': {
+                    if (stdout) {
+                        stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                    }
                     // Soft clear by resetting message state (Ink handles the visual refresh)
                     setMessages([
                         { id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true }
                     ]);
                     setCompletedIndex(1);
+                    setClearKey(prev => prev + 1);
                     // /clear always exits playground mode by resetting to a fresh session
                     if (parsedArgs.playground) {
                         parsedArgs.playground = false;
@@ -2823,7 +2820,10 @@ export default function App({ args = [] }) {
                                     COMMAND: ${activeCommandRef.current}
                                     PTY: ${isActiveCommandPty}
                                     OUTPUT: ${normalizedOutput.replace(/\n{3,}/g, '\n\n')}`;
-                                    return [...prev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
+                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                    const newMsgs = [...updatedPrev, { id: 'term-' + Date.now(), role: 'system', text: finalStatus, isTerminalRecord: true }];
+                                    setCompletedIndex(newMsgs.length);
+                                    return newMsgs;
                                 });
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
@@ -2955,6 +2955,19 @@ export default function App({ args = [] }) {
                             if (isBridgeConnected()) {
                                 sendStatus(packet.content);
                             }
+                            if (packet.content === 'Request Cancelled') {
+                                setMessages(prev => {
+                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                    const newMsgs = [...updatedPrev, {
+                                        id: 'cancel-' + Date.now(),
+                                        role: 'system',
+                                        text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
+                                        isMeta: true
+                                    }];
+                                    setCompletedIndex(newMsgs.length);
+                                    return newMsgs;
+                                });
+                            }
                             continue;
                         }
                         if (packet.type === 'status_history') {
@@ -2989,6 +3002,11 @@ export default function App({ args = [] }) {
                             inToolCall = false;
                             toolCallEncounteredInTurn = false;
                             thinkConsumedInTurn = false;
+                            setMessages(prev => {
+                                const newMsgs = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                setCompletedIndex(newMsgs.length);
+                                return newMsgs;
+                            });
                             continue;
                         }
                         if (packet.type === 'interactive_turn_finished') {
@@ -3015,12 +3033,17 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
-                            setMessages(prev => [...prev, {
-                                id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-                                role: 'system',
-                                text: packet.content,
-                                isVisualFeedback: true
-                            }]);
+                            setMessages(prev => {
+                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                const newMsgs = [...updatedPrev, {
+                                    id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+                                    role: 'system',
+                                    text: packet.content,
+                                    isVisualFeedback: true
+                                }];
+                                setCompletedIndex(newMsgs.length);
+                                return newMsgs;
+                            });
                             continue;
                         }
                         if (packet.type === 'exec_start') {
@@ -3050,14 +3073,19 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'tool_result') {
-                            setMessages(prev => [...prev, {
-                                id: 'tool-' + Date.now(),
-                                role: 'system',
-                                text: packet.content,
-                                fullText: packet.aiContent, // Preserve raw data for next turn
-                                binaryPart: packet.binaryPart, // v1.5.0 Multimodal Support
-                                toolName: packet.toolName
-                            }]);
+                            setMessages(prev => {
+                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                const newMsgs = [...updatedPrev, {
+                                    id: 'tool-' + Date.now(),
+                                    role: 'system',
+                                    text: packet.content,
+                                    fullText: packet.aiContent, // Preserve raw data for next turn
+                                    binaryPart: packet.binaryPart, // v1.5.0 Multimodal Support
+                                    toolName: packet.toolName
+                                }];
+                                setCompletedIndex(newMsgs.length);
+                                return newMsgs;
+                            });
 
                             // Track code changes
                             if (packet.toolName === 'update_file' && packet.aiContent) {
@@ -3118,6 +3146,9 @@ export default function App({ args = [] }) {
                         }
 
                         let chunkText = packet.content;
+                        if (packet.type === 'text' && chunkText.includes('Request Cancelled')) {
+                            continue;
+                        }
                         const chunkLower = chunkText.toLowerCase();
 
                         // [CONTEXT TRACKING] Update state based on chunk content
@@ -4212,6 +4243,11 @@ export default function App({ args = [] }) {
                                         const { targetPrompt } = result;
                                         deleteChatSummary(chatId);
 
+                                        if (stdout) {
+                                            stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                                        }
+                                        setClearKey(prev => prev + 1);
+
                                         // Find index of reverted user message
                                         const targetIdx = messages.findLastIndex(m =>
                                             m.role === 'user' &&
@@ -4568,7 +4604,10 @@ export default function App({ args = [] }) {
                         <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                             <Box>
                                 {statusText ? (
-                                    <Box>
+                                    <Box gap={1}>
+                                        <Gradient colors={['#001a1a', '#080510', '#12021c']}>
+                                            <Spinner />
+                                        </Gradient>
                                         <Text color="gray" bold italic>{statusText}</Text>
                                     </Box>
                                 ) : (
@@ -4658,29 +4697,34 @@ export default function App({ args = [] }) {
                 <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} />
             ) : (
                 <>
-                    <Box flexDirection="column" width="100%" flexGrow={1}>
-                        {windowedHistory.items.map((msg, idx) => (
-                            <MessageItem
-                                key={msg.id || idx}
-                                msg={msg}
-                                showFullThinking={showFullThinking}
-                                columns={stdout?.columns || 80}
-                                aiProvider={aiProvider}
-                                version={versionFluxflow}
-                            />
-                        ))}
-                    </Box>
-
-                    <Box flexDirection="column" padding={1} width="100%">
-                        {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
-                            <Box flexDirection="column" width="100%">
-                                <ChatLayout
-                                    messages={messages.slice(completedIndex)}
+                    <Box paddingX={1} flexDirection="column" width="100%">
+                        <Static key={`static-${clearKey}-${terminalSize.columns}-${terminalSize.rows}`} items={parsedBlocks.completed}>
+                            {(block) => (
+                                <BlockItem
+                                    key={block.key}
+                                    block={block}
+                                    columns={(stdout?.columns || 80) - 2}
                                     showFullThinking={showFullThinking}
-                                    columns={Math.max(20, (stdout?.columns || 80) - 1)}
                                     aiProvider={aiProvider}
                                     version={versionFluxflow}
                                 />
+                            )}
+                        </Static>
+                    </Box>
+
+                    <Box flexDirection="column" paddingX={1} paddingBottom={1} width="100%">
+                        {(activeView === 'chat' || ['ask', 'approval', 'terminalApproval'].includes(activeView)) && (
+                            <Box flexDirection="column" width="100%">
+                                {parsedBlocks.active.map((block) => (
+                                    <BlockItem
+                                        key={block.key}
+                                        block={block}
+                                        columns={Math.max(20, (stdout?.columns || 80) - 2)}
+                                        showFullThinking={showFullThinking}
+                                        aiProvider={aiProvider}
+                                        version={versionFluxflow}
+                                    />
+                                ))}
                                 {activeCommand && (
                                     <Box marginTop={1}>
                                         <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} />

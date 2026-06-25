@@ -1,140 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
-import { wrapText } from '../utils/text.js';
+import { wrapText, cleanSignals } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
-
-const TOOL_LABELS = {
-    'write_file': 'WriteFile',
-    'update_file': 'UpdateFile',
-    'read_folder': 'ReadFolder',
-    'view_file': 'ViewFile',
-    'exec_command': 'ExecuteCommand',
-    'web_search': 'WebSearch',
-    'web_scrape': 'ReadSite',
-    'search_keyword': 'SearchKeyword',
-    'write_pdf': 'CreatePDF',
-    'write_docx': 'CreateDocument',
-    'generate_image': 'GenerateImage',
-
-    // PascalCase Support
-    'WriteFile': 'WriteFile',
-    'PatchFile': 'PatchFile',
-    'ReadFolder': 'ReadFolder',
-    'ReadFile': 'ReadFile',
-    'Run': 'RunCommand',
-    'WebSearch': 'WebSearch',
-    'WebScrape': 'WebScrape',
-    'SearchKeyword': 'SearchKeyword',
-    'WritePDF': 'WritePDF',
-    'WriteDoc': 'WriteDoc',
-    'Memory': 'Memory',
-    'Chat': 'Chat',
-    'GenerateImage': 'GenerateImage'
-};
-
-const cleanSignals = (text) => {
-    if (!text) return text;
-
-    let result = text
-        .replace(/<\/think>(\r?\n){2}/gi, '</think>')
-        .replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
-    const trigger = 'tool:functions.';
-
-    // Greedy loop to strip all tool calls
-    while (true) {
-        const lowerResult = result.toLowerCase();
-        let triggerIdx = lowerResult.indexOf(trigger);
-        if (triggerIdx === -1) break;
-
-        // [HARDENING] Check for outer bracket
-        let startIdx = triggerIdx;
-        let hasOuterBracket = false;
-
-        // Look back for '[' (ignoring whitespace)
-        let k = triggerIdx - 1;
-        while (k >= 0 && /\s/.test(result[k])) k--;
-        if (k >= 0 && result[k] === '[') {
-            startIdx = k;
-            hasOuterBracket = true;
-        }
-
-        let balance = 0;
-        let foundStart = false;
-        let inString = null;
-        let j = triggerIdx;
-
-        while (j < result.length) {
-            const char = result[j];
-
-            // String immunity
-            if (!inString && (char === "'" || char === '"' || char === '`')) {
-                inString = char;
-            } else if (inString && char === inString && result[j - 1] !== '\\') {
-                inString = null;
-            }
-
-            if (!inString) {
-                if (char === '(') {
-                    balance++;
-                    foundStart = true;
-                } else if (char === ')') {
-                    balance--;
-                }
-            }
-
-            if (foundStart && balance === 0 && !inString) {
-                // If we have outer bracket, look for closing ']'
-                let endIdx = j;
-                if (hasOuterBracket) {
-                    let m = j + 1;
-                    while (m < result.length && /\s/.test(result[m])) m++;
-                    if (m < result.length && result[m] === ']') {
-                        endIdx = m;
-                    }
-                }
-                result = result.substring(0, startIdx) + result.substring(endIdx + 1);
-                break;
-            }
-
-            j++;
-
-            // [SAFETY] If we reached the end without finding a closing boundary,
-            // it's a partial call. Strip it and break to prevent infinite loop.
-            if (j === result.length) {
-                result = result.substring(0, startIdx);
-                return result; // Immediate exit
-            }
-        }
-    }
-
-    // Secondary cleanup for protocol signals and success/error markers
-    return result
-        .replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
-        .replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, '')
-        .replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, '')
-        // .replaceAll('[ANSWER]', '')
-        // .replaceAll('[/ANSWER]', '')
-        .replaceAll(/\[TOOL RESULT\]:?\s*/gi, '')
-        .split('\n')
-        .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
-        .join('\n')
-        .replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
-        .replaceAll(/\[\[END\]\]/gi, '')
-        .replaceAll(/\[\s*turn\s*:?.*?$/gi, '')
-        .replaceAll(/\n\s*turn\s*:?.*?$/gi, '')
-        .replaceAll(/\[\s*$/gi, '')
-        .replaceAll(/\n\nResponded on .*/g, '')
-        .replaceAll(/\n\n\[Prompted on: .*\]/g, '')
-        .replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
-        .replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
-        .replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
-        .replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
-        .replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
-        .replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
-        .trim();
-};
 
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
@@ -468,14 +336,14 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line, columns = 80 }) => {
+const DiffLine = React.memo(({ line, columns = 80, highlightInfo }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
 
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
         return (
-            <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+            <Box paddingX={1} width={columns}>
                 <Text color="gray">{'═'.repeat(Math.max(10, columns - 4))}</Text>
             </Box>
         );
@@ -497,8 +365,37 @@ const DiffLine = React.memo(({ line, columns = 80 }) => {
     const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : isContext ? 'white' : 'white';
     const numColor = isRemoval ? '#cf3a3a' : isAddition ? '#3acf65' : 'gray';
 
+    const hasHighlight = highlightInfo && (highlightInfo.prefixLen > 0 || highlightInfo.suffixLen > 0);
+    const rowBgColor = hasHighlight ? '#1a1a1a' : bgColor;
+
+    if (hasHighlight) {
+        const prefixLen = highlightInfo.prefixLen;
+        const suffixLen = highlightInfo.suffixLen;
+        const prefix = content.substring(0, prefixLen);
+        const delta = content.substring(prefixLen, content.length - suffixLen);
+        const suffix = content.substring(content.length - suffixLen);
+
+        return (
+            <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
+                <Box width={5} flexShrink={0}>
+                    <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
+                </Box>
+                <Box width={2} flexShrink={0} marginLeft={1}>
+                    <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
+                </Box>
+                <Box flexGrow={1} marginLeft={1}>
+                    <Text color={textColor} dimColor={isContext}>
+                        {prefix}
+                        <Text backgroundColor={bgColor}>{delta}</Text>
+                        {suffix}
+                    </Text>
+                </Box>
+            </Box>
+        );
+    }
+
     return (
-        <Box backgroundColor={bgColor} paddingX={1} width="100%">
+        <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
             <Box width={5} flexShrink={0}>
                 <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
             </Box>
@@ -517,11 +414,81 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
+    const highlightInfos = React.useMemo(() => {
+        const infos = Array(diffLines.length).fill(null);
+        let idx = 0;
+
+        while (idx < diffLines.length) {
+            const removals = [];
+            const additions = [];
+
+            while (idx < diffLines.length) {
+                const line = diffLines[idx];
+                const cleanLine = line.replace('[UI_CONTEXT]', '');
+                if (cleanLine.startsWith('-')) {
+                    removals.push({ idx, line: cleanLine });
+                    idx++;
+                } else {
+                    break;
+                }
+            }
+
+            while (idx < diffLines.length) {
+                const line = diffLines[idx];
+                const cleanLine = line.replace('[UI_CONTEXT]', '');
+                if (cleanLine.startsWith('+')) {
+                    additions.push({ idx, line: cleanLine });
+                    idx++;
+                } else {
+                    break;
+                }
+            }
+
+            if (removals.length > 0 && additions.length > 0) {
+                const pairCount = Math.min(removals.length, additions.length);
+                for (let k = 0; k < pairCount; k++) {
+                    const r = removals[k];
+                    const a = additions[k];
+
+                    const rRest = r.line.substring(1);
+                    const rSplit = rRest.indexOf('|');
+                    const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
+
+                    const aRest = a.line.substring(1);
+                    const aSplit = aRest.indexOf('|');
+                    const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
+
+                    let prefixLen = 0;
+                    while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
+                        prefixLen++;
+                    }
+
+                    let suffixLen = 0;
+                    const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
+                    while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
+                        suffixLen++;
+                    }
+
+                    if (prefixLen > 0 || suffixLen > 0) {
+                        infos[r.idx] = { prefixLen, suffixLen };
+                        infos[a.idx] = { prefixLen, suffixLen };
+                    }
+                }
+            }
+
+            if (removals.length === 0 && additions.length === 0) {
+                idx++;
+            }
+        }
+
+        return infos;
+    }, [diffLines]);
+
     return (
-        <Box flexDirection="column" width={columns - 3} marginBottom={0}>
-            <Box flexDirection="column" backgroundColor="#1a1a1a" paddingY={0} width="100%">
+        <Box flexDirection="column" width={columns - 3} marginBottom={1}>
+            <Box flexDirection="column" paddingY={0} width="100%">
                 {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} columns={columns - 3} />
+                    <DiffLine key={i} line={line} columns={columns - 3} highlightInfo={highlightInfos[i]} />
                 ))}
             </Box>
         </Box>
@@ -553,11 +520,21 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
 
         return (
             <Box flexDirection="column" width={columns - 3}>
-                <Box flexDirection="column" borderStyle="round" borderColor="#444" paddingX={1} width="100%">
-                    <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
-                        <Text backgroundColor="#444" color="white"> FILE SNAPSHOT </Text>
-                    </Box>
-                    <Box flexDirection="column" paddingY={1} width="100%">
+                <Box
+                    flexDirection="column"
+                    borderStyle="single"
+                    borderLeft={true}
+                    borderRight={false}
+                    borderTop={false}
+                    borderBottom={false}
+                    borderColor="#444444"
+                    paddingLeft={2}
+                    paddingRight={0}
+                    width="100%"
+                    marginBottom={1}
+                    backgroundColor={'#1a1a1a'}
+                >
+                    <Box flexDirection="column" width="100%">
                         {codeLines.map((line, idx) => (
                             <Box key={idx} width="100%">
                                 <Box width={gutterWidth + 2} flexShrink={0}>
@@ -588,11 +565,24 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                         const gutterWidth = String(codeLines.length).length;
 
                         return (
-                            <Box key={i} flexDirection="column" marginY={0} borderStyle="round" borderColor="#444" paddingX={1} width="100%">
-                                <Box alignSelf="flex-end" marginTop={-1} marginRight={1}>
-                                    <Text backgroundColor="#444" color="white"> {lang.toUpperCase()} </Text>
+                            <Box
+                                key={i}
+                                flexDirection="column"
+                                marginY={1}
+                                borderStyle="single"
+                                borderLeft={true}
+                                borderRight={false}
+                                borderTop={false}
+                                borderBottom={false}
+                                borderColor="#444444"
+                                paddingLeft={2}
+                                paddingRight={0}
+                                width="100%"
+                            >
+                                <Box marginBottom={1}>
+                                    <Text color="gray" bold>💻 {lang.toUpperCase() || 'CODE'}</Text>
                                 </Box>
-                                <Box flexDirection="column" paddingY={1} width="100%">
+                                <Box flexDirection="column" width="100%">
                                     {codeLines.map((line, idx) => (
                                         <Box key={idx} width="100%">
                                             <Box width={gutterWidth + 2} flexShrink={0}>
@@ -682,7 +672,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isVisualFeedback) {
         return (
             // [SPACE POINT]
-            <Box marginBottom={0} marginTop={0} paddingX={1} width="100%">
+            <Box marginBottom={0} marginTop={0} paddingX={0} width="100%">
                 <Text color="white">{msg.text}</Text>
             </Box>
         );
@@ -691,10 +681,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (isPatchError) {
         return (
             <Box marginBottom={1}>
-                <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1} paddingY={0}>
-                    <Text color="red" bold underline>❌ PATCH FAILED</Text>
+                <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={1} paddingY={0}>
+                    <Text color="white" bold underline>✗ PATCH FAILED</Text>
                     <Box marginTop={1}>
-                        <Text color="red">Patch failed: <Text color="white" bold>Model generated malformed edit.</Text></Text>
+                        <Text color="grey" bold>Model generated malformed edit.</Text>
                     </Box>
                 </Box>
             </Box>
@@ -854,15 +844,15 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         // [SPACE POINT]
         <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
-                <Box flexDirection="column" width="100%">
-                    <Box width="100%" height={1} overflow="hidden">
-                        <Text color="#444444">{'▄'.repeat(Math.max(1, columns))}</Text>
+                <Box flexDirection="column" width={columns - 1}>
+                    <Box width={columns - 1} height={1} overflow="hidden">
+                        <Text color="#444444">{'▄'.repeat(Math.max(1, columns - 1))}</Text>
                     </Box>
                     <Box
                         backgroundColor="#444444"
                         paddingX={1}
                         paddingY={0}
-                        width="100%"
+                        width={columns - 1}
                         flexDirection="column"
                     >
                         {wrapText(
@@ -871,7 +861,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                                 .replace(/\r/g, '\n')
                                 .replace(/\\\n/g, '\n')
                                 .replace(/\\$/, ''),
-                            columns - 6
+                            columns - 7
                         )
                             .split('\n')
                             .map((line, lineIdx) => (
@@ -885,8 +875,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                                 </Box>
                             ))}
                     </Box>
-                    <Box width="100%" height={1} overflow="hidden">
-                        <Text color="#444444">{'▀'.repeat(Math.max(1, columns))}</Text>
+                    <Box width={columns - 1} height={1} overflow="hidden">
+                        <Text color="#444444">{'▀'.repeat(Math.max(1, columns - 1))}</Text>
                     </Box>
                 </Box>
 
@@ -898,7 +888,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                         <Text bold color="white">
                             ✦ Thought{msg.duration ? (
                                 <Text color="gray"> for <Text bold color="white">{formatThinkingDuration(msg.duration)}</Text></Text>
-                            ) : ''}
+                            ) : '...'}
                         </Text>
                     )}
                     {/* [SPACE POINT] */}
@@ -925,6 +915,171 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             )}
         </Box>
     );
+});
+
+export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
+    const { msg, type, text, isStreaming } = block;
+
+    if (type === 'full-message') {
+        return (
+            <MessageItem
+                msg={msg}
+                showFullThinking={showFullThinking}
+                columns={columns}
+                aiProvider={aiProvider}
+                version={version}
+            />
+        );
+    }
+
+    if (type === 'think-header') {
+        return (
+            <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
+                {msg.isStreaming ? (
+                    <Text bold color="white">✧ Thinking...</Text>
+                ) : (
+                    <Text bold color="white">✦ Thought...</Text>
+                )}
+                {showFullThinking && (
+                    <Box flexDirection="row" width="100%">
+                        <Text color="gray">│ </Text>
+                    </Box>
+                )}
+            </Box>
+        );
+    }
+
+    if (type === 'think-line') {
+        if (!showFullThinking) return null;
+        if (!text || text.trim() === '') {
+            return (
+                <Box flexDirection="row" width="100%" paddingX={1}>
+                    <Text color="gray">│ </Text>
+                </Box>
+            );
+        }
+
+        const trimmed = text.trim();
+        const isUnordered = /^[\*\-\+]\s/.test(trimmed);
+        const isOrdered = /^\d+\.\s/.test(trimmed);
+
+        let content = text;
+        if (isUnordered || isOrdered) {
+            const bullet = isUnordered ? '  • ' : trimmed.match(/^\d+\.\s/)[0];
+            const indent = ' '.repeat(bullet.length);
+            const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ''), columns - (bullet.length + 10));
+            content = bullet + wrappedPart.split('\n').join('\n' + indent);
+        } else {
+            content = wrapText(text, columns - 10);
+        }
+
+        const wrappedLines = content.split('\n');
+        return (
+            <Box flexDirection="column" paddingX={1} width="100%">
+                {wrappedLines.map((wLine, idx) => (
+                    <Box key={idx} flexDirection="row" width="100%">
+                        <Text color="gray">│ </Text>
+                        <Box flexGrow={1} marginLeft={1}>
+                            <InlineMarkdown text={wLine} color="gray" italic />
+                        </Box>
+                    </Box>
+                ))}
+            </Box>
+        );
+    }
+
+    if (type === 'think-footer-padding') {
+        if (!showFullThinking) return null;
+        return (
+            <Box flexDirection="row" width="100%" paddingX={1}>
+                <Text color="gray">│ </Text>
+            </Box>
+        );
+    }
+
+    if (type === 'agent-line') {
+        if (!text || text.trim() === '') {
+            return <Box height={1} />;
+        }
+        return (
+            <Box flexDirection="column" paddingX={1} width="100%">
+                <CodeRenderer text={text} columns={columns} />
+            </Box>
+        );
+    }
+
+    if (type === 'table') {
+        return (
+            <Box flexDirection="column" paddingX={1} width="100%">
+                <TableRenderer buffer={text.split('\n')} terminalWidth={columns} />
+            </Box>
+        );
+    }
+
+    if (type === 'diff-line') {
+        return (
+            <DiffLine
+                line={text}
+                columns={columns}
+                highlightInfo={block.highlightInfo}
+            />
+        );
+    }
+
+    if (type === 'write-header') {
+        return (
+            <Box flexDirection="column" paddingX={1} width={columns}>
+                <MarkdownText text={text} columns={columns} />
+            </Box>
+        );
+    }
+
+    if (type === 'write-line') {
+        const { gutterWidth, lineNum, isLastLine } = block;
+        return (
+            <Box
+                flexDirection="row"
+                width={columns}
+                borderStyle="single"
+                borderLeft={true}
+                borderRight={false}
+                borderTop={false}
+                borderBottom={false}
+                borderColor="#444444"
+                paddingLeft={2}
+                paddingRight={0}
+                backgroundColor={'#1a1a1a'}
+                marginBottom={isLastLine ? 1 : 0}
+            >
+                <Box width={gutterWidth + 2} flexShrink={0}>
+                    <Text color="gray" dimColor>{String(lineNum).padStart(gutterWidth, ' ')} </Text>
+                </Box>
+                <Box flexGrow={1}>
+                    <Text color="white">{text}</Text>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (type === 'write-footer') {
+        return (
+            <Box flexDirection="column" paddingX={1} width={columns} marginTop={1} marginBottom={1}>
+                <MarkdownText text={text} columns={columns} />
+            </Box>
+        );
+    }
+
+    if (type === 'worked-duration') {
+        return (
+            <Box marginTop={1} marginBottom={2} paddingX={1} width="100%">
+                <Text>[</Text><Text color="gray">
+                    Worked for <Text bold color="white">{formatThinkingDuration(msg.workedDuration)}</Text>
+                </Text><Text>]</Text>
+            </Box>
+        );
+    }
+
+    return null;
 });
 
 const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80, aiProvider, version }) => {
