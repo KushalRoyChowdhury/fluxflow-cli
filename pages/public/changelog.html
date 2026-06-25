@@ -231,8 +231,19 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.12.0"]
+        const stableVersions = ["2.12.3"]
         const changelogData = {
+            "2.12.3" : {
+                "note": "JUNE 24 - Upgrades to Playground.",
+                "added": [
+                    "Added new command `/move` to copy playground codebase to original working directory under `playground-export/` (`/move` is only valid in playground mode)."
+                ],
+                "changed": [],
+                "fixes": [
+                    "Patched auto-CWD restore on `/clear`.",
+                    "Stability & Efficiency patches to IDE Companion Extention. Update to v1.4.2 recomended. Download here, [VS Code](https://marketplace.visualstudio.com/items?itemName=fluxflow-cli.fluxflow-cli-companion), [VSIX](https://github.com/KushalRoyChowdhury/fluxflow-cli/releases/tag/1.4)"
+                ]
+            },
             "2.12.0": {
                 "note": "JUNE 24 - Playground Mode.",
                 "added": [

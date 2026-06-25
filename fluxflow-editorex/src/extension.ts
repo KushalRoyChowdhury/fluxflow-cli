@@ -16,6 +16,7 @@ const originalStates = new Map<string, string>();
 const virtualDocs = new Map<string, string>();
 const newFilesCreatedByBridge = new Set<string>();
 const accumulatedEdits = new Map<string, Map<number, string>>();
+const manualEditBaseContents = new Map<string, string[]>();
 
 class FluxFlowDiffProvider implements vscode.TextDocumentContentProvider {
     provideTextDocumentContent(uri: vscode.Uri): string {
@@ -270,6 +271,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const ctx = await getIDEContext();
                     ws.send(JSON.stringify({ command: 'contextResponse', data: ctx }));
                     accumulatedEdits.clear();
+                    manualEditBaseContents.clear();
                 } else if (message.command === 'status') {
                     updateStatusBar(message.status);
                 } else if (message.command === 'version') {
@@ -355,6 +357,12 @@ export function activate(context: vscode.ExtensionContext) {
             const currentLines = currentContent.split(/\r?\n/);
             const lastLines = lastContent.split(/\r?\n/);
             
+            // Capture baseline content if not already present
+            if (!manualEditBaseContents.has(docPath)) {
+                manualEditBaseContents.set(docPath, lastLines);
+            }
+            const baseLines = manualEditBaseContents.get(docPath)!;
+
             let fileMap = accumulatedEdits.get(docPath);
             if (!fileMap) {
                 fileMap = new Map<number, string>();
@@ -362,13 +370,22 @@ export function activate(context: vscode.ExtensionContext) {
 
             currentLines.forEach((line, idx) => {
                 if (line !== lastLines[idx]) {
-                    fileMap!.set(idx + 1, line.trim());
+                    const originalLine = baseLines[idx] !== undefined ? baseLines[idx] : "";
+                    if (line.trim() === originalLine.trim()) {
+                        fileMap!.delete(idx + 1);
+                    } else {
+                        fileMap!.set(idx + 1, line.trim());
+                    }
                 }
             });
 
             // Move the file map to the end to maintain insertion order of most recent edits
             accumulatedEdits.delete(docPath);
-            accumulatedEdits.set(docPath, fileMap);
+            if (fileMap.size > 0) {
+                accumulatedEdits.set(docPath, fileMap);
+            } else {
+                manualEditBaseContents.delete(docPath);
+            }
         }
         lastKnownStates.set(docPath, currentContent);
     }));

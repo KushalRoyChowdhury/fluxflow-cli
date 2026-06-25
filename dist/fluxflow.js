@@ -11256,6 +11256,9 @@ function App({ args = [] }) {
         i++;
       } else if (arg === "--playground") {
         parsed.playground = true;
+      } else if ((arg === "--original-cwd" || arg === "--orginal-cwd") && args[i + 1]) {
+        parsed.originalCwd = args[i + 1];
+        i++;
       }
     }
     return parsed;
@@ -12200,6 +12203,7 @@ function App({ args = [] }) {
   const COMMANDS = [
     { cmd: "/quit", desc: "Exit and shutdown Flux" },
     { cmd: "/help", desc: "Show all available commands" },
+    ...parsedArgs.playground ? [{ cmd: "/move", desc: "Move playground directory to original CWD/playground-export" }] : [],
     { cmd: "/compress", desc: "Summarize and compress chat history" },
     { cmd: "/clear", desc: "Clear terminal screen" },
     { cmd: "/resume", desc: "Load previous session" },
@@ -12588,6 +12592,54 @@ ${cleanText}`, color: "magenta" }];
           }
           break;
         }
+        case "/move": {
+          if (!parsedArgs.playground) {
+            setMessages((prev) => {
+              setCompletedIndex(prev.length + 1);
+              return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] /move command is only available in playground mode.`, isMeta: true }];
+            });
+            break;
+          }
+          if (!parsedArgs.originalCwd) {
+            setMessages((prev) => {
+              setCompletedIndex(prev.length + 1);
+              return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Error: Original CWD not found.`, isMeta: true }];
+            });
+            break;
+          }
+          const src = path20.join(DATA_DIR, "playground");
+          const dest = path20.join(parsedArgs.originalCwd, "playground-export");
+          const moveFiles = async () => {
+            try {
+              setMessages((prev) => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
+              });
+              await fs22.ensureDir(dest);
+              const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
+              await fs22.copy(src, dest, {
+                overwrite: true,
+                filter: (srcPath) => {
+                  const relative = path20.relative(src, srcPath);
+                  if (!relative) return true;
+                  const parts2 = relative.split(path20.sep);
+                  return !parts2.some((part) => excludeDirs.includes(part));
+                }
+              });
+              setMessages((prev) => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Successfully copied playground content to ${dest}`, isMeta: true }];
+              });
+            } catch (err) {
+              setMessages((prev) => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Failed to move content: ${err.message}`, isMeta: true }];
+              });
+            }
+          };
+          moveFiles();
+          break;
+        }
         case "/clear": {
           setMessages([
             { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true }
@@ -12597,8 +12649,36 @@ ${cleanText}`, color: "magenta" }];
             parsedArgs.playground = false;
             deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
             });
-            fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
-            });
+            if (parsedArgs.originalCwd) {
+              try {
+                process.chdir(parsedArgs.originalCwd);
+                setMessages((prev) => {
+                  const newMsgs = [...prev, {
+                    id: "playground-" + Date.now(),
+                    role: "system",
+                    text: `[PLAYGROUND] Session ended. Restored Working Directory to ${parsedArgs.originalCwd}`,
+                    isMeta: true
+                  }];
+                  setCompletedIndex(newMsgs.length);
+                  return newMsgs;
+                });
+              } catch (e) {
+              }
+            }
+            setTimeout(() => {
+              fs22.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
+                setMessages((prev) => {
+                  const newMsgs = [...prev, {
+                    id: "playground-" + Date.now(),
+                    role: "system",
+                    text: `[PLAYGROUND] Failed to clear session: ${DATA_DIR + "/playground"}`,
+                    isMeta: true
+                  }];
+                  setCompletedIndex(newMsgs.length);
+                  return newMsgs;
+                });
+              });
+            }, 500);
             setSystemSettings((s2) => ({
               ...s2,
               allowExternalAccess: originalAllowExternalAccessRef.current,
@@ -15215,6 +15295,8 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
     process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow\x07");
   }
   if (args.includes("--playground")) {
+    const originalCwd = process.cwd();
+    process.argv.push("--original-cwd", originalCwd);
     const { DATA_DIR: DATA_DIR2 } = await Promise.resolve().then(() => (init_paths(), paths_exports));
     const pathMod = await import("path");
     const fsMod = await import("fs-extra");

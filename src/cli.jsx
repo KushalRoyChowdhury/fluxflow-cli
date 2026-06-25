@@ -309,6 +309,8 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
     // 5. PLAYGROUND: pin CWD before first render so StatusBar shows the right path immediately
     if (args.includes('--playground')) {
+        const originalCwd = process.cwd();
+        process.argv.push('--original-cwd', originalCwd);
         const { DATA_DIR } = await import('./utils/paths.js');
         const pathMod = await import('path');
         const fsMod = await import('fs-extra');
