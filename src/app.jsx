@@ -2920,7 +2920,7 @@ export default function App({ args = [] }) {
                                             setMessages(prev => {
                                                 const hasAskRecord = prev.some(m => m.isAskRecord && m.text?.includes(`Selection: ${val}`));
                                                 if (hasAskRecord) return prev;
-                                                return [
+                                                const newMsgs = [
                                                     ...prev,
                                                     {
                                                         id: 'ask-' + Date.now(),
@@ -2929,6 +2929,8 @@ export default function App({ args = [] }) {
                                                         isAskRecord: true
                                                     }
                                                 ];
+                                                setCompletedIndex(newMsgs.length);
+                                                return newMsgs;
                                             });
                                             resolve(val);
                                         }

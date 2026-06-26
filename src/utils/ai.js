@@ -2017,7 +2017,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const boxTop = `${' '.repeat(boxWidth)}`;
                             const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
                             const boxBottom = `${' '.repeat(boxWidth)}`;
-                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
                             // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             continue;
                         }
@@ -2080,7 +2080,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const boxWidth = Math.min(maxLen + 4, terminalWidth);
                                 const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
                                 const boxBottom = `${' '.repeat(boxWidth)}`;
-                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
                                 // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                                 // const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                 // const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
@@ -3174,7 +3174,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                                             const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                             const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
                                         }
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -3393,7 +3393,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                                                     const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                                                     const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}}`) };
 
                                                                     toolResults.push({ role: 'user', text: errorMsg });
                                                                     await incrementUsage('toolFailure');
@@ -3549,7 +3549,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                             const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                                             const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}`) };
+                                            yield { type: 'visual_feedback', content: colorMainWords(`\n${boxMid}`) };
 
                                             const toolEnd = Date.now();
                                             lastToolFinishedAt = toolEnd;
@@ -3589,7 +3589,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                                                 const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                                 const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
                                             }
                                             if (normToolName === 'exec_command') {
                                                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -3616,7 +3616,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}${boxMid.includes('Created') || boxMid.includes('Edited') || boxMid.includes('Written') ? '' : `\n${boxBottom}`}`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`\n${boxMid}${boxMid.includes('Created') || boxMid.includes('Edited') || boxMid.includes('Written') ? '' : `\n${boxBottom}`}`) };
                                 }
 
                                 // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
@@ -3695,7 +3695,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n${boxBottom}`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
                                 }
 
                                 if (normToolName === 'todo') {
@@ -3756,7 +3756,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             '' // Bottom padding spacing
                                         ].join('\n');
 
-                                        yield { type: 'visual_feedback', content: colorMainWords(output) };
+                                        yield { type: 'visual_feedback', content: `\n${colorMainWords(output)}` };
                                     }
                                 }
 

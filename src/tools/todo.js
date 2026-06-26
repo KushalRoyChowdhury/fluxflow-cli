@@ -52,6 +52,51 @@ export const todo = async (args, context = {}) => {
             .join('\n') + '\n';
     };
 
+    // Helper to apply markDone to tasks/content
+    const applyMarkDone = (content, markDone) => {
+        if (!markDone) return { content, markedCount: 0 };
+        const rawTargets = parseMessyArray(markDone);
+        const targets = (Array.isArray(rawTargets) ? rawTargets : [rawTargets])
+            .map(t => String(t).replace(/^- \[[xX ]\]\s*/i, '').trim())
+            .filter(Boolean);
+        const lines = content.split('\n');
+        let markedCount = 0;
+        let fileUpdated = false;
+
+        for (const searchStr of targets) {
+            let updatedThisTarget = false;
+
+            // First pass: Case-sensitive exact match
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes(searchStr) && /^- \[\s\]/.test(lines[i].trim())) {
+                    lines[i] = lines[i].replace('- [ ]', '- [x]');
+                    updatedThisTarget = true;
+                    fileUpdated = true;
+                    markedCount++;
+                    break;
+                }
+            }
+
+            // Second pass: Case-insensitive fallback
+            if (!updatedThisTarget) {
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].toLowerCase().includes(searchStr.toLowerCase()) && /^- \[\s\]/.test(lines[i].trim())) {
+                        lines[i] = lines[i].replace('- [ ]', '- [x]');
+                        updatedThisTarget = true;
+                        fileUpdated = true;
+                        markedCount++;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return {
+            content: fileUpdated ? lines.join('\n') : content,
+            markedCount
+        };
+    };
+
     try {
         // Ensure directory exists
         if (!fs.existsSync(todoDir)) {
@@ -61,11 +106,22 @@ export const todo = async (args, context = {}) => {
         if (method === 'create') {
             if (!tasks) return 'ERROR: Missing "tasks" for create method.';
 
-            const content = getTasksString(tasks);
+            let content = getTasksString(tasks);
+            let markedCount = 0;
+            if (markDone) {
+                const result = applyMarkDone(content, markDone);
+                content = result.content;
+                markedCount = result.markedCount;
+            }
+
             await RevertManager.recordFileChange(todoFile);
             fs.writeFileSync(todoFile, content, 'utf8');
 
             const total = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+            if (markedCount > 0) {
+                const completed = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
+                return `SUCCESS: TASK LIST CREATED (${markedCount} marked done, ${completed} completed, ${total - completed} left)\n${content}`;
+            }
             return `SUCCESS: TASK LIST CREATED (${total} total)\n${content}`;
         }
 
@@ -94,43 +150,10 @@ export const todo = async (args, context = {}) => {
             let markedCount = 0;
 
             if (markDone) {
-                const rawTargets = parseMessyArray(markDone);
-                const targets = (Array.isArray(rawTargets) ? rawTargets : [rawTargets])
-                    .map(t => String(t).replace(/^- \[[xX ]\]\s*/i, '').trim())
-                    .filter(Boolean);
-                const lines = content.split('\n');
-                let fileUpdated = false;
-
-                for (const searchStr of targets) {
-                    let updatedThisTarget = false;
-
-                    // First pass: Case-sensitive exact match
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].includes(searchStr) && /^- \[\s\]/.test(lines[i].trim())) {
-                            lines[i] = lines[i].replace('- [ ]', '- [x]');
-                            updatedThisTarget = true;
-                            fileUpdated = true;
-                            markedCount++;
-                            break;
-                        }
-                    }
-
-                    // Second pass: Case-insensitive fallback
-                    if (!updatedThisTarget) {
-                        for (let i = 0; i < lines.length; i++) {
-                            if (lines[i].toLowerCase().includes(searchStr.toLowerCase()) && /^- \[\s\]/.test(lines[i].trim())) {
-                                lines[i] = lines[i].replace('- [ ]', '- [x]');
-                                updatedThisTarget = true;
-                                fileUpdated = true;
-                                markedCount++;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (fileUpdated) {
-                    content = lines.join('\n');
+                const result = applyMarkDone(content, markDone);
+                if (result.markedCount > 0) {
+                    content = result.content;
+                    markedCount = result.markedCount;
                     await RevertManager.recordFileChange(todoFile);
                     fs.writeFileSync(todoFile, content, 'utf8');
                 }

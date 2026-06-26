@@ -88,7 +88,8 @@ ${projectContextBlock}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}
-- Sensitive files? Ask before Read${isSystemDir ? '\nPROTECTED DIRECTORY: ASK BEFORE MODIFYING' : ''}
+- Sensitive files? Ask before Read${isSystemDir ? '\n- PROTECTED DIRECTORY: ASK BEFORE MODIFYING' : ''}
+- No thinking leak in chat output
 
 -- FORMATTING --
 - GFM Supported

@@ -17,7 +17,8 @@ export const isPsAvailable = () => {
 
 export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
-Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **NO OTHER SYNTAX/MARKERS ALLOWED, BRACKETS SHOULD BE PROPERLY USED AS PER SCHEMA**
+Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+NO TOOL CALL INSIDE THINKING
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === 'Flux' ? ' (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run: Limit 1 OR 2 CONSECUTIVE Run)' : ''}. Next Turn, verify tool results, plan next**

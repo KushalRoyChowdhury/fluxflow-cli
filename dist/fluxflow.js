@@ -4452,7 +4452,8 @@ var init_main_tools = __esm({
     };
     TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
-Internal tools. MUST use the EXACT syntax '[tool:functions.ToolName(args)]'. **NO OTHER SYNTAX/MARKERS ALLOWED, BRACKETS SHOULD BE PROPERLY USED AS PER SCHEMA**
+Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+NO TOOL CALL INSIDE THINKING
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run: Limit 1 OR 2 CONSECUTIVE Run)" : ""}. Next Turn, verify tool results, plan next**
@@ -5751,7 +5752,8 @@ ${projectContextBlock}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? "" : "\n- ACCESS CONTROL: CWD only"}
-- Sensitive files? Ask before Read${isSystemDir ? "\nPROTECTED DIRECTORY: ASK BEFORE MODIFYING" : ""}
+- Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY: ASK BEFORE MODIFYING" : ""}
+- No thinking leak in chat output
 
 -- FORMATTING --
 - GFM Supported
@@ -8486,16 +8488,62 @@ var init_todo = __esm({
           return `- [ ] ${trimmed}`;
         }).filter(Boolean).join("\n") + "\n";
       };
+      const applyMarkDone = (content, markDone2) => {
+        if (!markDone2) return { content, markedCount: 0 };
+        const rawTargets = parseMessyArray(markDone2);
+        const targets = (Array.isArray(rawTargets) ? rawTargets : [rawTargets]).map((t) => String(t).replace(/^- \[[xX ]\]\s*/i, "").trim()).filter(Boolean);
+        const lines = content.split("\n");
+        let markedCount = 0;
+        let fileUpdated = false;
+        for (const searchStr of targets) {
+          let updatedThisTarget = false;
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes(searchStr) && /^- \[\s\]/.test(lines[i].trim())) {
+              lines[i] = lines[i].replace("- [ ]", "- [x]");
+              updatedThisTarget = true;
+              fileUpdated = true;
+              markedCount++;
+              break;
+            }
+          }
+          if (!updatedThisTarget) {
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].toLowerCase().includes(searchStr.toLowerCase()) && /^- \[\s\]/.test(lines[i].trim())) {
+                lines[i] = lines[i].replace("- [ ]", "- [x]");
+                updatedThisTarget = true;
+                fileUpdated = true;
+                markedCount++;
+                break;
+              }
+            }
+          }
+        }
+        return {
+          content: fileUpdated ? lines.join("\n") : content,
+          markedCount
+        };
+      };
       try {
         if (!fs19.existsSync(todoDir)) {
           fs19.mkdirSync(todoDir, { recursive: true });
         }
         if (method === "create") {
           if (!tasks) return 'ERROR: Missing "tasks" for create method.';
-          const content = getTasksString(tasks);
+          let content = getTasksString(tasks);
+          let markedCount = 0;
+          if (markDone) {
+            const result = applyMarkDone(content, markDone);
+            content = result.content;
+            markedCount = result.markedCount;
+          }
           await RevertManager.recordFileChange(todoFile);
           fs19.writeFileSync(todoFile, content, "utf8");
           const total = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
+          if (markedCount > 0) {
+            const completed = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
+            return `SUCCESS: TASK LIST CREATED (${markedCount} marked done, ${completed} completed, ${total - completed} left)
+${content}`;
+          }
           return `SUCCESS: TASK LIST CREATED (${total} total)
 ${content}`;
         }
@@ -8519,35 +8567,10 @@ ${fullContent}`;
           let content = fs19.readFileSync(todoFile, "utf8");
           let markedCount = 0;
           if (markDone) {
-            const rawTargets = parseMessyArray(markDone);
-            const targets = (Array.isArray(rawTargets) ? rawTargets : [rawTargets]).map((t) => String(t).replace(/^- \[[xX ]\]\s*/i, "").trim()).filter(Boolean);
-            const lines = content.split("\n");
-            let fileUpdated = false;
-            for (const searchStr of targets) {
-              let updatedThisTarget = false;
-              for (let i = 0; i < lines.length; i++) {
-                if (lines[i].includes(searchStr) && /^- \[\s\]/.test(lines[i].trim())) {
-                  lines[i] = lines[i].replace("- [ ]", "- [x]");
-                  updatedThisTarget = true;
-                  fileUpdated = true;
-                  markedCount++;
-                  break;
-                }
-              }
-              if (!updatedThisTarget) {
-                for (let i = 0; i < lines.length; i++) {
-                  if (lines[i].toLowerCase().includes(searchStr.toLowerCase()) && /^- \[\s\]/.test(lines[i].trim())) {
-                    lines[i] = lines[i].replace("- [ ]", "- [x]");
-                    updatedThisTarget = true;
-                    fileUpdated = true;
-                    markedCount++;
-                    break;
-                  }
-                }
-              }
-            }
-            if (fileUpdated) {
-              content = lines.join("\n");
+            const result = applyMarkDone(content, markDone);
+            if (result.markedCount > 0) {
+              content = result.content;
+              markedCount = result.markedCount;
               await RevertManager.recordFileChange(todoFile);
               fs19.writeFileSync(todoFile, content, "utf8");
             }
@@ -10601,8 +10624,8 @@ ${ideCtx.warnings}
                   const boxTop = `${" ".repeat(boxWidth)}`;
                   const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
                   const boxBottom = `${" ".repeat(boxWidth)}`;
-                  yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                  yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}`) };
                   continue;
                 }
                 const finalStart = startLine !== null ? startLine : 1;
@@ -10659,8 +10682,8 @@ ${boxBottom}`) };
                     const boxWidth = Math.min(maxLen + 4, terminalWidth);
                     const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
                     const boxBottom = `${" ".repeat(boxWidth)}`;
-                    yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                    yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}`) };
                   }
                 }
               }
@@ -11614,8 +11637,8 @@ ${ideErr} [/ERROR]`;
                           const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                           const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                           const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                          yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                          yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}`) };
                         }
                         toolResults.push({ role: "user", text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                         yield { type: "tool_result", content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -11838,8 +11861,8 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                                       const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                       const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                       const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                                      yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                                      yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}}`) };
                                       toolResults.push({ role: "user", text: errorMsg });
                                       await incrementUsage("toolFailure");
                                       if (settings.onToolResult) settings.onToolResult("failure", normToolName);
@@ -11989,7 +12012,8 @@ ${snippet2}
                           }
                           const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                           const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                          yield { type: "visual_feedback", content: colorMainWords(`${boxMid}`) };
+                          yield { type: "visual_feedback", content: colorMainWords(`
+${boxMid}`) };
                           const toolEnd2 = Date.now();
                           lastToolFinishedAt = toolEnd2;
                           yield { type: "tool_time", content: toolEnd2 - executionStart };
@@ -12023,8 +12047,8 @@ ${snippet2}
                             const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                             const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                             const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                            yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                            yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}`) };
                           }
                           if (normToolName === "exec_command") {
                             await new Promise((resolve) => setTimeout(resolve, 50));
@@ -12049,7 +12073,8 @@ ${boxBottom}`) };
                       const boxWidth = Math.min(label2.length + 4, terminalWidth);
                       const boxMid = `${label2.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                       const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                      yield { type: "visual_feedback", content: colorMainWords(`${boxMid}${boxMid.includes("Created") || boxMid.includes("Edited") || boxMid.includes("Written") ? "" : `
+                      yield { type: "visual_feedback", content: colorMainWords(`
+${boxMid}${boxMid.includes("Created") || boxMid.includes("Edited") || boxMid.includes("Written") ? "" : `
 ${boxBottom}`}`) };
                     }
                     if (lastToolFinishedAt > 0) {
@@ -12119,8 +12144,8 @@ ${boxBottom}`}`) };
                       const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                       const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                       const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                      yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
-${boxBottom}`) };
+                      yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}`) };
                     }
                     if (normToolName === "todo") {
                       const { method, tasks, markDone } = parseArgs(toolCall.args);
@@ -12173,7 +12198,8 @@ ${boxBottom}`) };
                           ""
                           // Bottom padding spacing
                         ].join("\n");
-                        yield { type: "visual_feedback", content: colorMainWords(output) };
+                        yield { type: "visual_feedback", content: `
+${colorMainWords(output)}` };
                       }
                     }
                     if (normToolName === "exec_command" && settings.onExecEnd) {
@@ -15885,7 +15911,7 @@ ${timestamp}` };
                       setMessages((prev) => {
                         const hasAskRecord = prev.some((m) => m.isAskRecord && m.text?.includes(`Selection: ${val}`));
                         if (hasAskRecord) return prev;
-                        return [
+                        const newMsgs = [
                           ...prev,
                           {
                             id: "ask-" + Date.now(),
@@ -15895,6 +15921,8 @@ Selection: ${val}`,
                             isAskRecord: true
                           }
                         ];
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
                       });
                       resolve(val);
                     }
