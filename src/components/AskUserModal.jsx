@@ -33,7 +33,21 @@ const AskUserModal = ({ question, options, onResolve }) => {
 
     if (isSuggestingElse) {
         return (
-            <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+            <Box
+                flexDirection="column"
+                borderStyle="single"
+                borderLeft={true}
+                borderRight={false}
+                borderTop={false}
+                borderBottom={false}
+                borderColor="#444444"
+                paddingLeft={2}
+                paddingRight={0}
+                paddingTop={1}
+                paddingBottom={1}
+                backgroundColor="#1a1a1a"
+                width="100%"
+            >
                 <Box paddingX={1}>
                     <Text color="white" bold>💬 SUGGEST SOMETHING ELSE</Text>
                 </Box>
@@ -56,7 +70,21 @@ const AskUserModal = ({ question, options, onResolve }) => {
     }
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+        <Box
+            flexDirection="column"
+            borderStyle="single"
+            borderLeft={true}
+            borderRight={false}
+            borderTop={false}
+            borderBottom={false}
+            borderColor="#444444"
+            paddingLeft={2}
+            paddingRight={0}
+            paddingTop={1}
+            paddingBottom={1}
+            backgroundColor="#1a1a1a"
+            width="100%"
+        >
             <Box paddingX={1} marginBottom={1}>
                 <Text color="white" bold>AGENT REQUEST: ACTION REQUIRED</Text>
             </Box>

@@ -336,7 +336,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line, columns = 80, highlightInfo }) => {
+const DiffLine = React.memo(({ line, columns = 80 }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
 
@@ -365,37 +365,8 @@ const DiffLine = React.memo(({ line, columns = 80, highlightInfo }) => {
     const textColor = isRemoval ? '#ff4d4d' : isAddition ? '#4dff88' : isContext ? 'white' : 'white';
     const numColor = isRemoval ? '#cf3a3a' : isAddition ? '#3acf65' : 'gray';
 
-    const hasHighlight = highlightInfo && (highlightInfo.prefixLen > 0 || highlightInfo.suffixLen > 0);
-    const rowBgColor = hasHighlight ? '#1a1a1a' : bgColor;
-
-    if (hasHighlight) {
-        const prefixLen = highlightInfo.prefixLen;
-        const suffixLen = highlightInfo.suffixLen;
-        const prefix = content.substring(0, prefixLen);
-        const delta = content.substring(prefixLen, content.length - suffixLen);
-        const suffix = content.substring(content.length - suffixLen);
-
-        return (
-            <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
-                <Box width={3} flexShrink={0} justifyContent="flex-end">
-                    <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
-                </Box>
-                <Box width={1} flexShrink={0} marginLeft={1}>
-                    <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
-                </Box>
-                <Box flexGrow={1} marginLeft={1}>
-                    <Text color={textColor} dimColor={isContext}>
-                        {prefix}
-                        <Text backgroundColor={bgColor}>{delta}</Text>
-                        {suffix}
-                    </Text>
-                </Box>
-            </Box>
-        );
-    }
-
     return (
-        <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
+        <Box backgroundColor={bgColor} paddingX={1} width={columns}>
             <Box width={3} flexShrink={0} justifyContent="flex-end">
                 <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
             </Box>
@@ -414,92 +385,22 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
-    const highlightInfos = React.useMemo(() => {
-        const infos = Array(diffLines.length).fill(null);
-        let idx = 0;
-
-        while (idx < diffLines.length) {
-            const removals = [];
-            const additions = [];
-
-            while (idx < diffLines.length) {
-                const line = diffLines[idx];
-                const cleanLine = line.replace('[UI_CONTEXT]', '');
-                if (cleanLine.startsWith('-')) {
-                    removals.push({ idx, line: cleanLine });
-                    idx++;
-                } else {
-                    break;
-                }
-            }
-
-            while (idx < diffLines.length) {
-                const line = diffLines[idx];
-                const cleanLine = line.replace('[UI_CONTEXT]', '');
-                if (cleanLine.startsWith('+')) {
-                    additions.push({ idx, line: cleanLine });
-                    idx++;
-                } else {
-                    break;
-                }
-            }
-
-            if (removals.length > 0 && additions.length > 0) {
-                const pairCount = Math.min(removals.length, additions.length);
-                for (let k = 0; k < pairCount; k++) {
-                    const r = removals[k];
-                    const a = additions[k];
-
-                    const rRest = r.line.substring(1);
-                    const rSplit = rRest.indexOf('|');
-                    const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
-
-                    const aRest = a.line.substring(1);
-                    const aSplit = aRest.indexOf('|');
-                    const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
-
-                    let prefixLen = 0;
-                    while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
-                        prefixLen++;
-                    }
-
-                    let suffixLen = 0;
-                    const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
-                    while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
-                        suffixLen++;
-                    }
-
-                    if (prefixLen > 0 || suffixLen > 0) {
-                        infos[r.idx] = { prefixLen, suffixLen };
-                        infos[a.idx] = { prefixLen, suffixLen };
-                    }
-                }
-            }
-
-            if (removals.length === 0 && additions.length === 0) {
-                idx++;
-            }
-        }
-
-        return infos;
-    }, [diffLines]);
-
     return (
         <Box flexDirection="column" width={columns - 3} marginBottom={1}>
             <Box flexDirection="column" paddingY={0} width="100%">
                 <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
-                    <Box width={5} flexShrink={0} />
-                    <Box width={2} flexShrink={0} marginLeft={1} />
+                    <Box width={3} flexShrink={0} />
+                    <Box width={1} flexShrink={0} marginLeft={1} />
                     <Box flexGrow={1} marginLeft={1}>
                         <Text>{' '}</Text>
                     </Box>
                 </Box>
                 {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} columns={columns - 3} highlightInfo={highlightInfos[i]} />
+                    <DiffLine key={i} line={line} columns={columns - 3} />
                 ))}
                 <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
-                    <Box width={5} flexShrink={0} />
-                    <Box width={2} flexShrink={0} marginLeft={1} />
+                    <Box width={3} flexShrink={0} />
+                    <Box width={1} flexShrink={0} marginLeft={1} />
                     <Box flexGrow={1} marginLeft={1}>
                         <Text>{' '}</Text>
                     </Box>
@@ -747,7 +648,21 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 
         return (
             <Box marginBottom={0} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                <Box
+                    flexDirection="column"
+                    borderStyle="single"
+                    borderLeft={true}
+                    borderRight={false}
+                    borderTop={false}
+                    borderBottom={false}
+                    borderColor="#444444"
+                    paddingLeft={2}
+                    paddingRight={0}
+                    paddingTop={1}
+                    paddingBottom={1}
+                    backgroundColor="#1a1a1a"
+                    width="100%"
+                >
                     <Box paddingX={1}>
                         <Text color="white" bold>AGENT REQUEST: RESOLVED</Text>
                     </Box>
@@ -762,7 +677,21 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isAboutRecord) {
         return (
             <Box marginBottom={0} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                <Box
+                    flexDirection="column"
+                    borderStyle="single"
+                    borderLeft={true}
+                    borderRight={false}
+                    borderTop={false}
+                    borderBottom={false}
+                    borderColor="#444444"
+                    paddingLeft={2}
+                    paddingRight={0}
+                    paddingTop={1}
+                    paddingBottom={1}
+                    backgroundColor="#1a1a1a"
+                    width="100%"
+                >
                     <Box paddingX={1}>
                         <Text color="white" bold>ABOUT FLUX FLOW</Text>
                     </Box>
@@ -777,7 +706,21 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isUpdateNotification) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+                <Box
+                    flexDirection="column"
+                    borderStyle="single"
+                    borderLeft={true}
+                    borderRight={false}
+                    borderTop={false}
+                    borderBottom={false}
+                    borderColor="#444444"
+                    paddingLeft={2}
+                    paddingRight={0}
+                    paddingTop={1}
+                    paddingBottom={1}
+                    backgroundColor="#1a1a1a"
+                    width="100%"
+                >
                     <Box paddingX={1}>
                         <Text color="white" bold>UPDATE AVAILABLE</Text>
                     </Box>
@@ -1065,7 +1008,6 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 <DiffLine
                     line={text}
                     columns={columns}
-                    highlightInfo={block.highlightInfo}
                 />
                 {isLastLine && renderPaddingLine(true)}
             </Box>

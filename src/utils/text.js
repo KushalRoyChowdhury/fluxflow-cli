@@ -480,72 +480,6 @@ export const parseMessageToBlocks = (msg, columns) => {
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
-        const highlightInfos = Array(diffLines.length).fill(null);
-        let idx = 0;
-
-        while (idx < diffLines.length) {
-            const removals = [];
-            const additions = [];
-
-            while (idx < diffLines.length) {
-                const line = diffLines[idx];
-                const cleanLine = line.replace('[UI_CONTEXT]', '');
-                if (cleanLine.startsWith('-')) {
-                    removals.push({ idx, line: cleanLine });
-                    idx++;
-                } else {
-                    break;
-                }
-            }
-
-            while (idx < diffLines.length) {
-                const line = diffLines[idx];
-                const cleanLine = line.replace('[UI_CONTEXT]', '');
-                if (cleanLine.startsWith('+')) {
-                    additions.push({ idx, line: cleanLine });
-                    idx++;
-                } else {
-                    break;
-                }
-            }
-
-            if (removals.length > 0 && additions.length > 0) {
-                const pairCount = Math.min(removals.length, additions.length);
-                for (let k = 0; k < pairCount; k++) {
-                    const r = removals[k];
-                    const a = additions[k];
-
-                    const rRest = r.line.substring(1);
-                    const rSplit = rRest.indexOf('|');
-                    const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
-
-                    const aRest = a.line.substring(1);
-                    const aSplit = aRest.indexOf('|');
-                    const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
-
-                    let prefixLen = 0;
-                    while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
-                        prefixLen++;
-                    }
-
-                    let suffixLen = 0;
-                    const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
-                    while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
-                        suffixLen++;
-                    }
-
-                    if (prefixLen > 0 || suffixLen > 0) {
-                        highlightInfos[r.idx] = { prefixLen, suffixLen };
-                        highlightInfos[a.idx] = { prefixLen, suffixLen };
-                    }
-                }
-            }
-
-            if (removals.length === 0 && additions.length === 0) {
-                idx++;
-            }
-        }
-
         const completedBlocks = [];
         let activeBlock = null;
 
@@ -556,7 +490,8 @@ export const parseMessageToBlocks = (msg, columns) => {
                 msg,
                 type: 'diff-line',
                 text: line,
-                highlightInfo: highlightInfos[i]
+                isFirstLine: i === 0,
+                isLastLine: isLast
             };
 
             if (isLast && msg.isStreaming) {

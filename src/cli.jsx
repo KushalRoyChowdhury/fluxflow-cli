@@ -3,11 +3,11 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 
 /**
- * AUTO-HEAP SCALER (4GB)
+ * AUTO-HEAP SCALER (6GB)
  * This ensures the agent can handle massive sessions and large project scans
  * without hitting Node's default memory limits.
  */
-const HEAP_LIMIT = 4096;
+const HEAP_LIMIT = 6144;
 const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
 if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {

@@ -954,22 +954,49 @@ export default function App({ args = [] }) {
         const active = [];
         const columns = terminalSize.columns || 80;
 
-        // Parse history messages (up to completedIndex)
-        messages.slice(0, completedIndex).forEach((msg) => {
+        const completedMsgs = messages.slice(0, completedIndex);
+        const activeMsgs = messages.slice(completedIndex);
+
+        const seenAskSelections = new Set();
+        const filterDuplicates = (msgList) => {
+            return msgList.filter(msg => {
+                if (msg.isAskRecord) {
+                    const selectionMatch = msg.text?.match(/Selection: (.*)/);
+                    const selection = selectionMatch ? selectionMatch[1].trim() : '';
+                    if (selection) {
+                        if (seenAskSelections.has(selection)) {
+                            return false;
+                        }
+                        seenAskSelections.add(selection);
+                    }
+                }
+                return true;
+            });
+        };
+
+        const uniqueCompleted = filterDuplicates(completedMsgs);
+        const uniqueActive = filterDuplicates(activeMsgs);
+
+        uniqueCompleted.forEach((msg) => {
             const parsed = parseMessageToBlocks(msg, columns);
             completed.push(...parsed.completed);
             completed.push(...parsed.active); // since they are in history, any active part is now completed
         });
 
-        // Parse current/active messages (from completedIndex onwards)
-        messages.slice(completedIndex).forEach((msg) => {
+        uniqueActive.forEach((msg) => {
             const parsed = parseMessageToBlocks(msg, columns);
-            completed.push(...parsed.completed);
-            active.push(...parsed.active);
+            const isStaticRecord = msg.role === 'system' || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user';
+
+            if (isStaticRecord) {
+                active.push(...parsed.completed);
+            } else {
+                completed.push(...parsed.completed);
+                active.push(...parsed.active);
+            }
         });
 
         // Keep a scrollback limit of blocks to prevent infinite memory usage in render tree
-        const MAX_BLOCKS = 1000;
+        const MAX_BLOCKS = 5000000000;
         const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
 
         return {
@@ -1589,9 +1616,9 @@ export default function App({ args = [] }) {
         { cmd: '/quit', desc: 'Exit and shutdown Flux' },
         { cmd: '/help', desc: 'Show all available commands' },
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
+        { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/compress', desc: 'Summarize and compress chat history' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
-        { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/save', desc: 'Force save current chat' },
@@ -2876,19 +2903,26 @@ export default function App({ args = [] }) {
                             },
                             onAskUser: async (question, options) => {
                                 return new Promise((resolve) => {
+                                    let resolvedFlag = false;
                                     setPendingAsk({
                                         question,
                                         options,
                                         resolve: (val) => {
-                                            setMessages(prev => [
-                                                ...prev,
-                                                {
-                                                    id: 'ask-' + Date.now(),
-                                                    role: 'system',
-                                                    text: `💬 **Ask User**\nSelection: ${val}`,
-                                                    isAskRecord: true
-                                                }
-                                            ]);
+                                            if (resolvedFlag) return;
+                                            resolvedFlag = true;
+                                            setMessages(prev => {
+                                                const hasAskRecord = prev.some(m => m.isAskRecord && m.text?.includes(`Selection: ${val}`));
+                                                if (hasAskRecord) return prev;
+                                                return [
+                                                    ...prev,
+                                                    {
+                                                        id: 'ask-' + Date.now(),
+                                                        role: 'system',
+                                                        text: `💬 **Ask User**\nSelection: ${val}`,
+                                                        isAskRecord: true
+                                                    }
+                                                ];
+                                            });
                                             resolve(val);
                                         }
                                     });
