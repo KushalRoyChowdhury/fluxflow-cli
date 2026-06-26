@@ -242,7 +242,7 @@ export const MultilineInput = ({
         const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
         if (isArrowKey) {
             const now = Date.now();
-            if (now - lastArrowTimeRef.current < 34) {
+            if (now - lastArrowTimeRef.current < 33) {
                 return; // Too fast! Drop this event to save Ink's CPU cycles
             }
             lastArrowTimeRef.current = now;
