@@ -1070,9 +1070,15 @@ export default function App({ args = [] }) {
         // [LIVE TERMINAL INPUT FORWARDING]
         if (isTerminalFocused && activeCommand) {
             if (key.return) {
-                const isWin = process.platform === 'win32';
-                writeToActiveCommand(isWin ? '\r\n' : '\n');
-                if (!isActiveCommandPty) setExecOutput(prev => prev + '\n');
+                if (isActiveCommandPty) {
+                    // PTY processes (conpty/winpty on Windows, pty on Linux/Mac) expect bare \r for Enter
+                    writeToActiveCommand('\r');
+                } else {
+                    // Non-PTY stdin: \r\n on Windows, \n on Unix
+                    const isWin = process.platform === 'win32';
+                    writeToActiveCommand(isWin ? '\r\n' : '\n');
+                    setExecOutput(prev => prev + '\n');
+                }
             } else if (key.backspace || key.delete) {
                 if (isActiveCommandPty) {
                     writeToActiveCommand('\x7f'); // ASCII DEL for backspace in many TTYs
@@ -1989,7 +1995,7 @@ export default function App({ args = [] }) {
                 setCompletedIndex(prev.length + 1);
                 const isBtw = hintText.startsWith('/btw');
                 const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, '') : hintText;
-                const prefix = isBtw ? '[QUESTION: QUEUED]' : '[STEERING HINT: QUEUED]';
+                const prefix = isBtw ? '[QUESTION]' : '[STEERING HINT]';
                 return [...prev, { id: 'hint-' + Date.now(), role: 'user', text: `${prefix} \n${cleanText}`, color: 'magenta' }];
             });
             setInput('');

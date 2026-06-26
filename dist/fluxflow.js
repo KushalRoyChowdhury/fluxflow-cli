@@ -14189,9 +14189,13 @@ function App({ args = [] }) {
     }
     if (isTerminalFocused && activeCommand) {
       if (key.return) {
-        const isWin = process.platform === "win32";
-        writeToActiveCommand(isWin ? "\r\n" : "\n");
-        if (!isActiveCommandPty) setExecOutput((prev) => prev + "\n");
+        if (isActiveCommandPty) {
+          writeToActiveCommand("\r");
+        } else {
+          const isWin = process.platform === "win32";
+          writeToActiveCommand(isWin ? "\r\n" : "\n");
+          setExecOutput((prev) => prev + "\n");
+        }
       } else if (key.backspace || key.delete) {
         if (isActiveCommandPty) {
           writeToActiveCommand("\x7F");
@@ -15006,7 +15010,7 @@ function App({ args = [] }) {
         setCompletedIndex(prev.length + 1);
         const isBtw = hintText.startsWith("/btw");
         const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, "") : hintText;
-        const prefix = isBtw ? "[QUESTION: QUEUED]" : "[STEERING HINT: QUEUED]";
+        const prefix = isBtw ? "[QUESTION]" : "[STEERING HINT]";
         return [...prev, { id: "hint-" + Date.now(), role: "user", text: `${prefix} 
 ${cleanText}`, color: "magenta" }];
       });
