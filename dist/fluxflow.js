@@ -3484,7 +3484,8 @@ ${coloredArt[7]}`;
 // src/components/ChatLayout.jsx
 import React4, { useState as useState3, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
-var useStreamingText, formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+import { diffWordsWithSpace } from "diff";
+var useStreamingText, formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, parseLineInfo, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
@@ -3737,29 +3738,95 @@ var init_ChatLayout = __esm({
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, columns = 80 }) => {
+    parseLineInfo = (l) => {
+      if (!l) return null;
+      const clean = l.replace("[UI_CONTEXT]", "").replace(/\r/g, "");
+      const isR = clean.startsWith("-");
+      const isA = clean.startsWith("+");
+      let rest = isR || isA ? clean.substring(1) : clean;
+      rest = rest.trim();
+      const splitIdx = rest.indexOf("|");
+      const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : "";
+      const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+      return { isR, isA, num, content };
+    };
+    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80 }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
         return /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2550".repeat(Math.max(10, columns - 4))));
       }
-      const isRemoval = cleanLine.startsWith("-");
-      const isAddition = cleanLine.startsWith("+");
-      const prefixChar = cleanLine[0];
-      const rest = cleanLine.substring(1);
-      const splitIdx = rest.indexOf("|");
-      const lineNum = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : "";
-      const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
-      const bgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : "#1a1a1a";
-      const textColor = isRemoval ? "#ff4d4d" : isAddition ? "#4dff88" : isContext ? "white" : "white";
-      const numColor = isRemoval ? "#cf3a3a" : isAddition ? "#3acf65" : "gray";
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: bgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, wrapText(content, columns - 14))));
+      const parsedCurrent = parseLineInfo(line);
+      if (!parsedCurrent) {
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
+      }
+      const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
+      const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
+      let finalPairContent = pairContent;
+      if (!finalPairContent && parentText && (isRemoval || isAddition)) {
+        const cleanParent = parentText.replace(/\[DIFF_START\]|\[DIFF_END\]/g, "").trim();
+        const diffLines = cleanParent.split("\n");
+        const pairLine = diffLines.find((l) => {
+          const p = parseLineInfo(l);
+          return p && p.num === lineNum && p.isR !== isRemoval;
+        });
+        if (pairLine) {
+          finalPairContent = parseLineInfo(pairLine).content;
+        }
+      }
+      let words = [];
+      if (finalPairContent !== void 0 && finalPairContent !== null) {
+        const oldStr = isRemoval ? content : finalPairContent;
+        const newStr = isRemoval ? finalPairContent : content;
+        try {
+          words = diffWordsWithSpace(oldStr, newStr);
+        } catch (e) {
+          words = [];
+        }
+      }
+      const hasInlineChange = words.some((part) => isRemoval && part.removed || isAddition && part.added);
+      const isPureUnpairedBlock = !finalPairContent && (isRemoval || isAddition);
+      const hasRealChange = hasInlineChange || isPureUnpairedBlock;
+      const finalNumColor = isRemoval || isAddition ? isRemoval ? "#d96868" : "#68d98c" : "gray";
+      const finalPrefixColor = isRemoval ? "#ff4d4d" : "#4dff88";
+      const displayPrefix = isRemoval ? "-" : isAddition ? "+" : " ";
+      const renderInlineDiff = () => {
+        if (isPureUnpairedBlock) {
+          const blockColor = isRemoval ? "#ff3333" : "#33ff66";
+          return /* @__PURE__ */ React4.createElement(Text4, { color: blockColor }, wrapText(content, columns - 14));
+        }
+        if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
+          const textColor = isRemoval ? "#b34d4d" : isAddition ? "#4db36b" : "gray";
+          return /* @__PURE__ */ React4.createElement(Text4, { color: textColor }, wrapText(content, columns - 14));
+        }
+        return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
+          const isWhitespace = /^\s+$/.test(part.value);
+          if (isRemoval) {
+            const isSurroundedByRemoval = words[idx - 1]?.removed || words[idx + 1]?.removed;
+            if (part.removed || isWhitespace && isSurroundedByRemoval) {
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#ff3333" }, part.value);
+            }
+            if (part.added) return null;
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#b34d4d" }, part.value);
+          }
+          if (isAddition) {
+            const isSurroundedByAddition = words[idx - 1]?.added || words[idx + 1]?.added;
+            if (part.added || isWhitespace && isSurroundedByAddition) {
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#33ff66" }, part.value);
+            }
+            if (part.removed) return null;
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#4db36b" }, part.value);
+          }
+          return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "gray" }, part.value);
+        }));
+      };
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
     });
     DiffBlock = React4.memo(({ text, columns = 80 }) => {
       const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
-      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, columns: columns - 3 })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
+      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, parentText: text, columns: columns - 3 })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
     CodeRenderer = React4.memo(({ text, columns = 80 }) => {
       if (!text) return null;
@@ -4071,6 +4138,8 @@ var init_ChatLayout = __esm({
           DiffLine,
           {
             line: text,
+            pairContent: block.pairContent,
+            parentText: msg?.text,
             columns
           }
         ), isLastLine && renderPaddingLine(true));

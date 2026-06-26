@@ -234,13 +234,17 @@
         const stableVersions = ["2.13.2"]
         const changelogData = {
             "2.13.2": {
-                "note": "JUNE 27 - Rendering Bug fixes and accessibility improvements.",
-                "added": [],
+                "note": "JUNE 27 - Bug fixes & Improvements.",
+                "added": [
+                    "New and improved smooth progressive stream renderer."
+                ],
                 "changed": [
-                    "Increased Heap memory size from 4GB to 6GB."
+                    "Increased Heap memory size from 4GB to 6GB.",
+                    "Improved DIFF viewer in terminal UI.",
+                    "Improved Keyboard navigation support."
                 ],
                 "fixes": [
-                    "Resolved a a bug with DIFF renderer."
+                    "Resolved a bug where the rendering might glitch out on long chats."
                 ]
             },
             "2.13.0": {

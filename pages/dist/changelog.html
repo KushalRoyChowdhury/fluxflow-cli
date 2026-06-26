@@ -231,8 +231,22 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.13.0"]
+        const stableVersions = ["2.13.2"]
         const changelogData = {
+            "2.13.2": {
+                "note": "JUNE 27 - Bug fixes & Improvements.",
+                "added": [
+                    "New and improved smooth progressive stream renderer."
+                ],
+                "changed": [
+                    "Increased Heap memory size from 4GB to 6GB.",
+                    "Improved DIFF viewer in terminal UI.",
+                    "Improved Keyboard navigation support."
+                ],
+                "fixes": [
+                    "Resolved a bug where the rendering might glitch out on long chats."
+                ]
+            },
             "2.13.0": {
                 "note": "JUNE 26 - Performance Improvements.",
                 "added": [

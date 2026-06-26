@@ -3,6 +3,7 @@ import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
 import { wrapText, cleanSignals } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
+import { diffWordsWithSpace } from 'diff';
 
 const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
     const [displayedText, setDisplayedText] = useState((isActiveBlock && isStreaming) ? '' : targetText);
@@ -414,7 +415,28 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line, pairContent, columns = 80 }) => {
+const parseLineInfo = (l) => {
+    if (!l) return null;
+    const clean = l.replace('[UI_CONTEXT]', '').replace(/\r/g, '');
+
+    // Check formatting indicators
+    const isR = clean.startsWith('-');
+    const isA = clean.startsWith('+');
+
+    // Slice away the prefix symbol if it exists, otherwise keep it clean
+    let rest = (isR || isA) ? clean.substring(1) : clean;
+    rest = rest.trim();
+
+    const splitIdx = rest.indexOf('|');
+
+    // Extract gutter values cleanly
+    const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
+    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+
+    return { isR, isA, num, content };
+};
+
+const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
 
@@ -427,94 +449,119 @@ const DiffLine = React.memo(({ line, pairContent, columns = 80 }) => {
         );
     }
 
-    const isRemoval = cleanLine.startsWith('-');
-    const isAddition = cleanLine.startsWith('+');
+    const parsedCurrent = parseLineInfo(line);
+    if (!parsedCurrent) {
+        return (
+            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
+                <Box width={3} flexShrink={0} />
+                <Box width={1} flexShrink={0} marginLeft={1} />
+                <Box flexGrow={1} marginLeft={1}>
+                    <Text color="gray">{wrapText(cleanLine, columns - 14)}</Text>
+                </Box>
+            </Box>
+        );
+    }
 
-    // Extract line number and content
-    const rest = cleanLine.substring(1);
-    const splitIdx = rest.indexOf('|');
+    const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
 
-    const lineNum = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
-    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+    // 🎨 Unified solid block backgrounds for the inner text container
+    const innerBgColor = isRemoval ? '#3a0c0c' : (isAddition ? '#0c3a1a' : undefined);
 
-    const bgColor = '#1a1a1a'; // Keep your smooth dark editor background active
+    // 🔍 Dynamic Lookup: Find the matching counterpart row
+    let finalPairContent = pairContent;
+    if (!finalPairContent && parentText && (isRemoval || isAddition)) {
+        const cleanParent = parentText.replace(/\[DIFF_START\]|\[DIFF_END\]/g, '').trim();
+        const diffLines = cleanParent.split('\n');
 
-    // 🔍 1. Compute fine-grained word tokens if a matching counterpart line exists
+        const pairLine = diffLines.find(l => {
+            const p = parseLineInfo(l);
+            return p && p.num === lineNum && p.isR !== isRemoval;
+        });
+
+        if (pairLine) {
+            finalPairContent = parseLineInfo(pairLine).content;
+        }
+    }
+
+    // 🔍 1. Compute fine-grained tokens
     let words = [];
-    if (pairContent && (isRemoval || isAddition)) {
-        const oldStr = isRemoval ? content : pairContent;
-        const newStr = isRemoval ? pairContent : content;
+    if (finalPairContent !== undefined && finalPairContent !== null) {
+        const oldStr = isRemoval ? content : finalPairContent;
+        const newStr = isRemoval ? finalPairContent : content;
         try {
-            // Using your existing library utility
             words = diffWordsWithSpace(oldStr, newStr);
         } catch (e) {
             words = [];
         }
     }
 
-    // 🔍 2. Determine if this line actually altered a word token or if it's a completely unpaired line block
+    // 🔍 2. Check if text is a modified slice or pure block
     const hasInlineChange = words.some(part => (isRemoval && part.removed) || (isAddition && part.added));
-    const isPureUnpairedBlock = !pairContent && (isRemoval || isAddition);
+    const isPureUnpairedBlock = (!finalPairContent && (isRemoval || isAddition));
     const hasRealChange = hasInlineChange || isPureUnpairedBlock;
 
-    // 🔍 3. Dynamic styling options for the gutter panel elements
-    const finalNumColor = hasRealChange ? (isRemoval ? '#d96868' : '#68d98c') : 'gray';
+    // Row indicator colors
+    const finalNumColor = (isRemoval || isAddition) ? (isRemoval ? '#d96868' : '#68d98c') : 'gray';
     const finalPrefixColor = isRemoval ? '#ff4d4d' : '#4dff88';
-
-    // HIDE SYMBOL: Only show indicator sign if the line was explicitly modified, otherwise hide with empty space
-    const displayPrefix = hasRealChange ? (isRemoval ? '-' : '+') : ' ';
+    const displayPrefix = isRemoval ? '-' : (isAddition ? '+' : ' ');
 
     const renderInlineDiff = () => {
-        // Case A: Pure completely brand new line with no older counterpart gets a full elegant background banner
+        // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
-            const blockColor = isRemoval ? '#d96868' : '#68d98c';
-            const blockBg = isRemoval ? '#3a0c0c' : '#0c3a1a';
+            const blockColor = isRemoval ? '#ff3333' : '#33ff66';
             return (
-                <Text color={blockColor} backgroundColor={blockBg}>
+                <Text color={blockColor}>
                     {wrapText(content, columns - 14)}
                 </Text>
             );
         }
 
-        // Case B: Truly unchanged context/boilerplate code drops into peaceful flat gray text
-        if (!pairContent || (!isRemoval && !isAddition) || words.length === 0) {
-            return <Text color="gray">{wrapText(content, columns - 14)}</Text>;
+        // Case B: Truly unchanged boilerplate context lines get full soft tint
+        if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
+            const textColor = isRemoval ? '#b34d4d' : (isAddition ? '#4db36b' : 'gray');
+            return <Text color={textColor}>{wrapText(content, columns - 14)}</Text>;
         }
 
-        // Case C: Surgical word-by-word token highlighted match
+        // Case C: Surgical inline changes with high-contrast normal-weight coloring 🎯
         return (
             <Text wrap="anywhere">
                 {words.map((part, idx) => {
                     const isWhitespace = /^\s+$/.test(part.value);
 
-                    // 🔴 REMOVAL ROW LAYOUT TREATMENT
+                    // 🔴 REMOVAL ROW TREATMENT
                     if (isRemoval) {
                         const isSurroundedByRemoval = (words[idx - 1]?.removed) || (words[idx + 1]?.removed);
 
+                        // NO bold! High-contrast neon red pops out changes instead
                         if (part.removed || (isWhitespace && isSurroundedByRemoval)) {
                             return (
-                                <Text key={idx} color="#d96868" backgroundColor="#3a0c0c">
+                                <Text key={idx} color="#ff3333">
                                     {part.value}
                                 </Text>
                             );
                         }
-                        if (part.added) return null; // Ignore added elements on an old deleted line asset
-                        return <Text key={idx} color={hasRealChange ? "#d96868" : "gray"}>{part.value}</Text>;
+                        if (part.added) return null;
+
+                        // Unchanged syntax components stay muted darker red
+                        return <Text key={idx} color="#b34d4d">{part.value}</Text>;
                     }
 
-                    // 🟢 ADDITION ROW LAYOUT TREATMENT
+                    // 🟢 ADDITION ROW TREATMENT
                     if (isAddition) {
                         const isSurroundedByAddition = (words[idx - 1]?.added) || (words[idx + 1]?.added);
 
+                        // NO bold! High-contrast neon green pops out changes instead
                         if (part.added || (isWhitespace && isSurroundedByAddition)) {
                             return (
-                                <Text key={idx} color="#68d98c" backgroundColor="#0c3a1a">
+                                <Text key={idx} color="#33ff66">
                                     {part.value}
                                 </Text>
                             );
                         }
-                        if (part.removed) return null; // Ignore old elements on a brand new added line asset
-                        return <Text key={idx} color={hasRealChange ? "#68d98c" : "gray"}>{part.value}</Text>;
+                        if (part.removed) return null;
+
+                        // Unchanged syntax components stay muted darker green
+                        return <Text key={idx} color="#4db36b">{part.value}</Text>;
                     }
 
                     return <Text key={idx} color="gray">{part.value}</Text>;
@@ -524,16 +571,21 @@ const DiffLine = React.memo(({ line, pairContent, columns = 80 }) => {
     };
 
     return (
-        <Box backgroundColor={bgColor} paddingX={1} width={columns}>
+        <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
+            {/* Gutter Line Number */}
             <Box width={3} flexShrink={0} justifyContent="flex-end">
                 <Text color={finalNumColor}>{lineNum}</Text>
             </Box>
+
+            {/* Gutter Prefix Symbol */}
             <Box width={1} flexShrink={0} marginLeft={1}>
-                <Text color={finalPrefixColor} bold={hasRealChange}>
+                <Text color={finalPrefixColor}>
                     {displayPrefix}
                 </Text>
             </Box>
-            <Box flexGrow={1} marginLeft={1}>
+
+            {/* Content Wrapper */}
+            <Box marginLeft={1} backgroundColor={innerBgColor} flexShrink={1}>
                 {renderInlineDiff()}
             </Box>
         </Box>
@@ -556,7 +608,7 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
                     </Box>
                 </Box>
                 {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} columns={columns - 3} />
+                    <DiffLine key={i} line={line} parentText={text} columns={columns - 3} />
                 ))}
                 <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
                     <Box width={3} flexShrink={0} />
@@ -1169,6 +1221,8 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 {isFirstLine && renderPaddingLine(false)}
                 <DiffLine
                     line={text}
+                    pairContent={block.pairContent}
+                    parentText={msg?.text} // 🎯 THIS FIXES STREAMING MATCHES!
                     columns={columns}
                 />
                 {isLastLine && renderPaddingLine(true)}
