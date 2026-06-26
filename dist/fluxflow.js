@@ -3214,6 +3214,7 @@ var init_TerminalBox = __esm({
           paddingLeft: 2,
           paddingRight: 0,
           paddingY: completed ? 0 : 1,
+          marginTop: 1,
           width: "100%"
         },
         /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, "ADVANCE"))),
@@ -3709,9 +3710,9 @@ var init_ChatLayout = __esm({
         const prefix = content.substring(0, prefixLen);
         const delta = content.substring(prefixLen, content.length - suffixLen);
         const suffix = content.substring(content.length - suffixLen);
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, prefix, /* @__PURE__ */ React4.createElement(Text4, { backgroundColor: bgColor }, delta), suffix)));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, prefix, /* @__PURE__ */ React4.createElement(Text4, { backgroundColor: bgColor }, delta), suffix)));
       }
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, wrapText(content, columns - 14))));
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, wrapText(content, columns - 14))));
     });
     DiffBlock = React4.memo(({ text, columns = 80 }) => {
       const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
@@ -3775,7 +3776,7 @@ var init_ChatLayout = __esm({
         }
         return infos;
       }, [diffLines]);
-      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, columns: columns - 3, highlightInfo: highlightInfos[i] }))));
+      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, columns: columns - 3, highlightInfo: highlightInfos[i] })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
     CodeRenderer = React4.memo(({ text, columns = 80 }) => {
       if (!text) return null;
@@ -3808,7 +3809,7 @@ var init_ChatLayout = __esm({
             marginBottom: 1,
             backgroundColor: "#1a1a1a"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, line)))))
+          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, line)))), /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))))
         ));
       }
       if (text.includes("```")) {
@@ -4022,21 +4023,23 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns }));
       }
       if (type === "diff-line") {
-        return /* @__PURE__ */ React4.createElement(
+        const { isFirstLine, isLastLine } = block;
+        const renderPaddingLine = (isEnd = false) => /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns, marginBottom: isEnd ? 1 : 0 }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, isFirstLine && renderPaddingLine(false), /* @__PURE__ */ React4.createElement(
           DiffLine,
           {
             line: text,
             columns,
             highlightInfo: block.highlightInfo
           }
-        );
+        ), isLastLine && renderPaddingLine(true));
       }
       if (type === "write-header") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
       }
       if (type === "write-line") {
-        const { gutterWidth, lineNum, isLastLine } = block;
-        return /* @__PURE__ */ React4.createElement(
+        const { gutterWidth, lineNum, isFirstLine, isLastLine } = block;
+        const renderPaddingLine = (isEnd = false) => /* @__PURE__ */ React4.createElement(
           Box3,
           {
             flexDirection: "row",
@@ -4050,11 +4053,29 @@ var init_ChatLayout = __esm({
             paddingLeft: 2,
             paddingRight: 0,
             backgroundColor: "#1a1a1a",
-            marginBottom: isLastLine ? 1 : 0
+            marginBottom: isEnd ? 1 : 0
+          },
+          /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ".repeat(gutterWidth + 2))),
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))
+        );
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, isFirstLine && renderPaddingLine(false), /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "row",
+            width: columns,
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            paddingRight: 0,
+            backgroundColor: "#1a1a1a"
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(gutterWidth, " "), " ")),
           /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, text))
-        );
+        ), isLastLine && renderPaddingLine(true));
       }
       if (type === "write-footer") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
@@ -10461,10 +10482,10 @@ ${boxBottom}`) };
                 if (!isError) {
                   let label2 = "";
                   if (isImage) {
-                    label2 = `\u2714 Viewed: ${filePath}`;
+                    label2 = `\u2714  Viewed: ${filePath}`;
                     attachedBinaryPart = binPart;
                   } else if (isPdf || isOfficeFile) {
-                    label2 = `\u2714 Viewed: ${filePath}`;
+                    label2 = `\u2714  Viewed: ${filePath}`;
                     attachedBinaryPart = binPart;
                   } else {
                     let totalLines = "...";
@@ -10473,7 +10494,7 @@ ${boxBottom}`) };
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
-                    label2 = `\u2714 Auto-Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                    label2 = `\u2714  Auto-Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                     taggedContextBlocks.push(textResult);
                   }
                   if (label2) {
@@ -11237,10 +11258,10 @@ ${ideErr} [/ERROR]`;
                     let label2 = "";
                     if (normToolName === "web_search") {
                       const { query, limit = 10 } = parseArgs(toolCall.args);
-                      label2 = `\u2714 Searched: ${query}`;
+                      label2 = `\u2714  Searched: ${query}`;
                     } else if (normToolName === "web_scrape") {
                       const url = parseArgs(toolCall.args).url || "...";
-                      label2 = `\u2714 Visited: ${url}`;
+                      label2 = `\u2714  Visited: ${url}`;
                     } else if (normToolName === "view_file") {
                       const { path: targetPath2, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
                       const rawStart = StartLine || start_line || startLine;
@@ -11264,30 +11285,30 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label2 = `\u2714 Viewed: ${targetPath2}`;
+                        label2 = `\u2714  Viewed: ${targetPath2}`;
                       } else if (isImage) {
-                        label2 = `\u2714 Viewed: ${targetPath2}`;
+                        label2 = `\u2714  Viewed: ${targetPath2}`;
                       } else {
-                        label2 = `\u2714 Read: ${targetPath2} \u2192 Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
+                        label2 = `\u2714  Read: ${targetPath2} \u2192 Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Viewed";
                       const path21 = parseArgs(toolCall.args).path;
-                      label2 = `\u2714 ${action}: ${path21 === "." ? "./" : path21}`;
+                      label2 = `\u2714  ${action}: ${path21 === "." ? "./" : path21}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
-                      label2 = `\u2714 ${action}: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "write_pdf") {
-                      label2 = `\u2714 Created: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "write_docx") {
-                      label2 = `\u2714 Created: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "file_map") {
-                      label2 = `\u2714 Get Map: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  Get Map: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label2 = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
                       const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                      label2 = `\u2714 Generated: ${argPath || outputPath || output || "generated_image.png"}`;
+                      label2 = `\u2714  Generated: ${argPath || outputPath || output || "generated_image.png"}`;
                     } else if (normToolName.toLowerCase() === "exec_command" || normToolName.toLowerCase() === "ask") {
                       label2 = "";
                     } else {
@@ -11657,7 +11678,7 @@ ${boxBottom}`) };
                                     if (successes.length === 0) {
                                       const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path19.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714 Edited: ${path19.basename(absPath)}`.toUpperCase();
+                                      const errorLabel = `\u2714  Edited: ${path19.basename(absPath)}`.toUpperCase();
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -11809,7 +11830,7 @@ ${snippet2}
 [SYSTEM] Check the content preview for verification [/SYSTEM]`;
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
-                          const feedbackLabel = `\u2714 ${action}: ${filePath || "..."}`;
+                          const feedbackLabel = `\u2714  ${action}: ${filePath || "..."}`;
                           let terminalWidth = 115;
                           if (process.stdout.isTTY) {
                             terminalWidth = process.stdout.columns - 5 || 120;
@@ -11842,7 +11863,7 @@ ${snippet2}
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2714 ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
+                            const deniedLabel = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -11938,7 +11959,7 @@ ${boxBottom}`}`) };
                           matchCount = parseInt(m[1]);
                         }
                       }
-                      const postLabel = `\u2714 Searched: "${keyword}" in ${file ? `"${file}"` : "./"} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
+                      const postLabel = `\u2714  Searched: "${keyword}" in ${file ? `"${file}"` : "./"} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
                       if (process.stdout.isTTY) {
                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -13508,7 +13529,7 @@ function App({ args = [] }) {
     if (manual) {
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
-        return [...prev, { id: "check-" + Date.now(), role: "system", text: "\u{1F50D} Checking for updates...", isMeta: true }];
+        return [...prev, { id: "check-" + Date.now(), role: "system", text: "[SYSTEM] Checking for updates...", isMeta: true }];
       });
     }
     try {

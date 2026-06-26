@@ -2055,10 +2055,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (!isError) {
                             let label = '';
                             if (isImage) {
-                                label = `✔ Viewed: ${filePath}`;
+                                label = `✔  Viewed: ${filePath}`;
                                 attachedBinaryPart = binPart;
                             } else if (isPdf || isOfficeFile) {
-                                label = `✔ Viewed: ${filePath}`;
+                                label = `✔  Viewed: ${filePath}`;
                                 attachedBinaryPart = binPart;
                             } else {
                                 let totalLines = '...';
@@ -2066,7 +2066,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const content = fs.readFileSync(absPath, 'utf8');
                                     totalLines = content.split('\n').length;
                                 } catch (e) { }
-                                label = `✔ Auto-Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                                label = `✔  Auto-Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                                 taggedContextBlocks.push(textResult);
                             }
 
@@ -2943,10 +2943,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'web_search') {
                                     const { query, limit = 10 } = parseArgs(toolCall.args);
-                                    label = `✔ Searched: ${query}`;
+                                    label = `✔  Searched: ${query}`;
                                 } else if (normToolName === 'web_scrape') {
                                     const url = parseArgs(toolCall.args).url || '...';
-                                    label = `✔ Visited: ${url}`;
+                                    label = `✔  Visited: ${url}`;
                                 } else if (normToolName === 'view_file') {
                                     const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
 
@@ -2972,30 +2972,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                     if (isPdf || isOfficeFile) {
-                                        label = `✔ Viewed: ${targetPath}`;
+                                        label = `✔  Viewed: ${targetPath}`;
                                     } else if (isImage) {
-                                        label = `✔ Viewed: ${targetPath}`;
+                                        label = `✔  Viewed: ${targetPath}`;
                                     } else {
-                                        label = `✔ Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
+                                        label = `✔  Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Viewed';
                                     const path = parseArgs(toolCall.args).path;
-                                    label = `✔ ${action}: ${path === '.' ? './' : path}`;
+                                    label = `✔  ${action}: ${path === '.' ? './' : path}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                    label = `✔ ${action}: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `✔ Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `✔ Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'file_map') {
-                                    label = `✔ Get Map: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Get Map: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
                                     const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                                    label = `✔ Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
+                                    label = `✔  Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
                                 } else if (normToolName.toLowerCase() === 'exec_command' || normToolName.toLowerCase() === 'ask') {
                                     label = '';
                                 } else {
@@ -3384,7 +3384,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
-                                                                    const errorLabel = `✔ Edited: ${path.basename(absPath)}`.toUpperCase();
+                                                                    const errorLabel = `✔  Edited: ${path.basename(absPath)}`.toUpperCase();
                                                                     // Get terminal physical width
                                                                     let terminalWidth = 115;
                                                                     if (process.stdout.isTTY) {
@@ -3541,7 +3541,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const feedbackLabel = `✔ ${action}: ${filePath || '...'}`;
+                                            const feedbackLabel = `✔  ${action}: ${filePath || '...'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -3580,7 +3580,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✔ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -3686,7 +3686,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const postLabel = `✔ Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `✔  Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
                                     // Get terminal physical width
                                     let terminalWidth = 115;
                                     if (process.stdout.isTTY) {
@@ -3741,7 +3741,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             .map(line => {
                                                 const trimmed = line.trim();
                                                 const isDone = trimmed.startsWith('- [x]');
-                                                // Premium ✔ for done, ○ for pending
+                                                // Premium ✔  for done, ○ for pending
                                                 const icon = isDone ? '\x1b[32m✔\x1b[0m' : '\x1b[90m○\x1b[0m';
                                                 const textColor = isDone ? '\x1b[90m' : '\x1b[37m';
                                                 return `${icon} ${textColor}${trimmed.substring(6).trim()}\x1b[0m`;

@@ -31,7 +31,7 @@ try {
                 settings = JSON.parse(decrypted);
             }
         }
-        
+
         if (settings) {
             const sys = settings.systemSettings || {};
             if (sys.useExternalData && sys.externalDataPath) {

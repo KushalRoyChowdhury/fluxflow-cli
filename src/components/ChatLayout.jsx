@@ -377,10 +377,10 @@ const DiffLine = React.memo(({ line, columns = 80, highlightInfo }) => {
 
         return (
             <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
-                <Box width={5} flexShrink={0}>
+                <Box width={3} flexShrink={0} justifyContent="flex-end">
                     <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
                 </Box>
-                <Box width={2} flexShrink={0} marginLeft={1}>
+                <Box width={1} flexShrink={0} marginLeft={1}>
                     <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
                 </Box>
                 <Box flexGrow={1} marginLeft={1}>
@@ -396,10 +396,10 @@ const DiffLine = React.memo(({ line, columns = 80, highlightInfo }) => {
 
     return (
         <Box backgroundColor={rowBgColor} paddingX={1} width={columns}>
-            <Box width={5} flexShrink={0}>
+            <Box width={3} flexShrink={0} justifyContent="flex-end">
                 <Text color={numColor} dimColor={isContext}>{lineNum}</Text>
             </Box>
-            <Box width={2} flexShrink={0} marginLeft={1}>
+            <Box width={1} flexShrink={0} marginLeft={1}>
                 <Text color={textColor} bold>{isRemoval ? '-' : isAddition ? '+' : ' '}</Text>
             </Box>
             <Box flexGrow={1} marginLeft={1}>
@@ -487,9 +487,23 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     return (
         <Box flexDirection="column" width={columns - 3} marginBottom={1}>
             <Box flexDirection="column" paddingY={0} width="100%">
+                <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+                    <Box width={5} flexShrink={0} />
+                    <Box width={2} flexShrink={0} marginLeft={1} />
+                    <Box flexGrow={1} marginLeft={1}>
+                        <Text>{' '}</Text>
+                    </Box>
+                </Box>
                 {diffLines.map((line, i) => (
                     <DiffLine key={i} line={line} columns={columns - 3} highlightInfo={highlightInfos[i]} />
                 ))}
+                <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+                    <Box width={5} flexShrink={0} />
+                    <Box width={2} flexShrink={0} marginLeft={1} />
+                    <Box flexGrow={1} marginLeft={1}>
+                        <Text>{' '}</Text>
+                    </Box>
+                </Box>
             </Box>
         </Box>
     );
@@ -535,6 +549,14 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                     backgroundColor={'#1a1a1a'}
                 >
                     <Box flexDirection="column" width="100%">
+                        <Box width="100%">
+                            <Box width={gutterWidth + 2} flexShrink={0}>
+                                <Text>{' '}</Text>
+                            </Box>
+                            <Box flexGrow={1}>
+                                <Text>{' '}</Text>
+                            </Box>
+                        </Box>
                         {codeLines.map((line, idx) => (
                             <Box key={idx} width="100%">
                                 <Box width={gutterWidth + 2} flexShrink={0}>
@@ -545,6 +567,14 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                 </Box>
                             </Box>
                         ))}
+                        <Box width="100%">
+                            <Box width={gutterWidth + 2} flexShrink={0}>
+                                <Text>{' '}</Text>
+                            </Box>
+                            <Box flexGrow={1}>
+                                <Text>{' '}</Text>
+                            </Box>
+                        </Box>
                     </Box>
                 </Box>
             </Box>
@@ -1017,12 +1047,28 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     }
 
     if (type === 'diff-line') {
+        const { isFirstLine, isLastLine } = block;
+
+        const renderPaddingLine = (isEnd = false) => (
+            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns} marginBottom={isEnd ? 1 : 0}>
+                <Box width={3} flexShrink={0} />
+                <Box width={1} flexShrink={0} marginLeft={1} />
+                <Box flexGrow={1} marginLeft={1}>
+                    <Text>{' '}</Text>
+                </Box>
+            </Box>
+        );
+
         return (
-            <DiffLine
-                line={text}
-                columns={columns}
-                highlightInfo={block.highlightInfo}
-            />
+            <Box flexDirection="column">
+                {isFirstLine && renderPaddingLine(false)}
+                <DiffLine
+                    line={text}
+                    columns={columns}
+                    highlightInfo={block.highlightInfo}
+                />
+                {isLastLine && renderPaddingLine(true)}
+            </Box>
         );
     }
 
@@ -1035,8 +1081,9 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     }
 
     if (type === 'write-line') {
-        const { gutterWidth, lineNum, isLastLine } = block;
-        return (
+        const { gutterWidth, lineNum, isFirstLine, isLastLine } = block;
+
+        const renderPaddingLine = (isEnd = false) => (
             <Box
                 flexDirection="row"
                 width={columns}
@@ -1049,14 +1096,41 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 paddingLeft={2}
                 paddingRight={0}
                 backgroundColor={'#1a1a1a'}
-                marginBottom={isLastLine ? 1 : 0}
+                marginBottom={isEnd ? 1 : 0}
             >
                 <Box width={gutterWidth + 2} flexShrink={0}>
-                    <Text color="gray" dimColor>{String(lineNum).padStart(gutterWidth, ' ')} </Text>
+                    <Text>{' '.repeat(gutterWidth + 2)}</Text>
                 </Box>
                 <Box flexGrow={1}>
-                    <Text color="white">{text}</Text>
+                    <Text>{' '}</Text>
                 </Box>
+            </Box>
+        );
+
+        return (
+            <Box flexDirection="column">
+                {isFirstLine && renderPaddingLine(false)}
+                <Box
+                    flexDirection="row"
+                    width={columns}
+                    borderStyle="single"
+                    borderLeft={true}
+                    borderRight={false}
+                    borderTop={false}
+                    borderBottom={false}
+                    borderColor="#444444"
+                    paddingLeft={2}
+                    paddingRight={0}
+                    backgroundColor={'#1a1a1a'}
+                >
+                    <Box width={gutterWidth + 2} flexShrink={0}>
+                        <Text color="gray" dimColor>{String(lineNum).padStart(gutterWidth, ' ')} </Text>
+                    </Box>
+                    <Box flexGrow={1}>
+                        <Text color="white">{text}</Text>
+                    </Box>
+                </Box>
+                {isLastLine && renderPaddingLine(true)}
             </Box>
         );
     }

@@ -530,7 +530,7 @@ export default function App({ args = [] }) {
         if (manual) {
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
-                return [...prev, { id: 'check-' + Date.now(), role: 'system', text: '🔍 Checking for updates...', isMeta: true }];
+                return [...prev, { id: 'check-' + Date.now(), role: 'system', text: '[SYSTEM] Checking for updates...', isMeta: true }];
             });
         }
         try {
@@ -3554,7 +3554,7 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
                         <Box paddingX={1} marginBottom={1}>
-                            <Text color="gray" bold>SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: { aiProvider })</Text>
+                            <Text color="gray" bold>SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: {aiProvider})</Text>
                         </Box>
 
                         <SelectInput

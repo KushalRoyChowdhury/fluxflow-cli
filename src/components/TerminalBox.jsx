@@ -155,6 +155,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             paddingLeft={2}
             paddingRight={0}
             paddingY={completed ? 0 : 1}
+            marginTop={1}
             width="100%"
         >
             <Box marginBottom={1} justifyContent="space-between" width="100%">
