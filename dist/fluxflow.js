@@ -2060,7 +2060,7 @@ var require_cli_spinners = __commonJS({
   }
 });
 
-// node_modules/.pnpm/ink-spinner@5.0.0_ink@7.0.5_6a08245cee021c4d1a06101f9abe2946/node_modules/ink-spinner/build/index.js
+// node_modules/.pnpm/ink-spinner@5.0.0_ink@7.1.0_38a84928ececc3ab151b45dc093a1a9a/node_modules/ink-spinner/build/index.js
 import React, { useState, useEffect } from "react";
 import { Text } from "ink";
 function Spinner({ type = "dots" }) {
@@ -2081,7 +2081,7 @@ function Spinner({ type = "dots" }) {
 }
 var import_cli_spinners, build_default;
 var init_build = __esm({
-  "node_modules/.pnpm/ink-spinner@5.0.0_ink@7.0.5_6a08245cee021c4d1a06101f9abe2946/node_modules/ink-spinner/build/index.js"() {
+  "node_modules/.pnpm/ink-spinner@5.0.0_ink@7.1.0_38a84928ececc3ab151b45dc093a1a9a/node_modules/ink-spinner/build/index.js"() {
     import_cli_spinners = __toESM(require_cli_spinners(), 1);
     build_default = Spinner;
   }
@@ -2090,7 +2090,6 @@ var init_build = __esm({
 // src/components/MultilineInput.jsx
 import React2, { useState as useState2, useEffect as useEffect2, useMemo, useCallback, useRef } from "react";
 import { Box, Text as Text2, useInput } from "ink";
-import chalk from "chalk";
 function expandTabs(text, tabSize) {
   return text.replace(/\t/g, " ".repeat(tabSize));
 }
@@ -2098,35 +2097,56 @@ function normalizeLineEndings(text) {
   if (text == null) return "";
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
-function computeStaticVisualLines(value, wrapWidth, formatText) {
+function computeVisualMatrix(value, cursorIndex, wrapWidth, formatText) {
+  const textBefore = (value || "").slice(0, cursorIndex);
+  const visualCursorIdx = formatText(textBefore).length;
   const fullFormatted = formatText(value || "");
   const literalLines = fullFormatted.split("\n");
   const visualLines = [];
-  let currentFormattedIdx = 0;
+  let currentIdx = 0;
+  let cursorLine = 0;
+  let cursorCol = 0;
+  let foundCursor = false;
   for (let i = 0; i < literalLines.length; i++) {
     const line = literalLines[i];
     if (line.length === 0) {
-      visualLines.push({
-        text: "",
-        formattedStart: currentFormattedIdx,
-        formattedEnd: currentFormattedIdx
-      });
-      currentFormattedIdx += 1;
+      if (!foundCursor && visualCursorIdx === currentIdx) {
+        cursorLine = visualLines.length;
+        cursorCol = 0;
+        foundCursor = true;
+      }
+      visualLines.push({ text: "", globalStart: currentIdx });
+      currentIdx += 1;
       continue;
     }
     for (let j = 0; j < line.length; j += wrapWidth) {
       const chunk = line.slice(j, j + wrapWidth);
-      const chunkStart = currentFormattedIdx + j;
+      const chunkStart = currentIdx + j;
       const chunkEnd = chunkStart + chunk.length;
-      visualLines.push({
-        text: chunk,
-        formattedStart: chunkStart,
-        formattedEnd: chunkEnd
-      });
+      if (!foundCursor && visualCursorIdx >= chunkStart && (visualCursorIdx < chunkEnd || visualCursorIdx === chunkEnd && j + wrapWidth >= line.length && i === literalLines.length - 1)) {
+        cursorLine = visualLines.length;
+        cursorCol = visualCursorIdx - chunkStart;
+        foundCursor = true;
+      }
+      visualLines.push({ text: chunk, globalStart: chunkStart });
     }
-    currentFormattedIdx += line.length + 1;
+    currentIdx += line.length + 1;
   }
-  return { visualLines, fullFormatted };
+  if (!foundCursor) {
+    if (visualLines.length === 0) {
+      visualLines.push({ text: "", globalStart: 0 });
+    } else {
+      if (fullFormatted.endsWith("\n")) {
+        visualLines.push({ text: "", globalStart: currentIdx });
+        cursorLine = visualLines.length - 1;
+        cursorCol = 0;
+      } else {
+        cursorLine = visualLines.length - 1;
+        cursorCol = visualLines[cursorLine].text.length;
+      }
+    }
+  }
+  return { visualLines, cursorLine, cursorCol };
 }
 var ControlledMultilineInput, MultilineInput;
 var init_MultilineInput = __esm({
@@ -2144,74 +2164,9 @@ var init_MultilineInput = __esm({
       tabSize = 4,
       cursorIndex = 0,
       highlight,
-      columns = 80,
-      // Hoisted static matrix properties passed from controller 🛠️
-      visualLines = [],
-      cursorLine = 0,
-      cursorCol = 0,
-      formatText
+      columns = 80
     }) => {
       const scrollOffsetRef = useRef(0);
-      const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
-      const contentHeight = visualLines.length;
-      const visibleRows = useMemo(() => {
-        return Math.max(rows ?? maxRows ?? 1, Math.min(maxRows ?? rows ?? 1, contentHeight));
-      }, [rows, maxRows, contentHeight]);
-      const cursorLineEnd = cursorLine + 1;
-      const viewportEnd = scrollOffsetRef.current + visibleRows;
-      let newScrollOffset = scrollOffsetRef.current;
-      if (cursorLineEnd <= scrollOffsetRef.current) {
-        newScrollOffset = Math.max(0, cursorLineEnd - 1);
-      } else if (cursorLineEnd > viewportEnd) {
-        newScrollOffset = cursorLineEnd - visibleRows;
-      } else if (contentHeight) {
-        if (contentHeight < visibleRows) {
-          newScrollOffset = 0;
-        } else if (contentHeight < viewportEnd) {
-          newScrollOffset = contentHeight - visibleRows;
-        }
-      }
-      scrollOffsetRef.current = newScrollOffset;
-      const visibleLines = useMemo(() => {
-        return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
-      }, [visualLines, newScrollOffset, visibleRows]);
-      return /* @__PURE__ */ React2.createElement(Box, { height: visibleRows, width: wrapWidth, overflow: "hidden", flexDirection: "column", flexGrow: 0, flexShrink: 0 }, visibleLines.map((lineObj, idx) => {
-        const globalLineIdx = newScrollOffset + idx;
-        const isCursorLine = globalLineIdx === cursorLine && focus && showCursor;
-        if (!isCursorLine) {
-          return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, lineObj.text || (placeholder && value.length === 0 ? formatText(placeholder, true) : " "));
-        }
-        const text = lineObj.text;
-        const left = text.slice(0, cursorCol);
-        const charAtCursor = text[cursorCol] || " ";
-        const right = text.slice(cursorCol + 1);
-        const styledCursor = chalk.white.bold.inverse(charAtCursor);
-        const combinedLineText = left + styledCursor + right;
-        return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, combinedLineText);
-      }));
-    };
-    MultilineInput = ({
-      value,
-      onChange,
-      onSubmit,
-      keyBindings,
-      showCursor = true,
-      highlightPastedText = false,
-      focus = true,
-      columns = 80,
-      tabSize = 4,
-      mask,
-      useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
-      ...controlledProps
-    }) => {
-      const [cursorIndex, setCursorIndex] = useState2(value.length);
-      const [pasteLength, setPasteLength] = useState2(0);
-      const cursorIndexRef = useRef(value.length);
-      const valueRef = useRef(value);
-      const pasteLengthRef = useRef(0);
-      cursorIndexRef.current = cursorIndex;
-      valueRef.current = value;
-      pasteLengthRef.current = pasteLength;
       const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
       const formatText = useCallback(
         (text, isPlaceholder = false) => {
@@ -2247,48 +2202,71 @@ var init_MultilineInput = __esm({
         },
         [tabSize, mask]
       );
-      const baseLayout = useMemo(() => {
-        return computeStaticVisualLines(value, wrapWidth, formatText);
-      }, [value, wrapWidth, formatText]);
-      const getCursorCoords = useCallback((rawIdx) => {
-        const textBefore = (valueRef.current || "").slice(0, rawIdx);
-        const visualCursorIdx = formatText(textBefore).length;
-        const { visualLines } = baseLayout;
-        let cursorLine2 = 0;
-        let cursorCol2 = 0;
-        let foundCursor = false;
-        for (let i = 0; i < visualLines.length; i++) {
-          const lineObj = visualLines[i];
-          const start = lineObj.formattedStart;
-          const end = lineObj.formattedEnd;
-          if (start === end) {
-            if (visualCursorIdx === start) {
-              cursorLine2 = i;
-              cursorCol2 = 0;
-              foundCursor = true;
-              break;
-            }
-            continue;
-          }
-          if (visualCursorIdx >= start && visualCursorIdx <= end) {
-            if (visualCursorIdx === end && lineObj.text.length === wrapWidth && i < visualLines.length - 1) {
-              continue;
-            }
-            cursorLine2 = i;
-            cursorCol2 = visualCursorIdx - start;
-            foundCursor = true;
-            break;
-          }
+      const { visualLines, cursorLine, cursorCol } = useMemo(() => {
+        return computeVisualMatrix(value, cursorIndex, wrapWidth, formatText);
+      }, [value, cursorIndex, wrapWidth, formatText]);
+      const contentHeight = visualLines.length;
+      const visibleRows = useMemo(() => {
+        return Math.max(rows ?? maxRows ?? 1, Math.min(maxRows ?? rows ?? 1, contentHeight));
+      }, [rows, maxRows, contentHeight]);
+      const cursorLineEnd = cursorLine + 1;
+      const viewportEnd = scrollOffsetRef.current + visibleRows;
+      let newScrollOffset = scrollOffsetRef.current;
+      if (cursorLineEnd <= scrollOffsetRef.current) {
+        newScrollOffset = Math.max(0, cursorLineEnd - 1);
+      } else if (cursorLineEnd > viewportEnd) {
+        newScrollOffset = cursorLineEnd - visibleRows;
+      } else if (contentHeight) {
+        if (contentHeight < visibleRows) {
+          newScrollOffset = 0;
+        } else if (contentHeight < viewportEnd) {
+          newScrollOffset = contentHeight - visibleRows;
         }
-        if (!foundCursor) {
-          cursorLine2 = Math.max(0, visualLines.length - 1);
-          cursorCol2 = visualLines[cursorLine2] ? visualLines[cursorLine2].text.length : 0;
+      }
+      scrollOffsetRef.current = newScrollOffset;
+      const visibleLines = useMemo(() => {
+        return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
+      }, [visualLines, newScrollOffset, visibleRows]);
+      const cursorStyle = useMemo(() => ({
+        ...textStyle,
+        color: showCursor && focus ? "white" : void 0,
+        bold: showCursor && focus,
+        inverse: showCursor && focus
+      }), [textStyle, showCursor, focus]);
+      return /* @__PURE__ */ React2.createElement(Box, { height: visibleRows, width: wrapWidth, overflow: "hidden", flexDirection: "column", flexGrow: 0, flexShrink: 0 }, visibleLines.map((lineObj, idx) => {
+        const globalLineIdx = newScrollOffset + idx;
+        const isCursorLine = globalLineIdx === cursorLine && focus && showCursor;
+        if (!isCursorLine) {
+          return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, lineObj.text || (placeholder && value.length === 0 ? formatText(placeholder, true) : " "));
         }
-        return { cursorLine: cursorLine2, cursorCol: cursorCol2 };
-      }, [baseLayout, formatText, wrapWidth]);
-      const { cursorLine, cursorCol } = useMemo(() => {
-        return getCursorCoords(cursorIndex);
-      }, [cursorIndex, getCursorCoords]);
+        const text = lineObj.text;
+        const left = text.slice(0, cursorCol);
+        const charAtCursor = text[cursorCol] || " ";
+        const right = text.slice(cursorCol + 1);
+        return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, /* @__PURE__ */ React2.createElement(Text2, null, left), /* @__PURE__ */ React2.createElement(Text2, { ...cursorStyle }, charAtCursor), /* @__PURE__ */ React2.createElement(Text2, null, right));
+      }));
+    };
+    MultilineInput = ({
+      value,
+      onChange,
+      onSubmit,
+      keyBindings,
+      showCursor = true,
+      highlightPastedText = false,
+      focus = true,
+      columns = 80,
+      useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
+      ...controlledProps
+    }) => {
+      const [cursorIndex, setCursorIndex] = useState2(value.length);
+      const [pasteLength, setPasteLength] = useState2(0);
+      const cursorIndexRef = useRef(value.length);
+      const valueRef = useRef(value);
+      const pasteLengthRef = useRef(0);
+      const lastArrowTimeRef = useRef(0);
+      cursorIndexRef.current = cursorIndex;
+      valueRef.current = value;
+      pasteLengthRef.current = pasteLength;
       useEffect2(() => {
         if (cursorIndexRef.current > value.length) {
           cursorIndexRef.current = value.length;
@@ -2299,8 +2277,17 @@ var init_MultilineInput = __esm({
         if (input === "\x1B[I" || input === "\x1B[O" || input === "[I" || input === "[O") {
           return;
         }
+        const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
+        if (isArrowKey) {
+          const now = Date.now();
+          if (now - lastArrowTimeRef.current < 33) {
+            return;
+          }
+          lastArrowTimeRef.current = now;
+        }
         const curIdx = cursorIndexRef.current;
         const val = valueRef.current;
+        const wrapWidth = Math.max(20, columns - 10);
         const submitKey = keyBindings?.submit ?? ((k) => k.return && k.ctrl);
         const newlineKey = keyBindings?.newline ?? ((k) => k.return);
         if (submitKey(key)) {
@@ -2317,28 +2304,17 @@ var init_MultilineInput = __esm({
         if (key.tab || key.shift && key.tab || key.ctrl && input === "c") {
           return;
         }
+        const identity = (t) => t;
         if (key.upArrow || key.downArrow) {
           if (showCursor) {
+            const { visualLines, cursorLine, cursorCol } = computeVisualMatrix(val, curIdx, wrapWidth, identity);
             const targetLine = key.upArrow ? cursorLine - 1 : cursorLine + 1;
-            if (targetLine >= 0 && targetLine < baseLayout.visualLines.length) {
-              const targetLineObj = baseLayout.visualLines[targetLine];
+            if (targetLine >= 0 && targetLine < visualLines.length) {
+              const targetLineObj = visualLines[targetLine];
               const targetCol = Math.min(cursorCol, targetLineObj.text.length);
-              const targetFormattedIdx = targetLineObj.formattedStart + targetCol;
-              let bestRawIdx = 0;
-              let minDiff = Infinity;
-              for (let k = 0; k <= val.length; k++) {
-                const fLen = formatText(val.slice(0, k)).length;
-                const diff = Math.abs(fLen - targetFormattedIdx);
-                if (diff < minDiff) {
-                  minDiff = diff;
-                  bestRawIdx = k;
-                }
-                if (fLen > targetFormattedIdx && diff > minDiff) {
-                  break;
-                }
-              }
-              cursorIndexRef.current = bestRawIdx;
-              setCursorIndex(bestRawIdx);
+              const newIndex = targetLineObj.globalStart + targetCol;
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
               setPasteLength(0);
             }
           }
@@ -2389,11 +2365,7 @@ var init_MultilineInput = __esm({
           cursorIndex,
           showCursor,
           focus,
-          columns,
-          visualLines: baseLayout.visualLines,
-          cursorLine,
-          cursorCol,
-          formatText
+          columns
         }
       );
     };
@@ -13134,14 +13106,14 @@ var init_strip_ansi = __esm({
   }
 });
 
-// node_modules/.pnpm/ink-gradient@4.0.1_ink@7.0._22a5e5164acbb76839b28b3b534da2cc/node_modules/ink-gradient/dist/index.js
+// node_modules/.pnpm/ink-gradient@4.0.1_ink@7.1._10eadb2cdb3bd743653644e90a99e776/node_modules/ink-gradient/dist/index.js
 import { jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
 import { Children, isValidElement, cloneElement } from "react";
 import { Box as Box13, Transform, Text as Text14 } from "ink";
 import gradientString from "gradient-string";
 var Gradient, dist_default;
 var init_dist = __esm({
-  "node_modules/.pnpm/ink-gradient@4.0.1_ink@7.0._22a5e5164acbb76839b28b3b534da2cc/node_modules/ink-gradient/dist/index.js"() {
+  "node_modules/.pnpm/ink-gradient@4.0.1_ink@7.1._10eadb2cdb3bd743653644e90a99e776/node_modules/ink-gradient/dist/index.js"() {
     init_strip_ansi();
     Gradient = (props) => {
       if (props.name && props.colors) {

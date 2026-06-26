@@ -231,8 +231,20 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.12.3"]
+        const stableVersions = ["2.13.0"]
         const changelogData = {
+            "2.13.0": {
+                "note": "JUNE 26 - Performance Improvements.",
+                "added": [
+                    "New rendering engine with massive performance improvement and all time low rendering overhead giving upto 99% more smoothness and lower resource usage than prior versions."
+                ],
+                "changed": [
+                    "UI Component redesigns to support this new renderer efficiently without broken layout."
+                ],
+                "fixes": [
+                    "Resolved a bug where the screen jumps to start on middle scroll re-renders (from v1.0.0 btw)."
+                ]
+            },
             "2.12.3" : {
                 "note": "JUNE 25 - Upgrades to Playground.",
                 "added": [
