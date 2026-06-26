@@ -4,6 +4,84 @@ import { TerminalBox } from './TerminalBox.jsx';
 import { wrapText, cleanSignals } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 
+const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
+    const [displayedText, setDisplayedText] = useState((isActiveBlock && isStreaming) ? '' : targetText);
+    const targetTextRef = useRef(targetText);
+
+    useEffect(() => {
+        targetTextRef.current = targetText;
+    }, [targetText]);
+
+    useEffect(() => {
+        if (!isActiveBlock) {
+            setDisplayedText(targetText);
+            return;
+        }
+
+        if (!isStreaming && displayedText === targetText) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            setDisplayedText(current => {
+                const target = targetTextRef.current;
+
+                if (current.length >= target.length) {
+                    if (!isStreaming) {
+                        clearInterval(interval);
+                    }
+                    return current;
+                }
+
+                if (!target.startsWith(current)) {
+                    return target;
+                }
+
+                const remaining = target.substring(current.length);
+                const words = remaining.split(/(\s+)/);
+                if (words.length <= 1) {
+                    if (!isStreaming) {
+                        clearInterval(interval);
+                    }
+                    return target;
+                }
+
+                const currentWordsCount = current.split(/\s+/).filter(Boolean).length;
+                const targetWordsCount = target.split(/\s+/).filter(Boolean).length;
+                const diff = targetWordsCount - currentWordsCount;
+
+                let wordsToAdd = 1;
+                if (diff > 15) {
+                    wordsToAdd = 4;
+                } else if (diff > 8) {
+                    wordsToAdd = 3;
+                } else if (diff > 3) {
+                    wordsToAdd = 2;
+                }
+
+                let addedText = '';
+                let wordCount = 0;
+                for (let i = 0; i < words.length; i++) {
+                    const w = words[i];
+                    addedText += w;
+                    if (/\S/.test(w)) {
+                        wordCount++;
+                        if (wordCount >= wordsToAdd) {
+                            break;
+                        }
+                    }
+                }
+
+                return current + addedText;
+            });
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [isStreaming, isActiveBlock, targetText, displayedText]);
+
+    return displayedText;
+};
+
 const formatThinkText = (cleaned, columns = 80) => {
     if (!cleaned) return null;
     const availableWidth = columns - 10;
@@ -932,18 +1010,19 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             );
         }
 
-        const trimmed = text.trim();
+        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const trimmed = animatedText.trim();
         const isUnordered = /^[\*\-\+]\s/.test(trimmed);
         const isOrdered = /^\d+\.\s/.test(trimmed);
 
-        let content = text;
+        let content = animatedText;
         if (isUnordered || isOrdered) {
             const bullet = isUnordered ? '  • ' : trimmed.match(/^\d+\.\s/)[0];
             const indent = ' '.repeat(bullet.length);
             const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ''), columns - (bullet.length + 10));
             content = bullet + wrappedPart.split('\n').join('\n' + indent);
         } else {
-            content = wrapText(text, columns - 10);
+            content = wrapText(animatedText, columns - 10);
         }
 
         const wrappedLines = content.split('\n');
@@ -974,9 +1053,10 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         if (!text || text.trim() === '') {
             return <Box height={1} />;
         }
+        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
-                <CodeRenderer text={text} columns={columns} />
+                <CodeRenderer text={animatedText} columns={columns} />
             </Box>
         );
     }

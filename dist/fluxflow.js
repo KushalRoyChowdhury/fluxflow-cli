@@ -2847,6 +2847,7 @@ var init_text = __esm({
             text: line
           };
           if (isLast && msg.isStreaming) {
+            block.isActiveBlock = true;
             activeBlock = block;
           } else {
             completedBlocks.push(block);
@@ -2882,6 +2883,7 @@ var init_text = __esm({
                   text: codeLines.join("\n")
                 };
                 if (isLast && msg.isStreaming && inCodeBlock) {
+                  block.isActiveBlock = true;
                   activeBlock = block;
                 } else {
                   completedBlocks.push(block);
@@ -2900,6 +2902,7 @@ var init_text = __esm({
                 text: codeLines.join("\n")
               };
               if (msg.isStreaming) {
+                block.isActiveBlock = true;
                 activeBlock = block;
               } else {
                 completedBlocks.push(block);
@@ -2915,7 +2918,8 @@ var init_text = __esm({
                   msg,
                   type: "table",
                   text: tableLines.join("\n"),
-                  isStreaming: true
+                  isStreaming: true,
+                  isActiveBlock: true
                 };
               } else {
                 completedBlocks.push({
@@ -2946,6 +2950,7 @@ var init_text = __esm({
               text: line
             };
             if (isLast && msg.isStreaming) {
+              block.isActiveBlock = true;
               activeBlock = block;
             } else {
               completedBlocks.push(block);
@@ -3479,12 +3484,76 @@ ${coloredArt[7]}`;
 // src/components/ChatLayout.jsx
 import React4, { useState as useState3, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
-var formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+var useStreamingText, formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
     init_text();
     init_terminal();
+    useStreamingText = (targetText, isStreaming, isActiveBlock) => {
+      const [displayedText, setDisplayedText] = useState3(isActiveBlock && isStreaming ? "" : targetText);
+      const targetTextRef = useRef2(targetText);
+      useEffect3(() => {
+        targetTextRef.current = targetText;
+      }, [targetText]);
+      useEffect3(() => {
+        if (!isActiveBlock) {
+          setDisplayedText(targetText);
+          return;
+        }
+        if (!isStreaming && displayedText === targetText) {
+          return;
+        }
+        const interval = setInterval(() => {
+          setDisplayedText((current) => {
+            const target = targetTextRef.current;
+            if (current.length >= target.length) {
+              if (!isStreaming) {
+                clearInterval(interval);
+              }
+              return current;
+            }
+            if (!target.startsWith(current)) {
+              return target;
+            }
+            const remaining = target.substring(current.length);
+            const words = remaining.split(/(\s+)/);
+            if (words.length <= 1) {
+              if (!isStreaming) {
+                clearInterval(interval);
+              }
+              return target;
+            }
+            const currentWordsCount = current.split(/\s+/).filter(Boolean).length;
+            const targetWordsCount = target.split(/\s+/).filter(Boolean).length;
+            const diff = targetWordsCount - currentWordsCount;
+            let wordsToAdd = 1;
+            if (diff > 15) {
+              wordsToAdd = 4;
+            } else if (diff > 8) {
+              wordsToAdd = 3;
+            } else if (diff > 3) {
+              wordsToAdd = 2;
+            }
+            let addedText = "";
+            let wordCount = 0;
+            for (let i = 0; i < words.length; i++) {
+              const w = words[i];
+              addedText += w;
+              if (/\S/.test(w)) {
+                wordCount++;
+                if (wordCount >= wordsToAdd) {
+                  break;
+                }
+              }
+            }
+            return current + addedText;
+          });
+        }, 100);
+        return () => clearInterval(interval);
+      }, [isStreaming, isActiveBlock, targetText, displayedText]);
+      return displayedText;
+    };
     formatThinkText = (cleaned, columns = 80) => {
       if (!cleaned) return null;
       const availableWidth = columns - 10;
@@ -3965,17 +4034,18 @@ var init_ChatLayout = __esm({
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "));
         }
-        const trimmed = text.trim();
+        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const trimmed = animatedText.trim();
         const isUnordered = /^[\*\-\+]\s/.test(trimmed);
         const isOrdered = /^\d+\.\s/.test(trimmed);
-        let content = text;
+        let content = animatedText;
         if (isUnordered || isOrdered) {
           const bullet = isUnordered ? "  \u2022 " : trimmed.match(/^\d+\.\s/)[0];
           const indent = " ".repeat(bullet.length);
           const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 10));
           content = bullet + wrappedPart.split("\n").join("\n" + indent);
         } else {
-          content = wrapText(text, columns - 10);
+          content = wrapText(animatedText, columns - 10);
         }
         const wrappedLines = content.split("\n");
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, wrappedLines.map((wLine, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wLine, color: "gray", italic: true })))));
@@ -3988,7 +4058,8 @@ var init_ChatLayout = __esm({
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { height: 1 });
         }
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text, columns }));
+        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns }));
       }
       if (type === "table") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns }));
@@ -13954,13 +14025,8 @@ function App({ args = [] }) {
     });
     uniqueActive.forEach((msg) => {
       const parsed = parseMessageToBlocks(msg, columns);
-      const isStaticRecord = msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user";
-      if (isStaticRecord) {
-        active.push(...parsed.completed);
-      } else {
-        completed.push(...parsed.completed);
-        active.push(...parsed.active);
-      }
+      completed.push(...parsed.completed);
+      active.push(...parsed.active);
     });
     const MAX_BLOCKS = 5e9;
     const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));

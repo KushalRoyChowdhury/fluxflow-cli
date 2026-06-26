@@ -542,6 +542,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                 text: line
             };
             if (isLast && msg.isStreaming) {
+                block.isActiveBlock = true;
                 activeBlock = block;
             } else {
                 completedBlocks.push(block);
@@ -579,6 +580,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                             text: codeLines.join('\n')
                         };
                         if (isLast && msg.isStreaming && inCodeBlock) {
+                            block.isActiveBlock = true;
                             activeBlock = block;
                         } else {
                             completedBlocks.push(block);
@@ -597,6 +599,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                         text: codeLines.join('\n')
                     };
                     if (msg.isStreaming) {
+                        block.isActiveBlock = true;
                         activeBlock = block;
                     } else {
                         completedBlocks.push(block);
@@ -612,7 +615,8 @@ export const parseMessageToBlocks = (msg, columns) => {
                             msg,
                             type: 'table',
                             text: tableLines.join('\n'),
-                            isStreaming: true
+                            isStreaming: true,
+                            isActiveBlock: true
                         };
                     } else {
                         completedBlocks.push({
@@ -645,6 +649,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                 };
 
                 if (isLast && msg.isStreaming) {
+                    block.isActiveBlock = true;
                     activeBlock = block;
                 } else {
                     completedBlocks.push(block);
