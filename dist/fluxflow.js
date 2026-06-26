@@ -2227,12 +2227,21 @@ var init_MultilineInput = __esm({
       const visibleLines = useMemo(() => {
         return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
       }, [visualLines, newScrollOffset, visibleRows]);
+      const [blink, setBlink] = useState2(true);
+      useEffect2(() => {
+        setBlink(true);
+        if (!focus || !showCursor) return;
+        const timer = setInterval(() => {
+          setBlink((prev) => !prev);
+        }, 530);
+        return () => clearInterval(timer);
+      }, [focus, showCursor, value, cursorIndex]);
       const cursorStyle = useMemo(() => ({
         ...textStyle,
-        color: showCursor && focus ? "white" : void 0,
-        bold: showCursor && focus,
-        inverse: showCursor && focus
-      }), [textStyle, showCursor, focus]);
+        color: showCursor && focus && blink ? "white" : void 0,
+        bold: showCursor && focus && blink,
+        inverse: showCursor && focus && blink
+      }), [textStyle, showCursor, focus, blink]);
       return /* @__PURE__ */ React2.createElement(Box, { height: visibleRows, width: wrapWidth, overflow: "hidden", flexDirection: "column", flexGrow: 0, flexShrink: 0 }, visibleLines.map((lineObj, idx) => {
         const globalLineIdx = newScrollOffset + idx;
         const isCursorLine = globalLineIdx === cursorLine && focus && showCursor;
@@ -2767,6 +2776,7 @@ var init_text = __esm({
             text: line,
             gutterWidth,
             lineNum: idx + 1,
+            isFirstLine: idx === 0,
             isLastLine: isLast
           };
           if (isLast && msg.isStreaming) {
@@ -13944,7 +13954,7 @@ function App({ args = [] }) {
     });
     uniqueActive.forEach((msg) => {
       const parsed = parseMessageToBlocks(msg, columns);
-      const isStaticRecord = msg.role === "system" || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user";
+      const isStaticRecord = msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user";
       if (isStaticRecord) {
         active.push(...parsed.completed);
       } else {

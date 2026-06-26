@@ -160,12 +160,23 @@ export const ControlledMultilineInput = ({
         return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
     }, [visualLines, newScrollOffset, visibleRows]);
 
+    const [blink, setBlink] = useState(true);
+
+    useEffect(() => {
+        setBlink(true);
+        if (!focus || !showCursor) return;
+        const timer = setInterval(() => {
+            setBlink(prev => !prev);
+        }, 530);
+        return () => clearInterval(timer);
+    }, [focus, showCursor, value, cursorIndex]);
+
     const cursorStyle = useMemo(() => ({
         ...textStyle,
-        color: (showCursor && focus) ? 'white' : undefined,
-        bold: showCursor && focus,
-        inverse: showCursor && focus
-    }), [textStyle, showCursor, focus]);
+        color: (showCursor && focus && blink) ? 'white' : undefined,
+        bold: showCursor && focus && blink,
+        inverse: showCursor && focus && blink
+    }), [textStyle, showCursor, focus, blink]);
 
     return (
         <Box height={visibleRows} width={wrapWidth} overflow="hidden" flexDirection="column" flexGrow={0} flexShrink={0}>

@@ -985,7 +985,7 @@ export default function App({ args = [] }) {
 
         uniqueActive.forEach((msg) => {
             const parsed = parseMessageToBlocks(msg, columns);
-            const isStaticRecord = msg.role === 'system' || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user';
+            const isStaticRecord = msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user';
 
             if (isStaticRecord) {
                 active.push(...parsed.completed);

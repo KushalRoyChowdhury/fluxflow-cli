@@ -459,6 +459,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                 text: line,
                 gutterWidth,
                 lineNum: idx + 1,
+                isFirstLine: idx === 0,
                 isLastLine: isLast
             };
 
