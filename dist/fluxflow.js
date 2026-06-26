@@ -2316,6 +2316,16 @@ var init_MultilineInput = __esm({
               cursorIndexRef.current = newIndex;
               setCursorIndex(newIndex);
               setPasteLength(0);
+            } else if (key.upArrow && cursorLine === 0) {
+              cursorIndexRef.current = 0;
+              setCursorIndex(0);
+              setPasteLength(0);
+            } else if (key.downArrow && cursorLine === visualLines.length - 1) {
+              const lastLineObj = visualLines[visualLines.length - 1];
+              const newIndex = lastLineObj.globalStart + lastLineObj.text.length;
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
             }
           }
         } else if (key.leftArrow) {
@@ -2345,6 +2355,22 @@ var init_MultilineInput = __esm({
             const newValue = val.slice(0, curIdx) + val.slice(curIdx + 1);
             onChange(newValue);
             setPasteLength(0);
+          }
+        } else if (key.home || key.end) {
+          if (showCursor) {
+            const { visualLines, cursorLine } = computeVisualMatrix(val, curIdx, wrapWidth, identity);
+            const currentLineObj = visualLines[cursorLine];
+            if (currentLineObj) {
+              let newIndex;
+              if (key.home) {
+                newIndex = currentLineObj.globalStart;
+              } else if (key.end) {
+                newIndex = currentLineObj.globalStart + currentLineObj.text.length;
+              }
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
+            }
           }
         } else {
           if (input) {
@@ -2758,61 +2784,6 @@ var init_text = __esm({
         const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : "";
         const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
-        const highlightInfos = Array(diffLines.length).fill(null);
-        let idx = 0;
-        while (idx < diffLines.length) {
-          const removals = [];
-          const additions = [];
-          while (idx < diffLines.length) {
-            const line = diffLines[idx];
-            const cleanLine = line.replace("[UI_CONTEXT]", "");
-            if (cleanLine.startsWith("-")) {
-              removals.push({ idx, line: cleanLine });
-              idx++;
-            } else {
-              break;
-            }
-          }
-          while (idx < diffLines.length) {
-            const line = diffLines[idx];
-            const cleanLine = line.replace("[UI_CONTEXT]", "");
-            if (cleanLine.startsWith("+")) {
-              additions.push({ idx, line: cleanLine });
-              idx++;
-            } else {
-              break;
-            }
-          }
-          if (removals.length > 0 && additions.length > 0) {
-            const pairCount = Math.min(removals.length, additions.length);
-            for (let k = 0; k < pairCount; k++) {
-              const r = removals[k];
-              const a = additions[k];
-              const rRest = r.line.substring(1);
-              const rSplit = rRest.indexOf("|");
-              const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
-              const aRest = a.line.substring(1);
-              const aSplit = aRest.indexOf("|");
-              const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
-              let prefixLen = 0;
-              while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
-                prefixLen++;
-              }
-              let suffixLen = 0;
-              const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
-              while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
-                suffixLen++;
-              }
-              if (prefixLen > 0 || suffixLen > 0) {
-                highlightInfos[r.idx] = { prefixLen, suffixLen };
-                highlightInfos[a.idx] = { prefixLen, suffixLen };
-              }
-            }
-          }
-          if (removals.length === 0 && additions.length === 0) {
-            idx++;
-          }
-        }
         const completedBlocks2 = [];
         let activeBlock2 = null;
         diffLines.forEach((line, i) => {
@@ -2822,7 +2793,8 @@ var init_text = __esm({
             msg,
             type: "diff-line",
             text: line,
-            highlightInfo: highlightInfos[i]
+            isFirstLine: i === 0,
+            isLastLine: isLast
           };
           if (isLast && msg.isStreaming) {
             activeBlock2 = block;
@@ -3686,7 +3658,7 @@ var init_ChatLayout = __esm({
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, columns = 80, highlightInfo }) => {
+    DiffLine = React4.memo(({ line, columns = 80 }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
@@ -3702,81 +3674,13 @@ var init_ChatLayout = __esm({
       const bgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : "#1a1a1a";
       const textColor = isRemoval ? "#ff4d4d" : isAddition ? "#4dff88" : isContext ? "white" : "white";
       const numColor = isRemoval ? "#cf3a3a" : isAddition ? "#3acf65" : "gray";
-      const hasHighlight = highlightInfo && (highlightInfo.prefixLen > 0 || highlightInfo.suffixLen > 0);
-      const rowBgColor = hasHighlight ? "#1a1a1a" : bgColor;
-      if (hasHighlight) {
-        const prefixLen = highlightInfo.prefixLen;
-        const suffixLen = highlightInfo.suffixLen;
-        const prefix = content.substring(0, prefixLen);
-        const delta = content.substring(prefixLen, content.length - suffixLen);
-        const suffix = content.substring(content.length - suffixLen);
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, prefix, /* @__PURE__ */ React4.createElement(Text4, { backgroundColor: bgColor }, delta), suffix)));
-      }
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: rowBgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, wrapText(content, columns - 14))));
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: bgColor, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: numColor, dimColor: isContext }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, bold: true }, isRemoval ? "-" : isAddition ? "+" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: textColor, dimColor: isContext }, wrapText(content, columns - 14))));
     });
     DiffBlock = React4.memo(({ text, columns = 80 }) => {
       const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
-      const highlightInfos = React4.useMemo(() => {
-        const infos = Array(diffLines.length).fill(null);
-        let idx = 0;
-        while (idx < diffLines.length) {
-          const removals = [];
-          const additions = [];
-          while (idx < diffLines.length) {
-            const line = diffLines[idx];
-            const cleanLine = line.replace("[UI_CONTEXT]", "");
-            if (cleanLine.startsWith("-")) {
-              removals.push({ idx, line: cleanLine });
-              idx++;
-            } else {
-              break;
-            }
-          }
-          while (idx < diffLines.length) {
-            const line = diffLines[idx];
-            const cleanLine = line.replace("[UI_CONTEXT]", "");
-            if (cleanLine.startsWith("+")) {
-              additions.push({ idx, line: cleanLine });
-              idx++;
-            } else {
-              break;
-            }
-          }
-          if (removals.length > 0 && additions.length > 0) {
-            const pairCount = Math.min(removals.length, additions.length);
-            for (let k = 0; k < pairCount; k++) {
-              const r = removals[k];
-              const a = additions[k];
-              const rRest = r.line.substring(1);
-              const rSplit = rRest.indexOf("|");
-              const rContent = rSplit !== -1 ? rRest.substring(rSplit + 1) : rRest;
-              const aRest = a.line.substring(1);
-              const aSplit = aRest.indexOf("|");
-              const aContent = aSplit !== -1 ? aRest.substring(aSplit + 1) : aRest;
-              let prefixLen = 0;
-              while (prefixLen < rContent.length && prefixLen < aContent.length && rContent[prefixLen] === aContent[prefixLen]) {
-                prefixLen++;
-              }
-              let suffixLen = 0;
-              const maxSuffix = Math.min(rContent.length - prefixLen, aContent.length - prefixLen);
-              while (suffixLen < maxSuffix && rContent[rContent.length - 1 - suffixLen] === aContent[aContent.length - 1 - suffixLen]) {
-                suffixLen++;
-              }
-              if (prefixLen > 0 || suffixLen > 0) {
-                infos[r.idx] = { prefixLen, suffixLen };
-                infos[a.idx] = { prefixLen, suffixLen };
-              }
-            }
-          }
-          if (removals.length === 0 && additions.length === 0) {
-            idx++;
-          }
-        }
-        return infos;
-      }, [diffLines]);
-      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, columns: columns - 3, highlightInfo: highlightInfos[i] })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 2, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
+      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, columns: columns - 3 })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
     CodeRenderer = React4.memo(({ text, columns = 80 }) => {
       if (!text) return null;
@@ -3895,13 +3799,70 @@ var init_ChatLayout = __esm({
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : "No selection";
         const s = emojiSpace(2);
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "AGENT REQUEST: RESOLVED")), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, selection)))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "column",
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            paddingRight: 0,
+            paddingTop: 1,
+            paddingBottom: 1,
+            backgroundColor: "#1a1a1a",
+            width: "100%"
+          },
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "AGENT REQUEST: RESOLVED")),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, selection)))
+        ));
       }
       if (msg.isAboutRecord) {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "ABOUT FLUX FLOW")), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, msg.text))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "column",
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            paddingRight: 0,
+            paddingTop: 1,
+            paddingBottom: 1,
+            backgroundColor: "#1a1a1a",
+            width: "100%"
+          },
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "ABOUT FLUX FLOW")),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, msg.text))
+        ));
       }
       if (msg.isUpdateNotification) {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "UPDATE AVAILABLE")), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: msg.text, columns }))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "column",
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            paddingRight: 0,
+            paddingTop: 1,
+            paddingBottom: 1,
+            backgroundColor: "#1a1a1a",
+            width: "100%"
+          },
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "UPDATE AVAILABLE")),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: msg.text, columns }))
+        ));
       }
       if (msg.isHelpRecord) {
         const commandList = [
@@ -4029,8 +3990,7 @@ var init_ChatLayout = __esm({
           DiffLine,
           {
             line: text,
-            columns,
-            highlightInfo: block.highlightInfo
+            columns
           }
         ), isLastLine && renderPaddingLine(true));
       }
@@ -5435,31 +5395,73 @@ var init_AskUserModal = __esm({
       });
       const s = emojiSpace(2);
       if (isSuggestingElse) {
-        return /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4AC} SUGGEST SOMETHING ELSE")), /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { italic: true, color: "gray" }, "Replying to: ", question)), /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4A0} "), /* @__PURE__ */ React9.createElement(
-          TextInput3,
-          {
-            value: customInput,
-            onChange: setCustomInput,
-            onSubmit: () => onResolve(customInput)
-          }
-        )), /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Press Enter to send)")));
-      }
-      return /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "AGENT REQUEST: ACTION REQUIRED")), /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { bold: true, color: "white" }, question)), /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
-        const isSelected = idx === selectedIndex;
         return /* @__PURE__ */ React9.createElement(
           Box8,
           {
-            key: opt.id,
             flexDirection: "column",
-            width: "100%",
-            backgroundColor: isSelected ? "#2a2a2a" : void 0,
-            paddingX: 1,
-            marginBottom: idx === allOptions.length - 1 ? 0 : 1
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            paddingRight: 0,
+            paddingTop: 1,
+            paddingBottom: 1,
+            backgroundColor: "#1a1a1a",
+            width: "100%"
           },
-          /* @__PURE__ */ React9.createElement(Text9, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", opt.label),
-          opt.description && /* @__PURE__ */ React9.createElement(Box8, { marginLeft: 4 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, opt.description))
+          /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4AC} SUGGEST SOMETHING ELSE")),
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { italic: true, color: "gray" }, "Replying to: ", question)),
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4A0} "), /* @__PURE__ */ React9.createElement(
+            TextInput3,
+            {
+              value: customInput,
+              onChange: setCustomInput,
+              onSubmit: () => onResolve(customInput)
+            }
+          )),
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Press Enter to send)"))
         );
-      })), /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Use Arrows to navigate, Enter to confirm)")));
+      }
+      return /* @__PURE__ */ React9.createElement(
+        Box8,
+        {
+          flexDirection: "column",
+          borderStyle: "single",
+          borderLeft: true,
+          borderRight: false,
+          borderTop: false,
+          borderBottom: false,
+          borderColor: "#444444",
+          paddingLeft: 2,
+          paddingRight: 0,
+          paddingTop: 1,
+          paddingBottom: 1,
+          backgroundColor: "#1a1a1a",
+          width: "100%"
+        },
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "AGENT REQUEST: ACTION REQUIRED")),
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { bold: true, color: "white" }, question)),
+        /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
+          const isSelected = idx === selectedIndex;
+          return /* @__PURE__ */ React9.createElement(
+            Box8,
+            {
+              key: opt.id,
+              flexDirection: "column",
+              width: "100%",
+              backgroundColor: isSelected ? "#2a2a2a" : void 0,
+              paddingX: 1,
+              marginBottom: idx === allOptions.length - 1 ? 0 : 1
+            },
+            /* @__PURE__ */ React9.createElement(Text9, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", opt.label),
+            opt.description && /* @__PURE__ */ React9.createElement(Box8, { marginLeft: 4 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, opt.description))
+          );
+        })),
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Use Arrows to navigate, Enter to confirm)"))
+      );
     };
     AskUserModal_default = AskUserModal;
   }
@@ -13915,18 +13917,55 @@ function App({ args = [] }) {
     const completed = [];
     const active = [];
     const columns = terminalSize.columns || 80;
-    messages.slice(0, completedIndex).forEach((msg) => {
+    const completedMsgs = messages.slice(0, completedIndex);
+    const activeMsgs = messages.slice(completedIndex);
+    const seenAskSelections = /* @__PURE__ */ new Set();
+    const filterDuplicates = (msgList) => {
+      return msgList.filter((msg) => {
+        if (msg.isAskRecord) {
+          const selectionMatch = msg.text?.match(/Selection: (.*)/);
+          const selection = selectionMatch ? selectionMatch[1].trim() : "";
+          if (selection) {
+            if (seenAskSelections.has(selection)) {
+              return false;
+            }
+            seenAskSelections.add(selection);
+          }
+        }
+        return true;
+      });
+    };
+    const uniqueCompleted = filterDuplicates(completedMsgs);
+    const uniqueActive = filterDuplicates(activeMsgs);
+    uniqueCompleted.forEach((msg) => {
       const parsed = parseMessageToBlocks(msg, columns);
       completed.push(...parsed.completed);
       completed.push(...parsed.active);
     });
-    messages.slice(completedIndex).forEach((msg) => {
+    uniqueActive.forEach((msg) => {
       const parsed = parseMessageToBlocks(msg, columns);
-      completed.push(...parsed.completed);
-      active.push(...parsed.active);
+      const isStaticRecord = msg.role === "system" || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user";
+      if (isStaticRecord) {
+        active.push(...parsed.completed);
+      } else {
+        completed.push(...parsed.completed);
+        active.push(...parsed.active);
+      }
     });
-    const MAX_BLOCKS = 1e3;
+    const MAX_BLOCKS = 5e9;
     const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
+    if (slicedCompleted.length >= 75e3) {
+      slicedCompleted.push({
+        key: "memory-warning-block",
+        msg: {
+          role: "system",
+          text: `\u26A0\uFE0F MEMORY WARNING: CHAT IS GETTING VERY LONG`,
+          subText: `This session has reached ${slicedCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
+          isHomeWarning: true
+        },
+        type: "full-message"
+      });
+    }
     return {
       completed: slicedCompleted,
       active
@@ -14459,9 +14498,9 @@ function App({ args = [] }) {
     { cmd: "/quit", desc: "Exit and shutdown Flux" },
     { cmd: "/help", desc: "Show all available commands" },
     ...parsedArgs.playground ? [{ cmd: "/move", desc: "Move playground directory to original CWD/playground-export" }] : [],
+    { cmd: "/resume", desc: "Load previous session" },
     { cmd: "/compress", desc: "Summarize and compress chat history" },
     { cmd: "/clear", desc: "Clear terminal screen" },
-    { cmd: "/resume", desc: "Load previous session" },
     { cmd: "/revert", desc: "Revert codebase back to a checkpoint" },
     { cmd: "/gemini", desc: "Get a happy message from Gemini CLI" },
     { cmd: "/save", desc: "Force save current chat" },
@@ -15691,20 +15730,27 @@ ${timestamp}` };
               },
               onAskUser: async (question, options) => {
                 return new Promise((resolve) => {
+                  let resolvedFlag = false;
                   setPendingAsk({
                     question,
                     options,
                     resolve: (val) => {
-                      setMessages((prev) => [
-                        ...prev,
-                        {
-                          id: "ask-" + Date.now(),
-                          role: "system",
-                          text: `\u{1F4AC} **Ask User**
+                      if (resolvedFlag) return;
+                      resolvedFlag = true;
+                      setMessages((prev) => {
+                        const hasAskRecord = prev.some((m) => m.isAskRecord && m.text?.includes(`Selection: ${val}`));
+                        if (hasAskRecord) return prev;
+                        return [
+                          ...prev,
+                          {
+                            id: "ask-" + Date.now(),
+                            role: "system",
+                            text: `\u{1F4AC} **Ask User**
 Selection: ${val}`,
-                          isAskRecord: true
-                        }
-                      ]);
+                            isAskRecord: true
+                          }
+                        ];
+                      });
                       resolve(val);
                     }
                   });
@@ -17350,7 +17396,7 @@ var init_app = __esm({
 // src/cli.jsx
 import { spawn as spawn3 } from "child_process";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var HEAP_LIMIT = 4096;
+var HEAP_LIMIT = 6144;
 var isBundled = fileURLToPath2(import.meta.url).endsWith(".js");
 if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-size"))) {
   const cp = spawn3(process.execPath, [

@@ -999,6 +999,19 @@ export default function App({ args = [] }) {
         const MAX_BLOCKS = 5000000000;
         const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
 
+        if (slicedCompleted.length >= 75000) {
+            slicedCompleted.push({
+                key: 'memory-warning-block',
+                msg: {
+                    role: 'system',
+                    text: `⚠️ MEMORY WARNING: CHAT IS GETTING VERY LONG`,
+                    subText: `This session has reached ${slicedCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
+                    isHomeWarning: true
+                },
+                type: 'full-message'
+            });
+        }
+
         return {
             completed: slicedCompleted,
             active

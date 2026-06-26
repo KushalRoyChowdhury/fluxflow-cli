@@ -279,10 +279,24 @@ export const MultilineInput = ({
                 const targetLine = key.upArrow ? cursorLine - 1 : cursorLine + 1;
 
                 if (targetLine >= 0 && targetLine < visualLines.length) {
+                    // Normal line-to-line navigation
                     const targetLineObj = visualLines[targetLine];
                     const targetCol = Math.min(cursorCol, targetLineObj.text.length);
 
                     const newIndex = targetLineObj.globalStart + targetCol;
+                    cursorIndexRef.current = newIndex;
+                    setCursorIndex(newIndex);
+                    setPasteLength(0);
+                } else if (key.upArrow && cursorLine === 0) {
+                    // Up arrow on the first line -> Move to the very start of the text! ↖️
+                    cursorIndexRef.current = 0;
+                    setCursorIndex(0);
+                    setPasteLength(0);
+                } else if (key.downArrow && cursorLine === visualLines.length - 1) {
+                    // Down arrow on the last line -> Move to the very end of the text! ↘️
+                    const lastLineObj = visualLines[visualLines.length - 1];
+                    const newIndex = lastLineObj.globalStart + lastLineObj.text.length;
+
                     cursorIndexRef.current = newIndex;
                     setCursorIndex(newIndex);
                     setPasteLength(0);
@@ -316,7 +330,29 @@ export const MultilineInput = ({
                 onChange(newValue);
                 setPasteLength(0);
             }
-        } else {
+        } else if (key.home || key.end) {
+            // Home and End key behaviour 🏠🔚
+            if (showCursor) {
+                const { visualLines, cursorLine } = computeVisualMatrix(val, curIdx, wrapWidth, identity);
+                const currentLineObj = visualLines[cursorLine];
+
+                if (currentLineObj) {
+                    let newIndex;
+                    if (key.home) {
+                        // Move to the start of the current visual line
+                        newIndex = currentLineObj.globalStart;
+                    } else if (key.end) {
+                        // Move to the end of the current visual line
+                        newIndex = currentLineObj.globalStart + currentLineObj.text.length;
+                    }
+
+                    cursorIndexRef.current = newIndex;
+                    setCursorIndex(newIndex);
+                    setPasteLength(0);
+                }
+            }
+        }
+        else {
             if (input) {
                 const newValue = val.slice(0, curIdx) + input + val.slice(curIdx);
                 onChange(newValue);
