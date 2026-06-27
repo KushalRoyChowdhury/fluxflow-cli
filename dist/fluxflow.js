@@ -2087,326 +2087,6 @@ var init_build = __esm({
   }
 });
 
-// src/components/MultilineInput.jsx
-import React2, { useState as useState2, useEffect as useEffect2, useMemo, useCallback, useRef } from "react";
-import { Box, Text as Text2, useInput } from "ink";
-function expandTabs(text, tabSize) {
-  return text.replace(/\t/g, " ".repeat(tabSize));
-}
-function normalizeLineEndings(text) {
-  if (text == null) return "";
-  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-}
-function computeVisualMatrix(value, cursorIndex, wrapWidth, formatText) {
-  const textBefore = (value || "").slice(0, cursorIndex);
-  const visualCursorIdx = formatText(textBefore).length;
-  const fullFormatted = formatText(value || "");
-  const literalLines = fullFormatted.split("\n");
-  const visualLines = [];
-  let currentIdx = 0;
-  let cursorLine = 0;
-  let cursorCol = 0;
-  let foundCursor = false;
-  for (let i = 0; i < literalLines.length; i++) {
-    const line = literalLines[i];
-    if (line.length === 0) {
-      if (!foundCursor && visualCursorIdx === currentIdx) {
-        cursorLine = visualLines.length;
-        cursorCol = 0;
-        foundCursor = true;
-      }
-      visualLines.push({ text: "", globalStart: currentIdx });
-      currentIdx += 1;
-      continue;
-    }
-    for (let j = 0; j < line.length; j += wrapWidth) {
-      const chunk = line.slice(j, j + wrapWidth);
-      const chunkStart = currentIdx + j;
-      const chunkEnd = chunkStart + chunk.length;
-      if (!foundCursor && visualCursorIdx >= chunkStart && (visualCursorIdx < chunkEnd || visualCursorIdx === chunkEnd && j + wrapWidth >= line.length && i === literalLines.length - 1)) {
-        cursorLine = visualLines.length;
-        cursorCol = visualCursorIdx - chunkStart;
-        foundCursor = true;
-      }
-      visualLines.push({ text: chunk, globalStart: chunkStart });
-    }
-    currentIdx += line.length + 1;
-  }
-  if (!foundCursor) {
-    if (visualLines.length === 0) {
-      visualLines.push({ text: "", globalStart: 0 });
-    } else {
-      if (fullFormatted.endsWith("\n")) {
-        visualLines.push({ text: "", globalStart: currentIdx });
-        cursorLine = visualLines.length - 1;
-        cursorCol = 0;
-      } else {
-        cursorLine = visualLines.length - 1;
-        cursorCol = visualLines[cursorLine].text.length;
-      }
-    }
-  }
-  return { visualLines, cursorLine, cursorCol };
-}
-var ControlledMultilineInput, MultilineInput;
-var init_MultilineInput = __esm({
-  "src/components/MultilineInput.jsx"() {
-    ControlledMultilineInput = ({
-      value,
-      rows,
-      maxRows,
-      highlightStyle,
-      textStyle,
-      placeholder = "",
-      mask,
-      showCursor = true,
-      focus = true,
-      tabSize = 4,
-      cursorIndex = 0,
-      highlight,
-      columns = 80
-    }) => {
-      const scrollOffsetRef = useRef(0);
-      const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
-      const formatText = useCallback(
-        (text, isPlaceholder = false) => {
-          const normalized = normalizeLineEndings(text);
-          if (!isPlaceholder && mask) {
-            return normalized.replace(/[^\n]/g, mask);
-          }
-          const expanded = expandTabs(normalized, tabSize);
-          if (isPlaceholder) return expanded;
-          return expanded.replace(/@\[(.*?)\]/g, (match, p1) => {
-            const hashIdx = p1.indexOf("#");
-            const colonIdx = p1.indexOf(":L");
-            let pathOnly = p1;
-            let suffix = "";
-            if (hashIdx !== -1) {
-              pathOnly = p1.slice(0, hashIdx);
-              suffix = p1.slice(hashIdx);
-            } else if (colonIdx !== -1) {
-              pathOnly = p1.slice(0, colonIdx);
-              suffix = p1.slice(colonIdx);
-            }
-            let rel = pathOnly.replace(/\\/g, "/");
-            const cwd = (process.cwd() || "").replace(/\\/g, "/");
-            if (cwd && rel.toLowerCase().startsWith(cwd.toLowerCase() + "/")) {
-              rel = rel.slice(cwd.length + 1);
-            } else if (rel.startsWith("./")) {
-              rel = rel.slice(2);
-            }
-            const parts = rel.split("/");
-            const basename = parts[parts.length - 1];
-            return `[${basename}${suffix}]`;
-          });
-        },
-        [tabSize, mask]
-      );
-      const { visualLines, cursorLine, cursorCol } = useMemo(() => {
-        return computeVisualMatrix(value, cursorIndex, wrapWidth, formatText);
-      }, [value, cursorIndex, wrapWidth, formatText]);
-      const contentHeight = visualLines.length;
-      const visibleRows = useMemo(() => {
-        return Math.max(rows ?? maxRows ?? 1, Math.min(maxRows ?? rows ?? 1, contentHeight));
-      }, [rows, maxRows, contentHeight]);
-      const cursorLineEnd = cursorLine + 1;
-      const viewportEnd = scrollOffsetRef.current + visibleRows;
-      let newScrollOffset = scrollOffsetRef.current;
-      if (cursorLineEnd <= scrollOffsetRef.current) {
-        newScrollOffset = Math.max(0, cursorLineEnd - 1);
-      } else if (cursorLineEnd > viewportEnd) {
-        newScrollOffset = cursorLineEnd - visibleRows;
-      } else if (contentHeight) {
-        if (contentHeight < visibleRows) {
-          newScrollOffset = 0;
-        } else if (contentHeight < viewportEnd) {
-          newScrollOffset = contentHeight - visibleRows;
-        }
-      }
-      scrollOffsetRef.current = newScrollOffset;
-      const visibleLines = useMemo(() => {
-        return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
-      }, [visualLines, newScrollOffset, visibleRows]);
-      const [blink, setBlink] = useState2(true);
-      useEffect2(() => {
-        setBlink(true);
-        if (!focus || !showCursor) return;
-        const timer = setInterval(() => {
-          setBlink((prev) => !prev);
-        }, 530);
-        return () => clearInterval(timer);
-      }, [focus, showCursor, value, cursorIndex]);
-      const cursorStyle = useMemo(() => ({
-        ...textStyle,
-        color: showCursor && focus && blink ? "white" : void 0,
-        bold: showCursor && focus && blink,
-        inverse: showCursor && focus && blink
-      }), [textStyle, showCursor, focus, blink]);
-      return /* @__PURE__ */ React2.createElement(Box, { height: visibleRows, width: wrapWidth, overflow: "hidden", flexDirection: "column", flexGrow: 0, flexShrink: 0 }, visibleLines.map((lineObj, idx) => {
-        const globalLineIdx = newScrollOffset + idx;
-        const isCursorLine = globalLineIdx === cursorLine && focus && showCursor;
-        if (!isCursorLine) {
-          return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, lineObj.text || (placeholder && value.length === 0 ? formatText(placeholder, true) : " "));
-        }
-        const text = lineObj.text;
-        const left = text.slice(0, cursorCol);
-        const charAtCursor = text[cursorCol] || " ";
-        const right = text.slice(cursorCol + 1);
-        return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, /* @__PURE__ */ React2.createElement(Text2, null, left), /* @__PURE__ */ React2.createElement(Text2, { ...cursorStyle }, charAtCursor), /* @__PURE__ */ React2.createElement(Text2, null, right));
-      }));
-    };
-    MultilineInput = ({
-      value,
-      onChange,
-      onSubmit,
-      keyBindings,
-      showCursor = true,
-      highlightPastedText = false,
-      focus = true,
-      columns = 80,
-      useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
-      ...controlledProps
-    }) => {
-      const [cursorIndex, setCursorIndex] = useState2(value.length);
-      const [pasteLength, setPasteLength] = useState2(0);
-      const cursorIndexRef = useRef(value.length);
-      const valueRef = useRef(value);
-      const pasteLengthRef = useRef(0);
-      const lastArrowTimeRef = useRef(0);
-      cursorIndexRef.current = cursorIndex;
-      valueRef.current = value;
-      pasteLengthRef.current = pasteLength;
-      useEffect2(() => {
-        if (cursorIndexRef.current > value.length) {
-          cursorIndexRef.current = value.length;
-          setCursorIndex(value.length);
-        }
-      }, [value]);
-      useCustomInput((input, key) => {
-        if (input === "\x1B[I" || input === "\x1B[O" || input === "[I" || input === "[O") {
-          return;
-        }
-        const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
-        if (isArrowKey) {
-          const now = Date.now();
-          if (now - lastArrowTimeRef.current < 33) {
-            return;
-          }
-          lastArrowTimeRef.current = now;
-        }
-        const curIdx = cursorIndexRef.current;
-        const val = valueRef.current;
-        const wrapWidth = Math.max(20, columns - 10);
-        const submitKey = keyBindings?.submit ?? ((k) => k.return && k.ctrl);
-        const newlineKey = keyBindings?.newline ?? ((k) => k.return);
-        if (submitKey(key)) {
-          onSubmit?.(val);
-          return;
-        } else if (newlineKey(key)) {
-          const newValue = val.slice(0, curIdx) + "\n" + val.slice(curIdx);
-          onChange(newValue);
-          cursorIndexRef.current = curIdx + 1;
-          setCursorIndex(curIdx + 1);
-          setPasteLength(0);
-          return;
-        }
-        if (key.tab || key.shift && key.tab || key.ctrl && input === "c") {
-          return;
-        }
-        const identity = (t) => t;
-        if (key.upArrow || key.downArrow) {
-          if (showCursor) {
-            const { visualLines, cursorLine, cursorCol } = computeVisualMatrix(val, curIdx, wrapWidth, identity);
-            const targetLine = key.upArrow ? cursorLine - 1 : cursorLine + 1;
-            if (targetLine >= 0 && targetLine < visualLines.length) {
-              const targetLineObj = visualLines[targetLine];
-              const targetCol = Math.min(cursorCol, targetLineObj.text.length);
-              const newIndex = targetLineObj.globalStart + targetCol;
-              cursorIndexRef.current = newIndex;
-              setCursorIndex(newIndex);
-              setPasteLength(0);
-            } else if (key.upArrow && cursorLine === 0) {
-              cursorIndexRef.current = 0;
-              setCursorIndex(0);
-              setPasteLength(0);
-            } else if (key.downArrow && cursorLine === visualLines.length - 1) {
-              const lastLineObj = visualLines[visualLines.length - 1];
-              const newIndex = lastLineObj.globalStart + lastLineObj.text.length;
-              cursorIndexRef.current = newIndex;
-              setCursorIndex(newIndex);
-              setPasteLength(0);
-            }
-          }
-        } else if (key.leftArrow) {
-          if (showCursor) {
-            const newIndex = Math.max(0, curIdx - 1);
-            cursorIndexRef.current = newIndex;
-            setCursorIndex(newIndex);
-            setPasteLength(0);
-          }
-        } else if (key.rightArrow) {
-          if (showCursor) {
-            const newIndex = Math.min(val.length, curIdx + 1);
-            cursorIndexRef.current = newIndex;
-            setCursorIndex(newIndex);
-            setPasteLength(0);
-          }
-        } else if (key.backspace) {
-          if (curIdx > 0) {
-            const newValue = val.slice(0, curIdx - 1) + val.slice(curIdx);
-            onChange(newValue);
-            cursorIndexRef.current = curIdx - 1;
-            setCursorIndex(curIdx - 1);
-            setPasteLength(0);
-          }
-        } else if (key.delete) {
-          if (curIdx < val.length) {
-            const newValue = val.slice(0, curIdx) + val.slice(curIdx + 1);
-            onChange(newValue);
-            setPasteLength(0);
-          }
-        } else if (key.home || key.end) {
-          if (showCursor) {
-            const { visualLines, cursorLine } = computeVisualMatrix(val, curIdx, wrapWidth, identity);
-            const currentLineObj = visualLines[cursorLine];
-            if (currentLineObj) {
-              let newIndex;
-              if (key.home) {
-                newIndex = currentLineObj.globalStart;
-              } else if (key.end) {
-                newIndex = currentLineObj.globalStart + currentLineObj.text.length;
-              }
-              cursorIndexRef.current = newIndex;
-              setCursorIndex(newIndex);
-              setPasteLength(0);
-            }
-          }
-        } else {
-          if (input) {
-            const newValue = val.slice(0, curIdx) + input + val.slice(curIdx);
-            onChange(newValue);
-            const newIndex = curIdx + input.length;
-            cursorIndexRef.current = newIndex;
-            setCursorIndex(newIndex);
-            setPasteLength(input.length > 1 ? input.length : 0);
-          }
-        }
-      }, focus);
-      return /* @__PURE__ */ React2.createElement(
-        ControlledMultilineInput,
-        {
-          ...controlledProps,
-          value,
-          cursorIndex,
-          showCursor,
-          focus,
-          columns
-        }
-      );
-    };
-  }
-});
-
 // src/utils/text.js
 import os2 from "os";
 var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseMessageToBlocks, TOOL_LABELS, cleanSignals;
@@ -3057,14 +2737,649 @@ var init_text = __esm({
   }
 });
 
+// src/components/MultilineInput.jsx
+import React2, { useState as useState2, useEffect as useEffect2, useMemo, useCallback, useRef } from "react";
+import { Box, Text as Text2, useInput } from "ink";
+function expandTabs(text, tabSize) {
+  return text.replace(/\t/g, " ".repeat(tabSize));
+}
+function normalizeLineEndings(text) {
+  if (text == null) return "";
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+function formattedToRaw(formattedIdx, pasteBlocks, value) {
+  let rawIdx = formattedIdx;
+  const sortedBlocks = [...pasteBlocks].sort((a, b) => a.start - b.start);
+  let currentFormattedOffset = 0;
+  for (const block of sortedBlocks) {
+    const formattedStart = block.start - currentFormattedOffset;
+    const lines = normalizeLineEndings(block.text).split("\n").length;
+    const chars = block.text.length;
+    const placeholderLength = (lines > 3 ? `[Pasted ${lines} lines]` : `[Pasted ${chars} chars]`).length;
+    const formattedEnd = formattedStart + placeholderLength;
+    if (formattedIdx <= formattedStart) {
+      break;
+    } else if (formattedIdx < formattedEnd) {
+      rawIdx = block.end;
+      break;
+    } else {
+      const delta = block.text.length - placeholderLength;
+      rawIdx += delta;
+      currentFormattedOffset += delta;
+    }
+  }
+  return Math.min(rawIdx, value.length);
+}
+function computeVisualMatrix(value, cursorIndex, wrapWidth, formatText, pasteBlocks = []) {
+  const textBefore = (value || "").slice(0, cursorIndex);
+  let visualCursorIdx = formatText(textBefore).length;
+  let fullFormatted = formatText(value || "");
+  const sortedBlocks = [...pasteBlocks].sort((a, b) => b.start - a.start);
+  for (const block of sortedBlocks) {
+    const formattedStart = formatText(value.slice(0, block.start)).length;
+    const formattedPasted = formatText(block.text);
+    const formattedEnd = formattedStart + formattedPasted.length;
+    const lines = normalizeLineEndings(block.text).split("\n").length;
+    const chars = block.text.length;
+    const placeholderText = lines > 3 ? `[Pasted ${lines} lines]` : `[Pasted ${chars} chars]`;
+    fullFormatted = fullFormatted.slice(0, formattedStart) + placeholderText + fullFormatted.slice(formattedEnd);
+    if (visualCursorIdx > formattedStart && visualCursorIdx < formattedEnd) {
+      visualCursorIdx = formattedStart + placeholderText.length;
+    } else if (visualCursorIdx >= formattedEnd) {
+      visualCursorIdx = visualCursorIdx - (formattedEnd - formattedStart) + placeholderText.length;
+    }
+  }
+  const literalLines = fullFormatted.split("\n");
+  const visualLines = [];
+  let currentIdx = 0;
+  let cursorLine = 0;
+  let cursorCol = 0;
+  let foundCursor = false;
+  for (let i = 0; i < literalLines.length; i++) {
+    const line = literalLines[i];
+    if (line.length === 0) {
+      if (!foundCursor && visualCursorIdx === currentIdx) {
+        cursorLine = visualLines.length;
+        cursorCol = 0;
+        foundCursor = true;
+      }
+      visualLines.push({ text: "", globalStart: formattedToRaw(currentIdx, pasteBlocks, value), formattedStart: currentIdx });
+      currentIdx += 1;
+      continue;
+    }
+    const wrapped = wrapText(line, wrapWidth);
+    const wrappedLines = wrapped.split("\n");
+    let lastMatchEnd = 0;
+    const chunks = [];
+    for (let j = 0; j < wrappedLines.length; j++) {
+      const wLine = wrappedLines[j];
+      const trimmed = wLine.trim();
+      if (trimmed.length === 0) {
+        const spaceLength = wLine.length || 1;
+        chunks.push({
+          text: wLine,
+          start: lastMatchEnd,
+          length: spaceLength
+        });
+        lastMatchEnd += spaceLength;
+      } else {
+        const idx = line.indexOf(trimmed, lastMatchEnd);
+        if (idx !== -1) {
+          const start = lastMatchEnd;
+          const nextTrimmed = j < wrappedLines.length - 1 ? wrappedLines[j + 1].trim() : "";
+          let end = line.length;
+          if (nextTrimmed.length > 0) {
+            const nextIdx = line.indexOf(nextTrimmed, idx + trimmed.length);
+            if (nextIdx !== -1) {
+              end = nextIdx;
+            }
+          }
+          chunks.push({
+            text: line.slice(start, end),
+            start,
+            length: end - start
+          });
+          lastMatchEnd = end;
+        } else {
+          chunks.push({
+            text: wLine,
+            start: lastMatchEnd,
+            length: wLine.length
+          });
+          lastMatchEnd += wLine.length;
+        }
+      }
+    }
+    for (let idx = 0; idx < chunks.length; idx++) {
+      const chunkObj = chunks[idx];
+      const chunk = chunkObj.text;
+      const chunkStart = currentIdx + chunkObj.start;
+      const chunkEnd = chunkStart + chunkObj.length;
+      if (!foundCursor && visualCursorIdx >= chunkStart && (visualCursorIdx < chunkEnd || visualCursorIdx === chunkEnd && idx === chunks.length - 1)) {
+        cursorLine = visualLines.length;
+        cursorCol = visualCursorIdx - chunkStart;
+        foundCursor = true;
+      }
+      visualLines.push({
+        text: chunk,
+        globalStart: formattedToRaw(chunkStart, pasteBlocks, value),
+        formattedStart: chunkStart
+      });
+    }
+    currentIdx += line.length + 1;
+  }
+  if (!foundCursor) {
+    if (visualLines.length === 0) {
+      visualLines.push({ text: "", globalStart: 0, formattedStart: 0 });
+    } else {
+      if (fullFormatted.endsWith("\n")) {
+        visualLines.push({
+          text: "",
+          globalStart: formattedToRaw(currentIdx, pasteBlocks, value),
+          formattedStart: currentIdx
+        });
+        cursorLine = visualLines.length - 1;
+        cursorCol = 0;
+      } else {
+        cursorLine = visualLines.length - 1;
+        cursorCol = visualLines[cursorLine].text.length;
+      }
+    }
+  }
+  return { visualLines, cursorLine, cursorCol };
+}
+var ControlledMultilineInput, MultilineInput;
+var init_MultilineInput = __esm({
+  "src/components/MultilineInput.jsx"() {
+    init_text();
+    ControlledMultilineInput = ({
+      value,
+      rows,
+      maxRows,
+      highlightStyle,
+      textStyle,
+      placeholder = "",
+      mask,
+      showCursor = true,
+      focus = true,
+      tabSize = 4,
+      cursorIndex = 0,
+      highlight,
+      columns = 80,
+      pasteBlocks = []
+    }) => {
+      const scrollOffsetRef = useRef(0);
+      const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
+      const formatText = useCallback(
+        (text, isPlaceholder = false) => {
+          const normalized = normalizeLineEndings(text);
+          if (!isPlaceholder && mask) {
+            return normalized.replace(/[^\n]/g, mask);
+          }
+          const expanded = expandTabs(normalized, tabSize);
+          if (isPlaceholder) return expanded;
+          return expanded.replace(/@\[(.*?)\]/g, (match, p1) => {
+            const hashIdx = p1.indexOf("#");
+            const colonIdx = p1.indexOf(":L");
+            let pathOnly = p1;
+            let suffix = "";
+            if (hashIdx !== -1) {
+              pathOnly = p1.slice(0, hashIdx);
+              suffix = p1.slice(hashIdx);
+            } else if (colonIdx !== -1) {
+              pathOnly = p1.slice(0, colonIdx);
+              suffix = p1.slice(colonIdx);
+            }
+            let rel = pathOnly.replace(/\\/g, "/");
+            const cwd = (process.cwd() || "").replace(/\\/g, "/");
+            if (cwd && rel.toLowerCase().startsWith(cwd.toLowerCase() + "/")) {
+              rel = rel.slice(cwd.length + 1);
+            } else if (rel.startsWith("./")) {
+              rel = rel.slice(2);
+            }
+            const parts = rel.split("/");
+            const basename = parts[parts.length - 1];
+            return `[${basename}${suffix}]`;
+          });
+        },
+        [tabSize, mask]
+      );
+      const { visualLines, cursorLine, cursorCol } = useMemo(() => {
+        return computeVisualMatrix(value, cursorIndex, wrapWidth, formatText, pasteBlocks);
+      }, [value, cursorIndex, wrapWidth, formatText, pasteBlocks]);
+      const contentHeight = visualLines.length;
+      const visibleRows = useMemo(() => {
+        return Math.max(rows ?? maxRows ?? 1, Math.min(maxRows ?? rows ?? 1, contentHeight));
+      }, [rows, maxRows, contentHeight]);
+      const cursorLineEnd = cursorLine + 1;
+      const viewportEnd = scrollOffsetRef.current + visibleRows;
+      let newScrollOffset = scrollOffsetRef.current;
+      if (cursorLineEnd <= scrollOffsetRef.current) {
+        newScrollOffset = Math.max(0, cursorLineEnd - 1);
+      } else if (cursorLineEnd > viewportEnd) {
+        newScrollOffset = cursorLineEnd - visibleRows;
+      } else if (contentHeight) {
+        if (contentHeight < visibleRows) {
+          newScrollOffset = 0;
+        } else if (contentHeight < viewportEnd) {
+          newScrollOffset = contentHeight - visibleRows;
+        }
+      }
+      scrollOffsetRef.current = newScrollOffset;
+      const visibleLines = useMemo(() => {
+        return visualLines.slice(newScrollOffset, newScrollOffset + visibleRows);
+      }, [visualLines, newScrollOffset, visibleRows]);
+      const [blink, setBlink] = useState2(true);
+      useEffect2(() => {
+        setBlink(true);
+        if (!focus || !showCursor) return;
+        const timer = setInterval(() => {
+          setBlink((prev) => !prev);
+        }, 530);
+        return () => clearInterval(timer);
+      }, [focus, showCursor, value, cursorIndex]);
+      const cursorStyle = useMemo(() => ({
+        ...textStyle,
+        color: showCursor && focus && blink ? "white" : void 0,
+        bold: showCursor && focus && blink,
+        inverse: showCursor && focus && blink
+      }), [textStyle, showCursor, focus, blink]);
+      const renderLineText = (text, isCursor, col, cStyle) => {
+        if (!text) {
+          const emptyText = placeholder && value.length === 0 ? formatText(placeholder, true) : "";
+          if (isCursor) {
+            const charAtCursor = emptyText[0] || " ";
+            const right = emptyText.slice(1);
+            return /* @__PURE__ */ React2.createElement(Text2, null, /* @__PURE__ */ React2.createElement(Text2, { ...cStyle }, charAtCursor), /* @__PURE__ */ React2.createElement(Text2, { color: "gray", dimColor: true }, right));
+          }
+          return /* @__PURE__ */ React2.createElement(Text2, { color: "gray", dimColor: true }, emptyText || " ");
+        }
+        const regex2 = /(\[Pasted \d+ (?:lines|chars)\])/g;
+        const parts = text.split(regex2);
+        let currentOffset = 0;
+        const rendered = [];
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          if (part === "") continue;
+          const isPlaceholder = part.match(/^\[Pasted \d+ (?:lines|chars)\]$/);
+          const partLength = part.length;
+          const partEnd = currentOffset + partLength;
+          if (isCursor && col >= currentOffset && col < partEnd) {
+            const localCol = col - currentOffset;
+            const left = part.slice(0, localCol);
+            const charAtCursor = part[localCol] || " ";
+            const right = part.slice(localCol + 1);
+            rendered.push(
+              /* @__PURE__ */ React2.createElement(Text2, { key: i }, /* @__PURE__ */ React2.createElement(Text2, { color: isPlaceholder ? "magenta" : void 0 }, left), /* @__PURE__ */ React2.createElement(Text2, { ...cStyle }, charAtCursor), /* @__PURE__ */ React2.createElement(Text2, { color: isPlaceholder ? "magenta" : void 0 }, right))
+            );
+          } else {
+            rendered.push(
+              /* @__PURE__ */ React2.createElement(Text2, { key: i, color: isPlaceholder ? "magenta" : void 0 }, part)
+            );
+          }
+          currentOffset = partEnd;
+        }
+        if (isCursor && col >= text.length) {
+          rendered.push(
+            /* @__PURE__ */ React2.createElement(Text2, { key: "cursor-end", ...cStyle }, " ")
+          );
+        }
+        return /* @__PURE__ */ React2.createElement(React2.Fragment, null, rendered);
+      };
+      return /* @__PURE__ */ React2.createElement(Box, { height: visibleRows, width: wrapWidth + 1, overflow: "hidden", flexDirection: "column", flexGrow: 0, flexShrink: 0 }, visibleLines.map((lineObj, idx) => {
+        const globalLineIdx = newScrollOffset + idx;
+        const isCursorLine = globalLineIdx === cursorLine && focus && showCursor;
+        return /* @__PURE__ */ React2.createElement(Text2, { key: globalLineIdx, ...textStyle, wrap: "truncate" }, renderLineText(lineObj.text, isCursorLine, cursorCol, cursorStyle));
+      }));
+    };
+    MultilineInput = ({
+      value,
+      onChange,
+      onSubmit,
+      keyBindings,
+      showCursor = true,
+      highlightPastedText = false,
+      focus = true,
+      columns = 80,
+      useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
+      onPasteStateChange,
+      ...controlledProps
+    }) => {
+      const [cursorIndex, setCursorIndex] = useState2(value.length);
+      const [pasteLength, setPasteLength] = useState2(0);
+      const [pasteBlocks, setPasteBlocks] = useState2([]);
+      const cursorIndexRef = useRef(value.length);
+      const valueRef = useRef(value);
+      const pasteLengthRef = useRef(0);
+      const pasteBlocksRef = useRef([]);
+      const pasteBufferRef = useRef("");
+      const pasteBufferStartRef = useRef(-1);
+      const pasteTimerRef = useRef(null);
+      const lastArrowTimeRef = useRef(0);
+      cursorIndexRef.current = cursorIndex;
+      valueRef.current = value;
+      pasteLengthRef.current = pasteLength;
+      pasteBlocksRef.current = pasteBlocks;
+      useEffect2(() => {
+        if (cursorIndexRef.current > value.length) {
+          cursorIndexRef.current = value.length;
+          setCursorIndex(value.length);
+        }
+        if (!value) {
+          setPasteBlocks([]);
+          setPasteLength(0);
+        } else {
+          setPasteBlocks((prev) => prev.filter((b) => b.end <= value.length && b.start <= value.length));
+        }
+      }, [value]);
+      useEffect2(() => {
+        onPasteStateChange?.(pasteBlocks.length > 0);
+      }, [pasteBlocks, onPasteStateChange]);
+      const finalizePasteTransaction = () => {
+        const accumulated = pasteBufferRef.current;
+        const start = pasteBufferStartRef.current;
+        const end = start + accumulated.length;
+        const val = valueRef.current;
+        const newValue = val.slice(0, start) + accumulated + val.slice(start);
+        onChange(newValue);
+        cursorIndexRef.current = end;
+        setCursorIndex(end);
+        setPasteLength(accumulated.length > 1 ? accumulated.length : 0);
+        const lines = normalizeLineEndings(accumulated).split("\n").length;
+        const chars = accumulated.length;
+        if (chars > 50 && (lines > 3 || lines <= 3 && chars > 200)) {
+          const newBlock = {
+            start,
+            end,
+            text: accumulated
+          };
+          setPasteBlocks((prev) => {
+            const delta = accumulated.length;
+            const adjusted = prev.map((block) => {
+              if (start <= block.start) {
+                return {
+                  ...block,
+                  start: block.start + delta,
+                  end: block.end + delta
+                };
+              }
+              return block;
+            });
+            return [...adjusted, newBlock];
+          });
+        }
+        pasteBufferRef.current = "";
+        pasteBufferStartRef.current = -1;
+        pasteTimerRef.current = null;
+      };
+      const flushPasteTransaction = () => {
+        if (pasteTimerRef.current) {
+          clearTimeout(pasteTimerRef.current);
+          finalizePasteTransaction();
+        }
+      };
+      useCustomInput((input, key) => {
+        if (input === "\x1B[I" || input === "\x1B[O" || input === "[I" || input === "[O") {
+          return;
+        }
+        let cleanInput = input;
+        let isBracketedStart = false;
+        let isBracketedEnd = false;
+        if (cleanInput && typeof cleanInput === "string") {
+          if (cleanInput.includes("\x1B[200~")) {
+            isBracketedStart = true;
+            cleanInput = cleanInput.replace(/\x1b\[200~/g, "");
+          }
+          if (cleanInput.includes("\x1B[201~")) {
+            isBracketedEnd = true;
+            cleanInput = cleanInput.replace(/\x1b\[201~/g, "");
+          }
+        }
+        const curIdx = cursorIndexRef.current;
+        const val = valueRef.current;
+        const currentPasteBlocks = pasteBlocksRef.current;
+        const wrapWidth = Math.max(20, columns - 10);
+        const adjustPasteBlocksOnEdit = (editStart, delta) => {
+          if (currentPasteBlocks.length === 0) return;
+          const updated = currentPasteBlocks.map((block) => {
+            if (editStart <= block.start) {
+              return {
+                ...block,
+                start: block.start + delta,
+                end: block.end + delta
+              };
+            }
+            if (editStart > block.start && editStart < block.end) {
+              return null;
+            }
+            return block;
+          }).filter(Boolean);
+          setPasteBlocks(updated);
+        };
+        const adjustIndex = (idx) => {
+          for (const block of currentPasteBlocks) {
+            if (idx > block.start && idx < block.end) {
+              return block.start;
+            }
+          }
+          return idx;
+        };
+        if (key.ctrl && (cleanInput === "o" || cleanInput === "")) {
+          setPasteBlocks([]);
+          return;
+        }
+        const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
+        if (isArrowKey) {
+          flushPasteTransaction();
+          const now = Date.now();
+          if (now - lastArrowTimeRef.current < 33) {
+            return;
+          }
+          lastArrowTimeRef.current = now;
+        }
+        const submitKey = keyBindings?.submit ?? ((k) => k.return && k.ctrl);
+        const newlineKey = keyBindings?.newline ?? ((k) => k.return);
+        if (submitKey(key)) {
+          flushPasteTransaction();
+          onSubmit?.(val);
+          return;
+        } else if (newlineKey(key)) {
+          flushPasteTransaction();
+          adjustPasteBlocksOnEdit(curIdx, 1);
+          const newValue = val.slice(0, curIdx) + "\n" + val.slice(curIdx);
+          onChange(newValue);
+          cursorIndexRef.current = curIdx + 1;
+          setCursorIndex(curIdx + 1);
+          setPasteLength(0);
+          return;
+        }
+        if (key.tab || key.shift && key.tab || key.ctrl && cleanInput === "c") {
+          return;
+        }
+        const identity = (t) => t;
+        if (key.upArrow || key.downArrow) {
+          flushPasteTransaction();
+          if (showCursor) {
+            const { visualLines, cursorLine, cursorCol } = computeVisualMatrix(val, curIdx, wrapWidth, identity, currentPasteBlocks);
+            const targetLine = key.upArrow ? cursorLine - 1 : cursorLine + 1;
+            if (targetLine >= 0 && targetLine < visualLines.length) {
+              const targetLineObj = visualLines[targetLine];
+              const targetCol = Math.min(cursorCol, targetLineObj.text.length);
+              const targetFormattedIdx = targetLineObj.formattedStart + targetCol;
+              let newIndex = formattedToRaw(targetFormattedIdx, currentPasteBlocks, val);
+              newIndex = adjustIndex(newIndex);
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
+            } else if (key.upArrow && cursorLine === 0) {
+              cursorIndexRef.current = 0;
+              setCursorIndex(0);
+              setPasteLength(0);
+            } else if (key.downArrow && cursorLine === visualLines.length - 1) {
+              const lastLineObj = visualLines[visualLines.length - 1];
+              const targetFormattedIdx = lastLineObj.formattedStart + lastLineObj.text.length;
+              let newIndex = formattedToRaw(targetFormattedIdx, currentPasteBlocks, val);
+              newIndex = adjustIndex(newIndex);
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
+            }
+          }
+        } else if (key.leftArrow) {
+          flushPasteTransaction();
+          if (showCursor) {
+            let newIndex = Math.max(0, curIdx - 1);
+            const activeBlock = currentPasteBlocks.find((b) => curIdx === b.end);
+            if (activeBlock) {
+              newIndex = activeBlock.start;
+            }
+            cursorIndexRef.current = newIndex;
+            setCursorIndex(newIndex);
+            setPasteLength(0);
+          }
+        } else if (key.rightArrow) {
+          flushPasteTransaction();
+          if (showCursor) {
+            let newIndex = Math.min(val.length, curIdx + 1);
+            const activeBlock = currentPasteBlocks.find((b) => curIdx === b.start);
+            if (activeBlock) {
+              newIndex = activeBlock.end;
+            }
+            cursorIndexRef.current = newIndex;
+            setCursorIndex(newIndex);
+            setPasteLength(0);
+          }
+        } else if (key.backspace) {
+          flushPasteTransaction();
+          const targetBlockIndex = currentPasteBlocks.findIndex((b) => curIdx === b.end);
+          if (targetBlockIndex !== -1) {
+            const targetBlock = currentPasteBlocks[targetBlockIndex];
+            const delta = -(targetBlock.end - targetBlock.start);
+            const newValue = val.slice(0, targetBlock.start) + val.slice(targetBlock.end);
+            onChange(newValue);
+            cursorIndexRef.current = targetBlock.start;
+            setCursorIndex(targetBlock.start);
+            setPasteLength(0);
+            const updatedBlocks = currentPasteBlocks.filter((_, idx) => idx !== targetBlockIndex).map((block) => {
+              if (block.start >= targetBlock.end) {
+                return {
+                  ...block,
+                  start: block.start + delta,
+                  end: block.end + delta
+                };
+              }
+              return block;
+            });
+            setPasteBlocks(updatedBlocks);
+          } else if (curIdx > 0) {
+            adjustPasteBlocksOnEdit(curIdx - 1, -1);
+            const newValue = val.slice(0, curIdx - 1) + val.slice(curIdx);
+            onChange(newValue);
+            cursorIndexRef.current = curIdx - 1;
+            setCursorIndex(curIdx - 1);
+            setPasteLength(0);
+          }
+        } else if (key.delete) {
+          flushPasteTransaction();
+          const targetBlockIndex = currentPasteBlocks.findIndex((b) => curIdx === b.start);
+          if (targetBlockIndex !== -1) {
+            const targetBlock = currentPasteBlocks[targetBlockIndex];
+            const delta = -(targetBlock.end - targetBlock.start);
+            const newValue = val.slice(0, targetBlock.start) + val.slice(targetBlock.end);
+            onChange(newValue);
+            setPasteLength(0);
+            const updatedBlocks = currentPasteBlocks.filter((_, idx) => idx !== targetBlockIndex).map((block) => {
+              if (block.start >= targetBlock.end) {
+                return {
+                  ...block,
+                  start: block.start + delta,
+                  end: block.end + delta
+                };
+              }
+              return block;
+            });
+            setPasteBlocks(updatedBlocks);
+          } else {
+            adjustPasteBlocksOnEdit(curIdx, -1);
+            if (curIdx < val.length) {
+              const newValue = val.slice(0, curIdx) + val.slice(curIdx + 1);
+              onChange(newValue);
+              setPasteLength(0);
+            }
+          }
+        } else if (key.home || key.end) {
+          flushPasteTransaction();
+          if (showCursor) {
+            const { visualLines, cursorLine } = computeVisualMatrix(val, curIdx, wrapWidth, identity, currentPasteBlocks);
+            const currentLineObj = visualLines[cursorLine];
+            if (currentLineObj) {
+              let newIndex;
+              if (key.home) {
+                newIndex = formattedToRaw(currentLineObj.formattedStart, currentPasteBlocks, val);
+              } else if (key.end) {
+                newIndex = formattedToRaw(currentLineObj.formattedStart + currentLineObj.text.length, currentPasteBlocks, val);
+              }
+              newIndex = adjustIndex(newIndex);
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
+            }
+          }
+        } else {
+          if (cleanInput !== "" || isBracketedStart || isBracketedEnd) {
+            const isPaste = isBracketedStart || isBracketedEnd || cleanInput.length > 1 || pasteTimerRef.current !== null;
+            if (isPaste) {
+              if (pasteTimerRef.current) {
+                clearTimeout(pasteTimerRef.current);
+                pasteBufferRef.current += cleanInput;
+              } else {
+                pasteBufferStartRef.current = curIdx;
+                pasteBufferRef.current = cleanInput;
+              }
+              if (isBracketedEnd) {
+                pasteTimerRef.current = null;
+                finalizePasteTransaction();
+              } else {
+                pasteTimerRef.current = setTimeout(() => {
+                  finalizePasteTransaction();
+                }, 100);
+              }
+            } else {
+              adjustPasteBlocksOnEdit(curIdx, cleanInput.length);
+              const newValue = val.slice(0, curIdx) + cleanInput + val.slice(curIdx);
+              onChange(newValue);
+              const newIndex = curIdx + cleanInput.length;
+              cursorIndexRef.current = newIndex;
+              setCursorIndex(newIndex);
+              setPasteLength(0);
+            }
+          }
+        }
+      }, focus);
+      return /* @__PURE__ */ React2.createElement(
+        ControlledMultilineInput,
+        {
+          ...controlledProps,
+          value,
+          cursorIndex,
+          showCursor,
+          focus,
+          columns,
+          pasteBlocks
+        }
+      );
+    };
+  }
+});
+
 // src/components/TerminalBox.jsx
-import React3 from "react";
-import { Box as Box2, Text as Text3 } from "ink";
+import React3, { useState as useState3 } from "react";
+import { Box as Box2, Text as Text3, useInput as useInput2 } from "ink";
 var TerminalBox;
 var init_TerminalBox = __esm({
   "src/components/TerminalBox.jsx"() {
     init_text();
-    TerminalBox = React3.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false }) => {
+    TerminalBox = React3.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24 }) => {
       const processPTY = (text) => {
         if (!text) return "";
         const lines = [[]];
@@ -3188,6 +3503,18 @@ var init_TerminalBox = __esm({
       };
       const cleanOutput = processPTY(output).replace(/\n{3,}/g, "\n\n");
       const displayOutput = isPty ? cleanOutput : cleanOutput ? wrapText(cleanOutput, columns - 6) : "";
+      const [isExpanded, setIsExpanded] = useState3(false);
+      useInput2((input, key) => {
+        if (isFocused && key.ctrl && (input === "o" || input === "")) {
+          setIsExpanded((prev) => !prev);
+        }
+      }, { isActive: isFocused });
+      const rawLines = displayOutput ? displayOutput.split("\n") : [];
+      const limit = Math.max(5, completed ? terminalHeight - 10 : terminalHeight - 20);
+      const hasCollapsibleContent = rawLines.length > limit;
+      const collapsedCount = rawLines.length - limit;
+      const visibleLines = hasCollapsibleContent && !isExpanded ? rawLines.slice(rawLines.length - limit) : rawLines;
+      const renderedOutput = visibleLines.join("\n");
       return /* @__PURE__ */ React3.createElement(
         Box2,
         {
@@ -3205,7 +3532,7 @@ var init_TerminalBox = __esm({
           width: "100%"
         },
         /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, "ADVANCE"))),
-        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { marginTop: completed ? 0 : 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: completed ? "gray" : void 0 }, displayOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", italic: true }, "Waiting for output...")),
+        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { flexDirection: "column", marginTop: 0, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, hasCollapsibleContent && !isExpanded && /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta" }, "...", collapsedCount, " lines collapsed... Press CTRL + O to expand.")), /* @__PURE__ */ React3.createElement(Text3, { color: completed ? "gray" : void 0 }, renderedOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", italic: true }, "Waiting for output...")),
         /* @__PURE__ */ React3.createElement(Box2, { justifyContent: "space-between", marginTop: 1 }, !completed ? /* @__PURE__ */ React3.createElement(Text3, { color: "gray", italic: true }, isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging.") : /* @__PURE__ */ React3.createElement(Box2, null), /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u25CF ARCHIVED" : isFocused ? "\u25B6 TERMINAL FOCUSED" : "\u25CF LIVE (Press TAB to focus)"))
       );
     });
@@ -3482,7 +3809,7 @@ ${coloredArt[7]}`;
 });
 
 // src/components/ChatLayout.jsx
-import React4, { useState as useState3, useEffect as useEffect3, useRef as useRef2 } from "react";
+import React4, { useState as useState4, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
 import { diffWordsWithSpace } from "diff";
 var useStreamingText, formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, parseLineInfo, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
@@ -3492,7 +3819,7 @@ var init_ChatLayout = __esm({
     init_text();
     init_terminal();
     useStreamingText = (targetText, isStreaming, isActiveBlock) => {
-      const [displayedText, setDisplayedText] = useState3(isActiveBlock && isStreaming ? "" : targetText);
+      const [displayedText, setDisplayedText] = useState4(isActiveBlock && isStreaming ? "" : targetText);
       const targetTextRef = useRef2(targetText);
       useEffect3(() => {
         targetTextRef.current = targetText;
@@ -3887,7 +4214,7 @@ var init_ChatLayout = __esm({
                 paddingRight: 0,
                 width: "100%"
               },
-              /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u{1F4BB} ", lang.toUpperCase() || "CODE")),
+              /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
               /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "#fcfca4ff" }, line)))))
             );
           }
@@ -4453,7 +4780,6 @@ var init_main_tools = __esm({
     TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
 -- TOOL DEFINITIONS --
 Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
-NO TOOL CALL INSIDE THINKING
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run: Limit 1 OR 2 CONSECUTIVE Run)" : ""}. Next Turn, verify tool results, plan next**
@@ -4472,7 +4798,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `${isPtyAvailable ? "Interactive " : ""}WINDOWS POWERSHELL ONLY` : `${isPtyAvailable ? "Interactive " : ""}WINDOWS CMD ONLY` : `${isPtyAvailable ? "Interactive " : ""}BASH`} command. Destructive/Irreversible ops -> Ask user
+7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops -> Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
@@ -5130,8 +5456,8 @@ ${finalOutput}`);
 });
 
 // src/components/SettingsMenu.jsx
-import React7, { useState as useState4 } from "react";
-import { Box as Box6, Text as Text7, useInput as useInput2 } from "ink";
+import React7, { useState as useState5 } from "react";
+import { Box as Box6, Text as Text7, useInput as useInput3 } from "ink";
 import TextInput from "ink-text-input";
 function SettingsMenu({
   systemSettings,
@@ -5144,11 +5470,11 @@ function SettingsMenu({
   setMessages,
   aiProvider
 }) {
-  const [activeColumn, setActiveColumn] = useState4("categories");
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState4(0);
-  const [selectedItemIndex, setSelectedItemIndex] = useState4(0);
-  const [editingItem, setEditingItem] = useState4(null);
-  const [editValue, setEditValue] = useState4("");
+  const [activeColumn, setActiveColumn] = useState5("categories");
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState5(0);
+  const [selectedItemIndex, setSelectedItemIndex] = useState5(0);
+  const [editingItem, setEditingItem] = useState5(null);
+  const [editValue, setEditValue] = useState5("");
   const getCategoryItems = (catId) => {
     switch (catId) {
       case "memory":
@@ -5186,7 +5512,7 @@ function SettingsMenu({
   };
   const currentCatId = CATEGORIES[selectedCategoryIndex].id;
   const currentItems = getCategoryItems(currentCatId);
-  useInput2((input, key) => {
+  useInput3((input, key) => {
     if (editingItem) {
       if (key.escape) {
         setEditingItem(null);
@@ -5451,13 +5777,13 @@ var init_SettingsMenu = __esm({
 });
 
 // src/components/ProfileForm.jsx
-import React8, { useState as useState5, useEffect as useEffect4 } from "react";
+import React8, { useState as useState6, useEffect as useEffect4 } from "react";
 import { Box as Box7, Text as Text8 } from "ink";
 import TextInput2 from "ink-text-input";
 function ProfileForm({ initialData, onSave, onCancel }) {
-  const [step, setStep] = useState5(0);
-  const [currentInput, setCurrentInput] = useState5("");
-  const [profile, setProfile] = useState5(() => ({
+  const [step, setStep] = useState6(0);
+  const [currentInput, setCurrentInput] = useState6("");
+  const [profile, setProfile] = useState6(() => ({
     name: initialData?.name || "",
     nickname: initialData?.nickname || "",
     instructions: initialData?.instructions || ""
@@ -5515,19 +5841,19 @@ var init_ProfileForm = __esm({
 });
 
 // src/components/AskUserModal.jsx
-import React9, { useState as useState6 } from "react";
-import { Box as Box8, Text as Text9, useInput as useInput3 } from "ink";
+import React9, { useState as useState7 } from "react";
+import { Box as Box8, Text as Text9, useInput as useInput4 } from "ink";
 import TextInput3 from "ink-text-input";
 var AskUserModal, AskUserModal_default;
 var init_AskUserModal = __esm({
   "src/components/AskUserModal.jsx"() {
     init_terminal();
     AskUserModal = ({ question, options, onResolve }) => {
-      const [isSuggestingElse, setIsSuggestingElse] = useState6(false);
-      const [customInput, setCustomInput] = useState6("");
-      const [selectedIndex, setSelectedIndex] = useState6(0);
+      const [isSuggestingElse, setIsSuggestingElse] = useState7(false);
+      const [customInput, setCustomInput] = useState7("");
+      const [selectedIndex, setSelectedIndex] = useState7(0);
       const allOptions = [...options, { id: "CUSTOM", label: "Suggest something else...", description: "Provide a custom response" }];
-      useInput3((input, key) => {
+      useInput4((input, key) => {
         if (isSuggestingElse) return;
         if (key.leftArrow || key.upArrow) {
           setSelectedIndex((prev) => Math.max(0, prev - 1));
@@ -5757,8 +6083,8 @@ ${projectContextBlock}
 
 -- FORMATTING --
 - GFM Supported
-- NO CHAT **AFTER** FIRING TOOLS IN THIS TURN
-- End final response with summary of changes made and files edited
+- NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
+- Task Complete & Results Verified? End response with summary of changes made and files edited
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
     };
@@ -8796,7 +9122,7 @@ var init_editor = __esm({
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path19 from "path";
 import fs20 from "fs";
-var client, globalSettings, colorMainWords, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream;
+var client, globalSettings, colorMainWords, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -8906,7 +9232,7 @@ var init_ai = __esm({
       }
       return fetch(url, options);
     };
-    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.9) {
+    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.85) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9038,7 +9364,7 @@ var init_ai = __esm({
         }
       }
     };
-    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.8) {
+    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.7) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9190,7 +9516,7 @@ var init_ai = __esm({
         }
       }
     };
-    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.5) {
+    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.45) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9778,9 +10104,69 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
     getSanitizedText = (text) => {
       return getContextSafeText(text, true);
     };
+    translateKimiToolCalls = (text) => {
+      if (!text) return text;
+      const PASCAL_MAP = {
+        "patchfile": "PatchFile",
+        "writefile": "WriteFile",
+        "readfile": "ReadFile",
+        "viewfile": "ReadFile",
+        "run": "Run",
+        "execcommand": "Run",
+        "searchkeyword": "SearchKeyword",
+        "websearch": "WebSearch",
+        "webscrape": "WebScrape",
+        "readfolder": "ReadFolder",
+        "writepdf": "WritePDF",
+        "writedoc": "WriteDoc",
+        "writedocx": "WriteDoc",
+        "filemap": "FileMap",
+        "generateimage": "GenerateImage",
+        "todo": "Todo",
+        "ask": "Ask"
+      };
+      const toPascalCase = (str) => {
+        return str.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join("");
+      };
+      const kimiRegex = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
+      let result = text.replace(kimiRegex, (match, toolName, argsJsonStr) => {
+        let parsedArgs = "";
+        try {
+          const argsObj = JSON.parse(argsJsonStr.trim());
+          if (argsObj && typeof argsObj === "object") {
+            const argPairs = Object.entries(argsObj).map(([key, val]) => {
+              const stringVal = typeof val === "string" ? val : JSON.stringify(val);
+              return `${key}=${JSON.stringify(stringVal)}`;
+            });
+            parsedArgs = argPairs.join(", ");
+          }
+        } catch (e) {
+          const pairs = [];
+          const pairRegex = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+          let pMatch;
+          while ((pMatch = pairRegex.exec(argsJsonStr)) !== null) {
+            const key = pMatch[1];
+            const val = pMatch[2] !== void 0 ? pMatch[2] : pMatch[0].split(":").slice(1).join(":").trim();
+            pairs.push(`${key}=${JSON.stringify(val)}`);
+          }
+          if (pairs.length > 0) {
+            parsedArgs = pairs.join(", ");
+          } else {
+            parsedArgs = argsJsonStr.trim();
+          }
+        }
+        const cleanKey = toolName.toLowerCase().replace(/_/g, "");
+        const normToolName = PASCAL_MAP[cleanKey] || toPascalCase(toolName);
+        return `[tool:functions.${normToolName}(${parsedArgs})]`;
+      });
+      result = result.replace(/<\|\s*tool_calls_section_begin\s*\|>/gi, "");
+      result = result.replace(/<\|\s*tool_calls_section_end\s*\|>/gi, "");
+      return result;
+    };
     detectToolCalls = (text) => {
       if (!text) return [];
-      const cleanText = text.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
+      const translatedText = translateKimiToolCalls(text);
+      const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
       const results = [];
       const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
       let match;
@@ -10695,7 +11081,9 @@ ${boxMid}`) };
         if (taggedContextBlocks.length > 0) {
           taggedContextStr = "[TAGGED CONTEXT]\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED CONTEXT]\n";
         }
+        const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
+OS: ${osDetected}
 CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
@@ -10926,7 +11314,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.5
+                  0.45
                 );
               } else if (aiProvider === "DeepSeek") {
                 stream = getDeepSeekStream(
@@ -10938,7 +11326,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.9
+                  0.85
                 );
               } else if (aiProvider === "NVIDIA") {
                 stream = getNVIDIAStream(
@@ -10950,7 +11338,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.8
+                  0.7
                 );
               } else {
                 const apiCallPromise = client.models.generateContentStream({
@@ -11037,9 +11425,13 @@ ${ideErr} [/ERROR]`;
                   if (!isBufferingToolCall) {
                     const toolIdx = remaining.indexOf("[tool");
                     const endIdx = remaining.indexOf("[[END]]");
+                    const kimiSectionIdx = remaining.indexOf("<|tool_calls_section_begin|>");
+                    const kimiCallIdx = remaining.indexOf("<|tool_call_begin|>");
                     const indices = [
                       { type: "tool", idx: toolIdx, start: "[tool", end: "]" },
-                      { type: "end", idx: endIdx, start: "[[END]]", end: "[[END]]" }
+                      { type: "end", idx: endIdx, start: "[[END]]", end: "[[END]]" },
+                      { type: "kimi_section", idx: kimiSectionIdx, start: "<|tool_calls_section_begin|>", end: "<|tool_calls_section_end|>" },
+                      { type: "kimi_call", idx: kimiCallIdx, start: "<|tool_call_begin|>", end: "<|tool_call_end|>" }
                     ].filter((i) => i.idx !== -1).sort((a, b) => a.idx - b.idx);
                     if (indices.length > 0) {
                       const match2 = indices[0];
@@ -11051,13 +11443,17 @@ ${ideErr} [/ERROR]`;
                       toolCallBuffer = "";
                       remaining = remaining.substring(match2.idx);
                     } else {
-                      const potentialStarts = ["[tool", "[[END]]"];
+                      const potentialStarts = ["[tool", "[[END]]", "<|tool_calls_section_begin|>", "<|tool_call_begin|>"];
                       let splitPoint = -1;
                       for (const start of potentialStarts) {
                         for (let len = start.length - 1; len > 0; len--) {
                           if (remaining.endsWith(start.substring(0, len))) {
                             splitPoint = remaining.length - len;
-                            activeBufferType = potentialStarts.indexOf(start) === 0 ? "tool" : "end";
+                            const idx = potentialStarts.indexOf(start);
+                            if (idx === 0) activeBufferType = "tool";
+                            else if (idx === 1) activeBufferType = "end";
+                            else if (idx === 2) activeBufferType = "kimi_section";
+                            else activeBufferType = "kimi_call";
                             break;
                           }
                         }
@@ -11076,7 +11472,6 @@ ${ideErr} [/ERROR]`;
                       }
                     }
                   } else {
-                    const endTag = activeBufferType === "tool" ? "]" : "[[END]]";
                     const combined = toolCallBuffer + remaining;
                     if (activeBufferType === "tool") {
                       const protocolPrefix = "[tool:functions.";
@@ -11090,6 +11485,7 @@ ${ideErr} [/ERROR]`;
                       }
                     }
                     let endIdx = -1;
+                    let endTag = "]";
                     if (activeBufferType === "tool") {
                       let balance = 0;
                       let inString = null;
@@ -11127,19 +11523,27 @@ ${ideErr} [/ERROR]`;
                         }
                       }
                     } else {
+                      if (activeBufferType === "end") endTag = "[[END]]";
+                      else if (activeBufferType === "kimi_section") endTag = "<|tool_calls_section_end|>";
+                      else if (activeBufferType === "kimi_call") endTag = "<|tool_call_end|>";
                       endIdx = combined.indexOf(endTag);
                     }
                     if (endIdx !== -1) {
-                      const fullMatch = combined.substring(0, endIdx + 1);
-                      msgs.push({ type: "text", content: fullMatch });
+                      const endLen = endTag.length;
+                      if (!activeBufferType.startsWith("kimi")) {
+                        const fullMatch = combined.substring(0, endIdx + endLen);
+                        msgs.push({ type: "text", content: fullMatch });
+                      }
                       toolCallBuffer = "";
                       isBufferingToolCall = false;
                       activeBufferType = null;
-                      remaining = combined.substring(endIdx + 1);
+                      remaining = combined.substring(endIdx + endLen);
                     } else {
-                      const MAX_BUFFER = 512;
+                      const MAX_BUFFER = activeBufferType.startsWith("kimi") ? 8192 : 512;
                       if (combined.length > MAX_BUFFER) {
-                        msgs.push({ type: "text", content: combined });
+                        if (!activeBufferType.startsWith("kimi")) {
+                          msgs.push({ type: "text", content: combined });
+                        }
                         toolCallBuffer = "";
                         isBufferingToolCall = false;
                       } else {
@@ -12548,12 +12952,12 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
 });
 
 // src/components/ResumeModal.jsx
-import React10, { useState as useState7, useEffect as useEffect5 } from "react";
-import { Box as Box9, Text as Text10, useInput as useInput4 } from "ink";
+import React10, { useState as useState8, useEffect as useEffect5 } from "react";
+import { Box as Box9, Text as Text10, useInput as useInput5 } from "ink";
 function ResumeModal({ onSelect, onDelete, onClose }) {
-  const [history, setHistory] = useState7({});
-  const [keys, setKeys] = useState7([]);
-  const [selectedIndex, setSelectedIndex] = useState7(0);
+  const [history, setHistory] = useState8({});
+  const [keys, setKeys] = useState8([]);
+  const [selectedIndex, setSelectedIndex] = useState8(0);
   useEffect5(() => {
     const fetchHistory = async () => {
       const h = await loadHistory();
@@ -12562,7 +12966,7 @@ function ResumeModal({ onSelect, onDelete, onClose }) {
     };
     fetchHistory();
   }, []);
-  useInput4((input, key) => {
+  useInput5((input, key) => {
     if (key.escape) onClose();
     if (key.upArrow) setSelectedIndex((prev) => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedIndex((prev) => Math.min(keys.length - 1, prev + 1));
@@ -12640,14 +13044,14 @@ var init_ResumeModal = __esm({
 });
 
 // src/components/MemoryModal.jsx
-import React11, { useState as useState8, useEffect as useEffect6 } from "react";
-import { Box as Box10, Text as Text11, useInput as useInput5, useStdout } from "ink";
+import React11, { useState as useState9, useEffect as useEffect6 } from "react";
+import { Box as Box10, Text as Text11, useInput as useInput6, useStdout } from "ink";
 function MemoryModal({ onClose }) {
   const { stdout } = useStdout();
   const columns = stdout?.columns || 80;
-  const [memories, setMemories] = useState8([]);
-  const [selectedIndex, setSelectedIndex] = useState8(0);
-  const [isMemoryOn, setIsMemoryOn] = useState8(true);
+  const [memories, setMemories] = useState9([]);
+  const [selectedIndex, setSelectedIndex] = useState9(0);
+  const [isMemoryOn, setIsMemoryOn] = useState9(true);
   const loadMemories = () => {
     const data = readEncryptedJson(MEMORIES_FILE, []);
     setMemories(data);
@@ -12662,7 +13066,7 @@ function MemoryModal({ onClose }) {
   useEffect6(() => {
     loadMemories();
   }, []);
-  useInput5((input, key) => {
+  useInput6((input, key) => {
     if (key.escape) onClose();
     if (key.upArrow) setSelectedIndex((prev) => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedIndex((prev) => Math.min(memories.length - 1, prev + 1));
@@ -12761,7 +13165,7 @@ var init_MemoryModal = __esm({
 });
 
 // src/components/UpdateProcessor.jsx
-import React12, { useState as useState9, useEffect as useEffect7 } from "react";
+import React12, { useState as useState10, useEffect as useEffect7 } from "react";
 import { Box as Box11, Text as Text12 } from "ink";
 import { spawn as spawn2 } from "child_process";
 var pty2, SPINNER_FRAMES, UpdateProcessor, UpdateProcessor_default;
@@ -12776,10 +13180,10 @@ var init_UpdateProcessor = __esm({
     }
     SPINNER_FRAMES = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
     UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings, onSuccess }) => {
-      const [status, setStatus] = useState9("initializing");
-      const [log, setLog] = useState9("");
-      const [error, setError] = useState9(null);
-      const [tick, setTick] = useState9(0);
+      const [status, setStatus] = useState10("initializing");
+      const [log, setLog] = useState10("");
+      const [error, setError] = useState10(null);
+      const [tick, setTick] = useState10(0);
       useEffect7(() => {
         const interval = setInterval(() => {
           setTick((t) => (t + 1) % 1e3);
@@ -12919,11 +13323,11 @@ var init_UpdateProcessor = __esm({
 });
 
 // src/components/ParserDownloadModal.jsx
-import React13, { useState as useState10, useEffect as useEffect8 } from "react";
-import { Box as Box12, Text as Text13, useInput as useInput6 } from "ink";
+import React13, { useState as useState11, useEffect as useEffect8 } from "react";
+import { Box as Box12, Text as Text13, useInput as useInput7 } from "ink";
 function ParserDownloadModal({ onClose }) {
-  const [selectedIndex, setSelectedIndex] = useState10(0);
-  const [status, setStatus] = useState10({});
+  const [selectedIndex, setSelectedIndex] = useState11(0);
+  const [status, setStatus] = useState11({});
   useEffect8(() => {
     const initialStatus = {};
     EXTENSIONS.forEach((item) => {
@@ -12935,7 +13339,7 @@ function ParserDownloadModal({ onClose }) {
     });
     setStatus(initialStatus);
   }, []);
-  useInput6(async (input, key) => {
+  useInput7(async (input, key) => {
     if (key.escape) onClose();
     if (key.upArrow) setSelectedIndex((prev) => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedIndex((prev) => Math.min(EXTENSIONS.length - 1, prev + 1));
@@ -13425,11 +13829,11 @@ var init_dist = __esm({
 });
 
 // src/components/RevertModal.jsx
-import React14, { useState as useState11 } from "react";
-import { Box as Box14, Text as Text15, useInput as useInput7 } from "ink";
+import React14, { useState as useState12 } from "react";
+import { Box as Box14, Text as Text15, useInput as useInput8 } from "ink";
 function RevertModal({ prompts, onSelect, onClose }) {
-  const [selectedIndex, setSelectedIndex] = useState11(0);
-  useInput7((input, key) => {
+  const [selectedIndex, setSelectedIndex] = useState12(0);
+  useInput8((input, key) => {
     if (key.escape) onClose();
     if (key.upArrow) setSelectedIndex((prev) => Math.max(0, prev - 1));
     if (key.downArrow) setSelectedIndex((prev) => Math.min(prompts.length - 1, prev + 1));
@@ -13551,8 +13955,8 @@ __export(app_exports, {
   default: () => App
 });
 import os4 from "os";
-import React15, { useState as useState12, useEffect as useEffect9, useRef as useRef3, useMemo as useMemo2 } from "react";
-import { Box as Box15, Text as Text16, useInput as useInput8, useStdout as useStdout2, Static } from "ink";
+import React15, { useState as useState13, useEffect as useEffect9, useRef as useRef3, useMemo as useMemo2 } from "react";
+import { Box as Box15, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
 import fs22 from "fs-extra";
 import path20 from "path";
 import { exec as exec2 } from "child_process";
@@ -13561,21 +13965,21 @@ import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
-  const [confirmExit, setConfirmExit] = useState12(false);
-  const [exitCountdown, setExitCountdown] = useState12(10);
+  const [confirmExit, setConfirmExit] = useState13(false);
+  const [exitCountdown, setExitCountdown] = useState13(10);
   const { stdout } = useStdout2();
-  const [input, setInput] = useState12("");
-  const [inputKey, setInputKey] = useState12(0);
-  const [isExpanded, setIsExpanded] = useState12(false);
-  const [mode, setMode] = useState12("Flux");
-  const [terminalSize, setTerminalSize] = useState12({
+  const [input, setInput] = useState13("");
+  const [inputKey, setInputKey] = useState13(0);
+  const [isExpanded, setIsExpanded] = useState13(false);
+  const [mode, setMode] = useState13("Flux");
+  const [terminalSize, setTerminalSize] = useState13({
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24
   });
-  const [selectedIndex, setSelectedIndex] = useState12(0);
-  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState12(false);
-  const [showBridgePromo, setShowBridgePromo] = useState12(false);
-  const [promoSelectedIndex, setPromoSelectedIndex] = useState12(0);
+  const [selectedIndex, setSelectedIndex] = useState13(0);
+  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState13(false);
+  const [showBridgePromo, setShowBridgePromo] = useState13(false);
+  const [promoSelectedIndex, setPromoSelectedIndex] = useState13(0);
   const suggestionOffsetRef = useRef3(0);
   const persistedModelRef = useRef3(null);
   useEffect9(() => {
@@ -13766,18 +14170,18 @@ function App({ args = [] }) {
       stdout.off("resize", handleResize);
     };
   }, [stdout]);
-  const [thinkingLevel, setThinkingLevel] = useState12("Medium");
-  const [aiProvider, setAiProvider] = useState12("Google");
-  const [setupStep, setSetupStep] = useState12(0);
-  const [latestVer, setLatestVer] = useState12(null);
-  const [showFullThinking, setShowFullThinking] = useState12(false);
-  const [activeModel, setActiveModel] = useState12("gemma-4-31b-it");
-  const [janitorModel, setJanitorModel] = useState12("gemma-4-26b-a4b-it");
-  const [isInitializing, setIsInitializing] = useState12(true);
-  const [isAppFocused, setIsAppFocused] = useState12(true);
+  const [thinkingLevel, setThinkingLevel] = useState13("Medium");
+  const [aiProvider, setAiProvider] = useState13("Google");
+  const [setupStep, setSetupStep] = useState13(0);
+  const [latestVer, setLatestVer] = useState13(null);
+  const [showFullThinking, setShowFullThinking] = useState13(false);
+  const [activeModel, setActiveModel] = useState13("gemma-4-31b-it");
+  const [janitorModel, setJanitorModel] = useState13("gemma-4-26b-a4b-it");
+  const [isInitializing, setIsInitializing] = useState13(true);
+  const [isAppFocused, setIsAppFocused] = useState13(true);
   const lastFocusEventTime = useRef3(0);
-  const [apiKey, setApiKey] = useState12(null);
-  const [tempKey, setTempKey] = useState12("");
+  const [apiKey, setApiKey] = useState13(null);
+  const [tempKey, setTempKey] = useState13("");
   const addShiftEnterBinding = async (ideName) => {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
@@ -13828,34 +14232,34 @@ function App({ args = [] }) {
       });
     }
   };
-  const [activeView, setActiveView] = useState12("chat");
-  const [apiTier, setApiTier] = useState12("Free");
-  const [quotas, setQuotas] = useState12({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
-  const [inputConfig, setInputConfig] = useState12(null);
-  const [systemSettings, setSystemSettings] = useState12({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
-  const [profileData, setProfileData] = useState12({ name: null, nickname: null, instructions: null });
-  const [imageSettings, setImageSettings] = useState12({ keyType: "Default", quality: "Low-High", apiKey: "" });
-  const [sessionStats, setSessionStats] = useState12({ tokens: 0 });
-  const [sessionAgentCalls, setSessionAgentCalls] = useState12(0);
-  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState12(0);
-  const [sessionTotalTokens, setSessionTotalTokens] = useState12(0);
-  const [chatTokens, setChatTokens] = useState12(0);
+  const [activeView, setActiveView] = useState13("chat");
+  const [apiTier, setApiTier] = useState13("Free");
+  const [quotas, setQuotas] = useState13({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+  const [inputConfig, setInputConfig] = useState13(null);
+  const [systemSettings, setSystemSettings] = useState13({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const [profileData, setProfileData] = useState13({ name: null, nickname: null, instructions: null });
+  const [imageSettings, setImageSettings] = useState13({ keyType: "Default", quality: "Low-High", apiKey: "" });
+  const [sessionStats, setSessionStats] = useState13({ tokens: 0 });
+  const [sessionAgentCalls, setSessionAgentCalls] = useState13(0);
+  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState13(0);
+  const [sessionTotalTokens, setSessionTotalTokens] = useState13(0);
+  const [chatTokens, setChatTokens] = useState13(0);
   const chatTokenStartRef = useRef3(0);
-  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState12(0);
-  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState12(0);
-  const [sessionToolSuccess, setSessionToolSuccess] = useState12(0);
-  const [sessionToolFailure, setSessionToolFailure] = useState12(0);
-  const [sessionToolDenied, setSessionToolDenied] = useState12(0);
-  const [sessionApiTime, setSessionApiTime] = useState12(0);
-  const [sessionToolTime, setSessionToolTime] = useState12(0);
-  const [sessionImageCount, setSessionImageCount] = useState12(0);
-  const [sessionImageCredits, setSessionImageCredits] = useState12(0);
-  const [dailyUsage, setDailyUsage] = useState12(null);
-  const [monthlyUsage, setMonthlyUsage] = useState12(null);
-  const [customPeriodUsage, setCustomPeriodUsage] = useState12(null);
-  const [statsMode, setStatsMode] = useState12("daily");
+  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState13(0);
+  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState13(0);
+  const [sessionToolSuccess, setSessionToolSuccess] = useState13(0);
+  const [sessionToolFailure, setSessionToolFailure] = useState13(0);
+  const [sessionToolDenied, setSessionToolDenied] = useState13(0);
+  const [sessionApiTime, setSessionApiTime] = useState13(0);
+  const [sessionToolTime, setSessionToolTime] = useState13(0);
+  const [sessionImageCount, setSessionImageCount] = useState13(0);
+  const [sessionImageCredits, setSessionImageCredits] = useState13(0);
+  const [dailyUsage, setDailyUsage] = useState13(null);
+  const [monthlyUsage, setMonthlyUsage] = useState13(null);
+  const [customPeriodUsage, setCustomPeriodUsage] = useState13(null);
+  const [statsMode, setStatsMode] = useState13("daily");
   const PLAYGROUND_CHAT_ID = "flow-playground";
-  const [chatId, setChatId] = useState12(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
+  const [chatId, setChatId] = useState13(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
   useEffect9(() => {
     const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
     setChatTokens(nextTokens);
@@ -13877,10 +14281,10 @@ function App({ args = [] }) {
       load();
     }
   }, [activeView, quotas.resetDay]);
-  const [activeCommand, setActiveCommand] = useState12(null);
-  const [execOutput, setExecOutput] = useState12("");
-  const [isTerminalFocused, setIsTerminalFocused] = useState12(false);
-  const [tick, setTick] = useState12(0);
+  const [activeCommand, setActiveCommand] = useState13(null);
+  const [execOutput, setExecOutput] = useState13("");
+  const [isTerminalFocused, setIsTerminalFocused] = useState13(false);
+  const [tick, setTick] = useState13(0);
   const isFirstRender = useRef3(true);
   const isSecondRender = useRef3(true);
   const isThirdRender = useRef3(true);
@@ -13980,9 +14384,9 @@ function App({ args = [] }) {
   useEffect9(() => {
     execOutputRef.current = execOutput;
   }, [execOutput]);
-  const [autoAcceptWrites, setAutoAcceptWrites] = useState12(false);
-  const [pendingApproval, setPendingApproval] = useState12(null);
-  const [pendingAsk, setPendingAsk] = useState12(null);
+  const [autoAcceptWrites, setAutoAcceptWrites] = useState13(false);
+  const [pendingApproval, setPendingApproval] = useState13(null);
+  const [pendingAsk, setPendingAsk] = useState13(null);
   const resetPendingApproval = (decision) => {
     setPendingApproval(null);
     setActiveView("chat");
@@ -14001,8 +14405,9 @@ function App({ args = [] }) {
     if (ms < 1e3) return `${ms}ms`;
     return formatDuration(Math.floor(ms / 1e3));
   };
-  const [statusText, setStatusText] = useState12(null);
-  const [wittyPhrase, setWittyPhrase] = useState12("");
+  const [statusText, setStatusText] = useState13(null);
+  const [wittyPhrase, setWittyPhrase] = useState13("");
+  const [hasPasteBlock, setHasPasteBlock] = useState13(false);
   useEffect9(() => {
     let interval;
     if (statusText) {
@@ -14017,19 +14422,20 @@ function App({ args = [] }) {
     }
     return () => clearInterval(interval);
   }, [statusText]);
-  const [isSpinnerActive, setIsSpinnerActive] = useState12(true);
-  const [isProcessing, setIsProcessing] = useState12(false);
-  const [isCompressing, setIsCompressing] = useState12(false);
-  const [escPressed, setEscPressed] = useState12(false);
-  const [escTimer, setEscTimer] = useState12(null);
-  const [escPressCount, setEscPressCount] = useState12(0);
-  const [recentPrompts, setRecentPrompts] = useState12([]);
+  const [isSpinnerActive, setIsSpinnerActive] = useState13(true);
+  const [isProcessing, setIsProcessing] = useState13(false);
+  const [isCompressing, setIsCompressing] = useState13(false);
+  const [escPressed, setEscPressed] = useState13(false);
+  const [escTimer, setEscTimer] = useState13(null);
+  const [escPressCount, setEscPressCount] = useState13(0);
+  const [recentPrompts, setRecentPrompts] = useState13([]);
   const escDoubleTimerRef = useRef3(null);
-  const [queuedPrompt, setQueuedPrompt] = useState12(null);
-  const [resolutionData, setResolutionData] = useState12(null);
-  const [tempModelOverride, setTempModelOverride] = useState12(null);
+  const didSignalTerminationRef = useRef3(false);
+  const [queuedPrompt, setQueuedPrompt] = useState13(null);
+  const [resolutionData, setResolutionData] = useState13(null);
+  const [tempModelOverride, setTempModelOverride] = useState13(null);
   useEffect9(() => setEscPressCount(0), [input]);
-  const [messages, setMessages] = useState12(() => {
+  const [messages, rawSetMessages] = useState13(() => {
     const logoMsg = { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true };
     const isHomeDir = process.cwd() === os4.homedir();
     const isSystemDir = (() => {
@@ -14064,9 +14470,24 @@ function App({ args = [] }) {
     }
     return msgs;
   });
+  const setMessages = (value) => {
+    rawSetMessages((prev) => {
+      const next = typeof value === "function" ? value(prev) : value;
+      const cleaned = [];
+      for (let i = 0; i < next.length; i++) {
+        const msg = next[i];
+        const prevMsg = cleaned[cleaned.length - 1];
+        if (msg && msg.text && msg.text.includes("Request Cancelled") && prevMsg && prevMsg.text && prevMsg.text.includes("Request Cancelled")) {
+          continue;
+        }
+        cleaned.push(msg);
+      }
+      return cleaned;
+    });
+  };
   const queuedPromptRef = useRef3(null);
-  const [btwResponse, setBtwResponse] = useState12("");
-  const [showBtwBox, setShowBtwBox] = useState12(false);
+  const [btwResponse, setBtwResponse] = useState13("");
+  const [showBtwBox, setShowBtwBox] = useState13(false);
   const btwResponseRef = useRef3("");
   const btwClosedRef = useRef3(null);
   useEffect9(() => {
@@ -14087,8 +14508,8 @@ function App({ args = [] }) {
       }
     }
   }, [messages]);
-  const [completedIndex, setCompletedIndex] = useState12(messages.length);
-  const [clearKey, setClearKey] = useState12(0);
+  const [completedIndex, setCompletedIndex] = useState13(messages.length);
+  const [clearKey, setClearKey] = useState13(0);
   const parsedBlocks = useMemo2(() => {
     const completed = [];
     const active = [];
@@ -14147,7 +14568,7 @@ function App({ args = [] }) {
     const lastChunk = execOutput.trim();
     return lastChunk.endsWith("?") || lastChunk.endsWith(":") || /\[[yYnN/]+\]\s*$/.test(lastChunk) || /\([yYnN]\)\s*$/.test(lastChunk);
   }, [activeCommand, execOutput]);
-  useInput8((inputText, key) => {
+  useInput9((inputText, key) => {
     if (inputText === "\x1B[I" || inputText === "\x1B[O" || inputText === "[I" || inputText === "[O") {
       return;
     }
@@ -14246,16 +14667,11 @@ function App({ args = [] }) {
         return;
       }
       if (isProcessing || activeCommand) {
-        if (!escPressed) {
-          setEscPressed(true);
-          if (escTimer) clearTimeout(escTimer);
-          setEscTimer(setTimeout(() => setEscPressed(false), 3e3));
-        } else {
-          signalTermination();
-          terminateActiveCommand();
-          setEscPressed(false);
-          if (escTimer) clearTimeout(escTimer);
-        }
+        didSignalTerminationRef.current = true;
+        signalTermination();
+        terminateActiveCommand();
+        setEscPressed(false);
+        if (escTimer) clearTimeout(escTimer);
       } else {
         if (activeView === "revert") {
           setActiveView("chat");
@@ -14977,6 +15393,7 @@ function App({ args = [] }) {
       setInputKey((prev) => prev + 1);
       return;
     }
+    didSignalTerminationRef.current = false;
     const normalizedValue = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
     if (normalizedValue.endsWith("\\")) {
       setInput(normalizedValue.slice(0, -1) + "\n");
@@ -15112,6 +15529,9 @@ ${cleanText}`, color: "magenta" }];
         case "/clear": {
           if (stdout) {
             stdout.write("\x1B[2J\x1B[3J\x1B[H");
+            if (stdout.isTTY) {
+              stdout.write("\x1B[?2004h");
+            }
           }
           setMessages([
             { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true }
@@ -15784,6 +16204,26 @@ ${timestamp}` };
         return [...prev, userMessage];
       });
       const streamChat = async () => {
+        let didAppendCancel = false;
+        const appendCancelMessage = (prev) => {
+          if (didAppendCancel) {
+            return prev;
+          }
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg && lastMsg.text && lastMsg.text.includes("Request Cancelled")) {
+            return prev;
+          }
+          didAppendCancel = true;
+          const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+          const newMsgs = [...updatedPrev, {
+            id: "cancel-" + Date.now(),
+            role: "system",
+            text: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m",
+            isMeta: true
+          }];
+          setCompletedIndex(newMsgs.length);
+          return newMsgs;
+        };
         let hasFiredJanitor = false;
         setIsProcessing(true);
         setIsExpanded(false);
@@ -15987,17 +16427,7 @@ Selection: ${val}`,
                 sendStatus(packet.content);
               }
               if (packet.content === "Request Cancelled") {
-                setMessages((prev) => {
-                  const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-                  const newMsgs = [...updatedPrev, {
-                    id: "cancel-" + Date.now(),
-                    role: "system",
-                    text: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m",
-                    isMeta: true
-                  }];
-                  setCompletedIndex(newMsgs.length);
-                  return newMsgs;
-                });
+                setMessages((prev) => appendCancelMessage(prev));
               }
               continue;
             }
@@ -16293,6 +16723,9 @@ Selection: ${val}`,
         } finally {
           setIsProcessing(false);
           setStatusText(null);
+          if (didSignalTerminationRef.current) {
+            setMessages((prev) => appendCancelMessage(prev));
+          }
           if (!hasFiredJanitor) {
             if (process.stdout.isTTY) {
               process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
@@ -17147,7 +17580,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box15, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, null, statusText ? /* @__PURE__ */ React15.createElement(Box15, { gap: 1 }, /* @__PURE__ */ React15.createElement(dist_default, { colors: ["#001a1a", "#080510", "#12021c"] }, /* @__PURE__ */ React15.createElement(build_default, null)), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true, italic: true }, statusText)) : /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box15, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box15, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, null, statusText ? /* @__PURE__ */ React15.createElement(Box15, { gap: 1 }, /* @__PURE__ */ React15.createElement(dist_default, { colors: ["#001a1a", "#080510", "#12021c"] }, /* @__PURE__ */ React15.createElement(build_default, null)), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true, italic: true }, statusText)) : /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box15, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
           Box15,
           {
             backgroundColor: "#555555",
@@ -17160,6 +17593,7 @@ Selection: ${val}`,
             MultilineInput,
             {
               key: `input-${inputKey}`,
+              onPasteStateChange: setHasPasteBlock,
               focus: !isTerminalFocused && !isCompressing,
               showCursor: isAppFocused && !isCompressing,
               lastFocusEventTime: lastFocusEventTime.current,
@@ -17203,7 +17637,7 @@ Selection: ${val}`,
       aiProvider,
       version: versionFluxflow
     }
-  )), activeCommand && /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty }))), isInitializing ? /* @__PURE__ */ React15.createElement(Box15, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React15.createElement(Box15, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+  )), activeCommand && /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty, terminalHeight: terminalSize.rows }))), isInitializing ? /* @__PURE__ */ React15.createElement(Box15, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React15.createElement(Box15, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
     CommandMenu,
     {
       items: [
@@ -17697,7 +18131,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
           }
           const promptPackageManager = async () => {
             const React17 = (await import("react")).default;
-            const { useState: useState13 } = React17;
+            const { useState: useState14 } = React17;
             const { render: render2, Box: Box16, Text: Text17 } = await import("ink");
             const SelectInput3 = (await import("ink-select-input")).default;
             const TextInput5 = (await import("ink-text-input")).default;
@@ -17714,8 +18148,8 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
               };
               let unmountFn;
               const PromptComponent = () => {
-                const [step, setStep] = useState13("select");
-                const [customCommand2, setCustomCommand] = useState13("");
+                const [step, setStep] = useState14("select");
+                const [customCommand2, setCustomCommand] = useState14("");
                 const handleSelect = (item) => {
                   if (item.value === "custom") {
                     setStep("custom");
@@ -17816,7 +18250,20 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   if (process.stdout.isTTY) {
     process.stdout.write("\x1B]0;FluxFlow\x07");
     process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow\x07");
+    process.stdout.write("\x1B[?2004h");
   }
+  const disableBracketedPaste = () => {
+    if (process.stdout.isTTY) {
+      process.stdout.write("\x1B[?2004l");
+    }
+  };
+  process.on("exit", disableBracketedPaste);
+  ["SIGINT", "SIGTERM", "SIGHUP"].forEach((sig) => {
+    process.once(sig, () => {
+      disableBracketedPaste();
+      process.exit(0);
+    });
+  });
   if (args.includes("--playground")) {
     const originalCwd = process.cwd();
     process.argv.push("--original-cwd", originalCwd);

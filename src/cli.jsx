@@ -301,11 +301,26 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     // 3. CLEAN SLATE (Non-destructive clear to preserve scrollback and title)
     process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
 
-    // 4. SET TERMINAL TITLE (Standard + VS Code/Antigravity specific)
+    // 4. SET TERMINAL TITLE AND BRACKETED PASTE
     if (process.stdout.isTTY) {
         process.stdout.write('\x1b]0;FluxFlow\x07');
         process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow\x07');
+        process.stdout.write('\x1b[?2004h'); // Enable bracketed paste mode
     }
+
+    const disableBracketedPaste = () => {
+        if (process.stdout.isTTY) {
+            process.stdout.write('\x1b[?2004l'); // Disable bracketed paste mode
+        }
+    };
+
+    process.on('exit', disableBracketedPaste);
+    ['SIGINT', 'SIGTERM', 'SIGHUP'].forEach(sig => {
+        process.once(sig, () => {
+            disableBracketedPaste();
+            process.exit(0);
+        });
+    });
 
     // 5. PLAYGROUND: pin CWD before first render so StatusBar shows the right path immediately
     if (args.includes('--playground')) {

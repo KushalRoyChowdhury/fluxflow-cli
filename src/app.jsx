@@ -855,6 +855,7 @@ export default function App({ args = [] }) {
     };
     const [statusText, setStatusText] = useState(null);
     const [wittyPhrase, setWittyPhrase] = useState('');
+    const [hasPasteBlock, setHasPasteBlock] = useState(false);
 
     useEffect(() => {
         let interval;
@@ -879,13 +880,14 @@ export default function App({ args = [] }) {
     const [escPressCount, setEscPressCount] = useState(0);
     const [recentPrompts, setRecentPrompts] = useState([]);
     const escDoubleTimerRef = useRef(null);
+    const didSignalTerminationRef = useRef(false);
     const [queuedPrompt, setQueuedPrompt] = useState(null);
     const [resolutionData, setResolutionData] = useState(null);
     const [tempModelOverride, setTempModelOverride] = useState(null);
 
     useEffect(() => setEscPressCount(0), [input]);
 
-    const [messages, setMessages] = useState(() => {
+    const [messages, rawSetMessages] = useState(() => {
         const logoMsg = { id: 'logo-' + Date.now(), role: 'system', isLogo: true, isMeta: true };
         const isHomeDir = process.cwd() === os.homedir();
         const isSystemDir = (() => {
@@ -921,6 +923,24 @@ export default function App({ args = [] }) {
         }
         return msgs;
     });
+
+    const setMessages = (value) => {
+        rawSetMessages(prev => {
+            const next = typeof value === 'function' ? value(prev) : value;
+            const cleaned = [];
+            for (let i = 0; i < next.length; i++) {
+                const msg = next[i];
+                const prevMsg = cleaned[cleaned.length - 1];
+                if (msg && msg.text && msg.text.includes('Request Cancelled') &&
+                    prevMsg && prevMsg.text && prevMsg.text.includes('Request Cancelled')) {
+                    continue;
+                }
+                cleaned.push(msg);
+            }
+            return cleaned;
+        });
+    };
+
     const queuedPromptRef = useRef(null);
     const [btwResponse, setBtwResponse] = useState('');
     const [showBtwBox, setShowBtwBox] = useState(false);
@@ -1131,16 +1151,11 @@ export default function App({ args = [] }) {
                 return;
             }
             if (isProcessing || activeCommand) {
-                if (!escPressed) {
-                    setEscPressed(true);
-                    if (escTimer) clearTimeout(escTimer);
-                    setEscTimer(setTimeout(() => setEscPressed(false), 3000));
-                } else {
-                    signalTermination();
-                    terminateActiveCommand();
-                    setEscPressed(false);
-                    if (escTimer) clearTimeout(escTimer);
-                }
+                didSignalTerminationRef.current = true;
+                signalTermination();
+                terminateActiveCommand();
+                setEscPressed(false);
+                if (escTimer) clearTimeout(escTimer);
             } else {
                 if (activeView === 'revert') {
                     setActiveView('chat');
@@ -1945,6 +1960,8 @@ export default function App({ args = [] }) {
             return;
         }
 
+        didSignalTerminationRef.current = false;
+
         // 1. HARD NORMALIZATION: Vaporize Windows \r\n artifacts immediately
         const normalizedValue = value
             .replace(/\r\n/g, '\n')
@@ -2113,6 +2130,9 @@ export default function App({ args = [] }) {
                 case '/clear': {
                     if (stdout) {
                         stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                        if (stdout.isTTY) {
+                            stdout.write('\x1b[?2004h');
+                        }
                     }
                     // Soft clear by resetting message state (Ink handles the visual refresh)
                     setMessages([
@@ -2780,6 +2800,27 @@ export default function App({ args = [] }) {
             });
 
             const streamChat = async () => {
+                let didAppendCancel = false;
+                const appendCancelMessage = (prev) => {
+                    if (didAppendCancel) {
+                        return prev;
+                    }
+                    const lastMsg = prev[prev.length - 1];
+                    if (lastMsg && lastMsg.text && lastMsg.text.includes('Request Cancelled')) {
+                        return prev;
+                    }
+                    didAppendCancel = true;
+                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                    const newMsgs = [...updatedPrev, {
+                        id: 'cancel-' + Date.now(),
+                        role: 'system',
+                        text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
+                        isMeta: true
+                    }];
+                    setCompletedIndex(newMsgs.length);
+                    return newMsgs;
+                };
+
                 let hasFiredJanitor = false;
                 setIsProcessing(true);
                 setIsExpanded(false);
@@ -3005,17 +3046,7 @@ export default function App({ args = [] }) {
                                 sendStatus(packet.content);
                             }
                             if (packet.content === 'Request Cancelled') {
-                                setMessages(prev => {
-                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                    const newMsgs = [...updatedPrev, {
-                                        id: 'cancel-' + Date.now(),
-                                        role: 'system',
-                                        text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
-                                        isMeta: true
-                                    }];
-                                    setCompletedIndex(newMsgs.length);
-                                    return newMsgs;
-                                });
+                                setMessages(prev => appendCancelMessage(prev));
                             }
                             continue;
                         }
@@ -3343,6 +3374,10 @@ export default function App({ args = [] }) {
                 } finally {
                     setIsProcessing(false);
                     setStatusText(null);
+
+                    if (didSignalTerminationRef.current) {
+                        setMessages(prev => appendCancelMessage(prev));
+                    }
 
                     if (!hasFiredJanitor) {
                         if (process.stdout.isTTY) {
@@ -4660,7 +4695,7 @@ export default function App({ args = [] }) {
                                         <Text color="gray" bold italic>{statusText}</Text>
                                     </Box>
                                 ) : (
-                                    <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : "Waiting for input..."}</Text>
+                                        <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
@@ -4707,6 +4742,7 @@ export default function App({ args = [] }) {
                                                 )}
                                                 <MultilineInput
                                                     key={`input-${inputKey}`}
+                                                    onPasteStateChange={setHasPasteBlock}
                                                     focus={!isTerminalFocused && !isCompressing}
                                                     showCursor={isAppFocused && !isCompressing}
                                                     lastFocusEventTime={lastFocusEventTime.current}
@@ -4776,7 +4812,7 @@ export default function App({ args = [] }) {
                                 ))}
                                 {activeCommand && (
                                     <Box marginTop={1}>
-                                        <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} />
+                                        <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} terminalHeight={terminalSize.rows} />
                                     </Box>
                                 )}
                             </Box>

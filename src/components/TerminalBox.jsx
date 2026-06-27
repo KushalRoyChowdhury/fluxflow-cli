@@ -1,8 +1,8 @@
-import React from 'react';
-import { Box, Text } from 'ink';
+import React, { useState } from 'react';
+import { Box, Text, useInput } from 'ink';
 import { wrapText } from '../utils/text.js';
 
-export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false }) => {
+export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24 }) => {
     // A smart terminal output resolver that simulates a terminal grid for Ink
     const processPTY = (text) => {
         if (!text) return '';
@@ -143,6 +143,25 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
 
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    useInput((input, key) => {
+        if (isFocused && key.ctrl && (input === 'o' || input === '\x0f')) {
+            setIsExpanded(prev => !prev);
+        }
+    }, { isActive: isFocused });
+
+    const rawLines = displayOutput ? displayOutput.split('\n') : [];
+    const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 20));
+    const hasCollapsibleContent = rawLines.length > limit;
+    const collapsedCount = rawLines.length - limit;
+
+    const visibleLines = (hasCollapsibleContent && !isExpanded)
+        ? rawLines.slice(rawLines.length - limit)
+        : rawLines;
+
+    const renderedOutput = visibleLines.join('\n');
+
     return (
         <Box
             flexDirection="column"
@@ -173,9 +192,14 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             </Box>
 
             {displayOutput ? (
-                <Box marginTop={completed ? 0 : 1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>
+                <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>
+                    {hasCollapsibleContent && !isExpanded && (
+                        <Box marginBottom={1}>
+                            <Text color="magenta">...{collapsedCount} lines collapsed... Press CTRL + O to expand.</Text>
+                        </Box>
+                    )}
                     {/* Only apply gray color if completed; let ANSI colors show during live execution */}
-                    <Text color={completed ? "gray" : undefined}>{displayOutput}</Text>
+                    <Text color={completed ? "gray" : undefined}>{renderedOutput}</Text>
                 </Box>
             ) : !completed && (
                 <Box marginTop={1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>

@@ -127,7 +127,7 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     return fetch(url, options);
 };
 
-const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.9) {
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.85) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -281,7 +281,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
     }
 };
 
-const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.8) {
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.7) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -452,7 +452,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 }
 
-const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.5) {
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.45) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -1141,10 +1141,83 @@ const getSanitizedText = (text) => {
     return getContextSafeText(text, true);
 };
 
+const translateKimiToolCalls = (text) => {
+    if (!text) return text;
+
+    const PASCAL_MAP = {
+        'patchfile': 'PatchFile',
+        'writefile': 'WriteFile',
+        'readfile': 'ReadFile',
+        'viewfile': 'ReadFile',
+        'run': 'Run',
+        'execcommand': 'Run',
+        'searchkeyword': 'SearchKeyword',
+        'websearch': 'WebSearch',
+        'webscrape': 'WebScrape',
+        'readfolder': 'ReadFolder',
+        'writepdf': 'WritePDF',
+        'writedoc': 'WriteDoc',
+        'writedocx': 'WriteDoc',
+        'filemap': 'FileMap',
+        'generateimage': 'GenerateImage',
+        'todo': 'Todo',
+        'ask': 'Ask'
+    };
+
+    const toPascalCase = (str) => {
+        return str
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join('');
+    };
+
+    const kimiRegex = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
+
+    let result = text.replace(kimiRegex, (match, toolName, argsJsonStr) => {
+        let parsedArgs = '';
+        try {
+            const argsObj = JSON.parse(argsJsonStr.trim());
+            if (argsObj && typeof argsObj === 'object') {
+                const argPairs = Object.entries(argsObj).map(([key, val]) => {
+                    const stringVal = typeof val === 'string' 
+                        ? val 
+                        : JSON.stringify(val);
+                    return `${key}=${JSON.stringify(stringVal)}`;
+                });
+                parsedArgs = argPairs.join(', ');
+            }
+        } catch (e) {
+            const pairs = [];
+            const pairRegex = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+            let pMatch;
+            while ((pMatch = pairRegex.exec(argsJsonStr)) !== null) {
+                const key = pMatch[1];
+                const val = pMatch[2] !== undefined ? pMatch[2] : pMatch[0].split(':').slice(1).join(':').trim();
+                pairs.push(`${key}=${JSON.stringify(val)}`);
+            }
+            if (pairs.length > 0) {
+                parsedArgs = pairs.join(', ');
+            } else {
+                parsedArgs = argsJsonStr.trim();
+            }
+        }
+
+        const cleanKey = toolName.toLowerCase().replace(/_/g, '');
+        const normToolName = PASCAL_MAP[cleanKey] || toPascalCase(toolName);
+        return `[tool:functions.${normToolName}(${parsedArgs})]`;
+    });
+
+    result = result.replace(/<\|\s*tool_calls_section_begin\s*\|>/gi, '');
+    result = result.replace(/<\|\s*tool_calls_section_end\s*\|>/gi, '');
+
+    return result;
+};
+
 const detectToolCalls = (text) => {
     if (!text) return [];
+    const translatedText = translateKimiToolCalls(text);
     // Strip any thinking blocks first to ensure no tool calls are detected inside them
-    const cleanText = text.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
+    const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
     const results = [];
     const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
 
@@ -2100,7 +2173,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             taggedContextStr = '[TAGGED CONTEXT]\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED CONTEXT]\n';
         }
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+        const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -2373,7 +2448,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.5
+                            0.45
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -2385,7 +2460,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.9
+                            0.85
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         stream = getNVIDIAStream(
@@ -2397,7 +2472,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.8
+                            0.7
                         );
                     } else {
                         const apiCallPromise = client.models.generateContentStream({
@@ -2487,7 +2562,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     let toolCallBuffer = '';
                     let isBufferingToolCall = false;
-                    let activeBufferType = null; // 'tool', 'end'
+                    let activeBufferType = null; // 'tool', 'end', 'kimi_section', 'kimi_call'
 
                     const getBufferedMessages = (text) => {
                         const msgs = [];
@@ -2497,11 +2572,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // Match the actual protocol starts: [tool:functions. or [[END]]
                                 const toolIdx = remaining.indexOf('[tool');
                                 const endIdx = remaining.indexOf('[[END]]');
+                                const kimiSectionIdx = remaining.indexOf('<|tool_calls_section_begin|>');
+                                const kimiCallIdx = remaining.indexOf('<|tool_call_begin|>');
 
                                 // Find the earliest occurrence of any tag
                                 const indices = [
                                     { type: 'tool', idx: toolIdx, start: '[tool', end: ']' },
-                                    { type: 'end', idx: endIdx, start: '[[END]]', end: '[[END]]' }
+                                    { type: 'end', idx: endIdx, start: '[[END]]', end: '[[END]]' },
+                                    { type: 'kimi_section', idx: kimiSectionIdx, start: '<|tool_calls_section_begin|>', end: '<|tool_calls_section_end|>' },
+                                    { type: 'kimi_call', idx: kimiCallIdx, start: '<|tool_call_begin|>', end: '<|tool_call_end|>' }
                                 ].filter(i => i.idx !== -1).sort((a, b) => a.idx - b.idx);
 
                                 if (indices.length > 0) {
@@ -2517,13 +2596,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else {
                                     // Check if the end of 'remaining' looks like the START of a tag (potential split)
                                     // We only buffer if it's very likely the start of a protocol tag
-                                    const potentialStarts = ['[tool', '[[END]]'];
+                                    const potentialStarts = ['[tool', '[[END]]', '<|tool_calls_section_begin|>', '<|tool_call_begin|>'];
                                     let splitPoint = -1;
                                     for (const start of potentialStarts) {
                                         for (let len = start.length - 1; len > 0; len--) {
                                             if (remaining.endsWith(start.substring(0, len))) {
                                                 splitPoint = remaining.length - len;
-                                                activeBufferType = potentialStarts.indexOf(start) === 0 ? 'tool' : 'end';
+                                                const idx = potentialStarts.indexOf(start);
+                                                if (idx === 0) activeBufferType = 'tool';
+                                                else if (idx === 1) activeBufferType = 'end';
+                                                else if (idx === 2) activeBufferType = 'kimi_section';
+                                                else activeBufferType = 'kimi_call';
                                                 break;
                                             }
                                         }
@@ -2543,7 +2626,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 }
                             } else {
-                                const endTag = activeBufferType === 'tool' ? ']' : '[[END]]';
                                 const combined = toolCallBuffer + remaining;
 
                                 // [HEURISTIC] If we're buffering a tool call but it doesn't match the protocol prefix, FLUSH.
@@ -2562,6 +2644,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 let endIdx = -1;
+                                let endTag = ']';
                                 if (activeBufferType === 'tool') {
                                     let balance = 0;
                                     let inString = null;
@@ -2600,24 +2683,33 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                     }
                                 } else {
+                                    if (activeBufferType === 'end') endTag = '[[END]]';
+                                    else if (activeBufferType === 'kimi_section') endTag = '<|tool_calls_section_end|>';
+                                    else if (activeBufferType === 'kimi_call') endTag = '<|tool_call_end|>';
                                     endIdx = combined.indexOf(endTag);
                                 }
 
                                 if (endIdx !== -1) {
-                                    const fullMatch = combined.substring(0, endIdx + 1);
-                                    msgs.push({ type: 'text', content: fullMatch });
+                                    const endLen = endTag.length;
+                                    if (!activeBufferType.startsWith('kimi')) {
+                                        // Standard tools are outputted to frontend (app.jsx intercepts standard ones)
+                                        const fullMatch = combined.substring(0, endIdx + endLen);
+                                        msgs.push({ type: 'text', content: fullMatch });
+                                    }
                                     toolCallBuffer = '';
                                     isBufferingToolCall = false;
                                     activeBufferType = null;
-                                    remaining = combined.substring(endIdx + 1);
+                                    remaining = combined.substring(endIdx + endLen);
                                 } else {
                                     // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
-                                    // Flush current buffer if it exceeds 512 chars
-                                    const MAX_BUFFER = 512;
+                                    // Flush/discard buffer if it exceeds limits
+                                    const MAX_BUFFER = activeBufferType.startsWith('kimi') ? 8192 : 512;
                                     if (combined.length > MAX_BUFFER) {
-                                        msgs.push({ type: 'text', content: combined });
+                                        if (!activeBufferType.startsWith('kimi')) {
+                                            msgs.push({ type: 'text', content: combined });
+                                        }
                                         toolCallBuffer = '';
-                                        isBufferingToolCall = false; // Give up on this "tool call"
+                                        isBufferingToolCall = false; // Give up on this
                                     } else {
                                         toolCallBuffer = combined;
                                     }

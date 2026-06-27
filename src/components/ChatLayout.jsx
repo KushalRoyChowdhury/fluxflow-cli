@@ -723,7 +723,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                 width="100%"
                             >
                                 <Box marginBottom={1}>
-                                    <Text color="gray" bold>💻 {lang.toUpperCase() || 'CODE'}</Text>
+                                    <Text color="gray" bold>▶_ {lang.toUpperCase() || 'CODE'}</Text>
                                 </Box>
                                 <Box flexDirection="column" width="100%">
                                     {codeLines.map((line, idx) => (
