@@ -117,6 +117,10 @@ export default function StartupArgs() {
                     <strong><code>--package &lt;npm|pnpm|yarn|bun&gt;</code></strong><br />
                     Set the package manager to be used when running core application updates (used in conjunction with <code>--update latest</code>).
                 </li>
+                <li>
+                    <strong><code>--allocation &lt;mb&gt;</code></strong><br />
+                    Set custom Memory Allocation limit.
+                </li>
             </ul>
         </DocPage>
     )
