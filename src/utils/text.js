@@ -550,6 +550,13 @@ const blocksCache = new Map();
 const streamingBlocksCache = new Map();
 
 const MAX_CACHE_SIZE = 200;
+const CHUNK_SIZE = 6; // Lines per Static batch (active buffer ≤ CHUNK_SIZE lines)
+
+// Hoisted to module scope — avoids recreating a closure on every streaming tick
+const indexBlockIntoMap = (b, map) => {
+    map.set(b.key, b);
+    if (b.type === 'chunk' && b.blocks) b.blocks.forEach(sub => indexBlockIntoMap(sub, map));
+};
 
 export const parseMessageToBlocks = (msg, columns) => {
     if (!msg) return { completed: [], active: [] };
@@ -591,40 +598,42 @@ export const parseMessageToBlocks = (msg, columns) => {
 
     if (text.includes('- Content Preview:')) {
         const mainParts = text.split('- Content Preview:');
-        const headerText = mainParts[0] || '';
         const contentPart = mainParts[1] || '';
-
         const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
-        const contentAndFooter = contentPart.split(footerMarker);
-        const content = contentAndFooter[0]?.trim() || '';
-        const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : '';
+        const content = contentPart.split(footerMarker)[0]?.trim() || '';
 
         const codeLines = content.split('\n').map(l => l.replace(/\r$/, ''));
         const gutterWidth = String(codeLines.length).length;
 
         const completedBlocks = [];
         let activeBlock = null;
+        let writeChunk = [];
+
+        const flushWrite = () => {
+            if (!writeChunk.length) return;
+            const batch = writeChunk;
+            writeChunk = [];  // fresh array; old one handed off — no spread needed
+            completedBlocks.push(batch.length === 1 ? batch[0] : {
+                key: `${batch[0].key}-chunk`, msg, type: 'chunk', blocks: batch
+            });
+        };
 
         codeLines.forEach((line, idx) => {
             const isLast = idx === codeLines.length - 1;
             const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, 'write-line', line, {
-                gutterWidth,
-                lineNum: idx + 1,
-                isFirstLine: idx === 0,
-                isLastLine: isLast
+                gutterWidth, lineNum: idx + 1, isFirstLine: idx === 0, isLastLine: isLast
             });
-
             if (isLast && msg.isStreaming) {
+                flushWrite();
                 activeBlock = block;
             } else {
-                completedBlocks.push(block);
+                writeChunk.push(block);
+                if (writeChunk.length >= CHUNK_SIZE) flushWrite();
             }
         });
+        flushWrite();
 
-        return {
-            completed: completedBlocks,
-            active: activeBlock ? [activeBlock] : []
-        };
+        return { completed: completedBlocks, active: activeBlock ? [activeBlock] : [] };
     }
 
     if (text.includes('[DIFF_START]')) {
@@ -632,14 +641,7 @@ export const parseMessageToBlocks = (msg, columns) => {
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
-        // Pre-parse and align diff lines so that DiffLine component doesn't need to do it repeatedly
-        const parsedLines = diffLines.map(line => {
-            return {
-                line,
-                parsed: parseLineInfo(line),
-                pairContent: null
-            };
-        });
+        const parsedLines = diffLines.map(line => ({ line, parsed: parseLineInfo(line), pairContent: null }));
 
         let currentGroup = [];
         for (let i = 0; i < parsedLines.length; i++) {
@@ -647,38 +649,40 @@ export const parseMessageToBlocks = (msg, columns) => {
             if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
                 currentGroup.push(item);
             } else {
-                if (currentGroup.length > 0) {
-                    alignChangeGroup(currentGroup);
-                    currentGroup = [];
-                }
+                if (currentGroup.length > 0) { alignChangeGroup(currentGroup); currentGroup = []; }
             }
         }
-        if (currentGroup.length > 0) {
-            alignChangeGroup(currentGroup);
-        }
+        if (currentGroup.length > 0) alignChangeGroup(currentGroup);
 
         const completedBlocks = [];
         let activeBlock = null;
+        let diffChunk = [];
+
+        const flushDiff = () => {
+            if (!diffChunk.length) return;
+            const batch = diffChunk;
+            diffChunk = [];  // fresh array; old one handed off — no spread needed
+            completedBlocks.push(batch.length === 1 ? batch[0] : {
+                key: `${batch[0].key}-chunk`, msg, type: 'chunk', blocks: batch
+            });
+        };
 
         diffLines.forEach((line, i) => {
             const isLast = i === diffLines.length - 1;
             const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, 'diff-line', line, {
-                isFirstLine: i === 0,
-                isLastLine: isLast,
-                pairContent: parsedLines[i].pairContent
+                isFirstLine: i === 0, isLastLine: isLast, pairContent: parsedLines[i].pairContent
             });
-
             if (isLast && msg.isStreaming) {
+                flushDiff();
                 activeBlock = block;
             } else {
-                completedBlocks.push(block);
+                diffChunk.push(block);
+                if (diffChunk.length >= CHUNK_SIZE) flushDiff();
             }
         });
+        flushDiff();
 
-        return {
-            completed: completedBlocks,
-            active: activeBlock ? [activeBlock] : []
-        };
+        return { completed: completedBlocks, active: activeBlock ? [activeBlock] : [] };
     }
 
     // If it's a system message, special record, user message, it's a single completed block
@@ -693,32 +697,51 @@ export const parseMessageToBlocks = (msg, columns) => {
     const completedBlocks = [];
     let activeBlock = null;
 
+    // ── Chunk-batching infrastructure ────────────────────────────────────────
+    // Per-line blocks are batched into groups of CHUNK_SIZE before being committed
+    // to Static, reducing total block count and React reconciler work.
+    let pendingChunk = [];
+    let pendingChunkType = null;
+
+    const flushPending = () => {
+        if (!pendingChunk.length) return;
+        const batch = pendingChunk;
+        pendingChunk = [];  // fresh array; old one handed off — no spread needed
+        pendingChunkType = null;
+        completedBlocks.push(batch.length === 1 ? batch[0] : {
+            key: `${msg.id || 'x'}-chunk-${batch[0].key}`,
+            msg,
+            type: 'chunk',
+            blocks: batch
+        });
+    };
+
+    // Enqueue a per-line block. Flushes on type change or when CHUNK_SIZE is reached.
+    const enqueue = (block) => {
+        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
+        pendingChunk.push(block);
+        pendingChunkType = block.type;
+        if (pendingChunk.length >= CHUNK_SIZE) flushPending();
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     if (msg.role === 'think') {
         completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', ''));
         const lines = text.split('\n');
         lines.forEach((line, idx) => {
-            const isLast = idx === lines.length - 1;
-            const block = getBlock(`${msg.id}-${idx}`, 'think-line', line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
-            if (isLast && msg.isStreaming) {
-                activeBlock = block;
-            } else {
-                completedBlocks.push(block);
-            }
+            enqueue(getBlock(`${msg.id}-${idx}`, 'think-line', line, {}));
         });
         if (!msg.isStreaming) {
-            completedBlocks.push({
-                key: `${msg.id}-footer-padding`,
-                msg,
-                type: 'think-footer-padding',
-                text: ''
-            });
+            flushPending();
+            completedBlocks.push({ key: `${msg.id}-footer-padding`, msg, type: 'think-footer-padding', text: '' });
         }
     } else {
         const lines = text.split('\n');
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
-        let codeLines = [];
+        let codeLineNum = 0;
+        let codeStartIdx = 0;
 
         lines.forEach((line, idx) => {
             const isLast = idx === lines.length - 1;
@@ -726,60 +749,59 @@ export const parseMessageToBlocks = (msg, columns) => {
             const isCodeBlockMarker = line.trim().startsWith('```');
 
             if (inCodeBlock) {
-                codeLines.push(line);
-                if (isCodeBlockMarker || isLast) {
-                    inCodeBlock = !isCodeBlockMarker;
-                    if (!inCodeBlock || isLast) {
-                        const block = getBlock(`${msg.id}-code-${idx}`, 'agent-line', codeLines.join('\n'), isLast && msg.isStreaming && inCodeBlock ? { isActiveBlock: true } : {});
-                        if (isLast && msg.isStreaming && inCodeBlock) {
-                            activeBlock = block;
-                        } else {
-                            completedBlocks.push(block);
-                        }
-                        codeLines = [];
-                    }
+                if (isCodeBlockMarker) {
+                    inCodeBlock = false;
+                    enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, 'code-fence-close', '', {}));
+                } else {
+                    codeLineNum++;
+                    enqueue(getBlock(`${msg.id}-code-line-${idx}`, 'code-line', line, { lineNum: codeLineNum }));
                 }
             } else if (isCodeBlockMarker) {
                 inCodeBlock = true;
-                codeLines.push(line);
-                if (isLast) {
-                    const block = getBlock(`${msg.id}-code-${idx}`, 'agent-line', codeLines.join('\n'), msg.isStreaming ? { isActiveBlock: true } : {});
-                    if (msg.isStreaming) {
-                        activeBlock = block;
-                    } else {
-                        completedBlocks.push(block);
-                    }
-                }
+                codeStartIdx = idx;
+                codeLineNum = 0;
+                const lang = line.trim().replace(/^```/, '').trim();
+                enqueue(getBlock(`${msg.id}-code-open-${idx}`, 'code-fence-open', lang, {}));
             } else if (isTableRow) {
                 inTable = true;
                 tableLines.push(line);
                 if (isLast) {
+                    // Table at end of message — structural, handle directly
+                    flushPending();
                     if (msg.isStreaming) {
-                        activeBlock = getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: true, isActiveBlock: true });
+                        activeBlock = getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: true });
                     } else {
                         completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
                     }
                 }
             } else {
                 if (inTable) {
+                    flushPending();
                     completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
                     inTable = false;
                     tableLines = [];
                 }
-
-                const block = getBlock(`${msg.id}-${idx}`, 'agent-line', line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
-
-                if (isLast && msg.isStreaming) {
-                    activeBlock = block;
-                } else {
-                    completedBlocks.push(block);
-                }
+                enqueue(getBlock(`${msg.id}-${idx}`, 'agent-line', line, {}));
             }
         });
 
         if (!msg.isStreaming && msg.workedDuration) {
+            flushPending();
             completedBlocks.push(getBlock(`${msg.id}-worked-duration`, 'worked-duration', ''));
         }
+    }
+
+    // Finalize: trailing pending chunk → activeBlock if streaming, else flush to completed
+    if (msg.isStreaming && pendingChunk.length > 0) {
+        // pendingChunk goes out of scope here — assign directly, no spread needed
+        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : {
+            key: `${msg.id || 'x'}-chunk-active-${pendingChunk[0].key}`,
+            msg,
+            type: 'chunk',
+            blocks: pendingChunk
+        };
+    } else {
+        flushPending();
     }
 
     const result = {
@@ -794,15 +816,11 @@ export const parseMessageToBlocks = (msg, columns) => {
         }
         streamingBlocksCache.delete(streamCacheKey);
     } else {
+        // Index both top-level blocks and chunk sub-blocks for getBlock cache hits
         const blocksMap = new Map();
-        completedBlocks.forEach(b => blocksMap.set(b.key, b));
-        if (activeBlock) {
-            blocksMap.set(activeBlock.key, activeBlock);
-        }
-        streamingBlocksCache.set(streamCacheKey, {
-            text,
-            blocksMap
-        });
+        completedBlocks.forEach(b => indexBlockIntoMap(b, blocksMap));
+        if (activeBlock) indexBlockIntoMap(activeBlock, blocksMap);
+        streamingBlocksCache.set(streamCacheKey, { text, blocksMap });
         if (streamingBlocksCache.size > MAX_CACHE_SIZE) {
             const firstKey = streamingBlocksCache.keys().next().value;
             streamingBlocksCache.delete(firstKey);

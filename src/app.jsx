@@ -1740,7 +1740,7 @@ export default function App({ args = [] }) {
                     ? [
                         { cmd: 'Fast', desc: 'Reasoning Disabled' },
                         { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                        { cmd: 'High', desc: 'Reasoning Enabled' }
+                        { cmd: 'High', desc: 'Deep Reasoning' }
                     ]
                     : aiProvider === 'OpenRouter'
                         ? [

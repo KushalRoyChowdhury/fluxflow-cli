@@ -1066,6 +1066,24 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
     const { msg, type, text, isStreaming } = block;
 
+    // Batch chunk — renders up to CHUNK_SIZE sub-blocks committed together to <Static>
+    if (type === 'chunk') {
+        return (
+            <Box flexDirection="column" width="100%">
+                {block.blocks.map(b => (
+                    <BlockItem
+                        key={b.key}
+                        block={b}
+                        columns={columns}
+                        showFullThinking={showFullThinking}
+                        aiProvider={aiProvider}
+                        version={version}
+                    />
+                ))}
+            </Box>
+        );
+    }
+
     if (type === 'full-message') {
         return (
             <MessageItem
@@ -1190,6 +1208,70 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             </Box>
         );
     }
+
+    // ── Streaming code-block lines ────────────────────────────────────────────
+    // Each of these types maps to one row of a fenced code block so that every
+    // completed line is immediately committed to <Static> scrollback.
+
+    if (type === 'code-fence-open') {
+        // Empty border row (top padding) + header row — mirrors write-line's renderPaddingLine pattern.
+        const borderProps = {
+            borderStyle: 'single', borderLeft: true, borderRight: false,
+            borderTop: false, borderBottom: false, borderColor: '#444444', paddingLeft: 2, width: '100%'
+        };
+        return (
+            <Box flexDirection="column" marginTop={1} width="100%">
+                {/* Empty pad row with left border — sits above the ▶_ header */}
+                <Box flexDirection="row" {...borderProps}>
+                    <Text> </Text>
+                </Box>
+                <Box flexDirection="row" {...borderProps}>
+                    <Text color="gray" bold>▶_ {(text || 'CODE').toUpperCase()}</Text>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (type === 'code-line') {
+        // Renders one source line with a 3-char gutter. Fixed width avoids
+        // needing to know the total line count up-front during streaming.
+        const { lineNum } = block;
+        return (
+            <Box
+                flexDirection="row"
+                borderStyle="single"
+                borderLeft borderRight={false} borderTop={false} borderBottom={false}
+                borderColor="#444444"
+                paddingLeft={2}
+                width="100%"
+            >
+                <Box width={4} flexShrink={0}>
+                    <Text color="gray" dimColor>{String(lineNum).padStart(3, ' ')} </Text>
+                </Box>
+                <Box flexGrow={1}>
+                    <Text color="#fcfca4ff">{text}</Text>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (type === 'code-fence-close') {
+        // Renders the closing spacer row that gives the block bottom breathing room.
+        return (
+            <Box
+                flexDirection="row"
+                borderStyle="single"
+                borderLeft borderRight={false} borderTop={false} borderBottom={false}
+                borderColor="#444444"
+                paddingLeft={2}
+                marginBottom={1}
+                width="100%"
+            >
+                <Text> </Text>
+            </Box>
+        );
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (type === 'write-header') {
         return (

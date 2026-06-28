@@ -94,6 +94,7 @@ ${projectContextBlock}
 -- FORMATTING --
 - GFM Supported
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
+- Short headsup about actions before firing tools
 - Task Complete & Results Verified? End response with summary of changes made and files edited
 - Basic LaTeX${mode === 'Flux' ? '' : '. Kaomojis'}
 === END SYSTEM PROMPT ===`.trim();

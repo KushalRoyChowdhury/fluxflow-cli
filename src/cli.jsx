@@ -22,16 +22,14 @@ const HEAP_LIMIT = (!isNaN(_allocValue) && _allocValue > 0)
     ? Math.min(_allocValue, _maxAllowed)
     : Math.max(1536, Math.min(32768, calculatedLimit));
 
-if (!Number.isNaN(_allocValue)) {
-    console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
-    await new Promise(resolve => setTimeout(resolve, 2000));
-} else {
-    console.log("\n[MEMORY] Using auto-detected memory allocation: " + calculatedLimit + " MB");
-}
-
 const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
 if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
+    if (!Number.isNaN(_allocValue)) {
+        console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
     const cp = spawn(process.execPath, [
         `--max-old-space-size=${HEAP_LIMIT}`,
         fileURLToPath(import.meta.url),
