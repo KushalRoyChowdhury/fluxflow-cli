@@ -36,7 +36,7 @@ import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './u
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
-import { formatTokens, parseMessageToBlocks } from './utils/text.js';
+import { formatTokens, parseMessageToBlocks, clearBlocksCache } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -969,6 +969,8 @@ export default function App({ args = [] }) {
     const [completedIndex, setCompletedIndex] = useState(messages.length);
     const [clearKey, setClearKey] = useState(0);
 
+    const lastCompletedBlocksRef = useRef([]);
+
     const parsedBlocks = useMemo(() => {
         const completed = [];
         const active = [];
@@ -1010,8 +1012,8 @@ export default function App({ args = [] }) {
         });
 
         // Keep a scrollback limit of blocks to prevent infinite memory usage in render tree
-        const MAX_BLOCKS = 5000000000;
-        const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
+        const MAX_BLOCKS = 1000000;
+        let slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
 
         if (slicedCompleted.length >= 75000) {
             slicedCompleted.push({
@@ -1024,6 +1026,18 @@ export default function App({ args = [] }) {
                 },
                 type: 'full-message'
             });
+        }
+
+        // Compare slicedCompleted with the last cached completed blocks by key to maintain referential integrity
+        const isIdentical =
+            lastCompletedBlocksRef.current &&
+            slicedCompleted.length === lastCompletedBlocksRef.current.length &&
+            slicedCompleted.every((block, idx) => block.key === lastCompletedBlocksRef.current[idx].key);
+
+        if (isIdentical) {
+            slicedCompleted = lastCompletedBlocksRef.current;
+        } else {
+            lastCompletedBlocksRef.current = slicedCompleted;
         }
 
         return {
@@ -2046,6 +2060,7 @@ export default function App({ args = [] }) {
 
                             if (target) {
                                 stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
+                                clearBlocksCache();
                                 setChatId(targetId);
 
                                 const savedData = await loadChatContext(targetId);
@@ -2140,6 +2155,7 @@ export default function App({ args = [] }) {
                     ]);
                     setCompletedIndex(1);
                     setClearKey(prev => prev + 1);
+                    clearBlocksCache();
                     // /clear always exits playground mode by resetting to a fresh session
                     if (parsedArgs.playground) {
                         parsedArgs.playground = false;
@@ -2184,6 +2200,11 @@ export default function App({ args = [] }) {
                     setIsExpanded(false);
                     setChatTokens(0);
                     chatTokenStartRef.current = sessionTotalTokens;
+                    setTimeout(() => {
+                        if (global.gc) {
+                            try { global.gc(); } catch (e) { }
+                        }
+                    }, 500);
                     break;
                 }
                 case '/revert': {
@@ -2199,6 +2220,11 @@ export default function App({ args = [] }) {
                             });
                         }
                     });
+                    setTimeout(() => {
+                        if (global.gc) {
+                            try { global.gc(); } catch (e) { }
+                        }
+                    }, 500);
                     break;
                 }
                 case '/mode': {
@@ -2801,24 +2827,24 @@ export default function App({ args = [] }) {
 
             const streamChat = async () => {
                 let didAppendCancel = false;
-                const appendCancelMessage = (prev) => {
-                    if (didAppendCancel) {
-                        return prev;
-                    }
-                    const lastMsg = prev[prev.length - 1];
-                    if (lastMsg && lastMsg.text && lastMsg.text.includes('Request Cancelled')) {
-                        return prev;
-                    }
+                const appendCancelMessage = () => {
+                    if (didAppendCancel) return;
                     didAppendCancel = true;
-                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                    const newMsgs = [...updatedPrev, {
-                        id: 'cancel-' + Date.now(),
-                        role: 'system',
-                        text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
-                        isMeta: true
-                    }];
-                    setCompletedIndex(newMsgs.length);
-                    return newMsgs;
+                    setMessages(prev => {
+                        const lastMsg = prev[prev.length - 1];
+                        if (lastMsg && lastMsg.text && lastMsg.text.includes('Request Cancelled')) {
+                            return prev;
+                        }
+                        const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                        const newMsgs = [...updatedPrev, {
+                            id: 'cancel-' + Date.now(),
+                            role: 'system',
+                            text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
+                            isMeta: true
+                        }];
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
                 };
 
                 let hasFiredJanitor = false;
@@ -3034,8 +3060,16 @@ export default function App({ args = [] }) {
                     const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
+                    const bullyTheBug = path.join(DATA_DIR, 'padding');
                     for await (const packet of stream) {
-                        // fs.appendFileSync("DEBUG.txt", JSON.stringify(packet) + "\n");
+                        // fs.appendFileSync('DEBUG.txt', JSON.stringify(packet, null, 2));
+                        if (packet.type === 'interactive_turn_finished') {
+                            fs.writeFileSync(bullyTheBug, 'pad_0xa\n');
+                        }
+                        else {
+                            fs.appendFileSync(bullyTheBug, '\r');
+                        }
+
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
                             isFirstPacket = false;
@@ -3046,7 +3080,7 @@ export default function App({ args = [] }) {
                                 sendStatus(packet.content);
                             }
                             if (packet.content === 'Request Cancelled') {
-                                setMessages(prev => appendCancelMessage(prev));
+                                appendCancelMessage();
                             }
                             continue;
                         }
@@ -3087,6 +3121,11 @@ export default function App({ args = [] }) {
                                 setCompletedIndex(newMsgs.length);
                                 return newMsgs;
                             });
+                            setTimeout(() => {
+                                if (global.gc) {
+                                    try { global.gc(); } catch (e) {}
+                                }
+                            }, 500);
                             continue;
                         }
                         if (packet.type === 'interactive_turn_finished') {
@@ -3110,6 +3149,11 @@ export default function App({ args = [] }) {
                                     onBackgroundIncrement: () => setSessionBackgroundCalls(prev => prev + 1)
                                 }
                             );
+                            setTimeout(() => {
+                                if (global.gc) {
+                                    try { global.gc(); } catch (e) { }
+                                }
+                            }, 500);
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
@@ -3296,7 +3340,6 @@ export default function App({ args = [] }) {
                         if ((chunkLower.includes('</think>') || chunkLower.includes('</thought>')) && currentThinkId) {
                             const parts = chunkText.split(/<\/(think|thought)>/gi);
                             const thinkPart = parts[0] || '';
-                            // Parts indices: 0: text before </think>, 1: 'think' or 'thought', 2+: rest
                             const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
                             setMessages(prev => {
@@ -3376,7 +3419,7 @@ export default function App({ args = [] }) {
                     setStatusText(null);
 
                     if (didSignalTerminationRef.current) {
-                        setMessages(prev => appendCancelMessage(prev));
+                        appendCancelMessage();
                     }
 
                     if (!hasFiredJanitor) {
@@ -4331,6 +4374,7 @@ export default function App({ args = [] }) {
                                             stdout.write('\x1b[2J\x1b[3J\x1b[H');
                                         }
                                         setClearKey(prev => prev + 1);
+                                        clearBlocksCache();
 
                                         // Find index of reverted user message
                                         const targetIdx = messages.findLastIndex(m =>
@@ -4394,6 +4438,7 @@ export default function App({ args = [] }) {
                                 const h = await loadHistory();
                                 if (h[id]) {
                                     stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
+                                    clearBlocksCache();
                                     setChatId(id);
 
                                     const savedData = await loadChatContext(id);

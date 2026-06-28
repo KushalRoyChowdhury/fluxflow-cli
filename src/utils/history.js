@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
-import { HISTORY_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
+import { HISTORY_FILE, HISTORY_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
@@ -23,26 +23,53 @@ const withLock = (op) => {
 };
 
 /**
- * Structure of history.json:
+ * Structure of history.json (Index metadata only, no messages):
  * {
- *   "chat-id-1": { name: "Fixing Auth", messages: [...], timestamp: 12345 },
- *   "chat-id-2": { name: "Refactor UI", messages: [...], timestamp: 12347 }
+ *   "chat-id-1": { name: "Fixing Auth", timestamp: 12345 },
+ *   "chat-id-2": { name: "Refactor UI", timestamp: 12347 }
  * }
  */
 
 export const loadHistory = async () => {
+    await fs.ensureDir(HISTORY_DIR);
+    let history = {};
     if (await fs.pathExists(HISTORY_FILE)) {
         try {
-            return readEncryptedJson(HISTORY_FILE, {});
+            history = readEncryptedJson(HISTORY_FILE, {});
         } catch (e) {
-            return {};
+            history = {};
         }
     }
-    return {};
+
+    // Add dynamic getter/setter for transparent lazy-loading compatibility
+    for (const id in history) {
+        const chatFile = path.join(HISTORY_DIR, `${id}.json`);
+        Object.defineProperty(history[id], 'messages', {
+            get: () => {
+                if (fs.existsSync(chatFile)) {
+                    try {
+                        return readEncryptedJson(chatFile, []);
+                    } catch (e) {
+                        return [];
+                    }
+                }
+                return [];
+            },
+            set: (msgs) => {
+                try {
+                    writeEncryptedJson(chatFile, msgs);
+                } catch (e) {}
+            },
+            enumerable: true,
+            configurable: true
+        });
+    }
+    return history;
 };
 
 export const saveChat = async (id, name, messages) => {
     return withLock(async () => {
+        await fs.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
 
@@ -56,12 +83,25 @@ export const saveChat = async (id, name, messages) => {
         // 3. Fallback to unique ID suffix
         const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
 
+        // Save the messages to the separate chat file
+        const chatFile = path.join(HISTORY_DIR, `${id}.json`);
+        writeEncryptedJson(chatFile, persistentMessages);
+
+        // Keep index clean (no inline messages stored in index)
         history[id] = {
             name: finalName,
-            messages: persistentMessages,
             updatedAt: Date.now()
         };
-        writeEncryptedJson(HISTORY_FILE, history);
+
+        // Write index only
+        const indexHistory = {};
+        for (const chatId in history) {
+            indexHistory[chatId] = {
+                name: history[chatId].name,
+                updatedAt: history[chatId].updatedAt
+            };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
     });
 };
 
@@ -76,9 +116,18 @@ export const saveChatTitle = async (id, title) => {
             history[id].updatedAt = Date.now();
         } else {
             // Janitor often runs BEFORE the main app's first save — create a skeleton entry
-            history[id] = { name: title, messages: [], updatedAt: Date.now() };
+            history[id] = { name: title, updatedAt: Date.now() };
         }
-        writeEncryptedJson(HISTORY_FILE, history);
+
+        // Write index only
+        const indexHistory = {};
+        for (const chatId in history) {
+            indexHistory[chatId] = {
+                name: history[chatId].name,
+                updatedAt: history[chatId].updatedAt
+            };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
     });
 };
 
@@ -86,7 +135,16 @@ export const deleteChat = async (id) => {
     return withLock(async () => {
         const history = await loadHistory();
         delete history[id];
-        writeEncryptedJson(HISTORY_FILE, history);
+
+        // Write index only
+        const indexHistory = {};
+        for (const chatId in history) {
+            indexHistory[chatId] = {
+                name: history[chatId].name,
+                updatedAt: history[chatId].updatedAt
+            };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
 
         // Also clean up context.json
         if (await fs.pathExists(CONTEXT_FILE)) {
@@ -115,6 +173,14 @@ export const deleteChat = async (id) => {
 
         // Clean up backups and transaction records
         await RevertManager.deleteChatBackups(id);
+
+        // Clean up the individual chat history file
+        const chatFile = path.join(HISTORY_DIR, `${id}.json`);
+        if (await fs.pathExists(chatFile)) {
+            try {
+                await fs.remove(chatFile);
+            } catch (e) {}
+        }
 
         return history;
     });

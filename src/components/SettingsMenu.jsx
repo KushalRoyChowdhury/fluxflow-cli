@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
+import v8 from 'v8';
 
 const CATEGORIES = [
     { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
@@ -71,6 +72,49 @@ export default function SettingsMenu({
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState('');
+
+    const [currentMemory, setCurrentMemory] = useState(0);
+    const [maxMemory, setMaxMemory] = useState(0);
+    const [memoryUnit, setMemoryUnit] = useState('MB');
+
+    useEffect(() => {
+        // 1. Get the absolute max limit in bytes (Runs ONCE on mount)
+        const maxLimitBytes = v8.getHeapStatistics().heap_size_limit;
+
+        // 2. Decide the best unit based on the MAX limit so they match perfectly
+        const isGB = maxLimitBytes >= 1024 * 1024 * 1024;
+        const unitLabel = isGB ? 'GB' : 'MB';
+        const divisor = isGB ? (1024 * 1024 * 1024) : (1024 * 1024);
+
+        // Set the stable max limit state
+        setMaxMemory(parseFloat((maxLimitBytes / divisor).toFixed(2)));
+        setMemoryUnit(unitLabel);
+
+        const getMemoryStats = () => {
+            const usage = process.memoryUsage();
+
+            // Switch to usage.heapTotal here if you prefer allocated space over actual used!
+            const targetBytes = usage.rss;
+            const converted = targetBytes / divisor;
+
+            // Keep 2 decimals for GB stats, or round nicely for MB stats
+            const formattedCurrent = isGB
+                ? parseFloat(converted.toFixed(2))
+                : Math.round(converted);
+
+            setCurrentMemory(formattedCurrent);
+        }
+
+        getMemoryStats();
+
+        // 3. Track the live memory usage every 1 seconds
+        const interval = setInterval(() => {
+            getMemoryStats();
+        }, 5000);
+
+        // Keep your memory leak-free! 🧹
+        return () => clearInterval(interval);
+    }, []);
 
     // Get items for current category
     const getCategoryItems = (catId) => {
@@ -396,10 +440,15 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={18} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={17} paddingX={1}>
                                         <Text color="white">
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>
+                                    </Box>
+                                );
+                                elements.push(
+                                    <Box key="memory-load-2026" paddingX={1}>
+                                        <Text color="gray">Memory Load: {currentMemory}/{maxMemory} {memoryUnit}</Text>
                                     </Box>
                                 );
                             }

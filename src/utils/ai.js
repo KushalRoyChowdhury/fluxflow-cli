@@ -23,7 +23,7 @@ let globalSettings = {};
 const colorMainWords = (label) => {
     if (!label) return label;
     return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
-        return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
+        return `${ansiBefore || ''}${icon}${ansiAfter || ''}  \x1b[95m${word}\x1b[0m`;
     });
 };
 
@@ -1179,8 +1179,8 @@ const translateKimiToolCalls = (text) => {
             const argsObj = JSON.parse(argsJsonStr.trim());
             if (argsObj && typeof argsObj === 'object') {
                 const argPairs = Object.entries(argsObj).map(([key, val]) => {
-                    const stringVal = typeof val === 'string' 
-                        ? val 
+                    const stringVal = typeof val === 'string'
+                        ? val
                         : JSON.stringify(val);
                     return `${key}=${JSON.stringify(stringVal)}`;
                 });

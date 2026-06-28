@@ -1,86 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
+import fs from 'fs';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
-import { wrapText, cleanSignals } from '../utils/text.js';
+import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
 
 const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
-    const [displayedText, setDisplayedText] = useState((isActiveBlock && isStreaming) ? '' : targetText);
-    const targetTextRef = useRef(targetText);
-
-    useEffect(() => {
-        targetTextRef.current = targetText;
-    }, [targetText]);
-
-    useEffect(() => {
-        if (!isActiveBlock) {
-            setDisplayedText(targetText);
-            return;
-        }
-
-        if (!isStreaming && displayedText === targetText) {
-            return;
-        }
-
-        const interval = setInterval(() => {
-            setDisplayedText(current => {
-                const target = targetTextRef.current;
-
-                if (current.length >= target.length) {
-                    if (!isStreaming) {
-                        clearInterval(interval);
-                    }
-                    return current;
-                }
-
-                if (!target.startsWith(current)) {
-                    return target;
-                }
-
-                const remaining = target.substring(current.length);
-                const words = remaining.split(/(\s+)/);
-                if (words.length <= 1) {
-                    if (!isStreaming) {
-                        clearInterval(interval);
-                    }
-                    return target;
-                }
-
-                const currentWordsCount = current.split(/\s+/).filter(Boolean).length;
-                const targetWordsCount = target.split(/\s+/).filter(Boolean).length;
-                const diff = targetWordsCount - currentWordsCount;
-
-                let wordsToAdd = 1;
-                if (diff > 15) {
-                    wordsToAdd = 4;
-                } else if (diff > 8) {
-                    wordsToAdd = 3;
-                } else if (diff > 3) {
-                    wordsToAdd = 2;
-                }
-
-                let addedText = '';
-                let wordCount = 0;
-                for (let i = 0; i < words.length; i++) {
-                    const w = words[i];
-                    addedText += w;
-                    if (/\S/.test(w)) {
-                        wordCount++;
-                        if (wordCount >= wordsToAdd) {
-                            break;
-                        }
-                    }
-                }
-
-                return current + addedText;
-            });
-        }, 100);
-
-        return () => clearInterval(interval);
-    }, [isStreaming, isActiveBlock, targetText, displayedText]);
-
-    return displayedText;
+    return targetText;
 };
 
 const formatThinkText = (cleaned, columns = 80) => {
@@ -415,27 +342,6 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const parseLineInfo = (l) => {
-    if (!l) return null;
-    const clean = l.replace('[UI_CONTEXT]', '').replace(/\r/g, '');
-
-    // Check formatting indicators
-    const isR = clean.startsWith('-');
-    const isA = clean.startsWith('+');
-
-    // Slice away the prefix symbol if it exists, otherwise keep it clean
-    let rest = (isR || isA) ? clean.substring(1) : clean;
-    rest = rest.trim();
-
-    const splitIdx = rest.indexOf('|');
-
-    // Extract gutter values cleanly
-    const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
-    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
-
-    return { isR, isA, num, content };
-};
-
 const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
@@ -443,7 +349,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
         return (
-            <Box paddingX={1} width={columns}>
+            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
                 <Text color="gray">{'═'.repeat(Math.max(10, columns - 4))}</Text>
             </Box>
         );
@@ -464,22 +370,40 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
 
     const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
 
-    // 🎨 Unified solid block backgrounds for the inner text container
-    const innerBgColor = isRemoval ? '#3a0c0c' : (isAddition ? '#0c3a1a' : undefined);
-
-    // 🔍 Dynamic Lookup: Find the matching counterpart row
+    // 🔍 Reconstruct and align hunk if rendering single diff-line blocks
     let finalPairContent = pairContent;
     if (!finalPairContent && parentText && (isRemoval || isAddition)) {
-        const cleanParent = parentText.replace(/\[DIFF_START\]|\[DIFF_END\]/g, '').trim();
-        const diffLines = cleanParent.split('\n');
+        const match = parentText.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
+        const diffBody = match ? match[1].trim() : '';
+        const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
-        const pairLine = diffLines.find(l => {
-            const p = parseLineInfo(l);
-            return p && p.num === lineNum && p.isR !== isRemoval;
+        const parsedLines = diffLines.map(l => {
+            return {
+                line: l,
+                parsed: parseLineInfo(l),
+                pairContent: null
+            };
         });
 
-        if (pairLine) {
-            finalPairContent = parseLineInfo(pairLine).content;
+        let currentGroup = [];
+        for (let idx = 0; idx < parsedLines.length; idx++) {
+            const item = parsedLines[idx];
+            if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+                currentGroup.push(item);
+            } else {
+                if (currentGroup.length > 0) {
+                    alignChangeGroup(currentGroup);
+                    currentGroup = [];
+                }
+            }
+        }
+        if (currentGroup.length > 0) {
+            alignChangeGroup(currentGroup);
+        }
+
+        const matchedItem = parsedLines.find(item => item.parsed && item.parsed.num === lineNum && item.parsed.isR === isRemoval);
+        if (matchedItem) {
+            finalPairContent = matchedItem.pairContent;
         }
     }
 
@@ -498,7 +422,9 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
     // 🔍 2. Check if text is a modified slice or pure block
     const hasInlineChange = words.some(part => (isRemoval && part.removed) || (isAddition && part.added));
     const isPureUnpairedBlock = (!finalPairContent && (isRemoval || isAddition));
-    const hasRealChange = hasInlineChange || isPureUnpairedBlock;
+
+    // 🎨 Unified solid block backgrounds for the inner text container
+    const innerBgColor = isRemoval ? '#3a0c0c' : (isAddition ? '#0c3a1a' : undefined);
 
     // Row indicator colors
     const finalNumColor = (isRemoval || isAddition) ? (isRemoval ? '#d96868' : '#68d98c') : 'gray';
@@ -518,7 +444,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
 
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
-            const textColor = isRemoval ? '#b34d4d' : (isAddition ? '#4db36b' : 'gray');
+            const textColor = isRemoval ? '#885555' : (isAddition ? '#558866' : 'gray');
             return <Text color={textColor}>{wrapText(content, columns - 14)}</Text>;
         }
 
@@ -543,7 +469,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
                         if (part.added) return null;
 
                         // Unchanged syntax components stay muted darker red
-                        return <Text key={idx} color="#b34d4d">{part.value}</Text>;
+                        return <Text key={idx} color="#885555">{part.value}</Text>;
                     }
 
                     // 🟢 ADDITION ROW TREATMENT
@@ -561,7 +487,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
                         if (part.removed) return null;
 
                         // Unchanged syntax components stay muted darker green
-                        return <Text key={idx} color="#4db36b">{part.value}</Text>;
+                        return <Text key={idx} color="#558866">{part.value}</Text>;
                     }
 
                     return <Text key={idx} color="gray">{part.value}</Text>;
@@ -597,6 +523,32 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
+    // Parse all lines
+    const parsedLines = diffLines.map(line => {
+        return {
+            line,
+            parsed: parseLineInfo(line),
+            pairContent: null
+        };
+    });
+
+    // Group contiguous changes and align them
+    let currentGroup = [];
+    for (let i = 0; i < parsedLines.length; i++) {
+        const item = parsedLines[i];
+        if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+            currentGroup.push(item);
+        } else {
+            if (currentGroup.length > 0) {
+                alignChangeGroup(currentGroup);
+                currentGroup = [];
+            }
+        }
+    }
+    if (currentGroup.length > 0) {
+        alignChangeGroup(currentGroup);
+    }
+
     return (
         <Box flexDirection="column" width={columns - 3} marginBottom={1}>
             <Box flexDirection="column" paddingY={0} width="100%">
@@ -607,8 +559,13 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
                         <Text>{' '}</Text>
                     </Box>
                 </Box>
-                {diffLines.map((line, i) => (
-                    <DiffLine key={i} line={line} parentText={text} columns={columns - 3} />
+                {parsedLines.map((item, i) => (
+                    <DiffLine
+                        key={i}
+                        line={item.line}
+                        pairContent={item.pairContent}
+                        columns={columns - 3}
+                    />
                 ))}
                 <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
                     <Box width={3} flexShrink={0} />

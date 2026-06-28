@@ -41,11 +41,21 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
 /**
  * Search Keyword Tool
  * Searches for a specific keyword in the current workspace natively without shell commands.
+ *
+ * @param {string}  keyword   - The keyword/word to search for.
+ * @param {string}  [file]    - Optional: restrict search to a specific file.
+ * @param {boolean} [subString=false] - When true, matches any substring;
+ *                                      when false (default), matches whole words only.
  */
 export const search_keyword = async (args) => {
-    // ✨ Uses your main app's argument parser again!
-    const { keyword, file } = parseArgs(args);
+    const { keyword, file, subString } = parseArgs(args);
     if (!keyword) return 'ERROR: Missing "keyword" argument.';
+
+    // Normalise subString: accept boolean true or string 'true'
+    const matchSubstring = subString === true || subString === 'true' || subString === 1 || subString === '1' || subString === "true";
+
+    // Build a word-boundary regex for whole-word matching (case-insensitive)
+    const wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
 
     const excludes = [
         'node_modules', '.git', 'dist', '.next', '.gemini',
@@ -82,7 +92,10 @@ export const search_keyword = async (args) => {
                 const fileMatches = [];
 
                 for (let i = 0; i < lines.length; i++) {
-                    if (lines[i].includes(keyword)) {
+                    const matched = matchSubstring
+                        ? lines[i].toLowerCase().includes(keyword.toLowerCase())  // substring: any occurrence (case-insensitive)
+                        : wordRegex.test(lines[i]);                               // default: whole-word only (case-insensitive)
+                    if (matched) {
                         const displayPath = fileObj.relativePath.replace(/\\/g, '/');
                         fileMatches.push(`${displayPath} → ${i + 1}`);
                     }
@@ -101,10 +114,10 @@ export const search_keyword = async (args) => {
         }
 
         if (matches.length === 0) {
-            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'}`;
+            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${matchSubstring ? '(subString mode)' : ''}`;
         }
 
-        let output = `Found ${matches.length} matches:\n\n`;
+        let output = `Found ${matches.length} matches ${matchSubstring ? '(subString mode)' : ''}:\n\n`;
         output += matches.join('\n');
         return output;
 

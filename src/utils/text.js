@@ -431,8 +431,163 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     return diffText;
 };
 
+export const parseLineInfo = (l) => {
+    if (!l) return null;
+    const clean = l.replace('[UI_CONTEXT]', '').replace(/\r/g, '');
+
+    // Check formatting indicators
+    const isR = clean.startsWith('-');
+    const isA = clean.startsWith('+');
+
+    // Slice away the prefix symbol if it exists, otherwise keep it clean
+    let rest = (isR || isA) ? clean.substring(1) : clean;
+    rest = rest.trim();
+
+    const splitIdx = rest.indexOf('|');
+
+    // Extract gutter values cleanly
+    const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
+    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+
+    return { isR, isA, num, content };
+};
+
+export const getSimilarity = (s1, s2) => {
+    if (!s1 && !s2) return 1.0;
+    if (!s1 || !s2) return 0.0;
+    const l1 = s1.length;
+    const l2 = s2.length;
+    const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
+    for (let i = 0; i <= l1; i++) dp[i][0] = i;
+    for (let j = 0; j <= l2; j++) dp[0][j] = j;
+    for (let i = 1; i <= l1; i++) {
+        for (let j = 1; j <= l2; j++) {
+            if (s1[i - 1] === s2[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1];
+            } else {
+                dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+            }
+        }
+    }
+    const maxLen = Math.max(l1, l2);
+    if (maxLen === 0) return 1.0;
+    return 1.0 - dp[l1][l2] / maxLen;
+};
+
+export const alignChangeGroup = (group) => {
+    const removals = [];
+    const additions = [];
+
+    group.forEach((item, index) => {
+        if (item.parsed.isR) {
+            removals.push({ index, content: item.parsed.content });
+        } else if (item.parsed.isA) {
+            additions.push({ index, content: item.parsed.content });
+        }
+    });
+
+    const N = removals.length;
+    const M = additions.length;
+    if (N === 0 || M === 0) return;
+
+    const dp = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
+    const choices = Array.from({ length: N + 1 }, () => Array(M + 1).fill(''));
+
+    for (let i = 1; i <= N; i++) choices[i][0] = 'up';
+    for (let j = 1; j <= M; j++) choices[0][j] = 'left';
+
+    const simMatrix = Array.from({ length: N }, () => Array(M).fill(0));
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < M; j++) {
+            simMatrix[i][j] = getSimilarity(removals[i].content.trim(), additions[j].content.trim());
+        }
+    }
+
+    for (let i = 1; i <= N; i++) {
+        for (let j = 1; j <= M; j++) {
+            const matchScore = simMatrix[i - 1][j - 1];
+            const score = matchScore >= 0.2 ? matchScore : -10;
+
+            const diag = dp[i - 1][j - 1] + score;
+            const up = dp[i - 1][j];
+            const left = dp[i][j - 1];
+
+            if (diag >= up && diag >= left) {
+                dp[i][j] = diag;
+                choices[i][j] = 'diag';
+            } else if (up >= left) {
+                dp[i][j] = up;
+                choices[i][j] = 'up';
+            } else {
+                dp[i][j] = left;
+                choices[i][j] = 'left';
+            }
+        }
+    }
+
+    let i = N;
+    let j = M;
+    while (i > 0 || j > 0) {
+        if (choices[i][j] === 'diag') {
+            const matchScore = simMatrix[i - 1][j - 1];
+            if (matchScore >= 0.2) {
+                const rIdx = removals[i - 1].index;
+                const aIdx = additions[j - 1].index;
+                group[rIdx].pairContent = group[aIdx].parsed.content;
+                group[aIdx].pairContent = group[rIdx].parsed.content;
+            }
+            i--;
+            j--;
+        } else if (choices[i][j] === 'up') {
+            i--;
+        } else {
+            j--;
+        }
+    }
+};
+
+const blocksCache = new Map();
+const streamingBlocksCache = new Map();
+
+const MAX_CACHE_SIZE = 200;
+
 export const parseMessageToBlocks = (msg, columns) => {
+    if (!msg) return { completed: [], active: [] };
+    const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
+    if (!msg.isStreaming && blocksCache.has(cacheKey)) {
+        return blocksCache.get(cacheKey);
+    }
     const text = cleanSignals(msg.text || '');
+
+    const streamCacheKey = `${msg.id}-${columns}`;
+    let cachedBlocks = new Map();
+    if (msg.isStreaming) {
+        const cached = streamingBlocksCache.get(streamCacheKey);
+        if (cached && text.startsWith(cached.text)) {
+            cachedBlocks = cached.blocksMap;
+        }
+    }
+
+    const getBlock = (key, type, textContent, extra = {}) => {
+        const existing = cachedBlocks.get(key);
+        if (
+            existing &&
+            existing.text === textContent &&
+            existing.type === type &&
+            !!existing.isActiveBlock === !!extra.isActiveBlock &&
+            !!existing.isStreaming === !!extra.isStreaming &&
+            existing.pairContent === extra.pairContent
+        ) {
+            return existing;
+        }
+        return {
+            key,
+            msg,
+            type,
+            text: textContent,
+            ...extra
+        };
+    };
 
     if (text.includes('- Content Preview:')) {
         const mainParts = text.split('- Content Preview:');
@@ -452,16 +607,12 @@ export const parseMessageToBlocks = (msg, columns) => {
 
         codeLines.forEach((line, idx) => {
             const isLast = idx === codeLines.length - 1;
-            const block = {
-                key: `${msg.id || Date.now()}-write-line-${idx}`,
-                msg,
-                type: 'write-line',
-                text: line,
+            const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, 'write-line', line, {
                 gutterWidth,
                 lineNum: idx + 1,
                 isFirstLine: idx === 0,
                 isLastLine: isLast
-            };
+            });
 
             if (isLast && msg.isStreaming) {
                 activeBlock = block;
@@ -481,19 +632,41 @@ export const parseMessageToBlocks = (msg, columns) => {
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
+        // Pre-parse and align diff lines so that DiffLine component doesn't need to do it repeatedly
+        const parsedLines = diffLines.map(line => {
+            return {
+                line,
+                parsed: parseLineInfo(line),
+                pairContent: null
+            };
+        });
+
+        let currentGroup = [];
+        for (let i = 0; i < parsedLines.length; i++) {
+            const item = parsedLines[i];
+            if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+                currentGroup.push(item);
+            } else {
+                if (currentGroup.length > 0) {
+                    alignChangeGroup(currentGroup);
+                    currentGroup = [];
+                }
+            }
+        }
+        if (currentGroup.length > 0) {
+            alignChangeGroup(currentGroup);
+        }
+
         const completedBlocks = [];
         let activeBlock = null;
 
         diffLines.forEach((line, i) => {
             const isLast = i === diffLines.length - 1;
-            const block = {
-                key: `${msg.id || Date.now()}-diff-${i}`,
-                msg,
-                type: 'diff-line',
-                text: line,
+            const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, 'diff-line', line, {
                 isFirstLine: i === 0,
-                isLastLine: isLast
-            };
+                isLastLine: isLast,
+                pairContent: parsedLines[i].pairContent
+            });
 
             if (isLast && msg.isStreaming) {
                 activeBlock = block;
@@ -511,12 +684,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     // If it's a system message, special record, user message, it's a single completed block
     if (msg.role === 'system' || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === 'user') {
         return {
-            completed: [{
-                key: `${msg.id || Date.now()}-full`,
-                msg,
-                type: 'full-message',
-                text
-            }],
+            completed: [getBlock(`${msg.id || Date.now()}-full`, 'full-message', text)],
             active: []
         };
     }
@@ -526,23 +694,12 @@ export const parseMessageToBlocks = (msg, columns) => {
     let activeBlock = null;
 
     if (msg.role === 'think') {
-        completedBlocks.push({
-            key: `${msg.id}-header`,
-            msg,
-            type: 'think-header',
-            text: ''
-        });
+        completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', ''));
         const lines = text.split('\n');
         lines.forEach((line, idx) => {
             const isLast = idx === lines.length - 1;
-            const block = {
-                key: `${msg.id}-${idx}`,
-                msg,
-                type: 'think-line',
-                text: line
-            };
+            const block = getBlock(`${msg.id}-${idx}`, 'think-line', line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
             if (isLast && msg.isStreaming) {
-                block.isActiveBlock = true;
                 activeBlock = block;
             } else {
                 completedBlocks.push(block);
@@ -573,14 +730,8 @@ export const parseMessageToBlocks = (msg, columns) => {
                 if (isCodeBlockMarker || isLast) {
                     inCodeBlock = !isCodeBlockMarker;
                     if (!inCodeBlock || isLast) {
-                        const block = {
-                            key: `${msg.id}-code-${idx}`,
-                            msg,
-                            type: 'agent-line',
-                            text: codeLines.join('\n')
-                        };
+                        const block = getBlock(`${msg.id}-code-${idx}`, 'agent-line', codeLines.join('\n'), isLast && msg.isStreaming && inCodeBlock ? { isActiveBlock: true } : {});
                         if (isLast && msg.isStreaming && inCodeBlock) {
-                            block.isActiveBlock = true;
                             activeBlock = block;
                         } else {
                             completedBlocks.push(block);
@@ -592,14 +743,8 @@ export const parseMessageToBlocks = (msg, columns) => {
                 inCodeBlock = true;
                 codeLines.push(line);
                 if (isLast) {
-                    const block = {
-                        key: `${msg.id}-code-${idx}`,
-                        msg,
-                        type: 'agent-line',
-                        text: codeLines.join('\n')
-                    };
+                    const block = getBlock(`${msg.id}-code-${idx}`, 'agent-line', codeLines.join('\n'), msg.isStreaming ? { isActiveBlock: true } : {});
                     if (msg.isStreaming) {
-                        block.isActiveBlock = true;
                         activeBlock = block;
                     } else {
                         completedBlocks.push(block);
@@ -610,46 +755,21 @@ export const parseMessageToBlocks = (msg, columns) => {
                 tableLines.push(line);
                 if (isLast) {
                     if (msg.isStreaming) {
-                        activeBlock = {
-                            key: `${msg.id}-table-${idx}`,
-                            msg,
-                            type: 'table',
-                            text: tableLines.join('\n'),
-                            isStreaming: true,
-                            isActiveBlock: true
-                        };
+                        activeBlock = getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: true, isActiveBlock: true });
                     } else {
-                        completedBlocks.push({
-                            key: `${msg.id}-table-${idx}`,
-                            msg,
-                            type: 'table',
-                            text: tableLines.join('\n'),
-                            isStreaming: false
-                        });
+                        completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
                     }
                 }
             } else {
                 if (inTable) {
-                    completedBlocks.push({
-                        key: `${msg.id}-table-${idx}`,
-                        msg,
-                        type: 'table',
-                        text: tableLines.join('\n'),
-                        isStreaming: false
-                    });
+                    completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
                     inTable = false;
                     tableLines = [];
                 }
 
-                const block = {
-                    key: `${msg.id}-${idx}`,
-                    msg,
-                    type: 'agent-line',
-                    text: line
-                };
+                const block = getBlock(`${msg.id}-${idx}`, 'agent-line', line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
 
                 if (isLast && msg.isStreaming) {
-                    block.isActiveBlock = true;
                     activeBlock = block;
                 } else {
                     completedBlocks.push(block);
@@ -658,19 +778,37 @@ export const parseMessageToBlocks = (msg, columns) => {
         });
 
         if (!msg.isStreaming && msg.workedDuration) {
-            completedBlocks.push({
-                key: `${msg.id}-worked-duration`,
-                msg,
-                type: 'worked-duration',
-                text: ''
-            });
+            completedBlocks.push(getBlock(`${msg.id}-worked-duration`, 'worked-duration', ''));
         }
     }
 
-    return {
+    const result = {
         completed: completedBlocks,
         active: activeBlock ? [activeBlock] : []
     };
+    if (!msg.isStreaming) {
+        blocksCache.set(cacheKey, result);
+        if (blocksCache.size > MAX_CACHE_SIZE) {
+            const firstKey = blocksCache.keys().next().value;
+            blocksCache.delete(firstKey);
+        }
+        streamingBlocksCache.delete(streamCacheKey);
+    } else {
+        const blocksMap = new Map();
+        completedBlocks.forEach(b => blocksMap.set(b.key, b));
+        if (activeBlock) {
+            blocksMap.set(activeBlock.key, activeBlock);
+        }
+        streamingBlocksCache.set(streamCacheKey, {
+            text,
+            blocksMap
+        });
+        if (streamingBlocksCache.size > MAX_CACHE_SIZE) {
+            const firstKey = streamingBlocksCache.keys().next().value;
+            streamingBlocksCache.delete(firstKey);
+        }
+    }
+    return result;
 };
 
 export const TOOL_LABELS = {
@@ -805,3 +943,7 @@ export const cleanSignals = (text) => {
         .trim();
 };
 
+export const clearBlocksCache = () => {
+    blocksCache.clear();
+    streamingBlocksCache.clear();
+};
