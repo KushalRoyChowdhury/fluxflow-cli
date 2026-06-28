@@ -60,7 +60,7 @@ export const loadHistory = async () => {
                     writeEncryptedJson(chatFile, msgs);
                 } catch (e) {}
             },
-            enumerable: true,
+            enumerable: false,
             configurable: true
         });
     }

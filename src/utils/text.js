@@ -840,106 +840,133 @@ export const TOOL_LABELS = {
     'GenerateImage': 'GenerateImage'
 };
 
+// ============================================================================
+// PRE-COMPILED REGEXES
+// Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
+// ============================================================================
+const REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
+const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
+const REGEX_SYSTEM = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi;
+const REGEX_THINK = /<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi;
+const REGEX_ANSWER = /\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi;
+const REGEX_TOOL_RES = /\[TOOL RESULT\]:?\s*/gi;
+// The (\r?\n)? perfectly mimics the old .split().filter().join() behavior
+const REGEX_SUCCESS_ERROR = /^\s*(SUCCESS|ERROR):.*(\r?\n)?/gm;
+const REGEX_TURN_1 = /\[\s*turn\s*:\s*(continue|finish)\s*\]/gi;
+const REGEX_END = /\[\[END\]\]/gi;
+const REGEX_TURN_2 = /\[\s*turn\s*:?.*?$/gi;
+const REGEX_TURN_3 = /\n\s*turn\s*:?.*?$/gi;
+const REGEX_OPEN_BRACKET = /\[\s*$/gi;
+const REGEX_RESPONDED = /\n\nResponded on .*/g;
+const REGEX_PROMPTED = /\n\n\[Prompted on: .*\]/g;
+const REGEX_ARROWS = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi;
+const REGEX_ARROWS_L = /(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi;
+const REGEX_ARROWS_U = /(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi;
+const REGEX_ARROWS_D = /(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi;
+const REGEX_ARROWS_LR = /(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
+const REGEX_TERMINAL = /@\[TerminalName:.*?, ProcessId:.*?\]/gi;
+const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
+
 export const cleanSignals = (text) => {
     if (!text) return text;
 
     let result = text
-        .replace(/<\/think>(\r?\n){2}/gi, '</think>')
-        .replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, '');
+        .replace(REGEX_INITIAL_THINK, '</think>')
+        .replace(REGEX_INITIAL_TOOL, '');
+
     const trigger = 'tool:functions.';
 
-    // Greedy loop to strip all tool calls
-    while (true) {
-        const lowerResult = result.toLowerCase();
-        let triggerIdx = lowerResult.indexOf(trigger);
-        if (triggerIdx === -1) break;
+    // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present
+    if (result.toLowerCase().includes(trigger)) {
+        // Greedy loop to strip all tool calls
+        while (true) {
+            const lowerResult = result.toLowerCase();
+            let triggerIdx = lowerResult.indexOf(trigger);
+            if (triggerIdx === -1) break;
 
-        // [HARDENING] Check for outer bracket
-        let startIdx = triggerIdx;
-        let hasOuterBracket = false;
+            // [HARDENING] Check for outer bracket
+            let startIdx = triggerIdx;
+            let hasOuterBracket = false;
 
-        // Look back for '[' (ignoring whitespace)
-        let k = triggerIdx - 1;
-        while (k >= 0 && /\s/.test(result[k])) k--;
-        if (k >= 0 && result[k] === '[') {
-            startIdx = k;
-            hasOuterBracket = true;
-        }
-
-        let balance = 0;
-        let foundStart = false;
-        let inString = null;
-        let j = triggerIdx;
-
-        while (j < result.length) {
-            const char = result[j];
-
-            // String immunity
-            if (!inString && (char === "'" || char === '"' || char === '`')) {
-                inString = char;
-            } else if (inString && char === inString && result[j - 1] !== '\\') {
-                inString = null;
+            // Look back for '[' (ignoring whitespace)
+            let k = triggerIdx - 1;
+            while (k >= 0 && /\s/.test(result[k])) k--;
+            if (k >= 0 && result[k] === '[') {
+                startIdx = k;
+                hasOuterBracket = true;
             }
 
-            if (!inString) {
-                if (char === '(') {
-                    balance++;
-                    foundStart = true;
-                } else if (char === ')') {
-                    balance--;
+            let balance = 0;
+            let foundStart = false;
+            let inString = null;
+            let j = triggerIdx;
+
+            while (j < result.length) {
+                const char = result[j];
+
+                // String immunity
+                if (!inString && (char === "'" || char === '"' || char === '`')) {
+                    inString = char;
+                } else if (inString && char === inString && result[j - 1] !== '\\') {
+                    inString = null;
                 }
-            }
 
-            if (foundStart && balance === 0 && !inString) {
-                // If we have outer bracket, look for closing ']'
-                let endIdx = j;
-                if (hasOuterBracket) {
-                    let m = j + 1;
-                    while (m < result.length && /\s/.test(result[m])) m++;
-                    if (m < result.length && result[m] === ']') {
-                        endIdx = m;
+                if (!inString) {
+                    if (char === '(') {
+                        balance++;
+                        foundStart = true;
+                    } else if (char === ')') {
+                        balance--;
                     }
                 }
-                result = result.substring(0, startIdx) + result.substring(endIdx + 1);
-                break;
-            }
 
-            j++;
+                if (foundStart && balance === 0 && !inString) {
+                    // If we have outer bracket, look for closing ']'
+                    let endIdx = j;
+                    if (hasOuterBracket) {
+                        let m = j + 1;
+                        while (m < result.length && /\s/.test(result[m])) m++;
+                        if (m < result.length && result[m] === ']') {
+                            endIdx = m;
+                        }
+                    }
+                    result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+                    break;
+                }
 
-            // [SAFETY] If we reached the end without finding a closing boundary,
-            // it's a partial call. Strip it and break to prevent infinite loop.
-            if (j === result.length) {
-                result = result.substring(0, startIdx);
-                return result; // Immediate exit
+                j++;
+
+                // [SAFETY] If we reached the end without finding a closing boundary,
+                // it's a partial call. Strip it and break to prevent infinite loop.
+                if (j === result.length) {
+                    result = result.substring(0, startIdx);
+                    return result; // Immediate exit
+                }
             }
         }
     }
 
     // Secondary cleanup for protocol signals and success/error markers
     return result
-        .replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, '')
-        .replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, '')
-        .replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, '')
-        // .replaceAll('[ANSWER]', '')
-        // .replaceAll('[/ANSWER]', '')
-        .replaceAll(/\[TOOL RESULT\]:?\s*/gi, '')
-        .split('\n')
-        .filter(line => !line.trim().startsWith('SUCCESS:') && !line.trim().startsWith('ERROR:'))
-        .join('\n')
-        .replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, '')
-        .replaceAll(/\[\[END\]\]/gi, '')
-        .replaceAll(/\[\s*turn\s*:?.*?$/gi, '')
-        .replaceAll(/\n\s*turn\s*:?.*?$/gi, '')
-        .replaceAll(/\[\s*$/gi, '')
-        .replaceAll(/\n\nResponded on .*/g, '')
-        .replaceAll(/\n\n\[Prompted on: .*\]/g, '')
-        .replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, '→')
-        .replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, '←')
-        .replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, '↑')
-        .replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, '↓')
-        .replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, '↔')
-        .replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, '')
-        .replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match)
+        .replaceAll(REGEX_SYSTEM, '')
+        .replaceAll(REGEX_THINK, '')
+        .replace(REGEX_ANSWER, '')
+        .replaceAll(REGEX_TOOL_RES, '')
+        .replaceAll(REGEX_SUCCESS_ERROR, '') // This replaces the memory-heavy .split().filter().join()
+        .replaceAll(REGEX_TURN_1, '')
+        .replaceAll(REGEX_END, '')
+        .replaceAll(REGEX_TURN_2, '')
+        .replaceAll(REGEX_TURN_3, '')
+        .replaceAll(REGEX_OPEN_BRACKET, '')
+        .replaceAll(REGEX_RESPONDED, '')
+        .replaceAll(REGEX_PROMPTED, '')
+        .replaceAll(REGEX_ARROWS, '→')
+        .replaceAll(REGEX_ARROWS_L, '←')
+        .replaceAll(REGEX_ARROWS_U, '↑')
+        .replaceAll(REGEX_ARROWS_D, '↓')
+        .replaceAll(REGEX_ARROWS_LR, '↔')
+        .replaceAll(REGEX_TERMINAL, '')
+        .replaceAll(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match)
         .trim();
 };
 

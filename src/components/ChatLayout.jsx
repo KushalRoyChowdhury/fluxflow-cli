@@ -54,6 +54,15 @@ const formatThinkText = (cleaned, columns = 80) => {
     );
 };
 
+// ============================================================================
+// PRE-COMPILED REGEXES (Prevents V8 recompilation during React render loop)
+// ============================================================================
+const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+const REGEX_FENCED_CODE = /```(\w*)\n?([\s\S]*?)(?:```|$)/;
+const REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
+const REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
+const REGEX_HEADING = /^(#{1,6})\s+(.*)/;
+
 const parseMathSymbols = (content) => {
     return content
         .replace(/\\multiply|\\mul|\\times/g, '×')
@@ -88,14 +97,9 @@ const parseMathSymbols = (content) => {
 const renderLatexText = (content, key) => {
     if (!content) return null;
 
-    // Handle fractions: \frac{a}{b} -> (a/b)
-    let formatted = content.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1/$2)');
-
-    // Replace math symbols
+    let formatted = content.replace(REGEX_LATEX_FRAC, '($1/$2)');
     formatted = parseMathSymbols(formatted);
-
-    // Split by styling commands: \mathbf{...}, \textbf{...}, \textit{...}, \underline{...}, \texttt{...}
-    const parts = formatted.split(/(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g);
+    const parts = formatted.split(REGEX_LATEX_STYLE);
 
     return (
         <React.Fragment key={key}>
@@ -125,8 +129,8 @@ const renderLatexText = (content, key) => {
 const InlineMarkdown = React.memo(({ text, color, italic }) => {
     if (!text) return null;
 
-    // Split by the outer-most markdown groups (check triple backticks BEFORE single ones, use non-greedy matching)
-    const parts = text.split(/(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
+    // Use cached regex to prevent GC thrashing during stream renders
+    const parts = text.split(REGEX_MD_TOKENS);
 
     return (
         <Text color={color} wrap="anywhere" italic={italic}>

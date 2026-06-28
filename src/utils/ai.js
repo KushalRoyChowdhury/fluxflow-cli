@@ -43,15 +43,15 @@ const MULTIMODAL_MODELS = [
     'openai/gpt-5.2-pro',
     'openai/gpt-5.5-pro',
     'moonshotai/kimi-k2.6',
+
     // NVIDIA vision models
     "moonshotai/kimi-k2.6",
+    "stepfun-ai/step-3.7-flash",
+    "google/gemma-4-31b-it",
+    "mistralai/mistral-medium-3.5-128b",
+
     // Google models
-    'gemma-4-31b-it',
-    'gemini-2.5-flash',
-    'gemini-3-flash-preview',
-    'gemini-3.5-flash',
-    'gemini-3.1-flash-lite',
-    'gemini-3.1-pro-preview'
+    // No need. All models on Gemini API is Multimodal
 ];
 
 export const isModelMultimodal = (model) => {
@@ -127,7 +127,7 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     return fetch(url, options);
 };
 
-const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.85) {
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.99) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -281,7 +281,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
     }
 };
 
-const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.7) {
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.99) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -300,7 +300,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                     const data = part.inlineData.data;
                     const isImage = mimeType.startsWith('image/');
 
-                    if (isImage) {
+                    if (isImage && MULTIMODAL_MODELS.includes(model)) {
                         msgContent.push({
                             type: 'image_url',
                             image_url: {
@@ -326,7 +326,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         'High': 'High',
         'xHigh': 'High'
     };
-    const apiLevel = thinkingLevelMap[thinkingLevel] || 'Standard';
+    const apiLevel = thinkingLevelMap[thinkingLevel] || 'High';
     const isThinking = apiLevel !== 'Fast';
 
     const isKimi = model.includes('kimi');
@@ -335,6 +335,16 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isGlm = model.includes('glm');
     const isMistral = model.includes('mistral');
     const isMinimax = model.includes('minimax');
+    const isGPT = model.includes('gpt');
+
+    const GPT_THINKING_LEVELS = {
+        'Fast': 'low',
+        'Low': 'low',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
 
     const maxTokens = (isMinimax || isDeepSeek) ? 16384 : 32768;
 
@@ -344,7 +354,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         max_tokens: maxTokens,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: temperature
+        temperature: temperature,
+        ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 
     if (isKimi) {
@@ -452,7 +463,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 }
 
-const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.45) {
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.95) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -761,7 +772,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             mode,
                             false,
                             null,
-                            0.4
+                            0.75
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -776,7 +787,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             mode,
                             false,
                             null,
-                            0.4
+                            0.75
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -791,7 +802,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             mode,
                             false,
                             null,
-                            0.4
+                            0.75
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -803,7 +814,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             config: {
                                 systemInstruction: janitorPrompt,
                                 maxOutputTokens: 512,
-                                temperature: 0.4,
+                                temperature: 0.75,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -1294,7 +1305,7 @@ export const initAI = (apiKey, settings = {}) => {
 /**
  * Generic helper to generate non-streaming content from any provider
  */
-const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.4) => {
+const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.75) => {
     const { aiProvider = 'Google', apiKey, mode } = settings;
     let fullText = '';
     let usageMetadata = null;
@@ -1317,7 +1328,6 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
             contents: normalizedContents,
             config: {
                 systemInstruction: systemInstruction,
-                maxOutputTokens: 2048,
                 temperature: temperature,
                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
             }
@@ -2264,6 +2274,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let isStutteringLoop = false;
             let isGeneralLoop = false;
             let isInitialAttempt = true;
+            let lastLoopCheckLen = 0;
             let accumulatedContext = '';
             let dedupeBuffer = '';
             let isDedupeActive = false;
@@ -2390,7 +2401,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
+                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal);
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {
@@ -2448,7 +2459,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.45
+                            0.95
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -2460,7 +2471,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.85
+                            0.99
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         stream = getNVIDIAStream(
@@ -2472,7 +2483,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.7
+                            0.99
                         );
                     } else {
                         const apiCallPromise = client.models.generateContentStream({
@@ -2481,7 +2492,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             config: {
                                 systemInstruction: currentSystemInstruction,
                                 mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
-                                temperature: 1.05,
+                                temperature: 1.0,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
@@ -2821,9 +2832,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
                             }
 
-                            // [SYSTEM SIGNAL FILTER] - Ignore thoughts and unclosed tools for signal detection
-                            const signalSafeText = getSanitizedText(turnText);
-
                             // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
                             const toolContext = getActiveToolContext(turnText);
                             if (toolContext.inside) {
@@ -2893,96 +2901,77 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             // [LOOP DETECTION] - Catch runaway repetitive reasoning (Monologue-Safe)
-                            // Shield loop detection from text inside tool calls (closed or unclosed)
-                            const contextSafeText = getContextSafeText(turnText, false);
-                            const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
-                            const thinkContent = thinkBlocks.join('').trim();
+                            // Throttled to run only every ~150 characters to prevent O(N^3) memory/CPU collapse during streaming
+                            if (turnText.length - lastLoopCheckLen > 150) {
+                                lastLoopCheckLen = turnText.length;
 
-                            // 1. Repetitive Sentence Check (The most common loop symptom)
-                            const sentences = thinkContent.split(/[.!?]\s+/);
-                            const uniqueSentences = new Set(sentences);
-                            const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
+                                const contextSafeText = getContextSafeText(turnText, false);
+                                const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
+                                const thinkContent = thinkBlocks.join('').trim();
 
-                            // 2. Verbosity Check (Global rambling detection)
-                            const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
+                                // 1. Repetitive Sentence Check (The most common loop symptom)
+                                const sentences = thinkContent.split(/[.!?]\s+/);
+                                const uniqueSentences = new Set(sentences);
+                                const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
 
-                            let repetitionThresholdThinking = 0.4;
-                            let repetitionThresholdResponse = 0.6;
+                                // 2. Verbosity Check (Global rambling detection)
+                                const wordCount = thinkContent.split(/\s+/).filter(w => w.length > 0).length;
 
-                            // Dynamic Thinking Cap based on tier (Only applicable for Gemma)
-                            let isOverVerboseThinking = false;
-                            if ((targetModel || "").toLowerCase().startsWith('gemma')) {
-                                const thinkingCaps = {
-                                    'low': 256,
-                                    'medium': 768,
-                                    'high': 2048,
-                                    'max': 4096,
-                                    'xhigh': 4096,
-                                };
-                                const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
-                                isOverVerboseThinking = wordCount > cap;
-                            }
+                                let repetitionThresholdThinking = 0.4;
+                                let repetitionThresholdResponse = 0.6;
 
-                            if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
-                                const reason = repetitionRatio > repetitionThresholdThinking ? 'Reasoning Loop Detected' : 'Thinking Budget Exceeded';
-                                yield { type: 'status', content: `${reason}. Re-centering...` };
-                                isThinkingLoop = true;
-                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                break; // Force close this turn's stream and proceed to next loop
-                            }
-
-                            // 3. Response Repetition Check
-                            const responseContent = signalSafeText.trim();
-                            const respSentences = responseContent.split(/[.!?]\s+/);
-                            const uniqueRespSentences = new Set(respSentences);
-                            const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
-
-                            if (respRepetitionRatio > repetitionThresholdResponse) {
-                                yield { type: 'status', content: `Response Loop Detected. Re-centering...` };
-                                isThinkingLoop = false;
-                                isGeneralLoop = true;
-                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                break;
-                            }
-
-                            // 4. Stutter / Word Loop Check (Global)
-                            const allWords = contextSafeText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
-                            let stutterDetected = false;
-
-                            // 4a. Word-level consecutive period repetition
-                            if (allWords.length > 5) {
-                                for (let p = 1; p <= 15; p++) {
-                                    const R = Math.max(3, Math.ceil(8 / p));
-                                    if (allWords.length < p * R) continue;
-                                    let isRepeating = true;
-                                    const pattern = allWords.slice(allWords.length - p);
-                                    const patternStr = pattern.join(' ');
-                                    for (let r = 1; r < R; r++) {
-                                        const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
-                                        if (prevPattern.join(' ') !== patternStr) {
-                                            isRepeating = false;
-                                            break;
-                                        }
-                                    }
-                                    if (isRepeating) {
-                                        stutterDetected = true;
-                                        break;
-                                    }
+                                // Dynamic Thinking Cap based on tier (Only applicable for Gemma)
+                                let isOverVerboseThinking = false;
+                                if ((targetModel || "").toLowerCase().startsWith('gemma')) {
+                                    const thinkingCaps = {
+                                        'low': 256,
+                                        'medium': 768,
+                                        'high': 2048,
+                                        'max': 4096,
+                                        'xhigh': 4096,
+                                    };
+                                    const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
+                                    isOverVerboseThinking = wordCount > cap;
                                 }
-                            }
 
-                            // 4b. Character-level consecutive period repetition
-                            if (!stutterDetected) {
-                                const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, '');
-                                if (cleanChars.length >= 10) {
-                                    for (let p = 1; p <= 10; p++) {
-                                        const R = Math.max(4, Math.ceil(12 / p));
-                                        if (cleanChars.length < p * R) continue;
-                                        const pattern = cleanChars.substring(cleanChars.length - p);
+                                if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
+                                    const reason = repetitionRatio > repetitionThresholdThinking ? 'Reasoning Loop Detected' : 'Thinking Budget Exceeded';
+                                    yield { type: 'status', content: `${reason}. Re-centering...` };
+                                    isThinkingLoop = true;
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                    break; // Force close this turn's stream and proceed to next loop
+                                }
+
+                                // 3. Response Repetition Check
+                                const signalSafeText = getSanitizedText(turnText);
+                                const responseContent = signalSafeText.trim();
+                                const respSentences = responseContent.split(/[.!?]\s+/);
+                                const uniqueRespSentences = new Set(respSentences);
+                                const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
+
+                                if (respRepetitionRatio > repetitionThresholdResponse) {
+                                    yield { type: 'status', content: `Response Loop Detected. Re-centering...` };
+                                    isThinkingLoop = false;
+                                    isGeneralLoop = true;
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                    break;
+                                }
+
+                                // 4. Stutter / Word Loop Check (Global)
+                                const allWords = contextSafeText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+                                let stutterDetected = false;
+
+                                // 4a. Word-level consecutive period repetition
+                                if (allWords.length > 5) {
+                                    for (let p = 1; p <= 15; p++) {
+                                        const R = Math.max(3, Math.ceil(8 / p));
+                                        if (allWords.length < p * R) continue;
                                         let isRepeating = true;
+                                        const pattern = allWords.slice(allWords.length - p);
+                                        const patternStr = pattern.join(' ');
                                         for (let r = 1; r < R; r++) {
-                                            const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
-                                            if (prevPattern !== pattern) {
+                                            const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
+                                            if (prevPattern.join(' ') !== patternStr) {
                                                 isRepeating = false;
                                                 break;
                                             }
@@ -2993,14 +2982,38 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                     }
                                 }
-                            }
 
-                            if (stutterDetected) {
-                                yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
-                                isThinkingLoop = false;
-                                isStutteringLoop = true;
-                                await new Promise(resolve => setTimeout(resolve, 3000));
-                                break;
+                                // 4b. Character-level consecutive period repetition
+                                if (!stutterDetected) {
+                                    const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, '');
+                                    if (cleanChars.length >= 10) {
+                                        for (let p = 1; p <= 10; p++) {
+                                            const R = Math.max(4, Math.ceil(12 / p));
+                                            if (cleanChars.length < p * R) continue;
+                                            const pattern = cleanChars.substring(cleanChars.length - p);
+                                            let isRepeating = true;
+                                            for (let r = 1; r < R; r++) {
+                                                const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
+                                                if (prevPattern !== pattern) {
+                                                    isRepeating = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (isRepeating) {
+                                                stutterDetected = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (stutterDetected) {
+                                    yield { type: 'status', content: `Stuttering Detected. Re-centering...` };
+                                    isThinkingLoop = false;
+                                    isStutteringLoop = true;
+                                    await new Promise(resolve => setTimeout(resolve, 3000));
+                                    break;
+                                }
                             }
 
                             // [REAL-TIME TOOL EXECUTION]

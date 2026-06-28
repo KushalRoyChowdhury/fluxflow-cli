@@ -47,7 +47,7 @@ export default function AppCommands() {
                         <li><code>Low</code>: Quick reasoning.</li>
                         <li><code>Medium</code> / <code>Standard</code>: Balanced reasoning.</li>
                         <li><code>High</code>: Deep reasoning.</li>
-                        <li><code>xHigh</code>: Extended reasoning for complex logic.</li>
+                        <li><code>xHigh</code>: Extended reasoning for complex logic (Depending on Model Provider).</li>
                     </ul>
                 </li>
                 <li>
@@ -85,6 +85,7 @@ export default function AppCommands() {
                         <li><code>latest</code>: Initiates the auto-updater to install the latest release.</li>
                     </ul>
                 </li>
+                <li><strong><code>/move</code></strong> Transfer your Playground Session data to CWD/playground-export.</li>
             </ul>
         </DocPage>
     )

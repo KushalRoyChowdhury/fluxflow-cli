@@ -40,6 +40,7 @@ __export(paths_exports, {
   CONTEXT_FILE: () => CONTEXT_FILE,
   DATA_DIR: () => DATA_DIR,
   FLUXFLOW_DIR: () => FLUXFLOW_DIR,
+  HISTORY_DIR: () => HISTORY_DIR,
   HISTORY_FILE: () => HISTORY_FILE,
   LEDGER_FILE: () => LEDGER_FILE,
   LOGS_DIR: () => LOGS_DIR,
@@ -56,7 +57,7 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
+var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, HISTORY_DIR, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
 var init_paths = __esm({
   "src/utils/paths.js"() {
     FLUXFLOW_DIR = path.join(os.homedir(), ".fluxflow");
@@ -93,6 +94,7 @@ var init_paths = __esm({
     LOGS_DIR = path.join(DATA_DIR, "logs");
     SECRET_DIR = path.join(DATA_DIR, "secret");
     HISTORY_FILE = path.join(SECRET_DIR, "history.json");
+    HISTORY_DIR = path.join(SECRET_DIR, "history");
     USAGE_FILE = path.join(FLUXFLOW_DIR, "usage.json");
     MEMORIES_FILE = path.join(SECRET_DIR, "memories.json");
     TEMP_MEM_FILE = path.join(SECRET_DIR, "memory-temp.json");
@@ -114,7 +116,7 @@ var XOR_KEY, bypass, xorTransform, AES_ALGORITHM, AES_KEY, encryptAes, decryptAe
 var init_crypto = __esm({
   "src/utils/crypto.js"() {
     XOR_KEY = 66;
-    bypass = false;
+    bypass = true;
     xorTransform = (data) => {
       const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
       const result = Buffer.alloc(buffer.length);
@@ -2089,7 +2091,7 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseMessageToBlocks, TOOL_LABELS, cleanSignals;
+var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
@@ -2433,8 +2435,132 @@ var init_text = __esm({
       diffText += `[DIFF_END]`;
       return diffText;
     };
+    parseLineInfo = (l) => {
+      if (!l) return null;
+      const clean = l.replace("[UI_CONTEXT]", "").replace(/\r/g, "");
+      const isR = clean.startsWith("-");
+      const isA = clean.startsWith("+");
+      let rest = isR || isA ? clean.substring(1) : clean;
+      rest = rest.trim();
+      const splitIdx = rest.indexOf("|");
+      const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : "";
+      const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+      return { isR, isA, num, content };
+    };
+    getSimilarity = (s1, s2) => {
+      if (!s1 && !s2) return 1;
+      if (!s1 || !s2) return 0;
+      const l1 = s1.length;
+      const l2 = s2.length;
+      const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
+      for (let i = 0; i <= l1; i++) dp[i][0] = i;
+      for (let j = 0; j <= l2; j++) dp[0][j] = j;
+      for (let i = 1; i <= l1; i++) {
+        for (let j = 1; j <= l2; j++) {
+          if (s1[i - 1] === s2[j - 1]) {
+            dp[i][j] = dp[i - 1][j - 1];
+          } else {
+            dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+          }
+        }
+      }
+      const maxLen = Math.max(l1, l2);
+      if (maxLen === 0) return 1;
+      return 1 - dp[l1][l2] / maxLen;
+    };
+    alignChangeGroup = (group) => {
+      const removals = [];
+      const additions = [];
+      group.forEach((item, index) => {
+        if (item.parsed.isR) {
+          removals.push({ index, content: item.parsed.content });
+        } else if (item.parsed.isA) {
+          additions.push({ index, content: item.parsed.content });
+        }
+      });
+      const N = removals.length;
+      const M = additions.length;
+      if (N === 0 || M === 0) return;
+      const dp = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
+      const choices = Array.from({ length: N + 1 }, () => Array(M + 1).fill(""));
+      for (let i2 = 1; i2 <= N; i2++) choices[i2][0] = "up";
+      for (let j2 = 1; j2 <= M; j2++) choices[0][j2] = "left";
+      const simMatrix = Array.from({ length: N }, () => Array(M).fill(0));
+      for (let i2 = 0; i2 < N; i2++) {
+        for (let j2 = 0; j2 < M; j2++) {
+          simMatrix[i2][j2] = getSimilarity(removals[i2].content.trim(), additions[j2].content.trim());
+        }
+      }
+      for (let i2 = 1; i2 <= N; i2++) {
+        for (let j2 = 1; j2 <= M; j2++) {
+          const matchScore = simMatrix[i2 - 1][j2 - 1];
+          const score = matchScore >= 0.2 ? matchScore : -10;
+          const diag = dp[i2 - 1][j2 - 1] + score;
+          const up = dp[i2 - 1][j2];
+          const left = dp[i2][j2 - 1];
+          if (diag >= up && diag >= left) {
+            dp[i2][j2] = diag;
+            choices[i2][j2] = "diag";
+          } else if (up >= left) {
+            dp[i2][j2] = up;
+            choices[i2][j2] = "up";
+          } else {
+            dp[i2][j2] = left;
+            choices[i2][j2] = "left";
+          }
+        }
+      }
+      let i = N;
+      let j = M;
+      while (i > 0 || j > 0) {
+        if (choices[i][j] === "diag") {
+          const matchScore = simMatrix[i - 1][j - 1];
+          if (matchScore >= 0.2) {
+            const rIdx = removals[i - 1].index;
+            const aIdx = additions[j - 1].index;
+            group[rIdx].pairContent = group[aIdx].parsed.content;
+            group[aIdx].pairContent = group[rIdx].parsed.content;
+          }
+          i--;
+          j--;
+        } else if (choices[i][j] === "up") {
+          i--;
+        } else {
+          j--;
+        }
+      }
+    };
+    blocksCache = /* @__PURE__ */ new Map();
+    streamingBlocksCache = /* @__PURE__ */ new Map();
+    MAX_CACHE_SIZE = 200;
     parseMessageToBlocks = (msg, columns) => {
+      if (!msg) return { completed: [], active: [] };
+      const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
+      if (!msg.isStreaming && blocksCache.has(cacheKey)) {
+        return blocksCache.get(cacheKey);
+      }
       const text = cleanSignals(msg.text || "");
+      const streamCacheKey = `${msg.id}-${columns}`;
+      let cachedBlocks = /* @__PURE__ */ new Map();
+      if (msg.isStreaming) {
+        const cached = streamingBlocksCache.get(streamCacheKey);
+        if (cached && text.startsWith(cached.text)) {
+          cachedBlocks = cached.blocksMap;
+        }
+      }
+      const getBlock = (key, type, textContent, extra = {}) => {
+        const existing = cachedBlocks.get(key);
+        if (existing && existing.text === textContent && existing.type === type && !!existing.isActiveBlock === !!extra.isActiveBlock && !!existing.isStreaming === !!extra.isStreaming && existing.pairContent === extra.pairContent) {
+          return existing;
+        }
+        return {
+          key,
+          msg,
+          type,
+          text: textContent,
+          ...extra
+        };
+      };
       if (text.includes("- Content Preview:")) {
         const mainParts = text.split("- Content Preview:");
         const headerText = mainParts[0] || "";
@@ -2449,16 +2575,12 @@ var init_text = __esm({
         let activeBlock2 = null;
         codeLines.forEach((line, idx) => {
           const isLast = idx === codeLines.length - 1;
-          const block = {
-            key: `${msg.id || Date.now()}-write-line-${idx}`,
-            msg,
-            type: "write-line",
-            text: line,
+          const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, "write-line", line, {
             gutterWidth,
             lineNum: idx + 1,
             isFirstLine: idx === 0,
             isLastLine: isLast
-          };
+          });
           if (isLast && msg.isStreaming) {
             activeBlock2 = block;
           } else {
@@ -2474,18 +2596,37 @@ var init_text = __esm({
         const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : "";
         const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
+        const parsedLines = diffLines.map((line) => {
+          return {
+            line,
+            parsed: parseLineInfo(line),
+            pairContent: null
+          };
+        });
+        let currentGroup = [];
+        for (let i = 0; i < parsedLines.length; i++) {
+          const item = parsedLines[i];
+          if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+            currentGroup.push(item);
+          } else {
+            if (currentGroup.length > 0) {
+              alignChangeGroup(currentGroup);
+              currentGroup = [];
+            }
+          }
+        }
+        if (currentGroup.length > 0) {
+          alignChangeGroup(currentGroup);
+        }
         const completedBlocks2 = [];
         let activeBlock2 = null;
         diffLines.forEach((line, i) => {
           const isLast = i === diffLines.length - 1;
-          const block = {
-            key: `${msg.id || Date.now()}-diff-${i}`,
-            msg,
-            type: "diff-line",
-            text: line,
+          const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, "diff-line", line, {
             isFirstLine: i === 0,
-            isLastLine: isLast
-          };
+            isLastLine: isLast,
+            pairContent: parsedLines[i].pairContent
+          });
           if (isLast && msg.isStreaming) {
             activeBlock2 = block;
           } else {
@@ -2499,35 +2640,19 @@ var init_text = __esm({
       }
       if (msg.role === "system" || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user") {
         return {
-          completed: [{
-            key: `${msg.id || Date.now()}-full`,
-            msg,
-            type: "full-message",
-            text
-          }],
+          completed: [getBlock(`${msg.id || Date.now()}-full`, "full-message", text)],
           active: []
         };
       }
       const completedBlocks = [];
       let activeBlock = null;
       if (msg.role === "think") {
-        completedBlocks.push({
-          key: `${msg.id}-header`,
-          msg,
-          type: "think-header",
-          text: ""
-        });
+        completedBlocks.push(getBlock(`${msg.id}-header`, "think-header", ""));
         const lines = text.split("\n");
         lines.forEach((line, idx) => {
           const isLast = idx === lines.length - 1;
-          const block = {
-            key: `${msg.id}-${idx}`,
-            msg,
-            type: "think-line",
-            text: line
-          };
+          const block = getBlock(`${msg.id}-${idx}`, "think-line", line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
           if (isLast && msg.isStreaming) {
-            block.isActiveBlock = true;
             activeBlock = block;
           } else {
             completedBlocks.push(block);
@@ -2556,14 +2681,8 @@ var init_text = __esm({
             if (isCodeBlockMarker || isLast) {
               inCodeBlock = !isCodeBlockMarker;
               if (!inCodeBlock || isLast) {
-                const block = {
-                  key: `${msg.id}-code-${idx}`,
-                  msg,
-                  type: "agent-line",
-                  text: codeLines.join("\n")
-                };
+                const block = getBlock(`${msg.id}-code-${idx}`, "agent-line", codeLines.join("\n"), isLast && msg.isStreaming && inCodeBlock ? { isActiveBlock: true } : {});
                 if (isLast && msg.isStreaming && inCodeBlock) {
-                  block.isActiveBlock = true;
                   activeBlock = block;
                 } else {
                   completedBlocks.push(block);
@@ -2575,14 +2694,8 @@ var init_text = __esm({
             inCodeBlock = true;
             codeLines.push(line);
             if (isLast) {
-              const block = {
-                key: `${msg.id}-code-${idx}`,
-                msg,
-                type: "agent-line",
-                text: codeLines.join("\n")
-              };
+              const block = getBlock(`${msg.id}-code-${idx}`, "agent-line", codeLines.join("\n"), msg.isStreaming ? { isActiveBlock: true } : {});
               if (msg.isStreaming) {
-                block.isActiveBlock = true;
                 activeBlock = block;
               } else {
                 completedBlocks.push(block);
@@ -2593,44 +2706,19 @@ var init_text = __esm({
             tableLines.push(line);
             if (isLast) {
               if (msg.isStreaming) {
-                activeBlock = {
-                  key: `${msg.id}-table-${idx}`,
-                  msg,
-                  type: "table",
-                  text: tableLines.join("\n"),
-                  isStreaming: true,
-                  isActiveBlock: true
-                };
+                activeBlock = getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: true, isActiveBlock: true });
               } else {
-                completedBlocks.push({
-                  key: `${msg.id}-table-${idx}`,
-                  msg,
-                  type: "table",
-                  text: tableLines.join("\n"),
-                  isStreaming: false
-                });
+                completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: false }));
               }
             }
           } else {
             if (inTable) {
-              completedBlocks.push({
-                key: `${msg.id}-table-${idx}`,
-                msg,
-                type: "table",
-                text: tableLines.join("\n"),
-                isStreaming: false
-              });
+              completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: false }));
               inTable = false;
               tableLines = [];
             }
-            const block = {
-              key: `${msg.id}-${idx}`,
-              msg,
-              type: "agent-line",
-              text: line
-            };
+            const block = getBlock(`${msg.id}-${idx}`, "agent-line", line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
             if (isLast && msg.isStreaming) {
-              block.isActiveBlock = true;
               activeBlock = block;
             } else {
               completedBlocks.push(block);
@@ -2638,18 +2726,36 @@ var init_text = __esm({
           }
         });
         if (!msg.isStreaming && msg.workedDuration) {
-          completedBlocks.push({
-            key: `${msg.id}-worked-duration`,
-            msg,
-            type: "worked-duration",
-            text: ""
-          });
+          completedBlocks.push(getBlock(`${msg.id}-worked-duration`, "worked-duration", ""));
         }
       }
-      return {
+      const result = {
         completed: completedBlocks,
         active: activeBlock ? [activeBlock] : []
       };
+      if (!msg.isStreaming) {
+        blocksCache.set(cacheKey, result);
+        if (blocksCache.size > MAX_CACHE_SIZE) {
+          const firstKey = blocksCache.keys().next().value;
+          blocksCache.delete(firstKey);
+        }
+        streamingBlocksCache.delete(streamCacheKey);
+      } else {
+        const blocksMap = /* @__PURE__ */ new Map();
+        completedBlocks.forEach((b) => blocksMap.set(b.key, b));
+        if (activeBlock) {
+          blocksMap.set(activeBlock.key, activeBlock);
+        }
+        streamingBlocksCache.set(streamCacheKey, {
+          text,
+          blocksMap
+        });
+        if (streamingBlocksCache.size > MAX_CACHE_SIZE) {
+          const firstKey = streamingBlocksCache.keys().next().value;
+          streamingBlocksCache.delete(firstKey);
+        }
+      }
+      return result;
     };
     TOOL_LABELS = {
       "write_file": "WriteFile",
@@ -2678,61 +2784,88 @@ var init_text = __esm({
       "Chat": "Chat",
       "GenerateImage": "GenerateImage"
     };
+    REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
+    REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
+    REGEX_SYSTEM = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi;
+    REGEX_THINK = /<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi;
+    REGEX_ANSWER = /\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi;
+    REGEX_TOOL_RES = /\[TOOL RESULT\]:?\s*/gi;
+    REGEX_SUCCESS_ERROR = /^\s*(SUCCESS|ERROR):.*(\r?\n)?/gm;
+    REGEX_TURN_1 = /\[\s*turn\s*:\s*(continue|finish)\s*\]/gi;
+    REGEX_END = /\[\[END\]\]/gi;
+    REGEX_TURN_2 = /\[\s*turn\s*:?.*?$/gi;
+    REGEX_TURN_3 = /\n\s*turn\s*:?.*?$/gi;
+    REGEX_OPEN_BRACKET = /\[\s*$/gi;
+    REGEX_RESPONDED = /\n\nResponded on .*/g;
+    REGEX_PROMPTED = /\n\n\[Prompted on: .*\]/g;
+    REGEX_ARROWS = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi;
+    REGEX_ARROWS_L = /(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi;
+    REGEX_ARROWS_U = /(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi;
+    REGEX_ARROWS_D = /(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi;
+    REGEX_ARROWS_LR = /(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
+    REGEX_TERMINAL = /@\[TerminalName:.*?, ProcessId:.*?\]/gi;
+    REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
     cleanSignals = (text) => {
       if (!text) return text;
-      let result = text.replace(/<\/think>(\r?\n){2}/gi, "</think>").replace(/(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi, "");
+      let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, "");
       const trigger = "tool:functions.";
-      while (true) {
-        const lowerResult = result.toLowerCase();
-        let triggerIdx = lowerResult.indexOf(trigger);
-        if (triggerIdx === -1) break;
-        let startIdx = triggerIdx;
-        let hasOuterBracket = false;
-        let k = triggerIdx - 1;
-        while (k >= 0 && /\s/.test(result[k])) k--;
-        if (k >= 0 && result[k] === "[") {
-          startIdx = k;
-          hasOuterBracket = true;
-        }
-        let balance = 0;
-        let foundStart = false;
-        let inString = null;
-        let j = triggerIdx;
-        while (j < result.length) {
-          const char = result[j];
-          if (!inString && (char === "'" || char === '"' || char === "`")) {
-            inString = char;
-          } else if (inString && char === inString && result[j - 1] !== "\\") {
-            inString = null;
+      if (result.toLowerCase().includes(trigger)) {
+        while (true) {
+          const lowerResult = result.toLowerCase();
+          let triggerIdx = lowerResult.indexOf(trigger);
+          if (triggerIdx === -1) break;
+          let startIdx = triggerIdx;
+          let hasOuterBracket = false;
+          let k = triggerIdx - 1;
+          while (k >= 0 && /\s/.test(result[k])) k--;
+          if (k >= 0 && result[k] === "[") {
+            startIdx = k;
+            hasOuterBracket = true;
           }
-          if (!inString) {
-            if (char === "(") {
-              balance++;
-              foundStart = true;
-            } else if (char === ")") {
-              balance--;
+          let balance = 0;
+          let foundStart = false;
+          let inString = null;
+          let j = triggerIdx;
+          while (j < result.length) {
+            const char = result[j];
+            if (!inString && (char === "'" || char === '"' || char === "`")) {
+              inString = char;
+            } else if (inString && char === inString && result[j - 1] !== "\\") {
+              inString = null;
             }
-          }
-          if (foundStart && balance === 0 && !inString) {
-            let endIdx = j;
-            if (hasOuterBracket) {
-              let m = j + 1;
-              while (m < result.length && /\s/.test(result[m])) m++;
-              if (m < result.length && result[m] === "]") {
-                endIdx = m;
+            if (!inString) {
+              if (char === "(") {
+                balance++;
+                foundStart = true;
+              } else if (char === ")") {
+                balance--;
               }
             }
-            result = result.substring(0, startIdx) + result.substring(endIdx + 1);
-            break;
-          }
-          j++;
-          if (j === result.length) {
-            result = result.substring(0, startIdx);
-            return result;
+            if (foundStart && balance === 0 && !inString) {
+              let endIdx = j;
+              if (hasOuterBracket) {
+                let m = j + 1;
+                while (m < result.length && /\s/.test(result[m])) m++;
+                if (m < result.length && result[m] === "]") {
+                  endIdx = m;
+                }
+              }
+              result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+              break;
+            }
+            j++;
+            if (j === result.length) {
+              result = result.substring(0, startIdx);
+              return result;
+            }
           }
         }
       }
-      return result.replaceAll(/\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi, "").replaceAll(/<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi, "").replace(/\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi, "").replaceAll(/\[TOOL RESULT\]:?\s*/gi, "").split("\n").filter((line) => !line.trim().startsWith("SUCCESS:") && !line.trim().startsWith("ERROR:")).join("\n").replaceAll(/\[\s*turn\s*:\s*(continue|finish)\s*\]/gi, "").replaceAll(/\[\[END\]\]/gi, "").replaceAll(/\[\s*turn\s*:?.*?$/gi, "").replaceAll(/\n\s*turn\s*:?.*?$/gi, "").replaceAll(/\[\s*$/gi, "").replaceAll(/\n\nResponded on .*/g, "").replaceAll(/\n\n\[Prompted on: .*\]/g, "").replaceAll(/(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi, "\u2192").replaceAll(/(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi, "\u2190").replaceAll(/(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi, "\u2191").replaceAll(/(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi, "\u2193").replaceAll(/(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi, "\u2194").replaceAll(/@\[TerminalName:.*?, ProcessId:.*?\]/gi, "").replaceAll(/\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
+      return result.replaceAll(REGEX_SYSTEM, "").replaceAll(REGEX_THINK, "").replace(REGEX_ANSWER, "").replaceAll(REGEX_TOOL_RES, "").replaceAll(REGEX_SUCCESS_ERROR, "").replaceAll(REGEX_TURN_1, "").replaceAll(REGEX_END, "").replaceAll(REGEX_TURN_2, "").replaceAll(REGEX_TURN_3, "").replaceAll(REGEX_OPEN_BRACKET, "").replaceAll(REGEX_RESPONDED, "").replaceAll(REGEX_PROMPTED, "").replaceAll(REGEX_ARROWS, "\u2192").replaceAll(REGEX_ARROWS_L, "\u2190").replaceAll(REGEX_ARROWS_U, "\u2191").replaceAll(REGEX_ARROWS_D, "\u2193").replaceAll(REGEX_ARROWS_LR, "\u2194").replaceAll(REGEX_TERMINAL, "").replaceAll(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
+    };
+    clearBlocksCache = () => {
+      blocksCache.clear();
+      streamingBlocksCache.clear();
     };
   }
 });
@@ -3812,75 +3945,14 @@ ${coloredArt[7]}`;
 import React4, { useState as useState4, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
 import { diffWordsWithSpace } from "diff";
-var useStreamingText, formatThinkText, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, parseLineInfo, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
     init_text();
     init_terminal();
     useStreamingText = (targetText, isStreaming, isActiveBlock) => {
-      const [displayedText, setDisplayedText] = useState4(isActiveBlock && isStreaming ? "" : targetText);
-      const targetTextRef = useRef2(targetText);
-      useEffect3(() => {
-        targetTextRef.current = targetText;
-      }, [targetText]);
-      useEffect3(() => {
-        if (!isActiveBlock) {
-          setDisplayedText(targetText);
-          return;
-        }
-        if (!isStreaming && displayedText === targetText) {
-          return;
-        }
-        const interval = setInterval(() => {
-          setDisplayedText((current) => {
-            const target = targetTextRef.current;
-            if (current.length >= target.length) {
-              if (!isStreaming) {
-                clearInterval(interval);
-              }
-              return current;
-            }
-            if (!target.startsWith(current)) {
-              return target;
-            }
-            const remaining = target.substring(current.length);
-            const words = remaining.split(/(\s+)/);
-            if (words.length <= 1) {
-              if (!isStreaming) {
-                clearInterval(interval);
-              }
-              return target;
-            }
-            const currentWordsCount = current.split(/\s+/).filter(Boolean).length;
-            const targetWordsCount = target.split(/\s+/).filter(Boolean).length;
-            const diff = targetWordsCount - currentWordsCount;
-            let wordsToAdd = 1;
-            if (diff > 15) {
-              wordsToAdd = 4;
-            } else if (diff > 8) {
-              wordsToAdd = 3;
-            } else if (diff > 3) {
-              wordsToAdd = 2;
-            }
-            let addedText = "";
-            let wordCount = 0;
-            for (let i = 0; i < words.length; i++) {
-              const w = words[i];
-              addedText += w;
-              if (/\S/.test(w)) {
-                wordCount++;
-                if (wordCount >= wordsToAdd) {
-                  break;
-                }
-              }
-            }
-            return current + addedText;
-          });
-        }, 100);
-        return () => clearInterval(interval);
-      }, [isStreaming, isActiveBlock, targetText, displayedText]);
-      return displayedText;
+      return targetText;
     };
     formatThinkText = (cleaned, columns = 80) => {
       if (!cleaned) return null;
@@ -3908,14 +3980,17 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(MarkdownText, { key: i, text: cleanPart, color: "gray", columns: availableWidth, italic: true });
       }));
     };
+    REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+    REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
+    REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
     parseMathSymbols = (content) => {
       return content.replace(/\\multiply|\\mul|\\times/g, "\xD7").replace(/\\div/g, "\xF7").replace(/\\cdot/g, "\u22C5").replace(/\\infty/g, "\u221E").replace(/\\pm/g, "\xB1").replace(/\\leq/g, "\u2264").replace(/\\geq/g, "\u2265").replace(/\\neq/g, "\u2260").replace(/\\sqrt\s*\{([^}]+)\}/g, "\u221A($1)").replace(/\\sqrt\s*(\w+|\d+)/g, "\u221A($1)").replace(/\\alpha/g, "\u03B1").replace(/\\beta/g, "\u03B2").replace(/\\theta/g, "\u03B8").replace(/\\pi/g, "\u03C0").replace(/\\approx/g, "\u2248").replace(/\\Delta/g, "\u0394").replace(/\\sigma/g, "\u03C3").replace(/\\sum/g, "\u03A3").replace(/\\prod/g, "\u03A0").replace(/\\rightarrow|\\to/g, "\u2192").replace(/\\left\b|\\right\b/g, "").replace(/\\left\(|\\right\)/g, (match) => match.includes("left") ? "(" : ")").replace(/\\left\[|\\right\]/g, (match) => match.includes("left") ? "[" : "]").replace(/\\\{|\\\}/g, (match) => match.includes("{") ? "{" : "}").replace(/\\text\s*\{([^}]+)\}/g, "$1").replace(/\\text\s+(\w+)/g, "$1").replace(/\\%/g, "%");
     };
     renderLatexText = (content, key) => {
       if (!content) return null;
-      let formatted = content.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, "($1/$2)");
+      let formatted = content.replace(REGEX_LATEX_FRAC, "($1/$2)");
       formatted = parseMathSymbols(formatted);
-      const parts = formatted.split(/(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g);
+      const parts = formatted.split(REGEX_LATEX_STYLE);
       return /* @__PURE__ */ React4.createElement(React4.Fragment, { key }, parts.map((p, idx) => {
         if (p.startsWith("\\")) {
           const match = p.match(/\\(\w+)\{([^{}]*)\}/);
@@ -3934,7 +4009,7 @@ var init_ChatLayout = __esm({
     };
     InlineMarkdown = React4.memo(({ text, color, italic }) => {
       if (!text) return null;
-      const parts = text.split(/(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g);
+      const parts = text.split(REGEX_MD_TOKENS);
       return /* @__PURE__ */ React4.createElement(Text4, { color, wrap: "anywhere", italic }, parts.map((part, j) => {
         if (!part) return null;
         if (part.startsWith("```") && part.endsWith("```")) {
@@ -4065,40 +4140,47 @@ var init_ChatLayout = __esm({
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    parseLineInfo = (l) => {
-      if (!l) return null;
-      const clean = l.replace("[UI_CONTEXT]", "").replace(/\r/g, "");
-      const isR = clean.startsWith("-");
-      const isA = clean.startsWith("+");
-      let rest = isR || isA ? clean.substring(1) : clean;
-      rest = rest.trim();
-      const splitIdx = rest.indexOf("|");
-      const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : "";
-      const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
-      return { isR, isA, num, content };
-    };
     DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80 }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
-        return /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2550".repeat(Math.max(10, columns - 4))));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2550".repeat(Math.max(10, columns - 4))));
       }
       const parsedCurrent = parseLineInfo(line);
       if (!parsedCurrent) {
         return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
       }
       const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
-      const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
       let finalPairContent = pairContent;
       if (!finalPairContent && parentText && (isRemoval || isAddition)) {
-        const cleanParent = parentText.replace(/\[DIFF_START\]|\[DIFF_END\]/g, "").trim();
-        const diffLines = cleanParent.split("\n");
-        const pairLine = diffLines.find((l) => {
-          const p = parseLineInfo(l);
-          return p && p.num === lineNum && p.isR !== isRemoval;
+        const match = parentText.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
+        const diffBody = match ? match[1].trim() : "";
+        const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
+        const parsedLines = diffLines.map((l) => {
+          return {
+            line: l,
+            parsed: parseLineInfo(l),
+            pairContent: null
+          };
         });
-        if (pairLine) {
-          finalPairContent = parseLineInfo(pairLine).content;
+        let currentGroup = [];
+        for (let idx = 0; idx < parsedLines.length; idx++) {
+          const item = parsedLines[idx];
+          if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+            currentGroup.push(item);
+          } else {
+            if (currentGroup.length > 0) {
+              alignChangeGroup(currentGroup);
+              currentGroup = [];
+            }
+          }
+        }
+        if (currentGroup.length > 0) {
+          alignChangeGroup(currentGroup);
+        }
+        const matchedItem = parsedLines.find((item) => item.parsed && item.parsed.num === lineNum && item.parsed.isR === isRemoval);
+        if (matchedItem) {
+          finalPairContent = matchedItem.pairContent;
         }
       }
       let words = [];
@@ -4113,7 +4195,7 @@ var init_ChatLayout = __esm({
       }
       const hasInlineChange = words.some((part) => isRemoval && part.removed || isAddition && part.added);
       const isPureUnpairedBlock = !finalPairContent && (isRemoval || isAddition);
-      const hasRealChange = hasInlineChange || isPureUnpairedBlock;
+      const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
       const finalNumColor = isRemoval || isAddition ? isRemoval ? "#d96868" : "#68d98c" : "gray";
       const finalPrefixColor = isRemoval ? "#ff4d4d" : "#4dff88";
       const displayPrefix = isRemoval ? "-" : isAddition ? "+" : " ";
@@ -4123,7 +4205,7 @@ var init_ChatLayout = __esm({
           return /* @__PURE__ */ React4.createElement(Text4, { color: blockColor }, wrapText(content, columns - 14));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
-          const textColor = isRemoval ? "#b34d4d" : isAddition ? "#4db36b" : "gray";
+          const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
           return /* @__PURE__ */ React4.createElement(Text4, { color: textColor }, wrapText(content, columns - 14));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
@@ -4134,7 +4216,7 @@ var init_ChatLayout = __esm({
               return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#ff3333" }, part.value);
             }
             if (part.added) return null;
-            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#b34d4d" }, part.value);
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#885555" }, part.value);
           }
           if (isAddition) {
             const isSurroundedByAddition = words[idx - 1]?.added || words[idx + 1]?.added;
@@ -4142,7 +4224,7 @@ var init_ChatLayout = __esm({
               return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#33ff66" }, part.value);
             }
             if (part.removed) return null;
-            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#4db36b" }, part.value);
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#558866" }, part.value);
           }
           return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "gray" }, part.value);
         }));
@@ -4153,7 +4235,37 @@ var init_ChatLayout = __esm({
       const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
-      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), diffLines.map((line, i) => /* @__PURE__ */ React4.createElement(DiffLine, { key: i, line, parentText: text, columns: columns - 3 })), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
+      const parsedLines = diffLines.map((line) => {
+        return {
+          line,
+          parsed: parseLineInfo(line),
+          pairContent: null
+        };
+      });
+      let currentGroup = [];
+      for (let i = 0; i < parsedLines.length; i++) {
+        const item = parsedLines[i];
+        if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
+          currentGroup.push(item);
+        } else {
+          if (currentGroup.length > 0) {
+            alignChangeGroup(currentGroup);
+            currentGroup = [];
+          }
+        }
+      }
+      if (currentGroup.length > 0) {
+        alignChangeGroup(currentGroup);
+      }
+      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), parsedLines.map((item, i) => /* @__PURE__ */ React4.createElement(
+        DiffLine,
+        {
+          key: i,
+          line: item.line,
+          pairContent: item.pairContent,
+          columns: columns - 3
+        }
+      )), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
     CodeRenderer = React4.memo(({ text, columns = 80 }) => {
       if (!text) return null;
@@ -4541,12 +4653,35 @@ var init_ChatLayout = __esm({
 // src/components/StatusBar.jsx
 import React5 from "react";
 import { Box as Box4, Text as Text5 } from "ink";
+import { useState as useState5, useEffect as useEffect4 } from "react";
 var StatusBar, StatusBar_default;
 var init_StatusBar = __esm({
   "src/components/StatusBar.jsx"() {
     init_text();
     StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google" }) => {
       const modeIcon = mode === "Flux" ? "" : "";
+      const [memoryUsage, setMemoryUsage] = useState5(0);
+      const [memoryLimit, setMemoryLimit] = useState5(0);
+      const [memoryUnit, setMemoryUnit] = useState5("MB");
+      useEffect4(() => {
+        const getMemoryInfo = () => {
+          const usage = process.memoryUsage();
+          const isGB = usage.heapTotal / (1024 * 1024) >= 1024;
+          const currentUnit = isGB ? "GB" : "MB";
+          const formatToNumber = (bytes, toGB) => {
+            const converted = bytes / (1024 * 1024 * (toGB ? 1024 : 1));
+            return toGB ? parseFloat(converted.toFixed(2)) : Math.round(converted);
+          };
+          setMemoryUnit(currentUnit);
+          setMemoryLimit(formatToNumber(usage.heapTotal, isGB));
+          setMemoryUsage(formatToNumber(usage.heapUsed, isGB));
+        };
+        getMemoryInfo();
+        const interval = setInterval(() => {
+          getMemoryInfo();
+        }, 3e3);
+        return () => clearInterval(interval);
+      }, []);
       let maxLimit = 256e3;
       if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
         maxLimit = 4e5;
@@ -4561,7 +4696,7 @@ var init_StatusBar = __esm({
         },
         /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, modeIcon, " ", mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray" }, "MEM: "), /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, isMemoryEnabled ? "ON" : "OFF"))),
         /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", italic: true }, " ", truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, " ", formatTokens(tokensTotal), " ", /* @__PURE__ */ React5.createElement(Text5, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", italic: true }, " ", chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, " | ", /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "CUSTOM"))))
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, " ", formatTokens(tokensTotal), " ", /* @__PURE__ */ React5.createElement(Text5, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503 "), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", italic: true }, " ", chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, " | ", /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "CUSTOM"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -4797,7 +4932,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variable
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
+6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops -> Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, Markdown IN ARRAY NOT ALLOWED. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
@@ -5456,9 +5591,10 @@ ${finalOutput}`);
 });
 
 // src/components/SettingsMenu.jsx
-import React7, { useState as useState5 } from "react";
+import React7, { useState as useState6, useEffect as useEffect5 } from "react";
 import { Box as Box6, Text as Text7, useInput as useInput3 } from "ink";
 import TextInput from "ink-text-input";
+import v8 from "v8";
 function SettingsMenu({
   systemSettings,
   setSystemSettings,
@@ -5470,11 +5606,34 @@ function SettingsMenu({
   setMessages,
   aiProvider
 }) {
-  const [activeColumn, setActiveColumn] = useState5("categories");
-  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState5(0);
-  const [selectedItemIndex, setSelectedItemIndex] = useState5(0);
-  const [editingItem, setEditingItem] = useState5(null);
-  const [editValue, setEditValue] = useState5("");
+  const [activeColumn, setActiveColumn] = useState6("categories");
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState6(0);
+  const [selectedItemIndex, setSelectedItemIndex] = useState6(0);
+  const [editingItem, setEditingItem] = useState6(null);
+  const [editValue, setEditValue] = useState6("");
+  const [currentMemory, setCurrentMemory] = useState6(0);
+  const [maxMemory, setMaxMemory] = useState6(0);
+  const [memoryUnit, setMemoryUnit] = useState6("MB");
+  useEffect5(() => {
+    const maxLimitBytes = v8.getHeapStatistics().heap_size_limit;
+    const isGB = maxLimitBytes >= 1024 * 1024 * 1024;
+    const unitLabel = isGB ? "GB" : "MB";
+    const divisor = isGB ? 1024 * 1024 * 1024 : 1024 * 1024;
+    setMaxMemory(parseFloat((maxLimitBytes / divisor).toFixed(2)));
+    setMemoryUnit(unitLabel);
+    const getMemoryStats = () => {
+      const usage = process.memoryUsage();
+      const targetBytes = usage.rss;
+      const converted = targetBytes / divisor;
+      const formattedCurrent = isGB ? parseFloat(converted.toFixed(2)) : Math.round(converted);
+      setCurrentMemory(formattedCurrent);
+    };
+    getMemoryStats();
+    const interval = setInterval(() => {
+      getMemoryStats();
+    }, 5e3);
+    return () => clearInterval(interval);
+  }, []);
   const getCategoryItems = (catId) => {
     switch (catId) {
       case "memory":
@@ -5734,7 +5893,10 @@ function SettingsMenu({
     });
     if (currentCatId === "other") {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 18, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 17, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+      );
+      elements.push(
+        /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
       );
     }
     if (hasConflict) {
@@ -5777,13 +5939,13 @@ var init_SettingsMenu = __esm({
 });
 
 // src/components/ProfileForm.jsx
-import React8, { useState as useState6, useEffect as useEffect4 } from "react";
+import React8, { useState as useState7, useEffect as useEffect6 } from "react";
 import { Box as Box7, Text as Text8 } from "ink";
 import TextInput2 from "ink-text-input";
 function ProfileForm({ initialData, onSave, onCancel }) {
-  const [step, setStep] = useState6(0);
-  const [currentInput, setCurrentInput] = useState6("");
-  const [profile, setProfile] = useState6(() => ({
+  const [step, setStep] = useState7(0);
+  const [currentInput, setCurrentInput] = useState7("");
+  const [profile, setProfile] = useState7(() => ({
     name: initialData?.name || "",
     nickname: initialData?.nickname || "",
     instructions: initialData?.instructions || ""
@@ -5793,7 +5955,7 @@ function ProfileForm({ initialData, onSave, onCancel }) {
     { key: "nickname", label: "Enter a Nickname (Agent will use this): " },
     { key: "instructions", label: "System Instructions (Persona overrides): " }
   ];
-  useEffect4(() => {
+  useEffect6(() => {
     const currentKey = steps[step].key;
     setCurrentInput(profile[currentKey] || "");
   }, [step, profile]);
@@ -5841,7 +6003,7 @@ var init_ProfileForm = __esm({
 });
 
 // src/components/AskUserModal.jsx
-import React9, { useState as useState7 } from "react";
+import React9, { useState as useState8 } from "react";
 import { Box as Box8, Text as Text9, useInput as useInput4 } from "ink";
 import TextInput3 from "ink-text-input";
 var AskUserModal, AskUserModal_default;
@@ -5849,9 +6011,9 @@ var init_AskUserModal = __esm({
   "src/components/AskUserModal.jsx"() {
     init_terminal();
     AskUserModal = ({ question, options, onResolve }) => {
-      const [isSuggestingElse, setIsSuggestingElse] = useState7(false);
-      const [customInput, setCustomInput] = useState7("");
-      const [selectedIndex, setSelectedIndex] = useState7(0);
+      const [isSuggestingElse, setIsSuggestingElse] = useState8(false);
+      const [customInput, setCustomInput] = useState8("");
+      const [selectedIndex, setSelectedIndex] = useState8(0);
       const allOptions = [...options, { id: "CUSTOM", label: "Suggest something else...", description: "Provide a custom response" }];
       useInput4((input, key) => {
         if (isSuggestingElse) return;
@@ -6322,27 +6484,61 @@ var init_history = __esm({
       return nextLock;
     };
     loadHistory = async () => {
+      await fs7.ensureDir(HISTORY_DIR);
+      let history = {};
       if (await fs7.pathExists(HISTORY_FILE)) {
         try {
-          return readEncryptedJson(HISTORY_FILE, {});
+          history = readEncryptedJson(HISTORY_FILE, {});
         } catch (e) {
-          return {};
+          history = {};
         }
       }
-      return {};
+      for (const id in history) {
+        const chatFile = path6.join(HISTORY_DIR, `${id}.json`);
+        Object.defineProperty(history[id], "messages", {
+          get: () => {
+            if (fs7.existsSync(chatFile)) {
+              try {
+                return readEncryptedJson(chatFile, []);
+              } catch (e) {
+                return [];
+              }
+            }
+            return [];
+          },
+          set: (msgs) => {
+            try {
+              writeEncryptedJson(chatFile, msgs);
+            } catch (e) {
+            }
+          },
+          enumerable: false,
+          configurable: true
+        });
+      }
+      return history;
     };
     saveChat = async (id, name, messages) => {
       return withLock(async () => {
+        await fs7.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
         const persistentMessages = (messages || []).filter((m) => !m.isUpdateNotification && !m.isMeta);
         const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
+        const chatFile = path6.join(HISTORY_DIR, `${id}.json`);
+        writeEncryptedJson(chatFile, persistentMessages);
         history[id] = {
           name: finalName,
-          messages: persistentMessages,
           updatedAt: Date.now()
         };
-        writeEncryptedJson(HISTORY_FILE, history);
+        const indexHistory = {};
+        for (const chatId in history) {
+          indexHistory[chatId] = {
+            name: history[chatId].name,
+            updatedAt: history[chatId].updatedAt
+          };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
       });
     };
     saveChatTitle = async (id, title) => {
@@ -6352,16 +6548,30 @@ var init_history = __esm({
           history[id].name = title;
           history[id].updatedAt = Date.now();
         } else {
-          history[id] = { name: title, messages: [], updatedAt: Date.now() };
+          history[id] = { name: title, updatedAt: Date.now() };
         }
-        writeEncryptedJson(HISTORY_FILE, history);
+        const indexHistory = {};
+        for (const chatId in history) {
+          indexHistory[chatId] = {
+            name: history[chatId].name,
+            updatedAt: history[chatId].updatedAt
+          };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
       });
     };
     deleteChat = async (id) => {
       return withLock(async () => {
         const history = await loadHistory();
         delete history[id];
-        writeEncryptedJson(HISTORY_FILE, history);
+        const indexHistory = {};
+        for (const chatId in history) {
+          indexHistory[chatId] = {
+            name: history[chatId].name,
+            updatedAt: history[chatId].updatedAt
+          };
+        }
+        writeEncryptedJson(HISTORY_FILE, indexHistory);
         if (await fs7.pathExists(CONTEXT_FILE)) {
           try {
             const contextData = readEncryptedJson(CONTEXT_FILE, []);
@@ -6383,6 +6593,13 @@ var init_history = __esm({
           writeEncryptedJson(TEMP_MEM_CHAT_FILE, cache);
         }
         await RevertManager.deleteChatBackups(id);
+        const chatFile = path6.join(HISTORY_DIR, `${id}.json`);
+        if (await fs7.pathExists(chatFile)) {
+          try {
+            await fs7.remove(chatFile);
+          } catch (e) {
+          }
+        }
         return history;
       });
     };
@@ -8085,8 +8302,10 @@ var init_search_keyword = __esm({
   "src/tools/search_keyword.js"() {
     init_arg_parser();
     search_keyword = async (args) => {
-      const { keyword, file } = parseArgs(args);
+      const { keyword, file, subString } = parseArgs(args);
       if (!keyword) return 'ERROR: Missing "keyword" argument.';
+      const matchSubstring = subString === true || subString === "true" || subString === 1 || subString === "1" || subString === "true";
+      const wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
       const excludes = [
         "node_modules",
         ".git",
@@ -8126,7 +8345,8 @@ var init_search_keyword = __esm({
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
             for (let i = 0; i < lines.length; i++) {
-              if (lines[i].includes(keyword)) {
+              const matched = matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) : wordRegex.test(lines[i]);
+              if (matched) {
                 const displayPath = fileObj.relativePath.replace(/\\/g, "/");
                 fileMatches.push(`${displayPath} \u2192 ${i + 1}`);
               }
@@ -8142,9 +8362,9 @@ var init_search_keyword = __esm({
           global.gc();
         }
         if (matches.length === 0) {
-          return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"}`;
+          return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${matchSubstring ? "(subString mode)" : ""}`;
         }
-        let output = `Found ${matches.length} matches:
+        let output = `Found ${matches.length} matches ${matchSubstring ? "(subString mode)" : ""}:
 
 `;
         output += matches.join("\n");
@@ -9142,7 +9362,7 @@ var init_ai = __esm({
     colorMainWords = (label2) => {
       if (!label2) return label2;
       return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
-        return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
+        return `${ansiBefore || ""}${icon}${ansiAfter || ""}  \x1B[95m${word}\x1B[0m`;
       });
     };
     TERMINATION_SIGNAL = false;
@@ -9162,13 +9382,11 @@ var init_ai = __esm({
       "moonshotai/kimi-k2.6",
       // NVIDIA vision models
       "moonshotai/kimi-k2.6",
+      "stepfun-ai/step-3.7-flash",
+      "google/gemma-4-31b-it",
+      "mistralai/mistral-medium-3.5-128b"
       // Google models
-      "gemma-4-31b-it",
-      "gemini-2.5-flash",
-      "gemini-3-flash-preview",
-      "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-3.1-pro-preview"
+      // No need. All models on Gemini API is Multimodal
     ];
     isModelMultimodal = (model) => {
       if (!model) return false;
@@ -9232,7 +9450,7 @@ var init_ai = __esm({
       }
       return fetch(url, options);
     };
-    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.85) {
+    getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.99) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9364,7 +9582,7 @@ var init_ai = __esm({
         }
       }
     };
-    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.7) {
+    getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 0.99) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9380,7 +9598,7 @@ var init_ai = __esm({
               const mimeType = part.inlineData.mimeType;
               const data = part.inlineData.data;
               const isImage = mimeType.startsWith("image/");
-              if (isImage) {
+              if (isImage && MULTIMODAL_MODELS.includes(model)) {
                 msgContent.push({
                   type: "image_url",
                   image_url: {
@@ -9404,7 +9622,7 @@ var init_ai = __esm({
         "High": "High",
         "xHigh": "High"
       };
-      const apiLevel = thinkingLevelMap[thinkingLevel] || "Standard";
+      const apiLevel = thinkingLevelMap[thinkingLevel] || "High";
       const isThinking = apiLevel !== "Fast";
       const isKimi = model.includes("kimi");
       const isGemma = model.includes("gemma");
@@ -9412,6 +9630,15 @@ var init_ai = __esm({
       const isGlm = model.includes("glm");
       const isMistral = model.includes("mistral");
       const isMinimax = model.includes("minimax");
+      const isGPT = model.includes("gpt");
+      const GPT_THINKING_LEVELS = {
+        "Fast": "low",
+        "Low": "low",
+        "Medium": "medium",
+        "Standard": "medium",
+        "High": "high",
+        "xHigh": "high"
+      };
       const maxTokens = isMinimax || isDeepSeek ? 16384 : 32768;
       const body = {
         model,
@@ -9419,7 +9646,8 @@ var init_ai = __esm({
         max_tokens: maxTokens,
         stream: true,
         stream_options: { include_usage: true },
-        temperature
+        temperature,
+        ...isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || "high" }
       };
       if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
@@ -9516,7 +9744,7 @@ var init_ai = __esm({
         }
       }
     };
-    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.45) {
+    getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.95) {
       const messages = [];
       if (systemInstruction) {
         messages.push({ role: "system", content: systemInstruction });
@@ -9763,7 +9991,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.4
+                  0.75
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -9779,7 +10007,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.4
+                  0.75
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -9795,7 +10023,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.4
+                  0.75
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -9807,7 +10035,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   config: {
                     systemInstruction: janitorPrompt,
                     maxOutputTokens: 512,
-                    temperature: 0.4,
+                    temperature: 0.75,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -10227,7 +10455,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       client = new GoogleGenAI({ apiKey });
       return client;
     };
-    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.4) => {
+    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.75) => {
       const { aiProvider = "Google", apiKey, mode } = settings;
       let fullText = "";
       let usageMetadata = null;
@@ -10245,7 +10473,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           contents: normalizedContents,
           config: {
             systemInstruction,
-            maxOutputTokens: 2048,
             temperature,
             thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
           }
@@ -11162,6 +11389,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           let isStutteringLoop = false;
           let isGeneralLoop = false;
           let isInitialAttempt = true;
+          let lastLoopCheckLen = 0;
           let accumulatedContext = "";
           let dedupeBuffer = "";
           let isDedupeActive = false;
@@ -11266,7 +11494,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
               } else if (retryCount > 0) {
                 yield { type: "model_update", content: null };
               }
-              currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, isMultiModal);
+              currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal);
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
                 yield { type: "status", content: "Checking Code..." };
@@ -11314,7 +11542,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.45
+                  0.95
                 );
               } else if (aiProvider === "DeepSeek") {
                 stream = getDeepSeekStream(
@@ -11326,7 +11554,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.85
+                  0.99
                 );
               } else if (aiProvider === "NVIDIA") {
                 stream = getNVIDIAStream(
@@ -11338,7 +11566,7 @@ ${ideErr} [/ERROR]`;
                   mode,
                   isMultiModal,
                   abortController.signal,
-                  0.7
+                  0.99
                 );
               } else {
                 const apiCallPromise = client.models.generateContentStream({
@@ -11347,7 +11575,7 @@ ${ideErr} [/ERROR]`;
                   config: {
                     systemInstruction: currentSystemInstruction,
                     mediaResolution: "MEDIA_RESOLUTION_MEDIUM",
-                    temperature: 1.05,
+                    temperature: 1,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -11641,7 +11869,6 @@ ${ideErr} [/ERROR]`;
                       for (const m of msgs) yield m;
                     }
                   }
-                  const signalSafeText3 = getSanitizedText(turnText);
                   const toolContext = getActiveToolContext(turnText);
                   if (toolContext.inside) {
                     if (!lastToolEventTime) lastToolEventTime = Date.now();
@@ -11712,78 +11939,60 @@ ${ideErr} [/ERROR]`;
                       }
                     }
                   }
-                  const contextSafeText = getContextSafeText(turnText, false);
-                  const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
-                  const thinkContent = thinkBlocks.join("").trim();
-                  const sentences = thinkContent.split(/[.!?]\s+/);
-                  const uniqueSentences = new Set(sentences);
-                  const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
-                  const wordCount = thinkContent.split(/\s+/).filter((w) => w.length > 0).length;
-                  let repetitionThresholdThinking = 0.4;
-                  let repetitionThresholdResponse = 0.6;
-                  let isOverVerboseThinking = false;
-                  if ((targetModel || "").toLowerCase().startsWith("gemma")) {
-                    const thinkingCaps = {
-                      "low": 256,
-                      "medium": 768,
-                      "high": 2048,
-                      "max": 4096,
-                      "xhigh": 4096
-                    };
-                    const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
-                    isOverVerboseThinking = wordCount > cap;
-                  }
-                  if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
-                    const reason = repetitionRatio > repetitionThresholdThinking ? "Reasoning Loop Detected" : "Thinking Budget Exceeded";
-                    yield { type: "status", content: `${reason}. Re-centering...` };
-                    isThinkingLoop = true;
-                    await new Promise((resolve) => setTimeout(resolve, 3e3));
-                    break;
-                  }
-                  const responseContent = signalSafeText3.trim();
-                  const respSentences = responseContent.split(/[.!?]\s+/);
-                  const uniqueRespSentences = new Set(respSentences);
-                  const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
-                  if (respRepetitionRatio > repetitionThresholdResponse) {
-                    yield { type: "status", content: `Response Loop Detected. Re-centering...` };
-                    isThinkingLoop = false;
-                    isGeneralLoop = true;
-                    await new Promise((resolve) => setTimeout(resolve, 3e3));
-                    break;
-                  }
-                  const allWords = contextSafeText.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
-                  let stutterDetected = false;
-                  if (allWords.length > 5) {
-                    for (let p = 1; p <= 15; p++) {
-                      const R = Math.max(3, Math.ceil(8 / p));
-                      if (allWords.length < p * R) continue;
-                      let isRepeating = true;
-                      const pattern = allWords.slice(allWords.length - p);
-                      const patternStr = pattern.join(" ");
-                      for (let r = 1; r < R; r++) {
-                        const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
-                        if (prevPattern.join(" ") !== patternStr) {
-                          isRepeating = false;
-                          break;
-                        }
-                      }
-                      if (isRepeating) {
-                        stutterDetected = true;
-                        break;
-                      }
+                  if (turnText.length - lastLoopCheckLen > 150) {
+                    lastLoopCheckLen = turnText.length;
+                    const contextSafeText = getContextSafeText(turnText, false);
+                    const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
+                    const thinkContent = thinkBlocks.join("").trim();
+                    const sentences = thinkContent.split(/[.!?]\s+/);
+                    const uniqueSentences = new Set(sentences);
+                    const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
+                    const wordCount = thinkContent.split(/\s+/).filter((w) => w.length > 0).length;
+                    let repetitionThresholdThinking = 0.4;
+                    let repetitionThresholdResponse = 0.6;
+                    let isOverVerboseThinking = false;
+                    if ((targetModel || "").toLowerCase().startsWith("gemma")) {
+                      const thinkingCaps = {
+                        "low": 256,
+                        "medium": 768,
+                        "high": 2048,
+                        "max": 4096,
+                        "xhigh": 4096
+                      };
+                      const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
+                      isOverVerboseThinking = wordCount > cap;
                     }
-                  }
-                  if (!stutterDetected) {
-                    const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, "");
-                    if (cleanChars.length >= 10) {
-                      for (let p = 1; p <= 10; p++) {
-                        const R = Math.max(4, Math.ceil(12 / p));
-                        if (cleanChars.length < p * R) continue;
-                        const pattern = cleanChars.substring(cleanChars.length - p);
+                    if (repetitionRatio > repetitionThresholdThinking || isOverVerboseThinking) {
+                      const reason = repetitionRatio > repetitionThresholdThinking ? "Reasoning Loop Detected" : "Thinking Budget Exceeded";
+                      yield { type: "status", content: `${reason}. Re-centering...` };
+                      isThinkingLoop = true;
+                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      break;
+                    }
+                    const signalSafeText3 = getSanitizedText(turnText);
+                    const responseContent = signalSafeText3.trim();
+                    const respSentences = responseContent.split(/[.!?]\s+/);
+                    const uniqueRespSentences = new Set(respSentences);
+                    const respRepetitionRatio = respSentences.length > 10 ? (respSentences.length - uniqueRespSentences.size) / respSentences.length : 0;
+                    if (respRepetitionRatio > repetitionThresholdResponse) {
+                      yield { type: "status", content: `Response Loop Detected. Re-centering...` };
+                      isThinkingLoop = false;
+                      isGeneralLoop = true;
+                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      break;
+                    }
+                    const allWords = contextSafeText.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+                    let stutterDetected = false;
+                    if (allWords.length > 5) {
+                      for (let p = 1; p <= 15; p++) {
+                        const R = Math.max(3, Math.ceil(8 / p));
+                        if (allWords.length < p * R) continue;
                         let isRepeating = true;
+                        const pattern = allWords.slice(allWords.length - p);
+                        const patternStr = pattern.join(" ");
                         for (let r = 1; r < R; r++) {
-                          const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
-                          if (prevPattern !== pattern) {
+                          const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
+                          if (prevPattern.join(" ") !== patternStr) {
                             isRepeating = false;
                             break;
                           }
@@ -11794,13 +12003,35 @@ ${ideErr} [/ERROR]`;
                         }
                       }
                     }
-                  }
-                  if (stutterDetected) {
-                    yield { type: "status", content: `Stuttering Detected. Re-centering...` };
-                    isThinkingLoop = false;
-                    isStutteringLoop = true;
-                    await new Promise((resolve) => setTimeout(resolve, 3e3));
-                    break;
+                    if (!stutterDetected) {
+                      const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, "");
+                      if (cleanChars.length >= 10) {
+                        for (let p = 1; p <= 10; p++) {
+                          const R = Math.max(4, Math.ceil(12 / p));
+                          if (cleanChars.length < p * R) continue;
+                          const pattern = cleanChars.substring(cleanChars.length - p);
+                          let isRepeating = true;
+                          for (let r = 1; r < R; r++) {
+                            const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
+                            if (prevPattern !== pattern) {
+                              isRepeating = false;
+                              break;
+                            }
+                          }
+                          if (isRepeating) {
+                            stutterDetected = true;
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    if (stutterDetected) {
+                      yield { type: "status", content: `Stuttering Detected. Re-centering...` };
+                      isThinkingLoop = false;
+                      isStutteringLoop = true;
+                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      break;
+                    }
                   }
                   const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
                   const allToolsFound = detectToolCalls(toolActionableText);
@@ -12952,13 +13183,13 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
 });
 
 // src/components/ResumeModal.jsx
-import React10, { useState as useState8, useEffect as useEffect5 } from "react";
+import React10, { useState as useState9, useEffect as useEffect7 } from "react";
 import { Box as Box9, Text as Text10, useInput as useInput5 } from "ink";
 function ResumeModal({ onSelect, onDelete, onClose }) {
-  const [history, setHistory] = useState8({});
-  const [keys, setKeys] = useState8([]);
-  const [selectedIndex, setSelectedIndex] = useState8(0);
-  useEffect5(() => {
+  const [history, setHistory] = useState9({});
+  const [keys, setKeys] = useState9([]);
+  const [selectedIndex, setSelectedIndex] = useState9(0);
+  useEffect7(() => {
     const fetchHistory = async () => {
       const h = await loadHistory();
       setHistory(h);
@@ -13044,14 +13275,14 @@ var init_ResumeModal = __esm({
 });
 
 // src/components/MemoryModal.jsx
-import React11, { useState as useState9, useEffect as useEffect6 } from "react";
+import React11, { useState as useState10, useEffect as useEffect8 } from "react";
 import { Box as Box10, Text as Text11, useInput as useInput6, useStdout } from "ink";
 function MemoryModal({ onClose }) {
   const { stdout } = useStdout();
   const columns = stdout?.columns || 80;
-  const [memories, setMemories] = useState9([]);
-  const [selectedIndex, setSelectedIndex] = useState9(0);
-  const [isMemoryOn, setIsMemoryOn] = useState9(true);
+  const [memories, setMemories] = useState10([]);
+  const [selectedIndex, setSelectedIndex] = useState10(0);
+  const [isMemoryOn, setIsMemoryOn] = useState10(true);
   const loadMemories = () => {
     const data = readEncryptedJson(MEMORIES_FILE, []);
     setMemories(data);
@@ -13063,7 +13294,7 @@ function MemoryModal({ onClose }) {
       setIsMemoryOn(true);
     }
   };
-  useEffect6(() => {
+  useEffect8(() => {
     loadMemories();
   }, []);
   useInput6((input, key) => {
@@ -13165,7 +13396,7 @@ var init_MemoryModal = __esm({
 });
 
 // src/components/UpdateProcessor.jsx
-import React12, { useState as useState10, useEffect as useEffect7 } from "react";
+import React12, { useState as useState11, useEffect as useEffect9 } from "react";
 import { Box as Box11, Text as Text12 } from "ink";
 import { spawn as spawn2 } from "child_process";
 var pty2, SPINNER_FRAMES, UpdateProcessor, UpdateProcessor_default;
@@ -13180,17 +13411,17 @@ var init_UpdateProcessor = __esm({
     }
     SPINNER_FRAMES = ["\u280B", "\u2819", "\u2839", "\u2838", "\u283C", "\u2834", "\u2826", "\u2827", "\u2807", "\u280F"];
     UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings, onSuccess }) => {
-      const [status, setStatus] = useState10("initializing");
-      const [log, setLog] = useState10("");
-      const [error, setError] = useState10(null);
-      const [tick, setTick] = useState10(0);
-      useEffect7(() => {
+      const [status, setStatus] = useState11("initializing");
+      const [log, setLog] = useState11("");
+      const [error, setError] = useState11(null);
+      const [tick, setTick] = useState11(0);
+      useEffect9(() => {
         const interval = setInterval(() => {
           setTick((t) => (t + 1) % 1e3);
         }, 33);
         return () => clearInterval(interval);
       }, []);
-      useEffect7(() => {
+      useEffect9(() => {
         let child;
         const runUpdate = async () => {
           const manager = settings.updateManager || "npm";
@@ -13323,12 +13554,12 @@ var init_UpdateProcessor = __esm({
 });
 
 // src/components/ParserDownloadModal.jsx
-import React13, { useState as useState11, useEffect as useEffect8 } from "react";
+import React13, { useState as useState12, useEffect as useEffect10 } from "react";
 import { Box as Box12, Text as Text13, useInput as useInput7 } from "ink";
 function ParserDownloadModal({ onClose }) {
-  const [selectedIndex, setSelectedIndex] = useState11(0);
-  const [status, setStatus] = useState11({});
-  useEffect8(() => {
+  const [selectedIndex, setSelectedIndex] = useState12(0);
+  const [status, setStatus] = useState12({});
+  useEffect10(() => {
     const initialStatus = {};
     EXTENSIONS.forEach((item) => {
       if (isParserInstalled(item.file)) {
@@ -13829,10 +14060,10 @@ var init_dist = __esm({
 });
 
 // src/components/RevertModal.jsx
-import React14, { useState as useState12 } from "react";
+import React14, { useState as useState13 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput8 } from "ink";
 function RevertModal({ prompts, onSelect, onClose }) {
-  const [selectedIndex, setSelectedIndex] = useState12(0);
+  const [selectedIndex, setSelectedIndex] = useState13(0);
   useInput8((input, key) => {
     if (key.escape) onClose();
     if (key.upArrow) setSelectedIndex((prev) => Math.max(0, prev - 1));
@@ -13955,7 +14186,7 @@ __export(app_exports, {
   default: () => App
 });
 import os4 from "os";
-import React15, { useState as useState13, useEffect as useEffect9, useRef as useRef3, useMemo as useMemo2 } from "react";
+import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef3, useMemo as useMemo2 } from "react";
 import { Box as Box15, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
 import fs22 from "fs-extra";
 import path20 from "path";
@@ -13965,24 +14196,24 @@ import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
-  const [confirmExit, setConfirmExit] = useState13(false);
-  const [exitCountdown, setExitCountdown] = useState13(10);
+  const [confirmExit, setConfirmExit] = useState14(false);
+  const [exitCountdown, setExitCountdown] = useState14(10);
   const { stdout } = useStdout2();
-  const [input, setInput] = useState13("");
-  const [inputKey, setInputKey] = useState13(0);
-  const [isExpanded, setIsExpanded] = useState13(false);
-  const [mode, setMode] = useState13("Flux");
-  const [terminalSize, setTerminalSize] = useState13({
+  const [input, setInput] = useState14("");
+  const [inputKey, setInputKey] = useState14(0);
+  const [isExpanded, setIsExpanded] = useState14(false);
+  const [mode, setMode] = useState14("Flux");
+  const [terminalSize, setTerminalSize] = useState14({
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24
   });
-  const [selectedIndex, setSelectedIndex] = useState13(0);
-  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState13(false);
-  const [showBridgePromo, setShowBridgePromo] = useState13(false);
-  const [promoSelectedIndex, setPromoSelectedIndex] = useState13(0);
+  const [selectedIndex, setSelectedIndex] = useState14(0);
+  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState14(false);
+  const [showBridgePromo, setShowBridgePromo] = useState14(false);
+  const [promoSelectedIndex, setPromoSelectedIndex] = useState14(0);
   const suggestionOffsetRef = useRef3(0);
   const persistedModelRef = useRef3(null);
-  useEffect9(() => {
+  useEffect11(() => {
     const ideName = getIDEName();
     const isIDE = !["Terminal", "Windows Terminal"].includes(ideName) || !!process.env.VSC_TERMINAL_URL;
     const graceTimer = setTimeout(() => {
@@ -14157,7 +14388,7 @@ function App({ args = [] }) {
       }
     }
   };
-  useEffect9(() => {
+  useEffect11(() => {
     const handleResize = () => {
       stdout.write("\x1B[2J\x1B[3J\x1B[H");
       setTerminalSize({
@@ -14170,18 +14401,18 @@ function App({ args = [] }) {
       stdout.off("resize", handleResize);
     };
   }, [stdout]);
-  const [thinkingLevel, setThinkingLevel] = useState13("Medium");
-  const [aiProvider, setAiProvider] = useState13("Google");
-  const [setupStep, setSetupStep] = useState13(0);
-  const [latestVer, setLatestVer] = useState13(null);
-  const [showFullThinking, setShowFullThinking] = useState13(false);
-  const [activeModel, setActiveModel] = useState13("gemma-4-31b-it");
-  const [janitorModel, setJanitorModel] = useState13("gemma-4-26b-a4b-it");
-  const [isInitializing, setIsInitializing] = useState13(true);
-  const [isAppFocused, setIsAppFocused] = useState13(true);
+  const [thinkingLevel, setThinkingLevel] = useState14("Medium");
+  const [aiProvider, setAiProvider] = useState14("Google");
+  const [setupStep, setSetupStep] = useState14(0);
+  const [latestVer, setLatestVer] = useState14(null);
+  const [showFullThinking, setShowFullThinking] = useState14(false);
+  const [activeModel, setActiveModel] = useState14("gemma-4-31b-it");
+  const [janitorModel, setJanitorModel] = useState14("gemma-4-26b-a4b-it");
+  const [isInitializing, setIsInitializing] = useState14(true);
+  const [isAppFocused, setIsAppFocused] = useState14(true);
   const lastFocusEventTime = useRef3(0);
-  const [apiKey, setApiKey] = useState13(null);
-  const [tempKey, setTempKey] = useState13("");
+  const [apiKey, setApiKey] = useState14(null);
+  const [tempKey, setTempKey] = useState14("");
   const addShiftEnterBinding = async (ideName) => {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
@@ -14232,35 +14463,35 @@ function App({ args = [] }) {
       });
     }
   };
-  const [activeView, setActiveView] = useState13("chat");
-  const [apiTier, setApiTier] = useState13("Free");
-  const [quotas, setQuotas] = useState13({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
-  const [inputConfig, setInputConfig] = useState13(null);
-  const [systemSettings, setSystemSettings] = useState13({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
-  const [profileData, setProfileData] = useState13({ name: null, nickname: null, instructions: null });
-  const [imageSettings, setImageSettings] = useState13({ keyType: "Default", quality: "Low-High", apiKey: "" });
-  const [sessionStats, setSessionStats] = useState13({ tokens: 0 });
-  const [sessionAgentCalls, setSessionAgentCalls] = useState13(0);
-  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState13(0);
-  const [sessionTotalTokens, setSessionTotalTokens] = useState13(0);
-  const [chatTokens, setChatTokens] = useState13(0);
+  const [activeView, setActiveView] = useState14("chat");
+  const [apiTier, setApiTier] = useState14("Free");
+  const [quotas, setQuotas] = useState14({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+  const [inputConfig, setInputConfig] = useState14(null);
+  const [systemSettings, setSystemSettings] = useState14({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const [profileData, setProfileData] = useState14({ name: null, nickname: null, instructions: null });
+  const [imageSettings, setImageSettings] = useState14({ keyType: "Default", quality: "Low-High", apiKey: "" });
+  const [sessionStats, setSessionStats] = useState14({ tokens: 0 });
+  const [sessionAgentCalls, setSessionAgentCalls] = useState14(0);
+  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState14(0);
+  const [sessionTotalTokens, setSessionTotalTokens] = useState14(0);
+  const [chatTokens, setChatTokens] = useState14(0);
   const chatTokenStartRef = useRef3(0);
-  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState13(0);
-  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState13(0);
-  const [sessionToolSuccess, setSessionToolSuccess] = useState13(0);
-  const [sessionToolFailure, setSessionToolFailure] = useState13(0);
-  const [sessionToolDenied, setSessionToolDenied] = useState13(0);
-  const [sessionApiTime, setSessionApiTime] = useState13(0);
-  const [sessionToolTime, setSessionToolTime] = useState13(0);
-  const [sessionImageCount, setSessionImageCount] = useState13(0);
-  const [sessionImageCredits, setSessionImageCredits] = useState13(0);
-  const [dailyUsage, setDailyUsage] = useState13(null);
-  const [monthlyUsage, setMonthlyUsage] = useState13(null);
-  const [customPeriodUsage, setCustomPeriodUsage] = useState13(null);
-  const [statsMode, setStatsMode] = useState13("daily");
+  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState14(0);
+  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState14(0);
+  const [sessionToolSuccess, setSessionToolSuccess] = useState14(0);
+  const [sessionToolFailure, setSessionToolFailure] = useState14(0);
+  const [sessionToolDenied, setSessionToolDenied] = useState14(0);
+  const [sessionApiTime, setSessionApiTime] = useState14(0);
+  const [sessionToolTime, setSessionToolTime] = useState14(0);
+  const [sessionImageCount, setSessionImageCount] = useState14(0);
+  const [sessionImageCredits, setSessionImageCredits] = useState14(0);
+  const [dailyUsage, setDailyUsage] = useState14(null);
+  const [monthlyUsage, setMonthlyUsage] = useState14(null);
+  const [customPeriodUsage, setCustomPeriodUsage] = useState14(null);
+  const [statsMode, setStatsMode] = useState14("daily");
   const PLAYGROUND_CHAT_ID = "flow-playground";
-  const [chatId, setChatId] = useState13(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
-  useEffect9(() => {
+  const [chatId, setChatId] = useState14(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
+  useEffect11(() => {
     const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
     setChatTokens(nextTokens);
     if (chatId) {
@@ -14268,7 +14499,7 @@ function App({ args = [] }) {
       });
     }
   }, [sessionTotalTokens, chatId, sessionStats.tokens]);
-  useEffect9(() => {
+  useEffect11(() => {
     if (activeView === "apiTier") {
       const load = async () => {
         const d = await getDailyUsage();
@@ -14281,17 +14512,17 @@ function App({ args = [] }) {
       load();
     }
   }, [activeView, quotas.resetDay]);
-  const [activeCommand, setActiveCommand] = useState13(null);
-  const [execOutput, setExecOutput] = useState13("");
-  const [isTerminalFocused, setIsTerminalFocused] = useState13(false);
-  const [tick, setTick] = useState13(0);
+  const [activeCommand, setActiveCommand] = useState14(null);
+  const [execOutput, setExecOutput] = useState14("");
+  const [isTerminalFocused, setIsTerminalFocused] = useState14(false);
+  const [tick, setTick] = useState14(0);
   const isFirstRender = useRef3(true);
   const isSecondRender = useRef3(true);
   const isThirdRender = useRef3(true);
   const prevProviderRef = useRef3(aiProvider);
   const originalAllowExternalAccessRef = useRef3(false);
   const originalMemoryRef = useRef3(true);
-  useEffect9(() => {
+  useEffect11(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
       const hasStandard = aiProvider === "DeepSeek" || aiProvider === "NVIDIA";
@@ -14304,7 +14535,7 @@ function App({ args = [] }) {
       }
     }
   }, [aiProvider, activeModel, thinkingLevel]);
-  useEffect9(() => {
+  useEffect11(() => {
     if (!apiKey) return;
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -14378,15 +14609,15 @@ function App({ args = [] }) {
   }, []);
   const activeCommandRef = useRef3(null);
   const execOutputRef = useRef3("");
-  useEffect9(() => {
+  useEffect11(() => {
     activeCommandRef.current = activeCommand;
   }, [activeCommand]);
-  useEffect9(() => {
+  useEffect11(() => {
     execOutputRef.current = execOutput;
   }, [execOutput]);
-  const [autoAcceptWrites, setAutoAcceptWrites] = useState13(false);
-  const [pendingApproval, setPendingApproval] = useState13(null);
-  const [pendingAsk, setPendingAsk] = useState13(null);
+  const [autoAcceptWrites, setAutoAcceptWrites] = useState14(false);
+  const [pendingApproval, setPendingApproval] = useState14(null);
+  const [pendingAsk, setPendingAsk] = useState14(null);
   const resetPendingApproval = (decision) => {
     setPendingApproval(null);
     setActiveView("chat");
@@ -14405,10 +14636,10 @@ function App({ args = [] }) {
     if (ms < 1e3) return `${ms}ms`;
     return formatDuration(Math.floor(ms / 1e3));
   };
-  const [statusText, setStatusText] = useState13(null);
-  const [wittyPhrase, setWittyPhrase] = useState13("");
-  const [hasPasteBlock, setHasPasteBlock] = useState13(false);
-  useEffect9(() => {
+  const [statusText, setStatusText] = useState14(null);
+  const [wittyPhrase, setWittyPhrase] = useState14("");
+  const [hasPasteBlock, setHasPasteBlock] = useState14(false);
+  useEffect11(() => {
     let interval;
     if (statusText) {
       const updatePhrase = () => {
@@ -14422,20 +14653,20 @@ function App({ args = [] }) {
     }
     return () => clearInterval(interval);
   }, [statusText]);
-  const [isSpinnerActive, setIsSpinnerActive] = useState13(true);
-  const [isProcessing, setIsProcessing] = useState13(false);
-  const [isCompressing, setIsCompressing] = useState13(false);
-  const [escPressed, setEscPressed] = useState13(false);
-  const [escTimer, setEscTimer] = useState13(null);
-  const [escPressCount, setEscPressCount] = useState13(0);
-  const [recentPrompts, setRecentPrompts] = useState13([]);
+  const [isSpinnerActive, setIsSpinnerActive] = useState14(true);
+  const [isProcessing, setIsProcessing] = useState14(false);
+  const [isCompressing, setIsCompressing] = useState14(false);
+  const [escPressed, setEscPressed] = useState14(false);
+  const [escTimer, setEscTimer] = useState14(null);
+  const [escPressCount, setEscPressCount] = useState14(0);
+  const [recentPrompts, setRecentPrompts] = useState14([]);
   const escDoubleTimerRef = useRef3(null);
   const didSignalTerminationRef = useRef3(false);
-  const [queuedPrompt, setQueuedPrompt] = useState13(null);
-  const [resolutionData, setResolutionData] = useState13(null);
-  const [tempModelOverride, setTempModelOverride] = useState13(null);
-  useEffect9(() => setEscPressCount(0), [input]);
-  const [messages, rawSetMessages] = useState13(() => {
+  const [queuedPrompt, setQueuedPrompt] = useState14(null);
+  const [resolutionData, setResolutionData] = useState14(null);
+  const [tempModelOverride, setTempModelOverride] = useState14(null);
+  useEffect11(() => setEscPressCount(0), [input]);
+  const [messages, rawSetMessages] = useState14(() => {
     const logoMsg = { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true };
     const isHomeDir = process.cwd() === os4.homedir();
     const isSystemDir = (() => {
@@ -14473,24 +14704,22 @@ function App({ args = [] }) {
   const setMessages = (value) => {
     rawSetMessages((prev) => {
       const next = typeof value === "function" ? value(prev) : value;
-      const cleaned = [];
-      for (let i = 0; i < next.length; i++) {
-        const msg = next[i];
-        const prevMsg = cleaned[cleaned.length - 1];
-        if (msg && msg.text && msg.text.includes("Request Cancelled") && prevMsg && prevMsg.text && prevMsg.text.includes("Request Cancelled")) {
-          continue;
+      if (next.length > 1) {
+        const last = next[next.length - 1];
+        const secondLast = next[next.length - 2];
+        if (last?.text?.includes("Request Cancelled") && secondLast?.text?.includes("Request Cancelled")) {
+          return next.slice(0, -1);
         }
-        cleaned.push(msg);
       }
-      return cleaned;
+      return next;
     });
   };
   const queuedPromptRef = useRef3(null);
-  const [btwResponse, setBtwResponse] = useState13("");
-  const [showBtwBox, setShowBtwBox] = useState13(false);
+  const [btwResponse, setBtwResponse] = useState14("");
+  const [showBtwBox, setShowBtwBox] = useState14(false);
   const btwResponseRef = useRef3("");
   const btwClosedRef = useRef3(null);
-  useEffect9(() => {
+  useEffect11(() => {
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     if (lastMsg && (lastMsg.role === "agent" || lastMsg.role === "assistant")) {
@@ -14508,59 +14737,105 @@ function App({ args = [] }) {
       }
     }
   }, [messages]);
-  const [completedIndex, setCompletedIndex] = useState13(messages.length);
-  const [clearKey, setClearKey] = useState13(0);
+  const [completedIndex, setCompletedIndex] = useState14(messages.length);
+  const [clearKey, setClearKey] = useState14(0);
+  const lastCompletedBlocksRef = useRef3([]);
+  const cachedHistoryRef = useRef3({
+    completedIndex: 0,
+    columns: 0,
+    historicalBlocks: [],
+    seenSelections: /* @__PURE__ */ new Set()
+  });
   const parsedBlocks = useMemo2(() => {
-    const completed = [];
-    const active = [];
     const columns = terminalSize.columns || 80;
-    const completedMsgs = messages.slice(0, completedIndex);
-    const activeMsgs = messages.slice(completedIndex);
-    const seenAskSelections = /* @__PURE__ */ new Set();
-    const filterDuplicates = (msgList) => {
-      return msgList.filter((msg) => {
-        if (msg.isAskRecord) {
-          const selectionMatch = msg.text?.match(/Selection: (.*)/);
-          const selection = selectionMatch ? selectionMatch[1].trim() : "";
-          if (selection) {
-            if (seenAskSelections.has(selection)) {
-              return false;
-            }
+    const SELECTION_REGEX = /Selection: (.*)/;
+    let historicalBlocks = [];
+    let seenAskSelections = /* @__PURE__ */ new Set();
+    const isResize = cachedHistoryRef.current.columns !== columns;
+    const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
+    if (isResize || isClear) {
+      const completedMsgs = messages.slice(0, completedIndex);
+      for (let i = 0; i < completedMsgs.length; i++) {
+        const msg = completedMsgs[i];
+        if (msg.isAskRecord && msg.text) {
+          const match = msg.text.match(SELECTION_REGEX);
+          if (match && match[1].trim()) {
+            const selection = match[1].trim();
+            if (seenAskSelections.has(selection)) continue;
             seenAskSelections.add(selection);
           }
         }
-        return true;
-      });
-    };
-    const uniqueCompleted = filterDuplicates(completedMsgs);
-    const uniqueActive = filterDuplicates(activeMsgs);
-    uniqueCompleted.forEach((msg) => {
+        const parsed = parseMessageToBlocks(msg, columns);
+        for (let j = 0; j < parsed.completed.length; j++) historicalBlocks.push(parsed.completed[j]);
+        for (let j = 0; j < parsed.active.length; j++) historicalBlocks.push(parsed.active[j]);
+      }
+      cachedHistoryRef.current = {
+        completedIndex,
+        columns,
+        historicalBlocks,
+        seenSelections: new Set(seenAskSelections)
+      };
+    } else {
+      historicalBlocks = cachedHistoryRef.current.historicalBlocks;
+      seenAskSelections = cachedHistoryRef.current.seenSelections;
+      if (completedIndex > cachedHistoryRef.current.completedIndex) {
+        historicalBlocks = [...historicalBlocks];
+        seenAskSelections = new Set(seenAskSelections);
+        const newMsgs = messages.slice(cachedHistoryRef.current.completedIndex, completedIndex);
+        for (let i = 0; i < newMsgs.length; i++) {
+          const msg = newMsgs[i];
+          if (msg.isAskRecord && msg.text) {
+            const match = msg.text.match(SELECTION_REGEX);
+            if (match && match[1].trim()) {
+              const selection = match[1].trim();
+              if (seenAskSelections.has(selection)) continue;
+              seenAskSelections.add(selection);
+            }
+          }
+          const parsed = parseMessageToBlocks(msg, columns);
+          for (let j = 0; j < parsed.completed.length; j++) historicalBlocks.push(parsed.completed[j]);
+          for (let j = 0; j < parsed.active.length; j++) historicalBlocks.push(parsed.active[j]);
+        }
+        cachedHistoryRef.current = {
+          completedIndex,
+          columns,
+          historicalBlocks,
+          seenSelections: seenAskSelections
+        };
+      }
+    }
+    const activeMsgs = messages.slice(completedIndex);
+    const streamingCompletedBlocks = [];
+    const activeBlocks = [];
+    for (let i = 0; i < activeMsgs.length; i++) {
+      const msg = activeMsgs[i];
+      if (msg.isAskRecord && msg.text) {
+        const match = msg.text.match(SELECTION_REGEX);
+        if (match && match[1].trim()) {
+          const selection = match[1].trim();
+          if (seenAskSelections.has(selection)) continue;
+        }
+      }
       const parsed = parseMessageToBlocks(msg, columns);
-      completed.push(...parsed.completed);
-      completed.push(...parsed.active);
-    });
-    uniqueActive.forEach((msg) => {
-      const parsed = parseMessageToBlocks(msg, columns);
-      completed.push(...parsed.completed);
-      active.push(...parsed.active);
-    });
-    const MAX_BLOCKS = 5e9;
-    const slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
-    if (slicedCompleted.length >= 75e3) {
-      slicedCompleted.push({
-        key: "memory-warning-block",
+      for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
+      for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
+    }
+    const finalCompleted = historicalBlocks.concat(streamingCompletedBlocks);
+    if (finalCompleted.length >= 75e3) {
+      finalCompleted.push({
+        key: `memory-warning-block-${finalCompleted.length}`,
         msg: {
           role: "system",
           text: `\u26A0\uFE0F MEMORY WARNING: CHAT IS GETTING VERY LONG`,
-          subText: `This session has reached ${slicedCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
+          subText: `This session has reached ${finalCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
           isHomeWarning: true
         },
         type: "full-message"
       });
     }
     return {
-      completed: slicedCompleted,
-      active
+      completed: finalCompleted,
+      active: activeBlocks
     };
   }, [messages, completedIndex, terminalSize.columns]);
   const isTerminalWaitingForInput = useMemo2(() => {
@@ -14749,7 +15024,7 @@ function App({ args = [] }) {
       setInput((prev) => prev.replace(/\\\r?$/, "").replace(/\r?$/, "") + "\n");
     }
   });
-  useEffect9(() => {
+  useEffect11(() => {
     process.stdout.write("\x1B[?1004h");
     const onData = (data) => {
       const str = data.toString();
@@ -14767,7 +15042,7 @@ function App({ args = [] }) {
       process.stdin.off("data", onData);
     };
   }, []);
-  useEffect9(() => {
+  useEffect11(() => {
     async function init() {
       try {
         const pkg = JSON.parse(fs22.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
@@ -14986,7 +15261,7 @@ function App({ args = [] }) {
     }
     init();
   }, []);
-  useEffect9(() => {
+  useEffect11(() => {
     let timer;
     if (confirmExit) {
       setExitCountdown(10);
@@ -15004,7 +15279,7 @@ function App({ args = [] }) {
       if (timer) clearInterval(timer);
     };
   }, [confirmExit]);
-  useEffect9(() => {
+  useEffect11(() => {
     if (!isInitializing) {
       const modelToSave = parsedArgs.model && activeModel === parsedArgs.model ? persistedModelRef.current : activeModel;
       let settingsToSave = systemSettings;
@@ -15054,7 +15329,7 @@ function App({ args = [] }) {
     }
   };
   const lastSavedTimeRef = useRef3(SESSION_START_TIME);
-  useEffect9(() => {
+  useEffect11(() => {
     if (activeView === "exit") {
       const flush = async () => {
         const now = Date.now();
@@ -15072,7 +15347,7 @@ function App({ args = [] }) {
       return () => clearTimeout(timer);
     }
   }, [activeView]);
-  useEffect9(() => {
+  useEffect11(() => {
     const interval = setInterval(async () => {
       if (!isInitializing) {
         const now = Date.now();
@@ -15082,7 +15357,7 @@ function App({ args = [] }) {
           lastSavedTimeRef.current += deltaSecs * 1e3;
         }
       }
-    }, 1500);
+    }, 2e3);
     return () => clearInterval(interval);
   }, [isInitializing]);
   const COMMANDS = [
@@ -15098,32 +15373,6 @@ function App({ args = [] }) {
     { cmd: "/export", desc: "Export current chat in a .txt file" },
     { cmd: "/chats", desc: "List all chat sessions" },
     { cmd: "/btw", desc: "Ask a question without intefering with ongoing tasks" },
-    // {
-    //     cmd: '/image', desc: 'Generate images using Pollinations', subs: [
-    //         {
-    //             cmd: 'setup', desc: 'Configure defaults', subs: [
-    //                 {
-    //                     cmd: 'key', desc: 'Set API key strategy', subs: [
-    //                         { cmd: 'default', desc: 'Default (Quota: Dynamic 25 max/hr)' },
-    //                         { cmd: 'custom', desc: 'Custom Key' }
-    //                     ]
-    //                 },
-    //                 {
-    //                     cmd: 'quality', desc: 'Set default quality', subs: [
-    //                         { cmd: 'low', desc: imageSettings?.keyType === 'Custom' ? '(0.001/img)' : '(1/img)' },
-    //                         { cmd: 'low-high', desc: imageSettings?.keyType === 'Custom' ? '(0.002/img)' : '(2/img)' },
-    //                         { cmd: 'medium', desc: imageSettings?.keyType === 'Custom' ? '(0.008/img)' : '(8/img)' },
-    //                         { cmd: 'medium-high', desc: imageSettings?.keyType === 'Custom' ? '(0.01/img)' : '(10/img)' },
-    //                         { cmd: 'high', desc: imageSettings?.keyType === 'Custom' ? '(0.045/img)' : '(45/img)' },
-    //                         { cmd: 'ultra', desc: imageSettings?.keyType === 'Custom' ? '(0.0488/img)' : '(49/img)' },
-    //                         { cmd: 'premium', desc: imageSettings?.keyType === 'Custom' ? '(0.1/img)' : '(100/img)' }
-    //                     ]
-    //                 }
-    //             ]
-    //         },
-    //         { cmd: 'stats', desc: 'Show remaining credits or Pollinations balance status' }
-    //     ]
-    // },
     {
       cmd: "/mode",
       desc: "Toggle Flux/Flow modes",
@@ -15165,7 +15414,7 @@ function App({ args = [] }) {
     },
     {
       cmd: "/model",
-      desc: "Switch Model for Agent",
+      desc: "Select Agent Model",
       subs: aiProvider === "OpenRouter" ? apiTier === "Free" ? [
         {
           cmd: "google/gemma-4-31b-it:free",
@@ -15177,11 +15426,11 @@ function App({ args = [] }) {
         },
         {
           cmd: "qwen/qwen3-coder:free",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "z-ai/glm-4.5-air:free",
-          desc: ""
+          desc: "Text Only"
         }
       ] : [
         {
@@ -15210,19 +15459,19 @@ function App({ args = [] }) {
         },
         {
           cmd: "deepseek/deepseek-v4-pro",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "deepseek/deepseek-v4-flash",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "xiaomi/mimo-v2.5-pro",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "z-ai/glm-5",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "openai/gpt-5.2-codex",
@@ -15243,106 +15492,122 @@ function App({ args = [] }) {
       ] : aiProvider === "DeepSeek" ? [
         {
           cmd: "deepseek-v4-flash",
-          desc: "Fast & Efficient"
+          desc: "Fast & Efficient (Text Only)"
         },
         {
           cmd: "deepseek-v4-pro",
-          desc: "High-Intelligence Reasoning"
+          desc: "High-Intelligence Reasoning (Text Only)"
         }
       ] : aiProvider === "NVIDIA" ? [
+        // --- Kimi (Moonshot AI) ---
         {
           cmd: "moonshotai/kimi-k2.6",
           desc: "Multimodal"
         },
-        {
-          cmd: "google/gemma-4-31b-it",
-          desc: ""
-        },
-        {
-          cmd: "stepfun-ai/step-3.7-flash",
-          desc: ""
-        },
-        {
-          cmd: "minimaxai/minimax-m2.7",
-          desc: ""
-        },
+        // --- DeepSeek Family ---
         {
           cmd: "deepseek-ai/deepseek-v4-flash",
-          desc: ""
+          desc: "Text Only"
         },
         {
           cmd: "deepseek-ai/deepseek-v4-pro",
-          desc: ""
+          desc: "Text Only"
         },
+        // --- StepFun ---
         {
-          cmd: "mistralai/mistral-medium-3.5-128b",
-          desc: ""
+          cmd: "stepfun-ai/step-3.7-flash",
+          desc: "Multimodal"
         },
+        // --- Gemma Family (Google) ---
         {
-          cmd: "z-ai/glm-5.1",
-          desc: ""
+          cmd: "google/gemma-4-31b-it",
+          desc: "Multimodal"
         },
         {
           cmd: "google/diffusiongemma-26b-a4b-it",
           desc: "Mega Fast [Experimental]"
         },
+        // --- Mistral ---
+        {
+          cmd: "mistralai/mistral-medium-3.5-128b",
+          desc: "Multimodal"
+        },
+        // --- GPT Open Source Series (OpenAI) ---
+        {
+          cmd: "openai/gpt-oss-20b",
+          desc: "Text Only"
+        },
+        {
+          cmd: "openai/gpt-oss-120b",
+          desc: "Text Only"
+        },
+        // --- GLM (Zhipu AI) ---
+        {
+          cmd: "z-ai/glm-5.1",
+          desc: "Text Only"
+        },
+        // --- MiniMax Family ---
+        {
+          cmd: "minimaxai/minimax-m2.7",
+          desc: "Text Only"
+        },
         {
           cmd: "minimaxai/minimax-m3",
-          desc: ""
+          desc: "Text Only"
         }
       ] : apiTier === "Free" ? [
         {
           cmd: "gemma-4-26b-a4b-it",
-          desc: "Standard & Faster"
+          desc: "Standard & Faster (Multimodal)"
         },
         {
           cmd: "gemma-4-31b-it",
-          desc: "Standard Default"
+          desc: "Standard Default (Multimodal)"
         },
         {
           cmd: "gemini-2.5-flash-lite",
-          desc: "Fast & Cheap (Limited Free Quota)"
+          desc: "Fast & Cheap (Multimodal) [Limited Free Quota]"
         },
         {
           cmd: "gemini-2.5-flash",
-          desc: "Fast & Reliable (Limited Free Quota)"
+          desc: "Fast & Reliable (Multimodal) [Limited Free Quota]"
         },
         {
           cmd: "gemini-3-flash-preview",
-          desc: "Fast & Lightweight (Limited Free Quota)"
+          desc: "Fast & Lightweight (Multimodal) [Limited Free Quota]"
         },
         {
           cmd: "gemini-3.5-flash",
-          desc: "Flash Latest (Limited Free Quota) [Instability Issues]"
+          desc: "Flash Latest (Multimodal) [Limited Free Quota] Instability Issues"
         }
       ] : [
         {
           cmd: "gemini-2.5-flash-lite",
-          desc: "Fast & Cheap"
+          desc: "Fast & Cheap (Multimodal)"
         },
         {
           cmd: "gemini-2.5-flash",
-          desc: "Fast & Reliable"
+          desc: "Fast & Reliable (Multimodal)"
         },
         {
           cmd: "gemini-2.5-pro",
-          desc: "Last gen Pro reasoning"
+          desc: "Last gen Pro reasoning (Multimodal)"
         },
         {
           cmd: "gemini-3.1-flash-lite",
-          desc: "Ultra-Fast & Lite"
+          desc: "Ultra-Fast & Lite (Multimodal)"
         },
         {
           cmd: "gemini-3-flash-preview",
-          desc: "Default, Fast & Lightweight"
+          desc: "Default, Fast & Lightweight (Multimodal)"
         },
         {
           cmd: "gemini-3.5-flash",
-          desc: "Flash Latest  [Instability Issues]"
+          desc: "Flash Latest (Multimodal) [Instability Issues]"
         },
         {
           cmd: "gemini-3.1-pro-preview",
-          desc: "Pro Reasoning"
+          desc: "Pro Reasoning (Multimodal)"
         }
       ]
     },
@@ -15359,7 +15624,7 @@ function App({ args = [] }) {
       cmd: "/fluxflow",
       desc: "Project management",
       subs: [
-        { cmd: "init", desc: "Create FluxFlow.md template" }
+        { cmd: "init", desc: "Create empty FluxFlow.md template" }
       ]
     },
     {
@@ -15374,8 +15639,8 @@ function App({ args = [] }) {
       cmd: "/update",
       desc: "Check/Install updates",
       subs: [
-        { cmd: "check", desc: "Check for new version" },
-        { cmd: "latest", desc: "Install latest release" }
+        { cmd: "latest", desc: "Install latest release" },
+        { cmd: "check", desc: "Check for new version" }
       ]
     }
   ];
@@ -15455,6 +15720,7 @@ ${cleanText}`, color: "magenta" }];
               const target = h[targetId] || Object.values(h).find((h2) => h2.name.toLowerCase() === targetId.toLowerCase());
               if (target) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                clearBlocksCache();
                 setChatId(targetId);
                 const savedData = await loadChatContext(targetId);
                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
@@ -15538,6 +15804,7 @@ ${cleanText}`, color: "magenta" }];
           ]);
           setCompletedIndex(1);
           setClearKey((prev) => prev + 1);
+          clearBlocksCache();
           if (parsedArgs.playground) {
             parsedArgs.playground = false;
             deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
@@ -15583,6 +15850,14 @@ ${cleanText}`, color: "magenta" }];
           setIsExpanded(false);
           setChatTokens(0);
           chatTokenStartRef.current = sessionTotalTokens;
+          setTimeout(() => {
+            if (global.gc) {
+              try {
+                global.gc();
+              } catch (e) {
+              }
+            }
+          }, 500);
           break;
         }
         case "/revert": {
@@ -15598,6 +15873,14 @@ ${cleanText}`, color: "magenta" }];
               });
             }
           });
+          setTimeout(() => {
+            if (global.gc) {
+              try {
+                global.gc();
+              } catch (e) {
+              }
+            }
+          }, 500);
           break;
         }
         case "/mode": {
@@ -16205,24 +16488,24 @@ ${timestamp}` };
       });
       const streamChat = async () => {
         let didAppendCancel = false;
-        const appendCancelMessage = (prev) => {
-          if (didAppendCancel) {
-            return prev;
-          }
-          const lastMsg = prev[prev.length - 1];
-          if (lastMsg && lastMsg.text && lastMsg.text.includes("Request Cancelled")) {
-            return prev;
-          }
+        const appendCancelMessage = () => {
+          if (didAppendCancel) return;
           didAppendCancel = true;
-          const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-          const newMsgs = [...updatedPrev, {
-            id: "cancel-" + Date.now(),
-            role: "system",
-            text: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m",
-            isMeta: true
-          }];
-          setCompletedIndex(newMsgs.length);
-          return newMsgs;
+          setMessages((prev) => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.text && lastMsg.text.includes("Request Cancelled")) {
+              return prev;
+            }
+            const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+            const newMsgs = [...updatedPrev, {
+              id: "cancel-" + Date.now(),
+              role: "system",
+              text: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m",
+              isMeta: true
+            }];
+            setCompletedIndex(newMsgs.length);
+            return newMsgs;
+          });
         };
         let hasFiredJanitor = false;
         setIsProcessing(true);
@@ -16416,7 +16699,14 @@ Selection: ${val}`,
           let toolCallBalance = 0;
           let inToolCallString = null;
           const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
+          const bullyTheBug = path20.join(DATA_DIR, "padding");
           for await (const packet of stream) {
+            if (packet.type === "interactive_turn_finished") {
+              fs22.writeFileSync(bullyTheBug, "pad_0xa\n");
+            } else {
+              fs22.appendFileSync(bullyTheBug, "\r");
+              parsedBlocks.completed = [];
+            }
             if (isFirstPacket && packet.type === "text") {
               apiStart = Date.now();
               isFirstPacket = false;
@@ -16427,7 +16717,7 @@ Selection: ${val}`,
                 sendStatus(packet.content);
               }
               if (packet.content === "Request Cancelled") {
-                setMessages((prev) => appendCancelMessage(prev));
+                appendCancelMessage();
               }
               continue;
             }
@@ -16466,6 +16756,14 @@ Selection: ${val}`,
                 setCompletedIndex(newMsgs.length);
                 return newMsgs;
               });
+              setTimeout(() => {
+                if (global.gc) {
+                  try {
+                    global.gc();
+                  } catch (e) {
+                  }
+                }
+              }, 100);
               continue;
             }
             if (packet.type === "interactive_turn_finished") {
@@ -16674,29 +16972,31 @@ Selection: ${val}`,
             }
             if (inThinkMode && currentThinkId) {
               setMessages((prev) => {
+                const next = [...prev];
                 let transitioning = false;
                 let transitionContent = "";
-                const newMsgs = prev.map((m) => {
-                  if (m.id === currentThinkId) {
-                    const newText = m.text + chunkText;
+                for (let i = next.length - 1; i >= 0; i--) {
+                  if (next[i].id === currentThinkId) {
+                    const newText = next[i].text + chunkText;
                     if (newText.toLowerCase().includes("</think>")) {
                       transitioning = true;
                       const parts = newText.split(/<\/think>/gi);
                       transitionContent = parts.slice(1).join("</think>") || "";
-                      const startTime = m.startTime || parseInt(m.id.split("-")[1]) || Date.now();
+                      const startTime = next[i].startTime || parseInt(String(next[i].id).split("-")[1]) || Date.now();
                       const duration = Date.now() - startTime;
-                      return { ...m, text: parts[0], isStreaming: false, duration };
+                      next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
+                    } else {
+                      next[i] = { ...next[i], text: newText, isStreaming: true };
                     }
-                    return { ...m, text: newText, isStreaming: true };
+                    break;
                   }
-                  return m;
-                });
+                }
                 if (transitioning) {
                   inThinkMode = false;
                   currentAgentId = "agent-" + Date.now();
-                  return [...newMsgs, { id: currentAgentId, role: "agent", text: transitionContent.replace(/<\/?(think|thought)>/gi, ""), isStreaming: true }];
+                  next.push({ id: currentAgentId, role: "agent", text: transitionContent.replace(/<\/?(think|thought)>/gi, ""), isStreaming: true });
                 }
-                return newMsgs;
+                return next;
               });
             } else if (!inThinkMode) {
               const chunkLower2 = chunkText.toLowerCase();
@@ -16707,9 +17007,16 @@ Selection: ${val}`,
                 currentAgentId = "agent-" + Date.now();
                 setMessages((prev) => [...prev, { id: currentAgentId, role: "agent", text: chunkText, isStreaming: true }]);
               } else {
-                setMessages((prev) => prev.map(
-                  (m) => m.id === currentAgentId ? { ...m, text: m.text + chunkText, isStreaming: true } : m
-                ));
+                setMessages((prev) => {
+                  const next = [...prev];
+                  for (let i = next.length - 1; i >= 0; i--) {
+                    if (next[i].id === currentAgentId) {
+                      next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
+                      break;
+                    }
+                  }
+                  return next;
+                });
               }
             }
           }
@@ -16724,7 +17031,7 @@ Selection: ${val}`,
           setIsProcessing(false);
           setStatusText(null);
           if (didSignalTerminationRef.current) {
-            setMessages((prev) => appendCancelMessage(prev));
+            appendCancelMessage();
           }
           if (!hasFiredJanitor) {
             if (process.stdout.isTTY) {
@@ -16817,7 +17124,7 @@ Selection: ${val}`,
     }
     return [];
   }, [input, isFilePickerDismissed]);
-  useEffect9(() => {
+  useEffect11(() => {
     setSelectedIndex(0);
   }, [suggestions]);
   const CustomMenuItem = ({ label: label2, isSelected }) => {
@@ -17314,6 +17621,7 @@ Selection: ${val}`,
                     stdout.write("\x1B[2J\x1B[3J\x1B[H");
                   }
                   setClearKey((prev) => prev + 1);
+                  clearBlocksCache();
                   const targetIdx = messages.findLastIndex(
                     (m) => m.role === "user" && m.text && (m.text.startsWith(targetPrompt) || m.text.includes(targetPrompt))
                   );
@@ -17366,6 +17674,7 @@ Selection: ${val}`,
               const h = await loadHistory();
               if (h[id]) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                clearBlocksCache();
                 setChatId(id);
                 const savedData = await loadChatContext(id);
                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
@@ -18007,7 +18316,22 @@ var init_app = __esm({
 // src/cli.jsx
 import { spawn as spawn3 } from "child_process";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var HEAP_LIMIT = 6144;
+import os5 from "os";
+var totalSystemRamBytes = os5.totalmem();
+var totalSystemRamMB = totalSystemRamBytes / (1024 * 1024);
+var SAFETY_MARGIN = 0.5;
+var calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
+var _rawArgs = process.argv.slice(2);
+var _allocIdx = _rawArgs.indexOf("--allocation");
+var _allocValue = _allocIdx !== -1 ? parseInt(_rawArgs[_allocIdx + 1], 10) : NaN;
+var _maxAllowed = Math.floor(totalSystemRamMB * 0.75);
+var HEAP_LIMIT = !isNaN(_allocValue) && _allocValue > 0 ? Math.min(_allocValue, _maxAllowed) : Math.max(1536, Math.min(32768, calculatedLimit));
+if (!Number.isNaN(_allocValue)) {
+  console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
+  await new Promise((resolve) => setTimeout(resolve, 2e3));
+} else {
+  console.log("\n[MEMORY] Using auto-detected memory allocation: " + calculatedLimit + " MB");
+}
 var isBundled = fileURLToPath2(import.meta.url).endsWith(".js");
 if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-size"))) {
   const cp = spawn3(process.execPath, [
@@ -18042,6 +18366,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   --thinking <Fast|Low|Medium|High|xHigh> Set startup thinking level
   --memory <on|off>                    Toggle memory system
   --resume <session_id>                Resume a previous session
+  --allocation <mb>                    Override Node.js max-old-space-size in MB (default: auto)
   --package <npm|pnpm|yarn|bun>        Set package manager for updates
   --auto-del <1d|7d|30d>               Set history auto-deletion timeframe
   --auto-exec <on|off>                 Toggle permission for autonomous command execution
@@ -18131,7 +18456,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
           }
           const promptPackageManager = async () => {
             const React17 = (await import("react")).default;
-            const { useState: useState14 } = React17;
+            const { useState: useState15 } = React17;
             const { render: render2, Box: Box16, Text: Text17 } = await import("ink");
             const SelectInput3 = (await import("ink-select-input")).default;
             const TextInput5 = (await import("ink-text-input")).default;
@@ -18148,8 +18473,8 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
               };
               let unmountFn;
               const PromptComponent = () => {
-                const [step, setStep] = useState14("select");
-                const [customCommand2, setCustomCommand] = useState14("");
+                const [step, setStep] = useState15("select");
+                const [customCommand2, setCustomCommand] = useState15("");
                 const handleSelect = (item) => {
                   if (item.value === "custom") {
                     setStep("custom");

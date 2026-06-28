@@ -10,10 +10,25 @@ import os from 'os';
  */
 const totalSystemRamBytes = os.totalmem();
 const totalSystemRamMB = totalSystemRamBytes / (1024 * 1024);
-const SAFETY_MARGIN = 0.75;
+const SAFETY_MARGIN = 0.50;
 const calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
 
-const HEAP_LIMIT = Math.max(1536, Math.min(6144, calculatedLimit));
+// Allow --allocation <mb> to override the auto-calculated heap limit
+const _rawArgs = process.argv.slice(2);
+const _allocIdx = _rawArgs.indexOf('--allocation');
+const _allocValue = _allocIdx !== -1 ? parseInt(_rawArgs[_allocIdx + 1], 10) : NaN;
+const _maxAllowed = Math.floor(totalSystemRamMB * 0.75);
+const HEAP_LIMIT = (!isNaN(_allocValue) && _allocValue > 0)
+    ? Math.min(_allocValue, _maxAllowed)
+    : Math.max(1536, Math.min(32768, calculatedLimit));
+
+if (!Number.isNaN(_allocValue)) {
+    console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
+    await new Promise(resolve => setTimeout(resolve, 2000));
+} else {
+    console.log("\n[MEMORY] Using auto-detected memory allocation: " + calculatedLimit + " MB");
+}
+
 const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
 if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
@@ -55,6 +70,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --thinking <Fast|Low|Medium|High|xHigh> Set startup thinking level
   --memory <on|off>                    Toggle memory system
   --resume <session_id>                Resume a previous session
+  --allocation <mb>                    Override Node.js max-old-space-size in MB (default: auto)
   --package <npm|pnpm|yarn|bun>        Set package manager for updates
   --auto-del <1d|7d|30d>               Set history auto-deletion timeframe
   --auto-exec <on|off>                 Toggle permission for autonomous command execution

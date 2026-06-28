@@ -927,17 +927,17 @@ export default function App({ args = [] }) {
     const setMessages = (value) => {
         rawSetMessages(prev => {
             const next = typeof value === 'function' ? value(prev) : value;
-            const cleaned = [];
-            for (let i = 0; i < next.length; i++) {
-                const msg = next[i];
-                const prevMsg = cleaned[cleaned.length - 1];
-                if (msg && msg.text && msg.text.includes('Request Cancelled') &&
-                    prevMsg && prevMsg.text && prevMsg.text.includes('Request Cancelled')) {
-                    continue;
+
+            // FAST PATH: Optimized O(1) deduplication without looping
+            if (next.length > 1) {
+                const last = next[next.length - 1];
+                const secondLast = next[next.length - 2];
+                if (last?.text?.includes('Request Cancelled') &&
+                    secondLast?.text?.includes('Request Cancelled')) {
+                    return next.slice(0, -1);
                 }
-                cleaned.push(msg);
             }
-            return cleaned;
+            return next;
         });
     };
 
@@ -971,80 +971,136 @@ export default function App({ args = [] }) {
 
     const lastCompletedBlocksRef = useRef([]);
 
+    // Put this near your hooks
+    const cachedHistoryRef = useRef({
+        completedIndex: 0,
+        columns: 0,
+        historicalBlocks: [],
+        seenSelections: new Set()
+    });
+
     const parsedBlocks = useMemo(() => {
-        const completed = [];
-        const active = [];
         const columns = terminalSize.columns || 80;
+        const SELECTION_REGEX = /Selection: (.*)/;
 
-        const completedMsgs = messages.slice(0, completedIndex);
-        const activeMsgs = messages.slice(completedIndex);
+        let historicalBlocks = [];
+        let seenAskSelections = new Set();
 
-        const seenAskSelections = new Set();
-        const filterDuplicates = (msgList) => {
-            return msgList.filter(msg => {
-                if (msg.isAskRecord) {
-                    const selectionMatch = msg.text?.match(/Selection: (.*)/);
-                    const selection = selectionMatch ? selectionMatch[1].trim() : '';
-                    if (selection) {
-                        if (seenAskSelections.has(selection)) {
-                            return false;
-                        }
+        // Check if terminal resized or chat was cleared
+        const isResize = cachedHistoryRef.current.columns !== columns;
+        const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
+
+        if (isResize || isClear) {
+            // SLOW PATH: User resized terminal or cleared chat. Re-parse history once.
+            const completedMsgs = messages.slice(0, completedIndex);
+            for (let i = 0; i < completedMsgs.length; i++) {
+                const msg = completedMsgs[i];
+                if (msg.isAskRecord && msg.text) {
+                    const match = msg.text.match(SELECTION_REGEX);
+                    if (match && match[1].trim()) {
+                        const selection = match[1].trim();
+                        if (seenAskSelections.has(selection)) continue;
                         seenAskSelections.add(selection);
                     }
                 }
-                return true;
-            });
-        };
+                const parsed = parseMessageToBlocks(msg, columns);
+                for (let j = 0; j < parsed.completed.length; j++) historicalBlocks.push(parsed.completed[j]);
+                for (let j = 0; j < parsed.active.length; j++) historicalBlocks.push(parsed.active[j]);
+            }
 
-        const uniqueCompleted = filterDuplicates(completedMsgs);
-        const uniqueActive = filterDuplicates(activeMsgs);
+            // Save to cache
+            cachedHistoryRef.current = {
+                completedIndex,
+                columns,
+                historicalBlocks,
+                seenSelections: new Set(seenAskSelections)
+            };
+        } else {
+            // FAST PATH: We are chatting or streaming.
+            // Grab the EXACT reference from cache (no memory copying!)
+            historicalBlocks = cachedHistoryRef.current.historicalBlocks;
+            seenAskSelections = cachedHistoryRef.current.seenSelections;
 
-        uniqueCompleted.forEach((msg) => {
+            // If a message just finished streaming, append it to our historical cache
+            if (completedIndex > cachedHistoryRef.current.completedIndex) {
+                // Clone the array ONLY when a message finishes (rare), not during streaming
+                historicalBlocks = [...historicalBlocks];
+                seenAskSelections = new Set(seenAskSelections);
+
+                const newMsgs = messages.slice(cachedHistoryRef.current.completedIndex, completedIndex);
+                for (let i = 0; i < newMsgs.length; i++) {
+                    const msg = newMsgs[i];
+                    if (msg.isAskRecord && msg.text) {
+                        const match = msg.text.match(SELECTION_REGEX);
+                        if (match && match[1].trim()) {
+                            const selection = match[1].trim();
+                            if (seenAskSelections.has(selection)) continue;
+                            seenAskSelections.add(selection);
+                        }
+                    }
+                    const parsed = parseMessageToBlocks(msg, columns);
+                    for (let j = 0; j < parsed.completed.length; j++) historicalBlocks.push(parsed.completed[j]);
+                    for (let j = 0; j < parsed.active.length; j++) historicalBlocks.push(parsed.active[j]);
+                }
+
+                // Update cache
+                cachedHistoryRef.current = {
+                    completedIndex,
+                    columns,
+                    historicalBlocks,
+                    seenSelections: seenAskSelections
+                };
+            }
+        }
+
+        const activeMsgs = messages.slice(completedIndex);
+        const streamingCompletedBlocks = [];
+        const activeBlocks = [];
+
+        for (let i = 0; i < activeMsgs.length; i++) {
+            const msg = activeMsgs[i];
+            if (msg.isAskRecord && msg.text) {
+                const match = msg.text.match(SELECTION_REGEX);
+                if (match && match[1].trim()) {
+                    const selection = match[1].trim();
+                    if (seenAskSelections.has(selection)) continue;
+                    // Note: We don't add to the Set here, because active blocks might be re-parsed
+                }
+            }
             const parsed = parseMessageToBlocks(msg, columns);
-            completed.push(...parsed.completed);
-            completed.push(...parsed.active); // since they are in history, any active part is now completed
-        });
+            for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
+            for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
+        }
 
-        uniqueActive.forEach((msg) => {
-            const parsed = parseMessageToBlocks(msg, columns);
-            completed.push(...parsed.completed);
-            active.push(...parsed.active);
-        });
+        // Combine history cache + newly completed lines from the active stream
+        // Using .concat() is highly optimized in V8 for memory
+        const finalCompleted = historicalBlocks.concat(streamingCompletedBlocks);
 
-        // Keep a scrollback limit of blocks to prevent infinite memory usage in render tree
-        const MAX_BLOCKS = 1000000;
-        let slicedCompleted = completed.slice(Math.max(0, completed.length - MAX_BLOCKS));
-
-        if (slicedCompleted.length >= 75000) {
-            slicedCompleted.push({
-                key: 'memory-warning-block',
+        // Give warning so the user can manually clear, preventing real OOM
+        if (finalCompleted.length >= 75000) {
+            finalCompleted.push({
+                key: `memory-warning-block-${finalCompleted.length}`,
                 msg: {
                     role: 'system',
                     text: `⚠️ MEMORY WARNING: CHAT IS GETTING VERY LONG`,
-                    subText: `This session has reached ${slicedCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
+                    subText: `This session has reached ${finalCompleted.length} blocks. To maintain optimal performance and prevent high memory usage, it is highly recommended to save and start a clean chat with /clear.`,
                     isHomeWarning: true
                 },
                 type: 'full-message'
             });
         }
 
-        // Compare slicedCompleted with the last cached completed blocks by key to maintain referential integrity
-        const isIdentical =
-            lastCompletedBlocksRef.current &&
-            slicedCompleted.length === lastCompletedBlocksRef.current.length &&
-            slicedCompleted.every((block, idx) => block.key === lastCompletedBlocksRef.current[idx].key);
-
-        if (isIdentical) {
-            slicedCompleted = lastCompletedBlocksRef.current;
-        } else {
-            lastCompletedBlocksRef.current = slicedCompleted;
-        }
-
         return {
-            completed: slicedCompleted,
-            active
+            completed: finalCompleted,
+            active: activeBlocks
         };
+
     }, [messages, completedIndex, terminalSize.columns]);
+
+    // useEffect(() => {
+    //     fs.writeFileSync('DEBUG.json', JSON.stringify(parsedBlocks.completed, null, 4));
+    // }, [parsedBlocks])
+
 
     // Heuristic to detect if terminal is likely waiting for input (ends with ? or :)
     const isTerminalWaitingForInput = useMemo(() => {
@@ -1650,7 +1706,7 @@ export default function App({ args = [] }) {
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
             }
-        }, 1500); // 1.5s "vibe" interval
+        }, 2000); // 2s "vibe" interval
         return () => clearInterval(interval);
     }, [isInitializing]);
 
@@ -1667,32 +1723,6 @@ export default function App({ args = [] }) {
         { cmd: '/export', desc: 'Export current chat in a .txt file' },
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
-        // {
-        //     cmd: '/image', desc: 'Generate images using Pollinations', subs: [
-        //         {
-        //             cmd: 'setup', desc: 'Configure defaults', subs: [
-        //                 {
-        //                     cmd: 'key', desc: 'Set API key strategy', subs: [
-        //                         { cmd: 'default', desc: 'Default (Quota: Dynamic 25 max/hr)' },
-        //                         { cmd: 'custom', desc: 'Custom Key' }
-        //                     ]
-        //                 },
-        //                 {
-        //                     cmd: 'quality', desc: 'Set default quality', subs: [
-        //                         { cmd: 'low', desc: imageSettings?.keyType === 'Custom' ? '(0.001/img)' : '(1/img)' },
-        //                         { cmd: 'low-high', desc: imageSettings?.keyType === 'Custom' ? '(0.002/img)' : '(2/img)' },
-        //                         { cmd: 'medium', desc: imageSettings?.keyType === 'Custom' ? '(0.008/img)' : '(8/img)' },
-        //                         { cmd: 'medium-high', desc: imageSettings?.keyType === 'Custom' ? '(0.01/img)' : '(10/img)' },
-        //                         { cmd: 'high', desc: imageSettings?.keyType === 'Custom' ? '(0.045/img)' : '(45/img)' },
-        //                         { cmd: 'ultra', desc: imageSettings?.keyType === 'Custom' ? '(0.0488/img)' : '(49/img)' },
-        //                         { cmd: 'premium', desc: imageSettings?.keyType === 'Custom' ? '(0.1/img)' : '(100/img)' }
-        //                     ]
-        //                 }
-        //             ]
-        //         },
-        //         { cmd: 'stats', desc: 'Show remaining credits or Pollinations balance status' }
-        //     ]
-        // },
         {
             cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
                 { cmd: 'flux', desc: 'Enable Dev toolset' },
@@ -1737,7 +1767,7 @@ export default function App({ args = [] }) {
         },
         {
             cmd: '/model',
-            desc: 'Switch Model for Agent',
+            desc: 'Select Agent Model',
             subs: aiProvider === 'OpenRouter'
                 ? (apiTier === 'Free'
                     ? [
@@ -1751,11 +1781,11 @@ export default function App({ args = [] }) {
                         },
                         {
                             cmd: 'qwen/qwen3-coder:free',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                         {
                             cmd: 'z-ai/glm-4.5-air:free',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                     ]
                     : [
@@ -1785,19 +1815,19 @@ export default function App({ args = [] }) {
                         },
                         {
                             cmd: 'deepseek/deepseek-v4-pro',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                         {
                             cmd: 'deepseek/deepseek-v4-flash',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                         {
                             cmd: 'xiaomi/mimo-v2.5-pro',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                         {
                             cmd: 'z-ai/glm-5',
-                            desc: ''
+                            desc: 'Text Only'
                         },
                         {
                             cmd: 'openai/gpt-5.2-codex',
@@ -1820,111 +1850,135 @@ export default function App({ args = [] }) {
                     ? [
                         {
                             cmd: 'deepseek-v4-flash',
-                            desc: 'Fast & Efficient'
+                            desc: 'Fast & Efficient (Text Only)'
                         },
                         {
                             cmd: 'deepseek-v4-pro',
-                            desc: 'High-Intelligence Reasoning'
+                            desc: 'High-Intelligence Reasoning (Text Only)'
                         }
                     ]
                     : aiProvider === 'NVIDIA'
                         ? [
+                            // --- Kimi (Moonshot AI) ---
                             {
                                 cmd: 'moonshotai/kimi-k2.6',
                                 desc: 'Multimodal'
                             },
-                            {
-                                cmd: 'google/gemma-4-31b-it',
-                                desc: ''
-                            },
-                            {
-                                cmd: 'stepfun-ai/step-3.7-flash',
-                                desc: ''
-                            },
-                            {
-                                cmd: 'minimaxai/minimax-m2.7',
-                                desc: ''
-                            },
+
+                            // --- DeepSeek Family ---
                             {
                                 cmd: 'deepseek-ai/deepseek-v4-flash',
-                                desc: ''
+                                desc: 'Text Only'
                             },
                             {
                                 cmd: 'deepseek-ai/deepseek-v4-pro',
-                                desc: ''
+                                desc: 'Text Only'
                             },
+
+                            // --- StepFun ---
                             {
-                                cmd: 'mistralai/mistral-medium-3.5-128b',
-                                desc: ''
+                                cmd: 'stepfun-ai/step-3.7-flash',
+                                desc: 'Multimodal'
                             },
+
+                            // --- Gemma Family (Google) ---
                             {
-                                cmd: 'z-ai/glm-5.1',
-                                desc: ''
+                                cmd: 'google/gemma-4-31b-it',
+                                desc: 'Multimodal'
                             },
                             {
                                 cmd: 'google/diffusiongemma-26b-a4b-it',
                                 desc: 'Mega Fast [Experimental]'
                             },
+
+                            // --- Mistral ---
+                            {
+                                cmd: 'mistralai/mistral-medium-3.5-128b',
+                                desc: 'Multimodal'
+                            },
+
+                            // --- GPT Open Source Series (OpenAI) ---
+                            {
+                                cmd: 'openai/gpt-oss-20b',
+                                desc: 'Text Only'
+                            },
+                            {
+                                cmd: 'openai/gpt-oss-120b',
+                                desc: 'Text Only'
+                            },
+
+                            // --- GLM (Zhipu AI) ---
+                            {
+                                cmd: 'z-ai/glm-5.1',
+                                desc: 'Text Only'
+                            },
+
+                            // --- MiniMax Family ---
+                            {
+                                cmd: 'minimaxai/minimax-m2.7',
+                                desc: 'Text Only'
+                            },
                             {
                                 cmd: 'minimaxai/minimax-m3',
-                                desc: ''
-                            }
+                                desc: 'Text Only'
+                            },
                         ]
+
                         : (apiTier === 'Free'
                             ? [
                                 {
                                     cmd: 'gemma-4-26b-a4b-it',
-                                    desc: 'Standard & Faster'
+                                    desc: 'Standard & Faster (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemma-4-31b-it',
-                                    desc: 'Standard Default'
+                                    desc: 'Standard Default (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-2.5-flash-lite',
-                                    desc: 'Fast & Cheap (Limited Free Quota)'
+                                    desc: 'Fast & Cheap (Multimodal) [Limited Free Quota]'
                                 },
                                 {
                                     cmd: 'gemini-2.5-flash',
-                                    desc: 'Fast & Reliable (Limited Free Quota)'
+                                    desc: 'Fast & Reliable (Multimodal) [Limited Free Quota]'
                                 },
                                 {
                                     cmd: 'gemini-3-flash-preview',
-                                    desc: 'Fast & Lightweight (Limited Free Quota)'
+                                    desc: 'Fast & Lightweight (Multimodal) [Limited Free Quota]'
                                 },
                                 {
                                     cmd: 'gemini-3.5-flash',
-                                    desc: 'Flash Latest (Limited Free Quota) [Instability Issues]'
+                                    desc: 'Flash Latest (Multimodal) [Limited Free Quota] Instability Issues'
                                 }
                             ]
                             : [
                                 {
                                     cmd: 'gemini-2.5-flash-lite',
-                                    desc: 'Fast & Cheap'
+                                    desc: 'Fast & Cheap (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-2.5-flash',
-                                    desc: 'Fast & Reliable'
+                                    desc: 'Fast & Reliable (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-2.5-pro',
-                                    desc: 'Last gen Pro reasoning'
+                                    desc: 'Last gen Pro reasoning (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-3.1-flash-lite',
-                                    desc: 'Ultra-Fast & Lite'
+                                    desc: 'Ultra-Fast & Lite (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-3-flash-preview',
-                                    desc: 'Default, Fast & Lightweight'
+                                    desc: 'Default, Fast & Lightweight (Multimodal)'
                                 },
                                 {
                                     cmd: 'gemini-3.5-flash',
-                                    desc: 'Flash Latest  [Instability Issues]'
+                                    desc: 'Flash Latest (Multimodal) [Instability Issues]'
                                 },
                                 {
                                     cmd: 'gemini-3.1-pro-preview',
-                                    desc: 'Pro Reasoning'
+                                    desc: 'Pro Reasoning (Multimodal)'
                                 },
 
                             ])
@@ -1940,7 +1994,7 @@ export default function App({ args = [] }) {
         { cmd: '/docs', desc: 'View Documentation' },
         {
             cmd: '/fluxflow', desc: 'Project management', subs: [
-                { cmd: 'init', desc: 'Create FluxFlow.md template' }
+                { cmd: 'init', desc: 'Create empty FluxFlow.md template' }
             ]
         },
         {
@@ -1951,8 +2005,8 @@ export default function App({ args = [] }) {
         },
         {
             cmd: '/update', desc: 'Check/Install updates', subs: [
+                { cmd: 'latest', desc: 'Install latest release' },
                 { cmd: 'check', desc: 'Check for new version' },
-                { cmd: 'latest', desc: 'Install latest release' }
             ]
         }
     ];
@@ -3068,6 +3122,8 @@ export default function App({ args = [] }) {
                         }
                         else {
                             fs.appendFileSync(bullyTheBug, '\r');
+                            // Clear parsedBlocks.completed
+                            parsedBlocks.completed = [];
                         }
 
                         if (isFirstPacket && packet.type === 'text') {
@@ -3121,11 +3177,13 @@ export default function App({ args = [] }) {
                                 setCompletedIndex(newMsgs.length);
                                 return newMsgs;
                             });
+
                             setTimeout(() => {
                                 if (global.gc) {
-                                    try { global.gc(); } catch (e) {}
+                                    try { global.gc(); } catch (e) { }
                                 }
-                            }, 500);
+                            }, 100);
+
                             continue;
                         }
                         if (packet.type === 'interactive_turn_finished') {
@@ -3149,11 +3207,13 @@ export default function App({ args = [] }) {
                                     onBackgroundIncrement: () => setSessionBackgroundCalls(prev => prev + 1)
                                 }
                             );
-                            setTimeout(() => {
-                                if (global.gc) {
-                                    try { global.gc(); } catch (e) { }
-                                }
-                            }, 500);
+
+                            // setTimeout(() => {
+                            //     if (global.gc) {
+                            //         try { global.gc(); } catch (e) { }
+                            //     }
+                            // }, 500);
+
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
@@ -3362,31 +3422,34 @@ export default function App({ args = [] }) {
                         // 3. Append to target role with Leak Protection
                         if (inThinkMode && currentThinkId) {
                             setMessages(prev => {
+                                const next = [...prev];
                                 let transitioning = false;
                                 let transitionContent = '';
 
-                                const newMsgs = prev.map(m => {
-                                    if (m.id === currentThinkId) {
-                                        const newText = m.text + chunkText;
+                                // Iterate backwards: instantly finds active block, avoiding full array map
+                                for (let i = next.length - 1; i >= 0; i--) {
+                                    if (next[i].id === currentThinkId) {
+                                        const newText = next[i].text + chunkText;
                                         if (newText.toLowerCase().includes('</think>')) {
                                             transitioning = true;
                                             const parts = newText.split(/<\/think>/gi);
                                             transitionContent = parts.slice(1).join('</think>') || '';
-                                            const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
+                                            const startTime = next[i].startTime || parseInt(String(next[i].id).split('-')[1]) || Date.now();
                                             const duration = Date.now() - startTime;
-                                            return { ...m, text: parts[0], isStreaming: false, duration };
+                                            next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
+                                        } else {
+                                            next[i] = { ...next[i], text: newText, isStreaming: true };
                                         }
-                                        return { ...m, text: newText, isStreaming: true };
+                                        break;
                                     }
-                                    return m;
-                                });
+                                }
 
                                 if (transitioning) {
                                     inThinkMode = false;
                                     currentAgentId = 'agent-' + Date.now();
-                                    return [...newMsgs, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true }];
+                                    next.push({ id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true });
                                 }
-                                return newMsgs;
+                                return next;
                             });
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
@@ -3399,11 +3462,17 @@ export default function App({ args = [] }) {
                                 currentAgentId = 'agent-' + Date.now();
                                 setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: chunkText, isStreaming: true }]);
                             } else {
-                                setMessages(prev => prev.map(m =>
-                                    m.id === currentAgentId
-                                        ? { ...m, text: m.text + chunkText, isStreaming: true }
-                                        : m
-                                ));
+                                setMessages(prev => {
+                                    const next = [...prev];
+                                    // Iterate backwards to update active text without array cloning overhead
+                                    for (let i = next.length - 1; i >= 0; i--) {
+                                        if (next[i].id === currentAgentId) {
+                                            next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
+                                            break;
+                                        }
+                                    }
+                                    return next;
+                                });
                             }
                         }
                     }
@@ -4740,7 +4809,7 @@ export default function App({ args = [] }) {
                                         <Text color="gray" bold italic>{statusText}</Text>
                                     </Box>
                                 ) : (
-                                        <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
+                                    <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>

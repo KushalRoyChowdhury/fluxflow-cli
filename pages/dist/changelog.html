@@ -231,24 +231,28 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.13.5"]
+        const stableVersions = ["2.14.0"]
         const changelogData = {
-            "2.13.5": {
-                "note": "JUNE 27 - Bug fixes & Improvements.",
+            "2.14.0": {
+                "note": "JUNE 29.",
                 "added": [
-                    "New and improved smooth progressive stream renderer."
+                    "Added Memory stats in status bar.",
+                    "Added GPT-OSS 20b & GPT-OSS 120B in NVIDIA API."
                 ],
                 "changed": [
-                    "Increased Heap memory size from 4GB to 6GB.",
+                    "Improved dynamic Memory Allocation.",
                     "Improved DIFF viewer in terminal UI.",
                     "Improved Keyboard navigation support.",
                     "New & Improved typing experience with Bracketed Pastes, Auto Collapsing etc.",
                     "Improved Terminal rendering.",
-                    "Better inline DIFFING in terminal UI."
+                    "Improved sub string keyword search.",
+                    "Improved Model descriptions.",
+                    "Improved Multimodal Support for NVIDIA API."
                 ],
                 "fixes": [
                     "Resolved a bug where the rendering might glitch out on long chats.",
-                    "Better tool stability with Kimi models."
+                    "Better tool stability with Kimi models.",
+                    "Fixed critical memory leaks (~200MB/s 💀)."
                 ]
             },
             "2.13.0": {
