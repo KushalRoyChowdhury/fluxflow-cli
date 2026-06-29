@@ -17,6 +17,12 @@ const calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
 const _rawArgs = process.argv.slice(2);
 const _allocIdx = _rawArgs.indexOf('--allocation');
 const _allocValue = _allocIdx !== -1 ? parseInt(_rawArgs[_allocIdx + 1], 10) : NaN;
+
+if (!isNaN(_allocValue) && _allocValue < 64) {
+    console.error(`\n[ERROR] Allocation value '${_allocValue} MB' is too low. Minimum: 64 MB, Recommended: 4096 MB.\n`);
+    process.exit(1);
+}
+
 const _maxAllowed = Math.floor(totalSystemRamMB * 0.75);
 const HEAP_LIMIT = (!isNaN(_allocValue) && _allocValue > 0)
     ? Math.min(_allocValue, _maxAllowed)
@@ -26,9 +32,12 @@ const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
 if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
     if (!Number.isNaN(_allocValue)) {
-        console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(`\n[MEMORY] Starting with: '${ _allocValue > _maxAllowed ? _maxAllowed : _allocValue } MB' Allocation ${ _allocValue > _maxAllowed ? "(Max allowed: '" + _maxAllowed + " MB')" : "" }. Please Wait...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
     }
+    // else {
+    //     console.log(`\n[MEMORY] Allocated '${HEAP_LIMIT} MB'.`);
+    // }
 
     const cp = spawn(process.execPath, [
         `--max-old-space-size=${HEAP_LIMIT}`,

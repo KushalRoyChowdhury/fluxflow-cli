@@ -2091,7 +2091,7 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
+var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
@@ -2533,6 +2533,11 @@ var init_text = __esm({
     blocksCache = /* @__PURE__ */ new Map();
     streamingBlocksCache = /* @__PURE__ */ new Map();
     MAX_CACHE_SIZE = 200;
+    CHUNK_SIZE = 6;
+    indexBlockIntoMap = (b, map) => {
+      map.set(b.key, b);
+      if (b.type === "chunk" && b.blocks) b.blocks.forEach((sub) => indexBlockIntoMap(sub, map));
+    };
     parseMessageToBlocks = (msg, columns) => {
       if (!msg) return { completed: [], active: [] };
       const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
@@ -2563,16 +2568,25 @@ var init_text = __esm({
       };
       if (text.includes("- Content Preview:")) {
         const mainParts = text.split("- Content Preview:");
-        const headerText = mainParts[0] || "";
         const contentPart = mainParts[1] || "";
         const footerMarker = "[SYSTEM] Check the content preview for verification [/SYSTEM]";
-        const contentAndFooter = contentPart.split(footerMarker);
-        const content = contentAndFooter[0]?.trim() || "";
-        const footer = contentAndFooter[1] ? `${footerMarker}${contentAndFooter[1]}` : "";
+        const content = contentPart.split(footerMarker)[0]?.trim() || "";
         const codeLines = content.split("\n").map((l) => l.replace(/\r$/, ""));
         const gutterWidth = String(codeLines.length).length;
         const completedBlocks2 = [];
         let activeBlock2 = null;
+        let writeChunk = [];
+        const flushWrite = () => {
+          if (!writeChunk.length) return;
+          const batch = writeChunk;
+          writeChunk = [];
+          completedBlocks2.push(batch.length === 1 ? batch[0] : {
+            key: `${batch[0].key}-chunk`,
+            msg,
+            type: "chunk",
+            blocks: batch
+          });
+        };
         codeLines.forEach((line, idx) => {
           const isLast = idx === codeLines.length - 1;
           const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, "write-line", line, {
@@ -2582,27 +2596,21 @@ var init_text = __esm({
             isLastLine: isLast
           });
           if (isLast && msg.isStreaming) {
+            flushWrite();
             activeBlock2 = block;
           } else {
-            completedBlocks2.push(block);
+            writeChunk.push(block);
+            if (writeChunk.length >= CHUNK_SIZE) flushWrite();
           }
         });
-        return {
-          completed: completedBlocks2,
-          active: activeBlock2 ? [activeBlock2] : []
-        };
+        flushWrite();
+        return { completed: completedBlocks2, active: activeBlock2 ? [activeBlock2] : [] };
       }
       if (text.includes("[DIFF_START]")) {
         const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : "";
         const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
-        const parsedLines = diffLines.map((line) => {
-          return {
-            line,
-            parsed: parseLineInfo(line),
-            pairContent: null
-          };
-        });
+        const parsedLines = diffLines.map((line) => ({ line, parsed: parseLineInfo(line), pairContent: null }));
         let currentGroup = [];
         for (let i = 0; i < parsedLines.length; i++) {
           const item = parsedLines[i];
@@ -2615,11 +2623,21 @@ var init_text = __esm({
             }
           }
         }
-        if (currentGroup.length > 0) {
-          alignChangeGroup(currentGroup);
-        }
+        if (currentGroup.length > 0) alignChangeGroup(currentGroup);
         const completedBlocks2 = [];
         let activeBlock2 = null;
+        let diffChunk = [];
+        const flushDiff = () => {
+          if (!diffChunk.length) return;
+          const batch = diffChunk;
+          diffChunk = [];
+          completedBlocks2.push(batch.length === 1 ? batch[0] : {
+            key: `${batch[0].key}-chunk`,
+            msg,
+            type: "chunk",
+            blocks: batch
+          });
+        };
         diffLines.forEach((line, i) => {
           const isLast = i === diffLines.length - 1;
           const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, "diff-line", line, {
@@ -2628,15 +2646,15 @@ var init_text = __esm({
             pairContent: parsedLines[i].pairContent
           });
           if (isLast && msg.isStreaming) {
+            flushDiff();
             activeBlock2 = block;
           } else {
-            completedBlocks2.push(block);
+            diffChunk.push(block);
+            if (diffChunk.length >= CHUNK_SIZE) flushDiff();
           }
         });
-        return {
-          completed: completedBlocks2,
-          active: activeBlock2 ? [activeBlock2] : []
-        };
+        flushDiff();
+        return { completed: completedBlocks2, active: activeBlock2 ? [activeBlock2] : [] };
       }
       if (msg.role === "system" || msg.isLogo || msg.isHelpRecord || msg.isTerminalRecord || msg.isHomeWarning || msg.isImageStats || msg.isAskRecord || msg.isAboutRecord || msg.isUpdateNotification || msg.role === "user") {
         return {
@@ -2646,88 +2664,96 @@ var init_text = __esm({
       }
       const completedBlocks = [];
       let activeBlock = null;
+      let pendingChunk = [];
+      let pendingChunkType = null;
+      const flushPending = () => {
+        if (!pendingChunk.length) return;
+        const batch = pendingChunk;
+        pendingChunk = [];
+        pendingChunkType = null;
+        completedBlocks.push(batch.length === 1 ? batch[0] : {
+          key: `${msg.id || "x"}-chunk-${batch[0].key}`,
+          msg,
+          type: "chunk",
+          blocks: batch
+        });
+      };
+      const enqueue = (block) => {
+        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
+        pendingChunk.push(block);
+        pendingChunkType = block.type;
+        if (pendingChunk.length >= CHUNK_SIZE) flushPending();
+      };
       if (msg.role === "think") {
         completedBlocks.push(getBlock(`${msg.id}-header`, "think-header", ""));
         const lines = text.split("\n");
         lines.forEach((line, idx) => {
-          const isLast = idx === lines.length - 1;
-          const block = getBlock(`${msg.id}-${idx}`, "think-line", line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
-          if (isLast && msg.isStreaming) {
-            activeBlock = block;
-          } else {
-            completedBlocks.push(block);
-          }
+          enqueue(getBlock(`${msg.id}-${idx}`, "think-line", line, {}));
         });
         if (!msg.isStreaming) {
-          completedBlocks.push({
-            key: `${msg.id}-footer-padding`,
-            msg,
-            type: "think-footer-padding",
-            text: ""
-          });
+          flushPending();
+          completedBlocks.push({ key: `${msg.id}-footer-padding`, msg, type: "think-footer-padding", text: "" });
         }
       } else {
         const lines = text.split("\n");
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
-        let codeLines = [];
+        let codeLineNum = 0;
+        let codeStartIdx = 0;
         lines.forEach((line, idx) => {
           const isLast = idx === lines.length - 1;
           const isTableRow = line.trim().startsWith("|");
           const isCodeBlockMarker = line.trim().startsWith("```");
           if (inCodeBlock) {
-            codeLines.push(line);
-            if (isCodeBlockMarker || isLast) {
-              inCodeBlock = !isCodeBlockMarker;
-              if (!inCodeBlock || isLast) {
-                const block = getBlock(`${msg.id}-code-${idx}`, "agent-line", codeLines.join("\n"), isLast && msg.isStreaming && inCodeBlock ? { isActiveBlock: true } : {});
-                if (isLast && msg.isStreaming && inCodeBlock) {
-                  activeBlock = block;
-                } else {
-                  completedBlocks.push(block);
-                }
-                codeLines = [];
-              }
+            if (isCodeBlockMarker) {
+              inCodeBlock = false;
+              enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, "code-fence-close", "", {}));
+            } else {
+              codeLineNum++;
+              enqueue(getBlock(`${msg.id}-code-line-${idx}`, "code-line", line, { lineNum: codeLineNum }));
             }
           } else if (isCodeBlockMarker) {
             inCodeBlock = true;
-            codeLines.push(line);
-            if (isLast) {
-              const block = getBlock(`${msg.id}-code-${idx}`, "agent-line", codeLines.join("\n"), msg.isStreaming ? { isActiveBlock: true } : {});
-              if (msg.isStreaming) {
-                activeBlock = block;
-              } else {
-                completedBlocks.push(block);
-              }
-            }
+            codeStartIdx = idx;
+            codeLineNum = 0;
+            const lang = line.trim().replace(/^```/, "").trim();
+            enqueue(getBlock(`${msg.id}-code-open-${idx}`, "code-fence-open", lang, {}));
           } else if (isTableRow) {
             inTable = true;
             tableLines.push(line);
             if (isLast) {
+              flushPending();
               if (msg.isStreaming) {
-                activeBlock = getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: true, isActiveBlock: true });
+                activeBlock = getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: true });
               } else {
                 completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: false }));
               }
             }
           } else {
             if (inTable) {
+              flushPending();
               completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, "table", tableLines.join("\n"), { isStreaming: false }));
               inTable = false;
               tableLines = [];
             }
-            const block = getBlock(`${msg.id}-${idx}`, "agent-line", line, isLast && msg.isStreaming ? { isActiveBlock: true } : {});
-            if (isLast && msg.isStreaming) {
-              activeBlock = block;
-            } else {
-              completedBlocks.push(block);
-            }
+            enqueue(getBlock(`${msg.id}-${idx}`, "agent-line", line, {}));
           }
         });
         if (!msg.isStreaming && msg.workedDuration) {
+          flushPending();
           completedBlocks.push(getBlock(`${msg.id}-worked-duration`, "worked-duration", ""));
         }
+      }
+      if (msg.isStreaming && pendingChunk.length > 0) {
+        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : {
+          key: `${msg.id || "x"}-chunk-active-${pendingChunk[0].key}`,
+          msg,
+          type: "chunk",
+          blocks: pendingChunk
+        };
+      } else {
+        flushPending();
       }
       const result = {
         completed: completedBlocks,
@@ -2742,14 +2768,9 @@ var init_text = __esm({
         streamingBlocksCache.delete(streamCacheKey);
       } else {
         const blocksMap = /* @__PURE__ */ new Map();
-        completedBlocks.forEach((b) => blocksMap.set(b.key, b));
-        if (activeBlock) {
-          blocksMap.set(activeBlock.key, activeBlock);
-        }
-        streamingBlocksCache.set(streamCacheKey, {
-          text,
-          blocksMap
-        });
+        completedBlocks.forEach((b) => indexBlockIntoMap(b, blocksMap));
+        if (activeBlock) indexBlockIntoMap(activeBlock, blocksMap);
+        streamingBlocksCache.set(streamCacheKey, { text, blocksMap });
         if (streamingBlocksCache.size > MAX_CACHE_SIZE) {
           const firstKey = streamingBlocksCache.keys().next().value;
           streamingBlocksCache.delete(firstKey);
@@ -4520,6 +4541,19 @@ var init_ChatLayout = __esm({
     });
     BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
       const { msg, type, text, isStreaming } = block;
+      if (type === "chunk") {
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, block.blocks.map((b) => /* @__PURE__ */ React4.createElement(
+          BlockItem,
+          {
+            key: b.key,
+            block: b,
+            columns,
+            showFullThinking,
+            aiProvider,
+            version
+          }
+        )));
+      }
       if (type === "full-message") {
         return /* @__PURE__ */ React4.createElement(
           MessageItem,
@@ -4582,6 +4616,56 @@ var init_ChatLayout = __esm({
             columns
           }
         ), isLastLine && renderPaddingLine(true));
+      }
+      if (type === "code-fence-open") {
+        const borderProps = {
+          borderStyle: "single",
+          borderLeft: true,
+          borderRight: false,
+          borderTop: false,
+          borderBottom: false,
+          borderColor: "#444444",
+          paddingLeft: 2,
+          width: "100%"
+        };
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", (text || "CODE").toUpperCase())));
+      }
+      if (type === "code-line") {
+        const { lineNum } = block;
+        return /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "row",
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            width: "100%"
+          },
+          /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(3, " "), " ")),
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "#fcfca4ff" }, text))
+        );
+      }
+      if (type === "code-fence-close") {
+        return /* @__PURE__ */ React4.createElement(
+          Box3,
+          {
+            flexDirection: "row",
+            borderStyle: "single",
+            borderLeft: true,
+            borderRight: false,
+            borderTop: false,
+            borderBottom: false,
+            borderColor: "#444444",
+            paddingLeft: 2,
+            marginBottom: 1,
+            width: "100%"
+          },
+          /* @__PURE__ */ React4.createElement(Text4, null, " ")
+        );
       }
       if (type === "write-header") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
@@ -6172,15 +6256,32 @@ ${userMemories}` : "";
 ${parts.join("\n\n")}
 ` : "";
     };
-    getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false) => {
+    getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini) => {
       let thinkingConfig = "";
-      if (thinkingLevel !== "GEM") {
+      if (!isGemini && aiProvider === "Google") {
         let levelKey = thinkingLevel;
         if (thinkingLevel === "Fast") levelKey = "Off";
         if (thinkingLevel === "Low") levelKey = "Minimal";
         if (thinkingLevel === "Standard") levelKey = "Medium";
         if (thinkingLevel === "xHigh" || thinkingLevel === "Max") levelKey = "xHigh";
         thinkingConfig = thinking_prompts_default[levelKey] || thinking_prompts_default["Medium"];
+      }
+      if (isGemini || aiProvider !== "Google") {
+        const MAP_FOR_NON_GOOGLE_OR_GEMINI = {
+          "Fast": "LOWEST",
+          "Low": "LOW",
+          "Medium": "MEDIUM",
+          "Standard": "MEDIUM",
+          "High": "HIGH",
+          "xHigh": "HIGH",
+          "Max": "HIGH"
+        };
+        thinkingConfig = thinking_prompts_default["xHigh"];
+        thinkingConfig = thinkingConfig.replace("EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. ", `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}
+`).replace("- MANDATORY THINKING: Full reasoning required for ALL requests/greetings", "");
+        if (thinkingLevel === "Fast") {
+          thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n";
+        }
       }
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
       const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}
@@ -6227,12 +6328,13 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT]
 - SYSTEM NOTIFICATION: [SYSTEM] in user turn
-${aiProvider === "Google" ? `${thinkingLevel !== "GEM" ? `
+
 -- THINKING RULES --
-${thinkingConfig}
-${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" ? `
+${aiProvider === "Google" && !isGemini ? `${thinkingConfig}
+${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && !isGemini ? `
 CRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings` : ""}` : ""}` : ``}
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings
+` : ""}` : `${thinkingConfig}`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider)}
 ${projectContextBlock}
 -- MEMORY RULES --
@@ -6246,6 +6348,7 @@ ${projectContextBlock}
 -- FORMATTING --
 - GFM Supported
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
+- Short headsup about actions before firing tools
 - Task Complete & Results Verified? End response with summary of changes made and files edited
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
@@ -11494,7 +11597,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
               } else if (retryCount > 0) {
                 yield { type: "model_update", content: null };
               }
-              currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? "GEM" : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal);
+              currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false);
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
                 yield { type: "status", content: "Checking Code..." };
@@ -15374,14 +15477,6 @@ function App({ args = [] }) {
     { cmd: "/chats", desc: "List all chat sessions" },
     { cmd: "/btw", desc: "Ask a question without intefering with ongoing tasks" },
     {
-      cmd: "/mode",
-      desc: "Toggle Flux/Flow modes",
-      subs: [
-        { cmd: "flux", desc: "Enable Dev toolset" },
-        { cmd: "flow", desc: "Enable Chat mode" }
-      ]
-    },
-    {
       cmd: "/thinking",
       desc: "Set AI reasoning depth",
       subs: aiProvider === "DeepSeek" ? [
@@ -15391,7 +15486,7 @@ function App({ args = [] }) {
       ] : aiProvider === "NVIDIA" ? [
         { cmd: "Fast", desc: "Reasoning Disabled" },
         { cmd: "Standard", desc: "Balanced Reasoning" },
-        { cmd: "High", desc: "Reasoning Enabled" }
+        { cmd: "High", desc: "Deep Reasoning" }
       ] : aiProvider === "OpenRouter" ? [
         { cmd: "Fast", desc: "Fastest" },
         { cmd: "Low", desc: "Quick Reasoning" },
@@ -15609,6 +15704,14 @@ function App({ args = [] }) {
           cmd: "gemini-3.1-pro-preview",
           desc: "Pro Reasoning (Multimodal)"
         }
+      ]
+    },
+    {
+      cmd: "/mode",
+      desc: "Toggle Flux/Flow modes",
+      subs: [
+        { cmd: "flux", desc: "Enable Dev toolset" },
+        { cmd: "flow", desc: "Enable Chat mode" }
       ]
     },
     { cmd: "/settings", desc: "Configure system prefs" },
@@ -18324,16 +18427,21 @@ var calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
 var _rawArgs = process.argv.slice(2);
 var _allocIdx = _rawArgs.indexOf("--allocation");
 var _allocValue = _allocIdx !== -1 ? parseInt(_rawArgs[_allocIdx + 1], 10) : NaN;
+if (!isNaN(_allocValue) && _allocValue < 64) {
+  console.error(`
+[ERROR] Allocation value '${_allocValue} MB' is too low. Minimum: 64 MB, Recommended: 4096 MB.
+`);
+  process.exit(1);
+}
 var _maxAllowed = Math.floor(totalSystemRamMB * 0.75);
 var HEAP_LIMIT = !isNaN(_allocValue) && _allocValue > 0 ? Math.min(_allocValue, _maxAllowed) : Math.max(1536, Math.min(32768, calculatedLimit));
-if (!Number.isNaN(_allocValue)) {
-  console.log("\n[MEMORY] Using custom memory allocation: " + _allocValue + " MB" + (_allocValue > _maxAllowed ? " (Max allowed: " + _maxAllowed + "MB)" : ""));
-  await new Promise((resolve) => setTimeout(resolve, 2e3));
-} else {
-  console.log("\n[MEMORY] Using auto-detected memory allocation: " + calculatedLimit + " MB");
-}
 var isBundled = fileURLToPath2(import.meta.url).endsWith(".js");
 if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-size"))) {
+  if (!Number.isNaN(_allocValue)) {
+    console.log(`
+[MEMORY] Starting with: '${_allocValue > _maxAllowed ? _maxAllowed : _allocValue} MB' Allocation ${_allocValue > _maxAllowed ? "(Max allowed: '" + _maxAllowed + " MB')" : ""}. Please Wait...`);
+    await new Promise((resolve) => setTimeout(resolve, 5e3));
+  }
   const cp = spawn3(process.execPath, [
     `--max-old-space-size=${HEAP_LIMIT}`,
     fileURLToPath2(import.meta.url),

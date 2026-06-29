@@ -17,16 +17,32 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     return parts.length > 0 ? `[SYSTEM CONTEXT]\n${parts.join('\n\n')}\n` : '';
 };
 
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false) => {
-    // fs.writeFileSync('debug.txt', `${aiProvider}\n\n${targetModel}`);
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini) => {
+    // fs.writeFileSync('debug.txt', `${aiProvider}`);
     let thinkingConfig = '';
-    if (thinkingLevel !== 'GEM') {
+    if (!isGemini && aiProvider === 'Google') {
         let levelKey = thinkingLevel;
         if (thinkingLevel === 'Fast') levelKey = 'Off';
         if (thinkingLevel === 'Low') levelKey = 'Minimal';
         if (thinkingLevel === 'Standard') levelKey = 'Medium';
         if (thinkingLevel === 'xHigh' || thinkingLevel === 'Max') levelKey = 'xHigh';
         thinkingConfig = thinkingPrompts[levelKey] || thinkingPrompts['Medium'];
+    }
+    if (isGemini || aiProvider !== 'Google') {
+        const MAP_FOR_NON_GOOGLE_OR_GEMINI = {
+            'Fast': 'LOWEST',
+            'Low': 'LOW',
+            'Medium': 'MEDIUM',
+            'Standard': 'MEDIUM',
+            'High': 'HIGH',
+            'xHigh': 'HIGH',
+            'Max': 'HIGH'
+        }
+        thinkingConfig = thinkingPrompts['xHigh'];
+        thinkingConfig = thinkingConfig.replace('EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. ', `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}\n`).replace('- MANDATORY THINKING: Full reasoning required for ALL requests/greetings', '');
+        if (thinkingLevel === 'Fast') {
+            thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n"
+        }
     }
 
     // fs.writeFileSync('level.txt', thinkingLevel);
@@ -77,10 +93,11 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT]
 - SYSTEM NOTIFICATION: [SYSTEM] in user turn
-${aiProvider === 'Google' ? `${thinkingLevel !== "GEM" ? `\n-- THINKING RULES --
-${thinkingConfig}
-${thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh' ? `\nCRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings` : ''}` : ''}` : ``}
+
+-- THINKING RULES --
+${aiProvider === 'Google' && !isGemini ? `${thinkingConfig}
+${thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh' && !isGemini ? `\nCRITICAL THINKING POLICY
+- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider)}
 ${projectContextBlock}
 -- MEMORY RULES --

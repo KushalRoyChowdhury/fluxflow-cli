@@ -1724,12 +1724,6 @@ export default function App({ args = [] }) {
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         {
-            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
-                { cmd: 'flux', desc: 'Enable Dev toolset' },
-                { cmd: 'flow', desc: 'Enable Chat mode' }
-            ]
-        },
-        {
             cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'DeepSeek'
                 ? [
                     { cmd: 'Fast', desc: 'Fastest' },
@@ -1982,6 +1976,12 @@ export default function App({ args = [] }) {
                                 },
 
                             ])
+        },
+        {
+            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+                { cmd: 'flux', desc: 'Enable Dev toolset' },
+                { cmd: 'flow', desc: 'Enable Chat mode' }
+            ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/key', desc: 'Manage API keys' },
