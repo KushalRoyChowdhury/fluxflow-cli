@@ -5015,7 +5015,7 @@ Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. *
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run: Limit 1 OR 2 CONSECUTIVE Run)" : ""}. Next Turn, verify tool results, plan next**
-${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EACH TURN***" : ""}
+${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full File read\n- No tool spamming\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EACH TURN***" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
 
@@ -18029,9 +18029,18 @@ Selection: ${val}`,
                   deleteChatSummary(chatId);
                   if (stdout) {
                     stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                    if (stdout.isTTY) {
+                      stdout.write("\x1B[?2004h");
+                    }
                   }
                   setClearKey((prev) => prev + 1);
                   clearBlocksCache();
+                  cachedHistoryRef.current = {
+                    completedIndex: 0,
+                    columns: 0,
+                    historicalBlocks: [],
+                    seenSelections: /* @__PURE__ */ new Set()
+                  };
                   const targetIdx = messages.findLastIndex(
                     (m) => m.role === "user" && m.text && (m.text.startsWith(targetPrompt) || m.text.includes(targetPrompt))
                   );

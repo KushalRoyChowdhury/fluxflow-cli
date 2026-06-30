@@ -4688,9 +4688,18 @@ export default function App({ args = [] }) {
 
                                         if (stdout) {
                                             stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                                            if (stdout.isTTY) {
+                                                stdout.write('\x1b[?2004h');
+                                            }
                                         }
                                         setClearKey(prev => prev + 1);
                                         clearBlocksCache();
+                                        cachedHistoryRef.current = {
+                                            completedIndex: 0,
+                                            columns: 0,
+                                            historicalBlocks: [],
+                                            seenSelections: new Set()
+                                        };
 
                                         // Find index of reverted user message
                                         const targetIdx = messages.findLastIndex(m =>
