@@ -597,6 +597,12 @@ export const parseMessageToBlocks = (msg, columns) => {
     };
 
     if (text.includes('- Content Preview:')) {
+        let extension = '';
+        const fileMatch = text.match(/File\s+\[(.*?)\]/i);
+        if (fileMatch) {
+            extension = fileMatch[1].split('.').pop().toLowerCase();
+        }
+
         const mainParts = text.split('- Content Preview:');
         const contentPart = mainParts[1] || '';
         const footerMarker = '[SYSTEM] Check the content preview for verification [/SYSTEM]';
@@ -618,10 +624,12 @@ export const parseMessageToBlocks = (msg, columns) => {
             });
         };
 
+        const innerWidth = columns - (gutterWidth + 6);
         codeLines.forEach((line, idx) => {
             const isLast = idx === codeLines.length - 1;
+            const wrappedLines = wrapText(line, innerWidth).split('\n');
             const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, 'write-line', line, {
-                gutterWidth, lineNum: idx + 1, isFirstLine: idx === 0, isLastLine: isLast
+                gutterWidth, lineNum: idx + 1, isFirstLine: idx === 0, isLastLine: isLast, extension, wrappedLines
             });
             if (isLast && msg.isStreaming) {
                 flushWrite();
@@ -637,7 +645,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     }
 
     if (text.includes('[DIFF_START]')) {
-        const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
+        const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
@@ -669,8 +677,13 @@ export const parseMessageToBlocks = (msg, columns) => {
 
         diffLines.forEach((line, i) => {
             const isLast = i === diffLines.length - 1;
+            const parsed = parsedLines[i].parsed;
+            let wrappedLines = null;
+            if (parsed) {
+                wrappedLines = wrapText(parsed.content, columns - 17).split('\n');
+            }
             const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, 'diff-line', line, {
-                isFirstLine: i === 0, isLastLine: isLast, pairContent: parsedLines[i].pairContent
+                isFirstLine: i === 0, isLastLine: isLast, pairContent: parsedLines[i].pairContent, wrappedLines
             });
             if (isLast && msg.isStreaming) {
                 flushDiff();
@@ -717,11 +730,14 @@ export const parseMessageToBlocks = (msg, columns) => {
     };
 
     // Enqueue a per-line block. Flushes on type change or when CHUNK_SIZE is reached.
-    const enqueue = (block) => {
+    const enqueue = (block, isLastOfMessage = false) => {
         if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
         pendingChunk.push(block);
         pendingChunkType = block.type;
-        if (pendingChunk.length >= CHUNK_SIZE) flushPending();
+        if (pendingChunk.length >= CHUNK_SIZE) {
+            if (msg.isStreaming && isLastOfMessage) return;
+            flushPending();
+        }
     };
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -729,7 +745,8 @@ export const parseMessageToBlocks = (msg, columns) => {
         completedBlocks.push(getBlock(`${msg.id}-header`, 'think-header', ''));
         const lines = text.split('\n');
         lines.forEach((line, idx) => {
-            enqueue(getBlock(`${msg.id}-${idx}`, 'think-line', line, {}));
+            const isLast = idx === lines.length - 1;
+            enqueue(getBlock(`${msg.id}-${idx}`, 'think-line', line, {}), isLast);
         });
         if (!msg.isStreaming) {
             flushPending();
@@ -740,6 +757,7 @@ export const parseMessageToBlocks = (msg, columns) => {
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
+        let currentLang = '';
         let codeLineNum = 0;
         let codeStartIdx = 0;
 
@@ -751,17 +769,17 @@ export const parseMessageToBlocks = (msg, columns) => {
             if (inCodeBlock) {
                 if (isCodeBlockMarker) {
                     inCodeBlock = false;
-                    enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, 'code-fence-close', '', {}));
+                    enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, 'code-fence-close', '', {}), isLast);
                 } else {
                     codeLineNum++;
-                    enqueue(getBlock(`${msg.id}-code-line-${idx}`, 'code-line', line, { lineNum: codeLineNum }));
+                    enqueue(getBlock(`${msg.id}-code-line-${idx}`, 'code-line', line, { lineNum: codeLineNum, lang: currentLang }), isLast);
                 }
             } else if (isCodeBlockMarker) {
                 inCodeBlock = true;
                 codeStartIdx = idx;
                 codeLineNum = 0;
-                const lang = line.trim().replace(/^```/, '').trim();
-                enqueue(getBlock(`${msg.id}-code-open-${idx}`, 'code-fence-open', lang, {}));
+                currentLang = line.trim().replace(/^```/, '').trim();
+                enqueue(getBlock(`${msg.id}-code-open-${idx}`, 'code-fence-open', currentLang, {}), isLast);
             } else if (isTableRow) {
                 inTable = true;
                 tableLines.push(line);
@@ -781,7 +799,7 @@ export const parseMessageToBlocks = (msg, columns) => {
                     inTable = false;
                     tableLines = [];
                 }
-                enqueue(getBlock(`${msg.id}-${idx}`, 'agent-line', line, {}));
+                enqueue(getBlock(`${msg.id}-${idx}`, 'agent-line', line, {}), isLast);
             }
         });
 

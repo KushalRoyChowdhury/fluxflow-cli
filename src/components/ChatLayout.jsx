@@ -94,6 +94,88 @@ const parseMathSymbols = (content) => {
         .replace(/\\%/g, '%');
 };
 
+const SYNTAX_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|import|export|from|default|class|extends|new|this|typeof|instanceof|try|catch|finally|throw|async|await|yield|public|private|protected|static|void|int|float|double|char|bool|boolean|def|elif|fn|pub|mut|struct|impl|enum|type|interface|package|namespace|using|include|define|nil|None|self|lambda)\b/;
+const SYNTAX_RULES = [
+    // Include paths
+    /((?<=\binclude\s+)(?:<[^>]+>|"[^"]+"))/.source,
+    // Import paths
+    /((?<=\b(?:from|import|require\s*\(\s*)\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"))/.source,
+    // Comments
+    /(\/\/.*|#.*)/.source,
+    // Strings
+    /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^\`\\])*`)/.source,
+    SYNTAX_KEYWORDS.source,
+    /\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\s*\()/.source,
+    /\b(true|false|null|undefined|nil|None)\b/.source,
+    /\b(\d+(?:\.\d+)?|0x[0-9a-fA-F]+)\b/.source
+];
+const REGEX_SYNTAX = new RegExp(SYNTAX_RULES.join('|'), 'g');
+const tokenCache = new Map();
+const MAX_TOKEN_CACHE_SIZE = 1000;
+
+const tokenizeLine = (line, lang) => {
+    if (!line) return [];
+    const cacheKey = `${lang}:${line}`;
+    if (tokenCache.has(cacheKey)) {
+        return tokenCache.get(cacheKey);
+    }
+
+    let lastIndex = 0;
+    const tokens = [];
+    let match;
+    REGEX_SYNTAX.lastIndex = 0; // Reset stateful global regex pointer
+
+    while ((match = REGEX_SYNTAX.exec(line)) !== null) {
+        const matchText = match[0];
+        const matchIndex = match.index;
+        if (matchIndex > lastIndex) {
+            tokens.push({ text: line.substring(lastIndex, matchIndex) });
+        }
+        let color = undefined;
+        let bold = false;
+        if (match[1] || match[2]) {
+            color = '#ce9178'; // Brownish/orange for include & import paths
+        } else if (match[3]) {
+            color = '#9ece6a'; // Comment (green)
+        } else if (match[4]) {
+            color = '#fcfca4'; // String (light yellow)
+        } else if (match[5]) {
+            color = '#ff7b72';
+            bold = true;
+        } else if (match[6]) {
+            color = '#b392f0';
+        } else if (match[7] || match[8]) {
+            color = '#ff9e64';
+        }
+        tokens.push({ text: matchText, color, bold });
+        lastIndex = REGEX_SYNTAX.lastIndex;
+    }
+    if (lastIndex < line.length) {
+        tokens.push({ text: line.substring(lastIndex) });
+    }
+
+    if (tokenCache.size >= MAX_TOKEN_CACHE_SIZE) {
+        const firstKey = tokenCache.keys().next().value;
+        tokenCache.delete(firstKey);
+    }
+    tokenCache.set(cacheKey, tokens);
+    return tokens;
+};
+
+const renderHighlightedLine = (line, lang, defaultColor = undefined) => {
+    if (!line) return <Text>{' '}</Text>;
+    const tokens = tokenizeLine(line, lang);
+    return (
+        <Text color={defaultColor}>
+            {tokens.map((token, idx) => (
+                <Text key={idx} color={token.color || defaultColor} bold={token.bold}>
+                    {token.text}
+                </Text>
+            ))}
+        </Text>
+    );
+};
+
 const renderLatexText = (content, key) => {
     if (!content) return null;
 
@@ -334,9 +416,12 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
                 content = wrapText(trimmed, columns - 4);
             }
 
+            const linesOfContent = content.split('\n');
             result.push(
-                <Box key={i} width="100%">
-                    <InlineMarkdown text={content} color={color} italic={italic} />
+                <Box key={i} flexDirection="column" width="100%">
+                    {linesOfContent.map((l, lIdx) => (
+                        <InlineMarkdown key={lIdx} text={l} color={color} italic={italic} />
+                    ))}
                 </Box>
             );
         }
@@ -346,7 +431,7 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) => {
+const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
 
@@ -438,18 +523,32 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
     const renderInlineDiff = () => {
         // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
-            const blockColor = isRemoval ? '#ff3333' : '#33ff66';
+            const blockColor = isRemoval ? '#ffdddd' : '#ddffdd';
+            const wrappedLines = wrapText(content, columns - 14).split('\n');
             return (
-                <Text color={blockColor}>
-                    {wrapText(content, columns - 14)}
-                </Text>
+                <Box flexDirection="column">
+                    {wrappedLines.map((wl, idx) => (
+                        <Box key={idx}>
+                            {renderHighlightedLine(wl, extension, blockColor)}
+                        </Box>
+                    ))}
+                </Box>
             );
         }
 
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
             const textColor = isRemoval ? '#885555' : (isAddition ? '#558866' : 'gray');
-            return <Text color={textColor}>{wrapText(content, columns - 14)}</Text>;
+            const wrappedLines = wrapText(content, columns - 14).split('\n');
+            return (
+                <Box flexDirection="column">
+                    {wrappedLines.map((wl, idx) => (
+                        <Box key={idx}>
+                            {renderHighlightedLine(wl, extension, textColor)}
+                        </Box>
+                    ))}
+                </Box>
+            );
         }
 
         // Case C: Surgical inline changes with high-contrast normal-weight coloring 🎯
@@ -465,7 +564,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
                         // NO bold! High-contrast neon red pops out changes instead
                         if (part.removed || (isWhitespace && isSurroundedByRemoval)) {
                             return (
-                                <Text key={idx} color="#ff3333">
+                                <Text key={idx} color="#ff3333" backgroundColor="#5a1818">
                                     {part.value}
                                 </Text>
                             );
@@ -483,7 +582,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
                         // NO bold! High-contrast neon green pops out changes instead
                         if (part.added || (isWhitespace && isSurroundedByAddition)) {
                             return (
-                                <Text key={idx} color="#33ff66">
+                                <Text key={idx} color="#33ff66" backgroundColor="#185a25">
                                     {part.value}
                                 </Text>
                             );
@@ -522,7 +621,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80 }) =>
     );
 });
 
-const DiffBlock = React.memo(({ text, columns = 80 }) => {
+const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
     const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
@@ -569,6 +668,7 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
                         line={item.line}
                         pairContent={item.pairContent}
                         columns={columns - 3}
+                        extension={extension}
                     />
                 ))}
                 <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
@@ -586,9 +686,15 @@ const DiffBlock = React.memo(({ text, columns = 80 }) => {
 export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
     if (!text) return null;
 
+    let extension = '';
+    const fileMatch = text.match(/File\s+\[(.*?)\]/i);
+    if (fileMatch) {
+        extension = fileMatch[1].split('.').pop().toLowerCase();
+    }
+
     // SCENARIO 1: Surgical Diff [DIFF_START]
     if (text.includes('[DIFF_START]')) {
-        return <DiffBlock text={text} columns={columns} />;
+        return <DiffBlock text={text} columns={columns} extension={extension} />;
     }
 
     // SCENARIO 2: Write File Content Preview
@@ -637,7 +743,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                     <Text color="gray" dimColor>{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                 </Box>
                                 <Box flexGrow={1}>
-                                    <Text color="white">{line}</Text>
+                                    {renderHighlightedLine(line, extension, 'white')}
                                 </Box>
                             </Box>
                         ))}
@@ -693,8 +799,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                                 <Text color="gray">{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                             </Box>
                                             <Box flexGrow={1}>
-                                                {/* yellow */}
-                                                <Text color="#fcfca4ff">{line}</Text>
+                                                {renderHighlightedLine(line, lang, '#e1e4e8')}
                                             </Box>
                                         </Box>
                                     ))}
@@ -1235,7 +1340,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'code-line') {
         // Renders one source line with a 3-char gutter. Fixed width avoids
         // needing to know the total line count up-front during streaming.
-        const { lineNum } = block;
+        const { lineNum, lang } = block;
         return (
             <Box
                 flexDirection="row"
@@ -1249,7 +1354,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Text color="gray" dimColor>{String(lineNum).padStart(3, ' ')} </Text>
                 </Box>
                 <Box flexGrow={1}>
-                    <Text color="#fcfca4ff">{text}</Text>
+                    {renderHighlightedLine(text, lang, '#e1e4e8')}
                 </Box>
             </Box>
         );
@@ -1282,7 +1387,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     }
 
     if (type === 'write-line') {
-        const { gutterWidth, lineNum, isFirstLine, isLastLine } = block;
+        const { gutterWidth, lineNum, isFirstLine, isLastLine, extension, wrappedLines } = block;
 
         const renderPaddingLine = (isEnd = false) => (
             <Box
@@ -1327,8 +1432,12 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Box width={gutterWidth + 2} flexShrink={0}>
                         <Text color="gray" dimColor>{String(lineNum).padStart(gutterWidth, ' ')} </Text>
                     </Box>
-                    <Box flexGrow={1}>
-                        <Text color="white">{text}</Text>
+                    <Box flexGrow={1} flexDirection="column">
+                        {(wrappedLines || [text]).map((wl, idx) => (
+                            <Box key={idx}>
+                                {renderHighlightedLine(wl, extension, 'white')}
+                            </Box>
+                        ))}
                     </Box>
                 </Box>
                 {isLastLine && renderPaddingLine(true)}

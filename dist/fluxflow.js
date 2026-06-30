@@ -2580,6 +2580,11 @@ var init_text = __esm({
         };
       };
       if (text.includes("- Content Preview:")) {
+        let extension = "";
+        const fileMatch = text.match(/File\s+\[(.*?)\]/i);
+        if (fileMatch) {
+          extension = fileMatch[1].split(".").pop().toLowerCase();
+        }
         const mainParts = text.split("- Content Preview:");
         const contentPart = mainParts[1] || "";
         const footerMarker = "[SYSTEM] Check the content preview for verification [/SYSTEM]";
@@ -2600,13 +2605,17 @@ var init_text = __esm({
             blocks: batch
           });
         };
+        const innerWidth = columns - (gutterWidth + 6);
         codeLines.forEach((line, idx) => {
           const isLast = idx === codeLines.length - 1;
+          const wrappedLines = wrapText(line, innerWidth).split("\n");
           const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, "write-line", line, {
             gutterWidth,
             lineNum: idx + 1,
             isFirstLine: idx === 0,
-            isLastLine: isLast
+            isLastLine: isLast,
+            extension,
+            wrappedLines
           });
           if (isLast && msg.isStreaming) {
             flushWrite();
@@ -2620,7 +2629,7 @@ var init_text = __esm({
         return { completed: completedBlocks2, active: activeBlock2 ? [activeBlock2] : [] };
       }
       if (text.includes("[DIFF_START]")) {
-        const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
+        const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
         const diffBody = match ? match[1].trim() : "";
         const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
         const parsedLines = diffLines.map((line) => ({ line, parsed: parseLineInfo(line), pairContent: null }));
@@ -2653,10 +2662,16 @@ var init_text = __esm({
         };
         diffLines.forEach((line, i) => {
           const isLast = i === diffLines.length - 1;
+          const parsed = parsedLines[i].parsed;
+          let wrappedLines = null;
+          if (parsed) {
+            wrappedLines = wrapText(parsed.content, columns - 17).split("\n");
+          }
           const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, "diff-line", line, {
             isFirstLine: i === 0,
             isLastLine: isLast,
-            pairContent: parsedLines[i].pairContent
+            pairContent: parsedLines[i].pairContent,
+            wrappedLines
           });
           if (isLast && msg.isStreaming) {
             flushDiff();
@@ -2679,11 +2694,8 @@ var init_text = __esm({
       let activeBlock = null;
       let pendingChunk = [];
       let pendingChunkType = null;
-      const flushPending = (force = false) => {
+      const flushPending = () => {
         if (!pendingChunk.length) return;
-        if (msg.isStreaming && !force) {
-          return;
-        }
         const batch = pendingChunk;
         pendingChunk = [];
         pendingChunkType = null;
@@ -2694,17 +2706,21 @@ var init_text = __esm({
           blocks: batch
         });
       };
-      const enqueue = (block) => {
-        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending(true);
+      const enqueue = (block, isLastOfMessage = false) => {
+        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
         pendingChunk.push(block);
         pendingChunkType = block.type;
-        if (pendingChunk.length >= CHUNK_SIZE) flushPending(false);
+        if (pendingChunk.length >= CHUNK_SIZE) {
+          if (msg.isStreaming && isLastOfMessage) return;
+          flushPending();
+        }
       };
       if (msg.role === "think") {
         completedBlocks.push(getBlock(`${msg.id}-header`, "think-header", ""));
         const lines = text.split("\n");
         lines.forEach((line, idx) => {
-          enqueue(getBlock(`${msg.id}-${idx}`, "think-line", line, {}));
+          const isLast = idx === lines.length - 1;
+          enqueue(getBlock(`${msg.id}-${idx}`, "think-line", line, {}), isLast);
         });
         if (!msg.isStreaming) {
           flushPending();
@@ -2715,6 +2731,7 @@ var init_text = __esm({
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
+        let currentLang = "";
         let codeLineNum = 0;
         let codeStartIdx = 0;
         lines.forEach((line, idx) => {
@@ -2724,17 +2741,17 @@ var init_text = __esm({
           if (inCodeBlock) {
             if (isCodeBlockMarker) {
               inCodeBlock = false;
-              enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, "code-fence-close", "", {}));
+              enqueue(getBlock(`${msg.id}-code-close-${codeStartIdx}`, "code-fence-close", "", {}), isLast);
             } else {
               codeLineNum++;
-              enqueue(getBlock(`${msg.id}-code-line-${idx}`, "code-line", line, { lineNum: codeLineNum }));
+              enqueue(getBlock(`${msg.id}-code-line-${idx}`, "code-line", line, { lineNum: codeLineNum, lang: currentLang }), isLast);
             }
           } else if (isCodeBlockMarker) {
             inCodeBlock = true;
             codeStartIdx = idx;
             codeLineNum = 0;
-            const lang = line.trim().replace(/^```/, "").trim();
-            enqueue(getBlock(`${msg.id}-code-open-${idx}`, "code-fence-open", lang, {}));
+            currentLang = line.trim().replace(/^```/, "").trim();
+            enqueue(getBlock(`${msg.id}-code-open-${idx}`, "code-fence-open", currentLang, {}), isLast);
           } else if (isTableRow) {
             inTable = true;
             tableLines.push(line);
@@ -2753,7 +2770,7 @@ var init_text = __esm({
               inTable = false;
               tableLines = [];
             }
-            enqueue(getBlock(`${msg.id}-${idx}`, "agent-line", line, {}));
+            enqueue(getBlock(`${msg.id}-${idx}`, "agent-line", line, {}), isLast);
           }
         });
         if (!msg.isStreaming && msg.workedDuration) {
@@ -3982,7 +3999,7 @@ ${coloredArt[7]}`;
 import React4, { useState as useState4, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
 import { diffWordsWithSpace } from "diff";
-var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, SYNTAX_KEYWORDS, SYNTAX_RULES, REGEX_SYNTAX, tokenCache, MAX_TOKEN_CACHE_SIZE, tokenizeLine, renderHighlightedLine, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
@@ -4022,6 +4039,74 @@ var init_ChatLayout = __esm({
     REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
     parseMathSymbols = (content) => {
       return content.replace(/\\multiply|\\mul|\\times/g, "\xD7").replace(/\\div/g, "\xF7").replace(/\\cdot/g, "\u22C5").replace(/\\infty/g, "\u221E").replace(/\\pm/g, "\xB1").replace(/\\leq/g, "\u2264").replace(/\\geq/g, "\u2265").replace(/\\neq/g, "\u2260").replace(/\\sqrt\s*\{([^}]+)\}/g, "\u221A($1)").replace(/\\sqrt\s*(\w+|\d+)/g, "\u221A($1)").replace(/\\alpha/g, "\u03B1").replace(/\\beta/g, "\u03B2").replace(/\\theta/g, "\u03B8").replace(/\\pi/g, "\u03C0").replace(/\\approx/g, "\u2248").replace(/\\Delta/g, "\u0394").replace(/\\sigma/g, "\u03C3").replace(/\\sum/g, "\u03A3").replace(/\\prod/g, "\u03A0").replace(/\\rightarrow|\\to/g, "\u2192").replace(/\\left\b|\\right\b/g, "").replace(/\\left\(|\\right\)/g, (match) => match.includes("left") ? "(" : ")").replace(/\\left\[|\\right\]/g, (match) => match.includes("left") ? "[" : "]").replace(/\\\{|\\\}/g, (match) => match.includes("{") ? "{" : "}").replace(/\\text\s*\{([^}]+)\}/g, "$1").replace(/\\text\s+(\w+)/g, "$1").replace(/\\%/g, "%");
+    };
+    SYNTAX_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|import|export|from|default|class|extends|new|this|typeof|instanceof|try|catch|finally|throw|async|await|yield|public|private|protected|static|void|int|float|double|char|bool|boolean|def|elif|fn|pub|mut|struct|impl|enum|type|interface|package|namespace|using|include|define|nil|None|self|lambda)\b/;
+    SYNTAX_RULES = [
+      // Include paths
+      /((?<=\binclude\s+)(?:<[^>]+>|"[^"]+"))/.source,
+      // Import paths
+      /((?<=\b(?:from|import|require\s*\(\s*)\s*)(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"))/.source,
+      // Comments
+      /(\/\/.*|#.*)/.source,
+      // Strings
+      /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^\`\\])*`)/.source,
+      SYNTAX_KEYWORDS.source,
+      /\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\s*\()/.source,
+      /\b(true|false|null|undefined|nil|None)\b/.source,
+      /\b(\d+(?:\.\d+)?|0x[0-9a-fA-F]+)\b/.source
+    ];
+    REGEX_SYNTAX = new RegExp(SYNTAX_RULES.join("|"), "g");
+    tokenCache = /* @__PURE__ */ new Map();
+    MAX_TOKEN_CACHE_SIZE = 1e3;
+    tokenizeLine = (line, lang) => {
+      if (!line) return [];
+      const cacheKey = `${lang}:${line}`;
+      if (tokenCache.has(cacheKey)) {
+        return tokenCache.get(cacheKey);
+      }
+      let lastIndex = 0;
+      const tokens = [];
+      let match;
+      REGEX_SYNTAX.lastIndex = 0;
+      while ((match = REGEX_SYNTAX.exec(line)) !== null) {
+        const matchText = match[0];
+        const matchIndex = match.index;
+        if (matchIndex > lastIndex) {
+          tokens.push({ text: line.substring(lastIndex, matchIndex) });
+        }
+        let color = void 0;
+        let bold = false;
+        if (match[1] || match[2]) {
+          color = "#ce9178";
+        } else if (match[3]) {
+          color = "#9ece6a";
+        } else if (match[4]) {
+          color = "#fcfca4";
+        } else if (match[5]) {
+          color = "#ff7b72";
+          bold = true;
+        } else if (match[6]) {
+          color = "#b392f0";
+        } else if (match[7] || match[8]) {
+          color = "#ff9e64";
+        }
+        tokens.push({ text: matchText, color, bold });
+        lastIndex = REGEX_SYNTAX.lastIndex;
+      }
+      if (lastIndex < line.length) {
+        tokens.push({ text: line.substring(lastIndex) });
+      }
+      if (tokenCache.size >= MAX_TOKEN_CACHE_SIZE) {
+        const firstKey = tokenCache.keys().next().value;
+        tokenCache.delete(firstKey);
+      }
+      tokenCache.set(cacheKey, tokens);
+      return tokens;
+    };
+    renderHighlightedLine = (line, lang, defaultColor = void 0) => {
+      if (!line) return /* @__PURE__ */ React4.createElement(Text4, null, " ");
+      const tokens = tokenizeLine(line, lang);
+      return /* @__PURE__ */ React4.createElement(Text4, { color: defaultColor }, tokens.map((token, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: token.color || defaultColor, bold: token.bold }, token.text)));
     };
     renderLatexText = (content, key) => {
       if (!content) return null;
@@ -4169,15 +4254,16 @@ var init_ChatLayout = __esm({
           } else {
             content = wrapText(trimmed, columns - 4);
           }
+          const linesOfContent = content.split("\n");
           result.push(
-            /* @__PURE__ */ React4.createElement(Box3, { key: i, width: "100%" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: content, color, italic }))
+            /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, linesOfContent.map((l, lIdx) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: lIdx, text: l, color, italic })))
           );
         }
       });
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80 }) => {
+    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
@@ -4238,12 +4324,14 @@ var init_ChatLayout = __esm({
       const displayPrefix = isRemoval ? "-" : isAddition ? "+" : " ";
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
-          const blockColor = isRemoval ? "#ff3333" : "#33ff66";
-          return /* @__PURE__ */ React4.createElement(Text4, { color: blockColor }, wrapText(content, columns - 14));
+          const blockColor = isRemoval ? "#ffdddd" : "#ddffdd";
+          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
           const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
-          return /* @__PURE__ */ React4.createElement(Text4, { color: textColor }, wrapText(content, columns - 14));
+          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor))));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
           const isWhitespace = /^\s+$/.test(part.value);
@@ -4268,7 +4356,7 @@ var init_ChatLayout = __esm({
       };
       return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
     });
-    DiffBlock = React4.memo(({ text, columns = 80 }) => {
+    DiffBlock = React4.memo(({ text, columns = 80, extension }) => {
       const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
@@ -4300,14 +4388,20 @@ var init_ChatLayout = __esm({
           key: i,
           line: item.line,
           pairContent: item.pairContent,
-          columns: columns - 3
+          columns: columns - 3,
+          extension
         }
       )), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
     CodeRenderer = React4.memo(({ text, columns = 80 }) => {
       if (!text) return null;
+      let extension = "";
+      const fileMatch = text.match(/File\s+\[(.*?)\]/i);
+      if (fileMatch) {
+        extension = fileMatch[1].split(".").pop().toLowerCase();
+      }
       if (text.includes("[DIFF_START]")) {
-        return /* @__PURE__ */ React4.createElement(DiffBlock, { text, columns });
+        return /* @__PURE__ */ React4.createElement(DiffBlock, { text, columns, extension });
       }
       if (text.includes("- Content Preview:")) {
         const mainParts = text.split("- Content Preview:");
@@ -4335,7 +4429,7 @@ var init_ChatLayout = __esm({
             marginBottom: 1,
             backgroundColor: "#1a1a1a"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, line)))), /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))))
+          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, extension, "white")))), /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))))
         ));
       }
       if (text.includes("```")) {
@@ -4364,7 +4458,7 @@ var init_ChatLayout = __esm({
                 width: "100%"
               },
               /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
-              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "#fcfca4ff" }, line)))))
+              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, lang, "#e1e4e8")))))
             );
           }
           let cleanPart = part;
@@ -4647,7 +4741,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", (text || "CODE").toUpperCase())));
       }
       if (type === "code-line") {
-        const { lineNum } = block;
+        const { lineNum, lang } = block;
         return /* @__PURE__ */ React4.createElement(
           Box3,
           {
@@ -4662,7 +4756,7 @@ var init_ChatLayout = __esm({
             width: "100%"
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(3, " "), " ")),
-          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "#fcfca4ff" }, text))
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(text, lang, "#e1e4e8"))
         );
       }
       if (type === "code-fence-close") {
@@ -4687,7 +4781,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
       }
       if (type === "write-line") {
-        const { gutterWidth, lineNum, isFirstLine, isLastLine } = block;
+        const { gutterWidth, lineNum, isFirstLine, isLastLine, extension, wrappedLines } = block;
         const renderPaddingLine = (isEnd = false) => /* @__PURE__ */ React4.createElement(
           Box3,
           {
@@ -4723,7 +4817,7 @@ var init_ChatLayout = __esm({
             backgroundColor: "#1a1a1a"
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(gutterWidth, " "), " ")),
-          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, text))
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, flexDirection: "column" }, (wrappedLines || [text]).map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, "white"))))
         ), isLastLine && renderPaddingLine(true));
       }
       if (type === "write-footer") {
@@ -18028,14 +18122,15 @@ Selection: ${val}`,
               try {
                 const result = await RevertManager.rollbackToBefore(txId);
                 if (result.success) {
-                  const { targetPrompt } = result;
-                  deleteChatSummary(chatId);
                   if (stdout) {
                     stdout.write("\x1B[2J\x1B[3J\x1B[H");
                     if (stdout.isTTY) {
                       stdout.write("\x1B[?2004h");
                     }
+                    await new Promise((resolve) => setTimeout(resolve, 300));
                   }
+                  const { targetPrompt } = result;
+                  deleteChatSummary(chatId);
                   setClearKey((prev) => prev + 1);
                   clearBlocksCache();
                   cachedHistoryRef.current = {

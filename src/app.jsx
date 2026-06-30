@@ -373,6 +373,7 @@ const getProjectFiles = (() => {
 let cachedShortcut = '\\ + Enter';
 
 export default function App({ args = [] }) {
+    let lastGCTime = null;
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
     const { stdout } = useStdout();
@@ -410,9 +411,22 @@ export default function App({ args = [] }) {
             }
         }, 1000);
 
+        // If there is no GC in last 30s invoke a GC
+        const memInterval = setInterval(() => {
+            if (lastGCTime) {
+                const diff = Date.now() - lastGCTime;
+                if (diff > 30000) {
+                    if (global.gc) {
+                        try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                    }
+                }
+            }
+        }, 30000);
+
         return () => {
             clearTimeout(graceTimer);
             clearInterval(interval);
+            clearInterval(memInterval);
         };
     }, []);
     // Parse CLI startup arguments
@@ -2293,7 +2307,7 @@ export default function App({ args = [] }) {
                     chatTokenStartRef.current = sessionTotalTokens;
                     setTimeout(() => {
                         if (global.gc) {
-                            try { global.gc(); } catch (e) { }
+                            try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
                         }
                     }, 500);
                     break;
@@ -2313,7 +2327,7 @@ export default function App({ args = [] }) {
                     });
                     setTimeout(() => {
                         if (global.gc) {
-                            try { global.gc(); } catch (e) { }
+                            try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
                         }
                     }, 500);
                     break;
@@ -3221,7 +3235,7 @@ export default function App({ args = [] }) {
 
                             setTimeout(() => {
                                 if (global.gc) {
-                                    try { global.gc(); } catch (e) { }
+                                    try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
                                 }
                             }, 100);
 
@@ -3249,11 +3263,11 @@ export default function App({ args = [] }) {
                                 }
                             );
 
-                            // setTimeout(() => {
-                            //     if (global.gc) {
-                            //         try { global.gc(); } catch (e) { }
-                            //     }
-                            // }, 500);
+                            setTimeout(() => {
+                                if (global.gc) {
+                                    try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                                }
+                            }, 500);
 
                             continue;
                         }
@@ -4680,18 +4694,18 @@ export default function App({ args = [] }) {
                         <RevertModal
                             prompts={recentPrompts}
                             onSelect={async (txId) => {
+                                if (stdout) {
+                                    stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                                    if (stdout.isTTY) {
+                                        stdout.write('\x1b[?2004h');
+                                    }
+                                }
                                 try {
                                     const result = await RevertManager.rollbackToBefore(txId);
                                     if (result.success) {
                                         const { targetPrompt } = result;
                                         deleteChatSummary(chatId);
 
-                                        if (stdout) {
-                                            stdout.write('\x1b[2J\x1b[3J\x1b[H');
-                                            if (stdout.isTTY) {
-                                                stdout.write('\x1b[?2004h');
-                                            }
-                                        }
                                         setClearKey(prev => prev + 1);
                                         clearBlocksCache();
                                         cachedHistoryRef.current = {

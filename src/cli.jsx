@@ -40,7 +40,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     // }
 
     const cp = spawn(process.execPath, [
-        `--max-old-space-size=${HEAP_LIMIT}`,
+        `--max-old-space-size=${HEAP_LIMIT}`, `--expose-gc`,
         fileURLToPath(import.meta.url),
         ...process.argv.slice(2)
     ], { stdio: 'inherit' });

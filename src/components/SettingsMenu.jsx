@@ -110,7 +110,7 @@ export default function SettingsMenu({
         // 3. Track the live memory usage every 1 seconds
         const interval = setInterval(() => {
             getMemoryStats();
-        }, 5000);
+        }, 30000);
 
         // Keep your memory leak-free! 🧹
         return () => clearInterval(interval);
