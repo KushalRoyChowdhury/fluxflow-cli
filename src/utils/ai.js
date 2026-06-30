@@ -3786,7 +3786,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const { keyword, file } = parseArgs(toolCall.args);
                                     let matchCount = 0;
                                     if (result) {
-                                        const m = result.match(/Found (\d+) matches/i);
+                                        const m = result.match(/Found (\d+) match/i);
                                         if (m) {
                                             matchCount = parseInt(m[1]);
                                         }
@@ -3993,7 +3993,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     success = true;
                     // Count the successful call
-                    await incrementUsage('agent');
+                    await incrementUsage('agent', aiProvider);
                 } catch (err) {
                     if (TERMINATION_SIGNAL) {
                         yield { type: 'status', content: 'Request Cancelled' };
@@ -4012,7 +4012,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                         // Swallow/suppress SDK stream-end JSON chunk parsing bug
                         success = true;
-                        await incrementUsage('agent');
+                        await incrementUsage('agent', aiProvider);
                         break;
                     }
 

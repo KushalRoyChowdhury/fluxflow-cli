@@ -232,8 +232,20 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.14.2"]
+        const stableVersions = ["2.15.0"]
         const changelogData = {
+            "2.15.0": {
+                "note": "JUNE 30 - Budgeting Overhaul.",
+                "added": [
+                    "New command `/budgets reset` to reset existing budgets."
+                ],
+                "changed": [
+                    "Budgeting flow removed from `/settings`.",
+                    "Changed how budgets are set. Now set a 'Global Budget' to limit overall usage, OR set 'Provider Specific' budgets to limit each provider usage.",
+                    "All previously set budgets will be auto-migrated to 'Global Budgets' by default.\n\n**NOTE:**\n*Budgets are calculated as `\"Token Usage per Provider/Overall\"`. Using premium models on same provider & same limit will cost more than same token limit with cheaper models.*\n***FluxFlow ONLY tracks \"Token Usage\" NOT \"API Costs\".***"
+                ],
+                "fixes": []
+            },
             "2.14.2": {
                 "note": "JUNE 29.",
                 "added": [],
@@ -1246,7 +1258,8 @@
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/`(.*?)`/g, '<code>$1</code>')
-                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+                .replaceAll('\n', '<br>')
         }
 
         function renderChangelog() {
@@ -1289,14 +1302,14 @@
 
                 if (data.added && data.added.length > 0) {
                     cardHtml += `
-                        <div class="section-title added-title">✨ Added</div>
+                        <div class="section-title added-title">✨ Improvements</div>
                         <ul>${data.added.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
                     `;
                 }
 
                 if (data.changed && data.changed.length > 0) {
                     cardHtml += `
-                        <div class="section-title changed-title">🔄 Changed</div>
+                        <div class="section-title changed-title">🔄 Patches</div>
                         <ul>${data.changed.map(item => `<li>${parseMarkdown(item)}</li>`).join('')}</ul>
                     `;
                 }

@@ -228,6 +228,28 @@ const flushUsage = async () => {
                         cachedUsage.stats[key] = Array.from(uniqueMap.values());
                     } else if (typeof cachedUsage.stats[key] === 'number') {
                         cachedUsage.stats[key] = Math.max(cachedUsage.stats[key], Number(diskData.stats[key]) || 0);
+                    } else if (cachedUsage.stats[key] && typeof cachedUsage.stats[key] === 'object') {
+                        // Merge plain objects (like providerRequests, models)
+                        const diskObj = diskData.stats[key] || {};
+                        const memObj = cachedUsage.stats[key];
+                        for (const subKey in diskObj) {
+                            if (typeof diskObj[subKey] === 'number') {
+                                memObj[subKey] = Math.max(memObj[subKey] || 0, diskObj[subKey]);
+                            } else if (diskObj[subKey] && typeof diskObj[subKey] === 'object') {
+                                // For nested objects like models[provider][model]
+                                if (!memObj[subKey]) memObj[subKey] = {};
+                                for (const mKey in diskObj[subKey]) {
+                                    if (typeof diskObj[subKey][mKey] === 'number') {
+                                        memObj[subKey][mKey] = Math.max(memObj[subKey][mKey] || 0, diskObj[subKey][mKey]);
+                                    } else if (diskObj[subKey][mKey] && typeof diskObj[subKey][mKey] === 'object') {
+                                        if (!memObj[subKey][mKey]) memObj[subKey][mKey] = {};
+                                        for (const valKey in diskObj[subKey][mKey]) {
+                                            memObj[subKey][mKey][valKey] = Math.max(memObj[subKey][mKey][valKey] || 0, diskObj[subKey][mKey][valKey]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -422,12 +444,18 @@ export const getMonthlyUsage = async () => {
 /**
  * Increments a specific usage key in memory
  */
-export const incrementUsage = async (key) => {
+export const incrementUsage = async (key, provider) => {
     const stats = await getDailyUsage();
     if (stats[key] !== undefined) {
         stats[key]++;
-        queueFlush();
     }
+    if (provider && key === 'agent') {
+        if (!stats.providerRequests) {
+            stats.providerRequests = {};
+        }
+        stats.providerRequests[provider] = (stats.providerRequests[provider] || 0) + 1;
+    }
+    queueFlush();
 };
 
 /**
@@ -551,18 +579,36 @@ export const checkQuota = async (key, settings) => {
     const tier = settings.apiTier || 'Free';
     const quotas = settings.quotas || {};
 
+    // Resolve effective limits — use per-provider budget if enabled for the active provider
+    const resolveAgentLimits = () => {
+        const providerBudgets = quotas.providerBudgets || {};
+        const useProvider = !!providerBudgets.__useProvider;
+        const currentProvider = settings.aiProvider || 'Google';
+        if (useProvider && providerBudgets[currentProvider]) {
+            const pb = providerBudgets[currentProvider];
+            return {
+                agentLimit: (typeof pb.agentLimit === 'number' && pb.agentLimit > 0) ? pb.agentLimit : 99999999,
+                tokenLimit: (typeof pb.tokenLimit === 'number' && pb.tokenLimit > 0) ? pb.tokenLimit : 99999999999999,
+                monthlyTokenLimit: (typeof pb.monthlyTokenLimit === 'number' && pb.monthlyTokenLimit > 0) ? pb.monthlyTokenLimit : 99999999999999,
+            };
+        }
+        return {
+            agentLimit: quotas.agentLimit || 99999999,
+            tokenLimit: quotas.tokenLimit || 99999999999999,
+            monthlyTokenLimit: quotas.monthlyTokenLimit || 99999999999999,
+        };
+    };
+
     if (tier === 'Free') {
         if (key === 'agent') {
-            const reqLimit = quotas.agentLimit || 99999999;
-            const tokenLimit = quotas.tokenLimit || 99999999999999;
-            const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+            const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
 
             const dailyUsage = await getDailyUsage();
-            
+
             // Hard constraint for free tier
             if ((dailyUsage.agent + dailyUsage.background) >= 999999) return false;
 
-            const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+            const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
             if (!dailyOk) return false;
 
             let monthlyUsage;
@@ -587,12 +633,10 @@ export const checkQuota = async (key, settings) => {
 
     if (tier === 'Paid' || tier === 'Custom') {
         if (key === 'agent') {
-            const reqLimit = quotas.agentLimit || 99999999;
-            const tokenLimit = quotas.tokenLimit || 99999999999999;
-            const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+            const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
 
             const dailyUsage = await getDailyUsage();
-            const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+            const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
             if (!dailyOk) return false;
 
             let monthlyUsage;

@@ -305,7 +305,13 @@ var init_settings = __esm({
         backgroundLimit: 999999,
         searchLimit: 100,
         customModelId: "",
-        customLimit: 0
+        customLimit: 0,
+        providerTiers: {
+          Google: "Free",
+          DeepSeek: "Free",
+          NVIDIA: "Free",
+          OpenRouter: "Free"
+        }
       },
       systemSettings: {
         memory: true,
@@ -345,7 +351,14 @@ var init_settings = __esm({
           settingsObj = {
             ...DEFAULT_SETTINGS,
             ...saved,
-            quotas: { ...DEFAULT_SETTINGS.quotas, ...saved.quotas },
+            quotas: {
+              ...DEFAULT_SETTINGS.quotas,
+              ...saved.quotas,
+              providerTiers: {
+                ...DEFAULT_SETTINGS.quotas.providerTiers,
+                ...saved.quotas?.providerTiers || {}
+              }
+            },
             systemSettings: { ...DEFAULT_SETTINGS.systemSettings, ...saved.systemSettings },
             profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData },
             imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings }
@@ -5746,7 +5759,7 @@ function SettingsMenu({
       case "other":
         return [
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
-          { label: "Budgets", value: "apiTier", status: apiTier === "Free" ? "Provider Limits" : "Custom Budget" },
+          { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -7081,6 +7094,26 @@ var init_usage = __esm({
                 cachedUsage.stats[key] = Array.from(uniqueMap.values());
               } else if (typeof cachedUsage.stats[key] === "number") {
                 cachedUsage.stats[key] = Math.max(cachedUsage.stats[key], Number(diskData.stats[key]) || 0);
+              } else if (cachedUsage.stats[key] && typeof cachedUsage.stats[key] === "object") {
+                const diskObj = diskData.stats[key] || {};
+                const memObj = cachedUsage.stats[key];
+                for (const subKey in diskObj) {
+                  if (typeof diskObj[subKey] === "number") {
+                    memObj[subKey] = Math.max(memObj[subKey] || 0, diskObj[subKey]);
+                  } else if (diskObj[subKey] && typeof diskObj[subKey] === "object") {
+                    if (!memObj[subKey]) memObj[subKey] = {};
+                    for (const mKey in diskObj[subKey]) {
+                      if (typeof diskObj[subKey][mKey] === "number") {
+                        memObj[subKey][mKey] = Math.max(memObj[subKey][mKey] || 0, diskObj[subKey][mKey]);
+                      } else if (diskObj[subKey][mKey] && typeof diskObj[subKey][mKey] === "object") {
+                        if (!memObj[subKey][mKey]) memObj[subKey][mKey] = {};
+                        for (const valKey in diskObj[subKey][mKey]) {
+                          memObj[subKey][mKey][valKey] = Math.max(memObj[subKey][mKey][valKey] || 0, diskObj[subKey][mKey][valKey]);
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }
@@ -7224,12 +7257,18 @@ var init_usage = __esm({
       }
       return summed;
     };
-    incrementUsage = async (key) => {
+    incrementUsage = async (key, provider) => {
       const stats = await getDailyUsage();
       if (stats[key] !== void 0) {
         stats[key]++;
-        queueFlush();
       }
+      if (provider && key === "agent") {
+        if (!stats.providerRequests) {
+          stats.providerRequests = {};
+        }
+        stats.providerRequests[provider] = (stats.providerRequests[provider] || 0) + 1;
+      }
+      queueFlush();
     };
     addToUsage = async (key, amount, provider, model) => {
       const stats = await getDailyUsage();
@@ -7324,14 +7363,30 @@ var init_usage = __esm({
     checkQuota = async (key, settings) => {
       const tier = settings.apiTier || "Free";
       const quotas = settings.quotas || {};
+      const resolveAgentLimits = () => {
+        const providerBudgets = quotas.providerBudgets || {};
+        const useProvider = !!providerBudgets.__useProvider;
+        const currentProvider = settings.aiProvider || "Google";
+        if (useProvider && providerBudgets[currentProvider]) {
+          const pb = providerBudgets[currentProvider];
+          return {
+            agentLimit: typeof pb.agentLimit === "number" && pb.agentLimit > 0 ? pb.agentLimit : 99999999,
+            tokenLimit: typeof pb.tokenLimit === "number" && pb.tokenLimit > 0 ? pb.tokenLimit : 99999999999999,
+            monthlyTokenLimit: typeof pb.monthlyTokenLimit === "number" && pb.monthlyTokenLimit > 0 ? pb.monthlyTokenLimit : 99999999999999
+          };
+        }
+        return {
+          agentLimit: quotas.agentLimit || 99999999,
+          tokenLimit: quotas.tokenLimit || 99999999999999,
+          monthlyTokenLimit: quotas.monthlyTokenLimit || 99999999999999
+        };
+      };
       if (tier === "Free") {
         if (key === "agent") {
-          const reqLimit = quotas.agentLimit || 99999999;
-          const tokenLimit = quotas.tokenLimit || 99999999999999;
-          const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+          const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
           const dailyUsage = await getDailyUsage();
           if (dailyUsage.agent + dailyUsage.background >= 999999) return false;
-          const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+          const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
           if (!dailyOk) return false;
           let monthlyUsage;
           if (quotas.resetMode === "Custom") {
@@ -7353,11 +7408,9 @@ var init_usage = __esm({
       }
       if (tier === "Paid" || tier === "Custom") {
         if (key === "agent") {
-          const reqLimit = quotas.agentLimit || 99999999;
-          const tokenLimit = quotas.tokenLimit || 99999999999999;
-          const monthlyTokenLimit = quotas.monthlyTokenLimit || 99999999999999;
+          const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
           const dailyUsage = await getDailyUsage();
-          const dailyOk = dailyUsage.agent < reqLimit && (dailyUsage.tokens || 0) < tokenLimit;
+          const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
           if (!dailyOk) return false;
           let monthlyUsage;
           if (quotas.resetMode === "Custom") {
@@ -8400,6 +8453,37 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
   }
   return results;
 }
+function normStr(s) {
+  return s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const cap = Math.floor(Math.max(a.length, b.length) / 2) + 1;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => i);
+  for (let j = 1; j <= b.length; j++) {
+    let prev = dp[0];
+    dp[0] = j;
+    for (let i = 1; i <= a.length; i++) {
+      const tmp = dp[i];
+      dp[i] = b[j - 1] === a[i - 1] ? prev : 1 + Math.min(prev, dp[i], dp[i - 1]);
+      prev = tmp;
+    }
+    if (Math.min(...dp) > cap) return cap + 1;
+  }
+  return dp[a.length];
+}
+function fuzzyMatch(line, keyword) {
+  const normLine = normStr(line);
+  const lineWords = normLine.split(" ");
+  const kwTokens = normStr(keyword).split(" ").filter(Boolean);
+  if (normLine.includes(normStr(keyword))) return true;
+  return kwTokens.every((token) => {
+    const maxDist = token.length <= 2 ? 0 : token.length <= 5 ? 1 : 2;
+    return lineWords.some((word) => levenshtein(token, word) <= maxDist);
+  });
+}
 var search_keyword;
 var init_search_keyword = __esm({
   "src/tools/search_keyword.js"() {
@@ -8407,7 +8491,7 @@ var init_search_keyword = __esm({
     search_keyword = async (args) => {
       const { keyword, file, subString } = parseArgs(args);
       if (!keyword) return 'ERROR: Missing "keyword" argument.';
-      const matchSubstring = subString === true || subString === "true" || subString === 1 || subString === "1" || subString === "true";
+      const matchSubstring = subString === true || subString === "true" || subString === 1 || subString === "1" || subString === "true" || subString === "yes" || subString === "yes" || false;
       const wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
       const excludes = [
         "node_modules",
@@ -8448,30 +8532,50 @@ var init_search_keyword = __esm({
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
             for (let i = 0; i < lines.length; i++) {
-              const matched = matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) : wordRegex.test(lines[i]);
+              const matched = matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) : wordRegex.test(lines[i]);
               if (matched) {
-                const displayPath = fileObj.relativePath.replace(/\\/g, "/");
-                fileMatches.push(`${displayPath} \u2192 ${i + 1}`);
+                fileMatches.push({ line: i + 1, content: lines[i].trim() });
               }
             }
-            return fileMatches;
+            if (fileMatches.length === 0) return null;
+            const displayPath = fileObj.relativePath.replace(/\\/g, "/");
+            return { path: displayPath, matches: fileMatches };
           } catch {
             return [];
           }
         });
         const settledResults = await Promise.all(searchPromises);
-        const matches = settledResults.flat().slice(0, maxMatches);
+        const fileGroups = [];
+        let totalMatches = 0;
+        for (const result of settledResults) {
+          if (!result) continue;
+          if (totalMatches >= maxMatches) break;
+          const remaining = maxMatches - totalMatches;
+          const trimmedMatches = result.matches.slice(0, remaining);
+          fileGroups.push({ path: result.path, matches: trimmedMatches });
+          totalMatches += trimmedMatches.length;
+        }
         if (typeof global.gc === "function") {
           global.gc();
         }
-        if (matches.length === 0) {
+        if (fileGroups.length === 0) {
           return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${matchSubstring ? "(subString mode)" : ""}`;
         }
-        let output = `Found ${matches.length} matches ${matchSubstring ? "(subString mode)" : ""}:
+        let output = `Found ${totalMatches} match${totalMatches === 1 ? "" : "es"} across ${fileGroups.length} file${fileGroups.length === 1 ? "" : "s"} ${matchSubstring ? "(subString mode)" : ""}:
 
 `;
-        output += matches.join("\n");
-        return output;
+        for (const group of fileGroups) {
+          output += `${group.path}
+`;
+          for (let i = 0; i < group.matches.length; i++) {
+            const isLast = i === group.matches.length - 1;
+            const prefix = isLast ? "\u2514\u2500\u2500" : "\u251C\u2500\u2500";
+            output += `${prefix} ${group.matches[i].line}: ${group.matches[i].content}
+`;
+          }
+          output += "\n";
+        }
+        return output.trimEnd();
       } catch (error) {
         return `ERROR: ${error.message}`;
       }
@@ -12869,7 +12973,7 @@ ${boxBottom}`}`) };
                       const { keyword, file } = parseArgs(toolCall.args);
                       let matchCount = 0;
                       if (result) {
-                        const m = result.match(/Found (\d+) matches/i);
+                        const m = result.match(/Found (\d+) match/i);
                         if (m) {
                           matchCount = parseInt(m[1]);
                         }
@@ -13034,7 +13138,7 @@ ${colorMainWords(output)}` };
               if (!hasFinish2 && !hasContinue2 && !didCallTool && signalSafeText2.length > 0 && !endsNormally && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop) {
               }
               success = true;
-              await incrementUsage("agent");
+              await incrementUsage("agent", aiProvider);
             } catch (err) {
               if (TERMINATION_SIGNAL) {
                 yield { type: "status", content: "Request Cancelled" };
@@ -13052,7 +13156,7 @@ ${colorMainWords(output)}` };
                   }
                 }
                 success = true;
-                await incrementUsage("agent");
+                await incrementUsage("agent", aiProvider);
                 break;
               }
               if (inThinkingState) {
@@ -14568,8 +14672,13 @@ function App({ args = [] }) {
   };
   const [activeView, setActiveView] = useState14("chat");
   const [apiTier, setApiTier] = useState14("Free");
-  const [quotas, setQuotas] = useState14({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+  const [quotas, setQuotas] = useState14({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0, providerBudgets: {} });
   const [inputConfig, setInputConfig] = useState14(null);
+  const [budgetReturnView, setBudgetReturnView] = useState14("chat");
+  const [providerBudgetQueue, setProviderBudgetQueue] = useState14([]);
+  const [providerBudgetCursor, setProviderBudgetCursor] = useState14(0);
+  const [pbsCursor, setPbsCursor] = useState14(0);
+  const [pbsSelected, setPbsSelected] = useState14({});
   const [systemSettings, setSystemSettings] = useState14({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
   const [profileData, setProfileData] = useState14({ name: null, nickname: null, instructions: null });
   const [imageSettings, setImageSettings] = useState14({ keyType: "Default", quality: "Low-High", apiKey: "" });
@@ -15025,6 +15134,34 @@ function App({ args = [] }) {
       }
       return;
     }
+    if (activeView === "providerBudgetSelect") {
+      const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+      if (key.upArrow) {
+        setPbsCursor((c) => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
+        return;
+      } else if (key.downArrow) {
+        setPbsCursor((c) => (c + 1) % PBS_PROVIDERS.length);
+        return;
+      } else if (inputText === " ") {
+        const prov = PBS_PROVIDERS[pbsCursor];
+        setPbsSelected((s) => ({ ...s, [prov]: !s[prov] }));
+        return;
+      } else if (key.return) {
+        const chosenProviders = PBS_PROVIDERS.filter((p) => pbsSelected[p]);
+        if (chosenProviders.length === 0) return;
+        const updatedQuotas = { ...quotas, providerBudgets: { ...quotas.providerBudgets || {}, __useProvider: true } };
+        setQuotas(updatedQuotas);
+        setProviderBudgetQueue(chosenProviders);
+        setProviderBudgetCursor(0);
+        setPbsCursor(0);
+        setActiveView("providerBudgetFlow");
+        return;
+      } else if (key.escape) {
+        setActiveView("budgetTypeSelect");
+        return;
+      }
+      return;
+    }
     if (key.escape) {
       if (showBtwBox) {
         setShowBtwBox(false);
@@ -15183,7 +15320,8 @@ function App({ args = [] }) {
       }
       const startupProvider = parsedArgs.provider || saved.aiProvider || "Google";
       setAiProvider(startupProvider);
-      const currentTier = saved.apiTier || "Free";
+      const providerTiers = saved.quotas?.providerTiers || {};
+      const currentTier = providerTiers[startupProvider] || saved.apiTier || "Free";
       persistedModelRef.current = saved.activeModel;
       if (parsedArgs.model) {
         setActiveModel(parsedArgs.model);
@@ -15215,8 +15353,8 @@ function App({ args = [] }) {
         setActiveModel(saved.activeModel);
       }
       setShowFullThinking(saved.showFullThinking);
-      setApiTier(saved.apiTier || "Free");
-      setQuotas(saved.quotas || { limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0 });
+      setApiTier(currentTier);
+      setQuotas(saved.quotas || { limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0, providerBudgets: {} });
       const freshSettings = {
         memory: true,
         compression: 0,
@@ -15735,7 +15873,8 @@ function App({ args = [] }) {
       desc: "Set or View budget limits",
       subs: [
         { cmd: "view", desc: "View current usage budget bars" },
-        { cmd: "set", desc: "Configure budgets (Daily/Monthly limits)" }
+        { cmd: "set", desc: "Configure budgets (Daily/Monthly limits)" },
+        { cmd: "reset", desc: "Reset budgets to default limits" }
       ]
     },
     {
@@ -16386,28 +16525,8 @@ ${list || "No saved chats found."}`, isMeta: true }];
         case "/budget": {
           const sub = parts[1]?.toLowerCase();
           if (sub === "set") {
-            setInputConfig({
-              label: "Enter Agent daily budget (requests made):",
-              key: "quotas",
-              subKey: "agentLimit",
-              value: getPrefilledValue(quotas.agentLimit),
-              returnView: "chat",
-              next: (newQuotas) => ({
-                label: "Enter Agent daily budget (tokens used):",
-                key: "quotas",
-                subKey: "tokenLimit",
-                value: getPrefilledValue(newQuotas.tokenLimit),
-                returnView: "chat",
-                next: (q2) => ({
-                  label: "Enter Agent monthly budget (tokens used):",
-                  key: "quotas",
-                  subKey: "monthlyTokenLimit",
-                  value: getPrefilledValue(q2.monthlyTokenLimit),
-                  returnView: "budgetResetMode"
-                })
-              })
-            });
-            setActiveView("input");
+            setBudgetReturnView("chat");
+            setActiveView("budgetTypeSelect");
           } else if (sub === "view") {
             const run = async () => {
               const usage = await getDailyUsage();
@@ -16419,10 +16538,34 @@ ${list || "No saved chats found."}`, isMeta: true }];
               setActiveView("budgetView");
             };
             run();
+          } else if (sub === "reset") {
+            const defaultQuotas = {
+              limitMode: "Daily",
+              agentLimit: 99999999,
+              tokenLimit: 99999999999999,
+              backgroundLimit: 999999,
+              searchLimit: 100,
+              customModelId: "",
+              customLimit: 0,
+              providerBudgets: {},
+              providerTiers: {
+                Google: "Free",
+                DeepSeek: "Free",
+                NVIDIA: "Free",
+                OpenRouter: "Free"
+              }
+            };
+            setQuotas(defaultQuotas);
+            setApiTier("Free");
+            saveSettings({ apiTier: "Free", quotas: defaultQuotas });
+            setMessages((prev) => {
+              setCompletedIndex(prev.length + 1);
+              return [...prev, { id: Date.now(), role: "system", text: `\u2705 [BUDGET] Budgets and limits reset to default values successfully.`, isMeta: true }];
+            });
           } else {
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
-              return [...prev, { id: Date.now(), role: "system", text: `Usage: /budget <Set|View>`, isMeta: true }];
+              return [...prev, { id: Date.now(), role: "system", text: `Usage: /budget <Set|View|Reset>`, isMeta: true }];
             });
           }
           break;
@@ -17230,6 +17373,87 @@ Selection: ${val}`,
   useEffect11(() => {
     setSelectedIndex(0);
   }, [suggestions]);
+  useEffect11(() => {
+    if (activeView !== "providerBudgetSelect") return;
+    const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+    const existingBudgets = quotas.providerBudgets || {};
+    const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
+      acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
+      return acc;
+    }, {});
+    setPbsSelected(initialSelected);
+    setPbsCursor(0);
+  }, [activeView]);
+  useEffect11(() => {
+    if (activeView !== "providerBudgetFlow") return;
+    const currentProvider = providerBudgetQueue[providerBudgetCursor];
+    if (!currentProvider) {
+      const returnMode = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
+      const rawPB = quotas.providerBudgets || {};
+      const cleaned = { __useProvider: true };
+      for (const prov of providerBudgetQueue) {
+        if (rawPB[prov]) cleaned[prov] = rawPB[prov];
+      }
+      const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
+      setQuotas(finalCleanedQuotas);
+      saveSettings({ apiTier, quotas: finalCleanedQuotas });
+      setActiveView(returnMode);
+      return;
+    }
+    const existingPB = (quotas.providerBudgets || {})[currentProvider] || {};
+    const totalProviders = providerBudgetQueue.length;
+    const currentStep = providerBudgetCursor + 1;
+    const providerLabel = `[${currentStep}/${totalProviders}] ${currentProvider}`;
+    const advanceToNext = (finalQuotas) => {
+      if (providerBudgetCursor + 1 < providerBudgetQueue.length) {
+        setProviderBudgetCursor((c) => c + 1);
+        setActiveView("providerBudgetFlow");
+      } else {
+        const rawPB = finalQuotas.providerBudgets || {};
+        const cleaned = { __useProvider: true };
+        for (const prov of providerBudgetQueue) {
+          if (rawPB[prov]) cleaned[prov] = rawPB[prov];
+        }
+        const finalCleanedQuotas = { ...finalQuotas, providerBudgets: cleaned };
+        setQuotas(finalCleanedQuotas);
+        const rm = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
+        saveSettings({ apiTier, quotas: finalCleanedQuotas });
+        setActiveView(rm);
+      }
+    };
+    setInputConfig({
+      label: `${providerLabel} \u2014 Daily budget (requests/day):`,
+      key: "providerBudgets",
+      providerKey: currentProvider,
+      subKey: "agentLimit",
+      value: getPrefilledValue(existingPB.agentLimit),
+      returnView: "providerBudgetSelect",
+      next: (newQuotas) => {
+        const updatedPB = (newQuotas.providerBudgets || {})[currentProvider] || {};
+        return {
+          label: `${providerLabel} \u2014 Daily budget (tokens/day):`,
+          key: "providerBudgets",
+          providerKey: currentProvider,
+          subKey: "tokenLimit",
+          value: getPrefilledValue(updatedPB.tokenLimit),
+          returnView: "providerBudgetSelect",
+          next: (q2) => {
+            const pb2 = (q2.providerBudgets || {})[currentProvider] || {};
+            return {
+              label: `${providerLabel} \u2014 Monthly budget (tokens/month):`,
+              key: "providerBudgets",
+              providerKey: currentProvider,
+              subKey: "monthlyTokenLimit",
+              value: getPrefilledValue(pb2.monthlyTokenLimit),
+              returnView: "providerBudgetFlow",
+              onDone: advanceToNext
+            };
+          }
+        };
+      }
+    });
+    setActiveView("input");
+  }, [activeView, providerBudgetCursor]);
   const CustomMenuItem = ({ label: label2, isSelected }) => {
     const isCancel = label2 === "Cancel" || label2 === "Back" || label2.toLowerCase().includes("exit") || label2.toLowerCase().includes("back");
     return /* @__PURE__ */ React15.createElement(
@@ -17308,7 +17532,9 @@ Selection: ${val}`,
                   defaultModel = "moonshotai/kimi-k2.6";
                 }
                 setActiveModel(defaultModel);
-                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier, quotas });
+                const targetTier = (quotas.providerTiers || {})[selectedProvider] || "Free";
+                setApiTier(targetTier);
+                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
                 setMessages((prev) => [
                   ...prev,
                   {
@@ -17333,30 +17559,12 @@ Selection: ${val}`,
           }
         );
       case "apiTier": {
-        const reqCurrent = dailyUsage?.agent || 0;
-        const reqLimit = quotas.agentLimit || 99999999;
-        const tokenCurrent = dailyUsage?.tokens || 0;
-        const tokenLimit = quotas.tokenLimit || 99999999999999;
-        const monthlyCurrent = quotas.resetMode === "Custom" ? customPeriodUsage?.tokens || 0 : monthlyUsage?.tokens || 0;
-        const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
-        let resetInfo = "";
-        if (quotas.resetMode === "Custom") {
-          const today = /* @__PURE__ */ new Date();
-          const resetDay = quotas.resetDay || 1;
-          let resetMonth = today.getMonth();
-          if (today.getDate() >= resetDay) {
-            resetMonth += 1;
-          }
-          const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
-          const monthName = resetDate.toLocaleString("default", { month: "short" });
-          resetInfo = `Resets on: ${resetDay}-${monthName}`;
-        }
-        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: ", aiProvider, ")")), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "SET API KEY STRATEGY FOR ", aiProvider, ".")), /* @__PURE__ */ React15.createElement(
           SelectInput2,
           {
             items: [
-              { label: "Provider Limits", value: "Free" },
-              { label: `Set Budgets (API with Billing Account) ${apiTier === "Paid" ? "\u25CF" : ""}`, value: "Paid" },
+              { label: "Free Key [Basic set of Models]", value: "Free" },
+              { label: `Billing Key [Premium Models Available] ${apiTier === "Paid" ? "\u25CF" : ""}`, value: "Paid" },
               { label: "Back", value: "settings" }
             ],
             onSelect: (item) => {
@@ -17366,40 +17574,22 @@ Selection: ${val}`,
               }
               const newTier = item.value;
               setApiTier(newTier);
-              if (newTier === "Paid") {
-                setInputConfig({
-                  label: "Enter Agent daily budget (requests made):",
-                  key: "quotas",
-                  subKey: "agentLimit",
-                  value: getPrefilledValue(quotas.agentLimit),
-                  returnView: "settings",
-                  next: (newQuotas) => ({
-                    label: "Enter Agent daily budget (tokens used):",
-                    key: "quotas",
-                    subKey: "tokenLimit",
-                    value: getPrefilledValue(newQuotas.tokenLimit),
-                    returnView: "settings",
-                    next: (q2) => ({
-                      label: "Enter Agent monthly budget (tokens used):",
-                      key: "quotas",
-                      subKey: "monthlyTokenLimit",
-                      value: getPrefilledValue(q2.monthlyTokenLimit),
-                      returnView: "resetMode"
-                    })
-                  })
-                });
-                setActiveView("input");
-              } else {
-                const newQuotas = { ...quotas, agentLimit: 99999999, tokenLimit: 99999999999999, monthlyTokenLimit: 99999999999999 };
-                setQuotas(newQuotas);
-                saveSettings({ apiTier: newTier, quotas: newQuotas });
-                setActiveView("settings");
-              }
+              const updatedProviderTiers = {
+                ...quotas.providerTiers || {},
+                [aiProvider]: newTier
+              };
+              const newQuotas = {
+                ...quotas,
+                providerTiers: updatedProviderTiers
+              };
+              setQuotas(newQuotas);
+              saveSettings({ apiTier: newTier, quotas: newQuotas });
+              setActiveView("settings");
             },
             itemComponent: CustomMenuItem,
             indicatorComponent: () => null
           }
-        ), apiTier === "Paid" && /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", marginTop: 1, borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true }, "USAGE BUDGET STATUS")), renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)")));
+        ), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)")));
       }
       case "resetMode":
         return /* @__PURE__ */ React15.createElement(
@@ -17436,6 +17626,82 @@ Selection: ${val}`,
             onClose: () => setActiveView("apiTier")
           }
         );
+      case "budgetTypeSelect":
+        return /* @__PURE__ */ React15.createElement(
+          CommandMenu,
+          {
+            title: "SELECT BUDGET TYPE",
+            items: [
+              { label: `Global Budget  (single limit for all providers) ${apiTier === "Paid" && !quotas.providerBudgets?.["__useProvider"] ? "\u25CF" : ""}`, value: "global" },
+              { label: `Provider Budgets  (set limits per provider individually) ${quotas.providerBudgets?.["__useProvider"] ? "\u25CF" : ""}`, value: "provider" },
+              { label: "Back", value: budgetReturnView }
+            ],
+            onSelect: (item) => {
+              if (item.value === budgetReturnView || item.value === "Back") {
+                setActiveView(budgetReturnView);
+                return;
+              }
+              if (item.value === "global") {
+                const updatedQuotas = {
+                  ...quotas,
+                  agentLimit: 99999999,
+                  tokenLimit: 99999999999999,
+                  monthlyTokenLimit: 99999999999999,
+                  providerBudgets: { __useProvider: false }
+                };
+                setQuotas(updatedQuotas);
+                const returnMode = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
+                setInputConfig({
+                  label: "Enter Agent daily budget (requests made):",
+                  key: "quotas",
+                  subKey: "agentLimit",
+                  value: getPrefilledValue(updatedQuotas.agentLimit),
+                  returnView: budgetReturnView,
+                  next: (newQuotas) => ({
+                    label: "Enter Agent daily budget (tokens used):",
+                    key: "quotas",
+                    subKey: "tokenLimit",
+                    value: getPrefilledValue(newQuotas.tokenLimit),
+                    returnView: budgetReturnView,
+                    next: (q2) => ({
+                      label: "Enter Agent monthly budget (tokens used):",
+                      key: "quotas",
+                      subKey: "monthlyTokenLimit",
+                      value: getPrefilledValue(q2.monthlyTokenLimit),
+                      returnView: returnMode
+                    })
+                  })
+                });
+                setActiveView("input");
+              } else if (item.value === "provider") {
+                const updatedQuotas = {
+                  ...quotas,
+                  agentLimit: 99999999,
+                  tokenLimit: 99999999999999,
+                  monthlyTokenLimit: 99999999999999,
+                  providerBudgets: {
+                    ...quotas.providerBudgets || {},
+                    __useProvider: true
+                  }
+                };
+                setQuotas(updatedQuotas);
+                setActiveView("providerBudgetSelect");
+              }
+            },
+            onClose: () => setActiveView(budgetReturnView)
+          }
+        );
+      case "providerBudgetSelect": {
+        const PROVIDERS_LIST = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+        const anySelected = PROVIDERS_LIST.some((p) => pbsSelected[p]);
+        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
+          const isActive = i === pbsCursor;
+          const isChecked = !!pbsSelected[prov];
+          return /* @__PURE__ */ React15.createElement(Box15, { key: prov, backgroundColor: isActive ? "#2a2a2a" : void 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? "\u276F " : "  ", /* @__PURE__ */ React15.createElement(Text16, { color: isChecked ? "green" : "gray" }, isChecked ? "\u2611" : "\u2610"), "  ", prov, isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React15.createElement(Text16, { color: "cyan" }, " (budget set)") : null));
+        }), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React15.createElement(Text16, { color: "yellow", italic: true }, "  Select at least one provider to continue")));
+      }
+      case "providerBudgetFlow":
+        return null;
       case "budgetResetMode":
         return /* @__PURE__ */ React15.createElement(
           CommandMenu,
@@ -17479,7 +17745,12 @@ Selection: ${val}`,
         const monthlyCurrent = quotas.resetMode === "Custom" ? customPeriodUsage?.tokens || 0 : monthlyUsage?.tokens || 0;
         const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
         const isFreeTier = apiTier !== "Paid";
-        const limitsNotSet = isFreeTier && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
+        const usingProviderBudgets = !!quotas.providerBudgets?.__useProvider;
+        const providerBudgetsMap = quotas.providerBudgets || {};
+        const configuredProviders = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"].filter(
+          (p) => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
+        );
+        const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
         let resetInfo = "";
         if (quotas.resetMode === "Custom") {
           const today = /* @__PURE__ */ new Date();
@@ -17492,7 +17763,22 @@ Selection: ${val}`,
           const monthName = resetDate.toLocaleString("default", { month: "short" });
           resetInfo = `Resets on: ${resetDay}-${monthName}`;
         }
-        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS", isFreeTier ? " (Isn't it fun to see numbers go BRRRR)" : ""), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React15.createElement(Box15, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "yellow", bold: true }, "LIMITS NOT SET")) : /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
+        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS", isFreeTier && !usingProviderBudgets ? " (Isn't it fun to see numbers go BRRRR)" : ""), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React15.createElement(Box15, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "yellow", bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
+          const pb = providerBudgetsMap[prov];
+          const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
+          let provTokenCurrent = 0;
+          const dailyModels = dailyUsage?.models?.[prov] || {};
+          for (const m in dailyModels) {
+            provTokenCurrent += dailyModels[m]?.tokens || 0;
+          }
+          let provMonthlyCurrent = 0;
+          const monthlySource = quotas.resetMode === "Custom" ? customPeriodUsage : monthlyUsage;
+          const monthlyModels = monthlySource?.models?.[prov] || {};
+          for (const m in monthlyModels) {
+            provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+          }
+          return /* @__PURE__ */ React15.createElement(Box15, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Text16, { color: "cyan", bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
+        }), resetInfo ? /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box15, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
       }
       case "input":
         return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, inputConfig.note)), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React15.createElement(
@@ -17501,7 +17787,7 @@ Selection: ${val}`,
             value: inputConfig?.value || "",
             onChange: (val) => setInputConfig((prev) => ({ ...prev, value: val })),
             onSubmit: async (val) => {
-              const { key, subKey, next } = inputConfig;
+              const { key, subKey, next, onDone } = inputConfig;
               let newQuotas = { ...quotas };
               let newSettings = {};
               if (key === "quotas") {
@@ -17510,6 +17796,19 @@ Selection: ${val}`,
                   parsedValue = Math.max(1, Math.min(30, parsedValue));
                 }
                 newQuotas[subKey] = parsedValue;
+                setQuotas(newQuotas);
+                newSettings.quotas = newQuotas;
+              } else if (key === "providerBudgets") {
+                const prov = inputConfig.providerKey;
+                const parsedValue = subKey.toLowerCase().includes("limit") ? parseInt(val) || 0 : val;
+                const existingPBudgets = newQuotas.providerBudgets || {};
+                newQuotas.providerBudgets = {
+                  ...existingPBudgets,
+                  [prov]: {
+                    ...existingPBudgets[prov] || {},
+                    [subKey]: parsedValue
+                  }
+                };
                 setQuotas(newQuotas);
                 newSettings.quotas = newQuotas;
               } else if (key === "activeModel") {
@@ -17561,15 +17860,23 @@ Selection: ${val}`,
                   defaultModel = "moonshotai/kimi-k2.6";
                 }
                 setActiveModel(defaultModel);
+                const targetTier = (quotas.providerTiers || {})[prov] || "Free";
+                setApiTier(targetTier);
                 newSettings.aiProvider = prov;
                 newSettings.activeModel = defaultModel;
+                newSettings.apiTier = targetTier;
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: Date.now(), role: "system", text: `\u2705 ${prov} API Key saved successfully! Model set to ${defaultModel}.`, isMeta: true }];
                 });
               }
               if (next) {
-                setInputConfig(next(key === "quotas" ? newQuotas : val));
+                const nextConfig = next(key === "quotas" || key === "providerBudgets" ? newQuotas : val);
+                setInputConfig(nextConfig);
+              } else if (onDone) {
+                saveSettings({ ...newSettings, apiTier, quotas: newQuotas, imageSettings: newSettings.imageSettings || imageSettings });
+                setInputConfig(null);
+                onDone(newQuotas);
               } else {
                 saveSettings({ ...newSettings, apiTier, quotas: newQuotas, imageSettings: newSettings.imageSettings || imageSettings });
                 setInputConfig(null);
@@ -18063,7 +18370,7 @@ Selection: ${val}`,
         setSetupStep(1);
       }
     }
-  ))) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set budgets in /settings \u2192 Others \u2192 Budgets to avoid runaway spending)."), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React15.createElement(
+  ))) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set /settings \u2192 Others \u2192 API Strategy to use premium models. Set budget limit at /budgets.)."), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React15.createElement(
     TextInput4,
     {
       value: tempKey,

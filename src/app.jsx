@@ -663,8 +663,13 @@ export default function App({ args = [] }) {
 
     const [activeView, setActiveView] = useState('chat'); // chat, mode, thinking, model, settings, profile
     const [apiTier, setApiTier] = useState('Free');
-    const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
+    const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
+    const [budgetReturnView, setBudgetReturnView] = useState('chat');
+    const [providerBudgetQueue, setProviderBudgetQueue] = useState([]); // ordered list of providers to configure
+    const [providerBudgetCursor, setProviderBudgetCursor] = useState(0); // which provider in the queue we're on
+    const [pbsCursor, setPbsCursor] = useState(0); // providerBudgetSelect list cursor
+    const [pbsSelected, setPbsSelected] = useState({}); // providerBudgetSelect checkbox state
     const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
@@ -1200,6 +1205,36 @@ export default function App({ args = [] }) {
             return;
         }
 
+        // Provider Budget Select keyboard handling
+        if (activeView === 'providerBudgetSelect') {
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'NVIDIA', 'OpenRouter'];
+            if (key.upArrow) {
+                setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
+                return;
+            } else if (key.downArrow) {
+                setPbsCursor(c => (c + 1) % PBS_PROVIDERS.length);
+                return;
+            } else if (inputText === ' ') {
+                const prov = PBS_PROVIDERS[pbsCursor];
+                setPbsSelected(s => ({ ...s, [prov]: !s[prov] }));
+                return;
+            } else if (key.return) {
+                const chosenProviders = PBS_PROVIDERS.filter(p => pbsSelected[p]);
+                if (chosenProviders.length === 0) return;
+                const updatedQuotas = { ...quotas, providerBudgets: { ...(quotas.providerBudgets || {}), __useProvider: true } };
+                setQuotas(updatedQuotas);
+                setProviderBudgetQueue(chosenProviders);
+                setProviderBudgetCursor(0);
+                setPbsCursor(0);
+                setActiveView('providerBudgetFlow');
+                return;
+            } else if (key.escape) {
+                setActiveView('budgetTypeSelect');
+                return;
+            }
+            return;
+        }
+
         // 1. ESC Logic
         if (key.escape) {
             if (showBtwBox) {
@@ -1389,7 +1424,8 @@ export default function App({ args = [] }) {
             const startupProvider = parsedArgs.provider || saved.aiProvider || 'Google';
             setAiProvider(startupProvider);
 
-            const currentTier = saved.apiTier || 'Free';
+            const providerTiers = saved.quotas?.providerTiers || {};
+            const currentTier = providerTiers[startupProvider] || saved.apiTier || 'Free';
 
             persistedModelRef.current = saved.activeModel;
             if (parsedArgs.model) {
@@ -1423,8 +1459,8 @@ export default function App({ args = [] }) {
             }
 
             setShowFullThinking(saved.showFullThinking);
-            setApiTier(saved.apiTier || 'Free');
-            setQuotas(saved.quotas || { limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0 });
+            setApiTier(currentTier);
+            setQuotas(saved.quotas || { limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
             const freshSettings = {
                 memory: true,
                 compression: 0.0,
@@ -2000,7 +2036,8 @@ export default function App({ args = [] }) {
         {
             cmd: '/budget', desc: 'Set or View budget limits', subs: [
                 { cmd: 'view', desc: 'View current usage budget bars' },
-                { cmd: 'set', desc: 'Configure budgets (Daily/Monthly limits)' }
+                { cmd: 'set', desc: 'Configure budgets (Daily/Monthly limits)' },
+                { cmd: 'reset', desc: 'Reset budgets to default limits' }
             ]
         },
         {
@@ -2696,28 +2733,8 @@ export default function App({ args = [] }) {
                 case '/budget': {
                     const sub = parts[1]?.toLowerCase();
                     if (sub === 'set') {
-                        setInputConfig({
-                            label: "Enter Agent daily budget (requests made):",
-                            key: 'quotas',
-                            subKey: 'agentLimit',
-                            value: getPrefilledValue(quotas.agentLimit),
-                            returnView: 'chat',
-                            next: (newQuotas) => ({
-                                label: "Enter Agent daily budget (tokens used):",
-                                key: 'quotas',
-                                subKey: 'tokenLimit',
-                                value: getPrefilledValue(newQuotas.tokenLimit),
-                                returnView: 'chat',
-                                next: (q2) => ({
-                                    label: "Enter Agent monthly budget (tokens used):",
-                                    key: 'quotas',
-                                    subKey: 'monthlyTokenLimit',
-                                    value: getPrefilledValue(q2.monthlyTokenLimit),
-                                    returnView: 'budgetResetMode'
-                                })
-                            })
-                        });
-                        setActiveView('input');
+                        setBudgetReturnView('chat');
+                        setActiveView('budgetTypeSelect');
                     } else if (sub === 'view') {
                         const run = async () => {
                             const usage = await getDailyUsage();
@@ -2729,10 +2746,34 @@ export default function App({ args = [] }) {
                             setActiveView('budgetView');
                         };
                         run();
+                    } else if (sub === 'reset') {
+                        const defaultQuotas = {
+                            limitMode: 'Daily',
+                            agentLimit: 99999999,
+                            tokenLimit: 99999999999999,
+                            backgroundLimit: 999999,
+                            searchLimit: 100,
+                            customModelId: '',
+                            customLimit: 0,
+                            providerBudgets: {},
+                            providerTiers: {
+                                Google: 'Free',
+                                DeepSeek: 'Free',
+                                NVIDIA: 'Free',
+                                OpenRouter: 'Free'
+                            }
+                        };
+                        setQuotas(defaultQuotas);
+                        setApiTier('Free');
+                        saveSettings({ apiTier: 'Free', quotas: defaultQuotas });
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, { id: Date.now(), role: 'system', text: `✅ [BUDGET] Budgets and limits reset to default values successfully.`, isMeta: true }];
+                        });
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `Usage: /budget <Set|View>`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `Usage: /budget <Set|View|Reset>`, isMeta: true }];
                         });
                     }
                     break;
@@ -3607,6 +3648,97 @@ export default function App({ args = [] }) {
         setSelectedIndex(0);
     }, [suggestions]);
 
+    // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
+    useEffect(() => {
+        if (activeView !== 'providerBudgetSelect') return;
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'NVIDIA', 'OpenRouter'];
+        const existingBudgets = quotas.providerBudgets || {};
+        const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
+            acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
+            return acc;
+        }, {});
+        setPbsSelected(initialSelected);
+        setPbsCursor(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeView]);
+
+    // Effect: when activeView becomes 'providerBudgetFlow', set up the input chain for the current provider
+    useEffect(() => {
+        if (activeView !== 'providerBudgetFlow') return;
+
+        const currentProvider = providerBudgetQueue[providerBudgetCursor];
+        if (!currentProvider) {
+            const returnMode = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
+            const rawPB = quotas.providerBudgets || {};
+            const cleaned = { __useProvider: true };
+            for (const prov of providerBudgetQueue) {
+                if (rawPB[prov]) cleaned[prov] = rawPB[prov];
+            }
+            const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
+            setQuotas(finalCleanedQuotas);
+            saveSettings({ apiTier, quotas: finalCleanedQuotas });
+            setActiveView(returnMode);
+            return;
+        }
+
+        const existingPB = (quotas.providerBudgets || {})[currentProvider] || {};
+        const totalProviders = providerBudgetQueue.length;
+        const currentStep = providerBudgetCursor + 1;
+        const providerLabel = `[${currentStep}/${totalProviders}] ${currentProvider}`;
+
+        const advanceToNext = (finalQuotas) => {
+            if (providerBudgetCursor + 1 < providerBudgetQueue.length) {
+                setProviderBudgetCursor(c => c + 1);
+                setActiveView('providerBudgetFlow');
+            } else {
+                const rawPB = finalQuotas.providerBudgets || {};
+                const cleaned = { __useProvider: true };
+                for (const prov of providerBudgetQueue) {
+                    if (rawPB[prov]) cleaned[prov] = rawPB[prov];
+                }
+                const finalCleanedQuotas = { ...finalQuotas, providerBudgets: cleaned };
+                setQuotas(finalCleanedQuotas);
+                const rm = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
+                saveSettings({ apiTier, quotas: finalCleanedQuotas });
+                setActiveView(rm);
+            }
+        };
+
+        setInputConfig({
+            label: `${providerLabel} — Daily budget (requests/day):`,
+            key: 'providerBudgets',
+            providerKey: currentProvider,
+            subKey: 'agentLimit',
+            value: getPrefilledValue(existingPB.agentLimit),
+            returnView: 'providerBudgetSelect',
+            next: (newQuotas) => {
+                const updatedPB = (newQuotas.providerBudgets || {})[currentProvider] || {};
+                return {
+                    label: `${providerLabel} — Daily budget (tokens/day):`,
+                    key: 'providerBudgets',
+                    providerKey: currentProvider,
+                    subKey: 'tokenLimit',
+                    value: getPrefilledValue(updatedPB.tokenLimit),
+                    returnView: 'providerBudgetSelect',
+                    next: (q2) => {
+                        const pb2 = (q2.providerBudgets || {})[currentProvider] || {};
+                        return {
+                            label: `${providerLabel} — Monthly budget (tokens/month):`,
+                            key: 'providerBudgets',
+                            providerKey: currentProvider,
+                            subKey: 'monthlyTokenLimit',
+                            value: getPrefilledValue(pb2.monthlyTokenLimit),
+                            returnView: 'providerBudgetFlow',
+                            onDone: advanceToNext
+                        };
+                    }
+                };
+            }
+        });
+        setActiveView('input');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeView, providerBudgetCursor]);
+
     const CustomMenuItem = ({ label, isSelected }) => {
         const isCancel = label === 'Cancel' || label === 'Back' || label.toLowerCase().includes('exit') || label.toLowerCase().includes('back');
         return (
@@ -3701,7 +3833,9 @@ export default function App({ args = [] }) {
                                     defaultModel = 'moonshotai/kimi-k2.6';
                                 }
                                 setActiveModel(defaultModel);
-                                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier, quotas });
+                                const targetTier = (quotas.providerTiers || {})[selectedProvider] || 'Free';
+                                setApiTier(targetTier);
+                                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
                                 setMessages(prev => [
                                     ...prev,
                                     {
@@ -3727,36 +3861,16 @@ export default function App({ args = [] }) {
                 );
 
             case 'apiTier': {
-                const reqCurrent = dailyUsage?.agent || 0;
-                const reqLimit = quotas.agentLimit || 99999999;
-                const tokenCurrent = dailyUsage?.tokens || 0;
-                const tokenLimit = quotas.tokenLimit || 99999999999999;
-                const monthlyCurrent = quotas.resetMode === 'Custom' ? (customPeriodUsage?.tokens || 0) : (monthlyUsage?.tokens || 0);
-                const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
-
-                let resetInfo = '';
-                if (quotas.resetMode === 'Custom') {
-                    const today = new Date();
-                    const resetDay = quotas.resetDay || 1;
-                    let resetMonth = today.getMonth();
-                    if (today.getDate() >= resetDay) {
-                        resetMonth += 1;
-                    }
-                    const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
-                    const monthName = resetDate.toLocaleString('default', { month: 'short' });
-                    resetInfo = `Resets on: ${resetDay}-${monthName}`;
-                }
-
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
                         <Box paddingX={1} marginBottom={1}>
-                            <Text color="gray" bold>SELECT YOUR CURRENT API TIER BASED ON YOUR PROVIDER. (Provider: {aiProvider})</Text>
+                            <Text color="gray" bold>SET API KEY STRATEGY FOR {aiProvider}.</Text>
                         </Box>
 
                         <SelectInput
                             items={[
-                                { label: 'Provider Limits', value: 'Free' },
-                                { label: `Set Budgets (API with Billing Account) ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
+                                { label: 'Free Key [Basic set of Models]', value: 'Free' },
+                                { label: `Billing Key [Premium Models Available] ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
                                 { label: 'Back', value: 'settings' }
                             ]}
                             onSelect={(item) => {
@@ -3768,61 +3882,21 @@ export default function App({ args = [] }) {
                                 const newTier = item.value;
                                 setApiTier(newTier);
 
-                                if (newTier === 'Paid') {
-                                    setInputConfig({
-                                        label: "Enter Agent daily budget (requests made):",
-                                        key: 'quotas',
-                                        subKey: 'agentLimit',
-                                        value: getPrefilledValue(quotas.agentLimit),
-                                        returnView: 'settings',
-                                        next: (newQuotas) => ({
-                                            label: "Enter Agent daily budget (tokens used):",
-                                            key: 'quotas',
-                                            subKey: 'tokenLimit',
-                                            value: getPrefilledValue(newQuotas.tokenLimit),
-                                            returnView: 'settings',
-                                            next: (q2) => ({
-                                                label: "Enter Agent monthly budget (tokens used):",
-                                                key: 'quotas',
-                                                subKey: 'monthlyTokenLimit',
-                                                value: getPrefilledValue(q2.monthlyTokenLimit),
-                                                returnView: 'resetMode'
-                                            })
-                                        })
-                                    });
-                                    setActiveView('input');
-                                } else {
-                                    const newQuotas = { ...quotas, agentLimit: 99999999, tokenLimit: 99999999999999, monthlyTokenLimit: 99999999999999 };
-                                    setQuotas(newQuotas);
-                                    saveSettings({ apiTier: newTier, quotas: newQuotas });
-                                    setActiveView('settings');
-                                }
+                                const updatedProviderTiers = {
+                                    ...(quotas.providerTiers || {}),
+                                    [aiProvider]: newTier
+                                };
+                                const newQuotas = {
+                                    ...quotas,
+                                    providerTiers: updatedProviderTiers
+                                };
+                                setQuotas(newQuotas);
+                                saveSettings({ apiTier: newTier, quotas: newQuotas });
+                                setActiveView('settings');
                             }}
                             itemComponent={CustomMenuItem}
                             indicatorComponent={() => null}
                         />
-
-                        {apiTier === 'Paid' && (
-                            <Box flexDirection="column" marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} width="100%">
-                                <Box marginBottom={1}>
-                                    <Text color="white" bold>USAGE BUDGET STATUS</Text>
-                                </Box>
-                                {renderProgressBar('Daily Requests', reqCurrent, reqLimit, 'cyan')}
-                                {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
-                                {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
-                                {resetInfo ? (
-                                    <Box marginLeft={4} marginTop={1}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="magenta" bold>{resetInfo}</Text>
-                                    </Box>
-                                ) : (
-                                    <Box marginLeft={4} marginTop={1}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
-                                    </Box>
-                                )}
-                            </Box>
-                        )}
 
                         <Box paddingX={1} marginTop={1}>
                             <Text color="gray" italic>(Arrows to select • Enter to confirm)</Text>
@@ -3868,7 +3942,112 @@ export default function App({ args = [] }) {
                     />
                 );
 
+            case 'budgetTypeSelect':
+                return (
+                    <CommandMenu
+                        title="SELECT BUDGET TYPE"
+                        items={[
+                            { label: `Global Budget  (single limit for all providers) ${apiTier === 'Paid' && !quotas.providerBudgets?.['__useProvider'] ? '●' : ''}`, value: 'global' },
+                            { label: `Provider Budgets  (set limits per provider individually) ${quotas.providerBudgets?.['__useProvider'] ? '●' : ''}`, value: 'provider' },
+                            { label: 'Back', value: budgetReturnView }
+                        ]}
+                        onSelect={(item) => {
+                            if (item.value === budgetReturnView || item.value === 'Back') {
+                                setActiveView(budgetReturnView);
+                                return;
+                            }
+
+                            if (item.value === 'global') {
+                                // Clear providerBudgets and reset to default global budget values before set
+                                const updatedQuotas = {
+                                    ...quotas,
+                                    agentLimit: 99999999,
+                                    tokenLimit: 99999999999999,
+                                    monthlyTokenLimit: 99999999999999,
+                                    providerBudgets: { __useProvider: false }
+                                };
+                                setQuotas(updatedQuotas);
+                                const returnMode = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
+                                setInputConfig({
+                                    label: "Enter Agent daily budget (requests made):",
+                                    key: 'quotas',
+                                    subKey: 'agentLimit',
+                                    value: getPrefilledValue(updatedQuotas.agentLimit),
+                                    returnView: budgetReturnView,
+                                    next: (newQuotas) => ({
+                                        label: "Enter Agent daily budget (tokens used):",
+                                        key: 'quotas',
+                                        subKey: 'tokenLimit',
+                                        value: getPrefilledValue(newQuotas.tokenLimit),
+                                        returnView: budgetReturnView,
+                                        next: (q2) => ({
+                                            label: "Enter Agent monthly budget (tokens used):",
+                                            key: 'quotas',
+                                            subKey: 'monthlyTokenLimit',
+                                            value: getPrefilledValue(q2.monthlyTokenLimit),
+                                            returnView: returnMode
+                                        })
+                                    })
+                                });
+                                setActiveView('input');
+                            } else if (item.value === 'provider') {
+                                const updatedQuotas = {
+                                    ...quotas,
+                                    agentLimit: 99999999,
+                                    tokenLimit: 99999999999999,
+                                    monthlyTokenLimit: 99999999999999,
+                                    providerBudgets: {
+                                        ...(quotas.providerBudgets || {}),
+                                        __useProvider: true
+                                    }
+                                };
+                                setQuotas(updatedQuotas);
+                                setActiveView('providerBudgetSelect');
+                            }
+                        }}
+                        onClose={() => setActiveView(budgetReturnView)}
+                    />
+                );
+
+            case 'providerBudgetSelect': {
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'NVIDIA', 'OpenRouter'];
+                const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
+                        <Box paddingX={1} marginBottom={1}>
+                            <Text color="gray" bold>SELECT PROVIDERS TO SET BUDGETS FOR</Text>
+                        </Box>
+                        {PROVIDERS_LIST.map((prov, i) => {
+                            const isActive = i === pbsCursor;
+                            const isChecked = !!pbsSelected[prov];
+                            return (
+                                <Box key={prov} backgroundColor={isActive ? "#2a2a2a" : undefined} paddingX={1} width="100%">
+                                    <Text color={isActive ? 'white' : 'gray'} bold={isActive}>
+                                        {isActive ? '❯ ' : '  '}
+                                        <Text color={isChecked ? 'green' : 'gray'}>{isChecked ? '☑' : '☐'}</Text>
+                                        {'  '}{prov}
+                                        {isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? (
+                                            <Text color="cyan"> (budget set)</Text>
+                                        ) : null}
+                                    </Text>
+                                </Box>
+                            );
+                        })}
+                        <Box paddingX={1} marginTop={1} flexDirection="column">
+                            <Text color="gray" italic>↑↓ Navigate  •  Space to toggle  •  Enter to confirm  •  ESC to go back</Text>
+                            {!anySelected && <Text color="yellow" italic>  Select at least one provider to continue</Text>}
+                        </Box>
+                    </Box>
+                );
+            }
+
+            case 'providerBudgetFlow':
+                // Logic is handled by the useEffect above — it fires when this view becomes active
+                // and immediately transitions to 'input' with the correct config for the current provider.
+                return null;
+
             case 'budgetResetMode':
+
                 return (
                     <CommandMenu
                         title="SELECT MONTHLY RESET MODE"
@@ -3914,7 +4093,12 @@ export default function App({ args = [] }) {
                 const monthlyLimit = quotas.monthlyTokenLimit || 99999999999999;
 
                 const isFreeTier = apiTier !== 'Paid';
-                const limitsNotSet = isFreeTier && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
+                const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
+                const providerBudgetsMap = quotas.providerBudgets || {};
+                const configuredProviders = ['Google', 'DeepSeek', 'NVIDIA', 'OpenRouter'].filter(
+                    p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
+                );
+                const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
 
                 let resetInfo = '';
                 if (quotas.resetMode === 'Custom') {
@@ -3932,12 +4116,54 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" padding={1} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
-                            <Text color="white" bold underline>BUDGET LIMIT STATUS{isFreeTier ? " (Isn't it fun to see numbers go BRRRR)" : ""}</Text>
+                            <Text color="white" bold underline>BUDGET LIMIT STATUS{isFreeTier && !usingProviderBudgets ? " (Isn't it fun to see numbers go BRRRR)" : ""}</Text>
                             <Text color="gray">[ ESC to Close ]</Text>
                         </Box>
                         {limitsNotSet ? (
                             <Box padding={1} justifyContent="center" alignItems="center" width="100%">
                                 <Text color="yellow" bold>LIMITS NOT SET</Text>
+                            </Box>
+                        ) : usingProviderBudgets && configuredProviders.length > 0 ? (
+                            <Box flexDirection="column" gap={1} width="100%">
+                                {configuredProviders.map(prov => {
+                                    const pb = providerBudgetsMap[prov];
+                                    const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
+
+                                    let provTokenCurrent = 0;
+                                    const dailyModels = dailyUsage?.models?.[prov] || {};
+                                    for (const m in dailyModels) {
+                                        provTokenCurrent += dailyModels[m]?.tokens || 0;
+                                    }
+
+                                    let provMonthlyCurrent = 0;
+                                    const monthlySource = quotas.resetMode === 'Custom' ? customPeriodUsage : monthlyUsage;
+                                    const monthlyModels = monthlySource?.models?.[prov] || {};
+                                    for (const m in monthlyModels) {
+                                        provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+                                    }
+
+                                    return (
+                                        <Box key={prov} flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} width="100%">
+                                            <Box marginBottom={0}>
+                                                <Text color="cyan" bold>◆ {prov}</Text>
+                                            </Box>
+                                            {renderProgressBar('Daily Requests', provReqCurrent, pb.agentLimit || 99999999, 'cyan')}
+                                            {renderProgressBar('Daily Tokens', provTokenCurrent, pb.tokenLimit || 99999999999999, 'green')}
+                                            {renderProgressBar('Monthly Tokens', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, 'yellow')}
+                                        </Box>
+                                    );
+                                })}
+                                {resetInfo ? (
+                                    <Box marginLeft={4}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="magenta" bold>{resetInfo}</Text>
+                                    </Box>
+                                ) : (
+                                    <Box marginLeft={4}>
+                                        <Text color="gray">Monthly Reset  : </Text>
+                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
+                                    </Box>
+                                )}
                             </Box>
                         ) : (
                             <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} width="100%">
@@ -3982,7 +4208,7 @@ export default function App({ args = [] }) {
                                 value={inputConfig?.value || ''}
                                 onChange={(val) => setInputConfig(prev => ({ ...prev, value: val }))}
                                 onSubmit={async (val) => {
-                                    const { key, subKey, next } = inputConfig;
+                                    const { key, subKey, next, onDone } = inputConfig;
 
                                     let newQuotas = { ...quotas };
                                     let newSettings = {};
@@ -3993,6 +4219,19 @@ export default function App({ args = [] }) {
                                             parsedValue = Math.max(1, Math.min(30, parsedValue));
                                         }
                                         newQuotas[subKey] = parsedValue;
+                                        setQuotas(newQuotas);
+                                        newSettings.quotas = newQuotas;
+                                    } else if (key === 'providerBudgets') {
+                                        const prov = inputConfig.providerKey;
+                                        const parsedValue = subKey.toLowerCase().includes('limit') ? parseInt(val) || 0 : val;
+                                        const existingPBudgets = newQuotas.providerBudgets || {};
+                                        newQuotas.providerBudgets = {
+                                            ...existingPBudgets,
+                                            [prov]: {
+                                                ...(existingPBudgets[prov] || {}),
+                                                [subKey]: parsedValue
+                                            }
+                                        };
                                         setQuotas(newQuotas);
                                         newSettings.quotas = newQuotas;
                                     } else if (key === 'activeModel') {
@@ -4043,8 +4282,11 @@ export default function App({ args = [] }) {
                                         } else if (prov === 'NVIDIA') {
                                             defaultModel = 'moonshotai/kimi-k2.6';
                                         } setActiveModel(defaultModel);
+                                        const targetTier = (quotas.providerTiers || {})[prov] || 'Free';
+                                        setApiTier(targetTier);
                                         newSettings.aiProvider = prov;
                                         newSettings.activeModel = defaultModel;
+                                        newSettings.apiTier = targetTier;
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
@@ -4053,7 +4295,12 @@ export default function App({ args = [] }) {
                                     }
 
                                     if (next) {
-                                        setInputConfig(next(key === 'quotas' ? newQuotas : val));
+                                        const nextConfig = next(key === 'quotas' || key === 'providerBudgets' ? newQuotas : val);
+                                        setInputConfig(nextConfig);
+                                    } else if (onDone) {
+                                        saveSettings({ ...newSettings, apiTier, quotas: newQuotas, imageSettings: newSettings.imageSettings || imageSettings });
+                                        setInputConfig(null);
+                                        onDone(newQuotas);
                                     } else {
                                         saveSettings({ ...newSettings, apiTier, quotas: newQuotas, imageSettings: newSettings.imageSettings || imageSettings });
                                         setInputConfig(null);
@@ -4963,7 +5210,7 @@ export default function App({ args = [] }) {
                                         </>
                                     ) : (
                                         <>
-                                            <Text color="white">Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set budgets in /settings → Others → Budgets to avoid runaway spending).</Text>
+                                            <Text color="white">Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set /settings → Others → API Strategy to use premium models. Set budget limit at /budgets.).</Text>
                                             <Box marginTop={1}>
                                                 <Text color="gray" bold> {'>'} </Text>
                                                 <TextInput

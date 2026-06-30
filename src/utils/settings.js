@@ -15,7 +15,13 @@ const DEFAULT_SETTINGS = {
         backgroundLimit: 999999,
         searchLimit: 100,
         customModelId: '',
-        customLimit: 0
+        customLimit: 0,
+        providerTiers: {
+            Google: 'Free',
+            DeepSeek: 'Free',
+            NVIDIA: 'Free',
+            OpenRouter: 'Free'
+        }
     },
     systemSettings: {
         memory: true,
@@ -64,7 +70,14 @@ export const loadSettings = async () => {
             settingsObj = {
                 ...DEFAULT_SETTINGS,
                 ...saved,
-                quotas: { ...DEFAULT_SETTINGS.quotas, ...saved.quotas },
+                quotas: {
+                    ...DEFAULT_SETTINGS.quotas,
+                    ...saved.quotas,
+                    providerTiers: {
+                        ...DEFAULT_SETTINGS.quotas.providerTiers,
+                        ...(saved.quotas?.providerTiers || {})
+                    }
+                },
                 systemSettings: { ...DEFAULT_SETTINGS.systemSettings, ...saved.systemSettings },
                 profileData: { ...DEFAULT_SETTINGS.profileData, ...saved.profileData },
                 imageSettings: { ...DEFAULT_SETTINGS.imageSettings, ...saved.imageSettings }

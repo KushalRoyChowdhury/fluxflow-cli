@@ -145,7 +145,7 @@ export default function SettingsMenu({
             case 'other':
                 return [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    { label: 'Budgets', value: 'apiTier', status: apiTier === 'Free' ? 'Provider Limits' : 'Custom Budget' },
+                    { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ]; default:
                 return [];
