@@ -56,48 +56,48 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             {/* 🛠️ MODE & THINKING ZONE */}
             <Box>
                 <Box marginRight={1}>
-                    <Text color="white" bold>{modeIcon} {mode.toUpperCase()}</Text>
+                    <Text color="white" bold>{mode.toUpperCase()}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃ </Text>
+                <Text color="gray" dimColor>┃</Text>
 
                 <Box marginX={1}>
                     <Text color="white" bold>{thinkingLevel.toUpperCase()}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃ </Text>
+                <Text color="gray" dimColor>┃</Text>
 
                 <Box marginX={1}>
-                    <Text color="gray">MEM: </Text>
+                    <Text color="gray" bold>MEM: </Text>
                     <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text>
                 </Box>
             </Box>
 
             {/* 📁 WORKSPACE TELEMETRY */}
             <Box flexGrow={1} justifyContent="center" paddingX={2}>
-                <Text color="white" italic> {truncatePath(process.cwd(), 35)}</Text>
+                <Text color="white" italic>{truncatePath(process.cwd(), 35)}</Text>
             </Box>
 
             {/* 🔋 PERFORMANCE & ID ZONE */}
             <Box>
-                <Text color="gray" dimColor>┃ </Text>
+                <Text color="gray" dimColor>┃</Text>
 
                 <Box marginX={1}>
-                    <Text color="white"> {formatTokens(tokensTotal)} <Text dimColor>{((tokens / maxLimit) * 100).toFixed(0)}%</Text></Text>
+                    <Text color="white">{formatTokens(tokensTotal)} <Text dimColor>{((tokens / maxLimit) * 100).toFixed(0)}%</Text></Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃ </Text>
+                <Text color="gray" dimColor>┃</Text>
 
                 <Box marginX={1}>
                     <Text color="grey" bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃ </Text>
+                <Text color="gray" dimColor>┃</Text>
 
                 <Box marginLeft={1}>
-                    <Text color="gray" italic> {chatId}</Text>
+                    <Text color="gray" bold>{chatId}</Text>
                     {(apiTier === 'Custom' || apiTier === 'Paid') && (
-                        <Text color="white"> | <Text color="gray" bold>CUSTOM</Text></Text>
+                        <Box><Text color="gray" dimColor> ┃ </Text><Text color="gray" bold>PAID</Text></Box>
                     )}
                 </Box>
             </Box>

@@ -3864,13 +3864,13 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
                         <Box paddingX={1} marginBottom={1}>
-                            <Text color="gray" bold>SET API KEY STRATEGY FOR {aiProvider}.</Text>
+                            <Text color="white" bold>SELECT API MODE FOR {aiProvider.toUpperCase()}</Text>
                         </Box>
 
                         <SelectInput
                             items={[
-                                { label: 'Free Key [Basic set of Models]', value: 'Free' },
-                                { label: `Billing Key [Premium Models Available] ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
+                                { label: 'Free Mode (For Free APIs)     [Free Models Only]', value: 'Free' },
+                                { label: `Paid Mode (For Billing APIs)  [Premium Models Unlocked] ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
                                 { label: 'Back', value: 'settings' }
                             ]}
                             onSelect={(item) => {
@@ -4116,12 +4116,12 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="white" padding={1} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
-                            <Text color="white" bold underline>BUDGET LIMIT STATUS{isFreeTier && !usingProviderBudgets ? " (Isn't it fun to see numbers go BRRRR)" : ""}</Text>
+                            <Text color="white" bold underline>BUDGET LIMIT STATUS</Text>
                             <Text color="gray">[ ESC to Close ]</Text>
                         </Box>
                         {limitsNotSet ? (
                             <Box padding={1} justifyContent="center" alignItems="center" width="100%">
-                                <Text color="yellow" bold>LIMITS NOT SET</Text>
+                                <Text color="white" bold>LIMITS NOT SET</Text>
                             </Box>
                         ) : usingProviderBudgets && configuredProviders.length > 0 ? (
                             <Box flexDirection="column" gap={1} width="100%">
@@ -5294,7 +5294,7 @@ export default function App({ args = [] }) {
                                             }
                                             return (
                                                 <Text color="gray" dimColor italic>
-                                                    Paid API has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
+                                                    Paid API Strategy has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
                                                 </Text>
                                             );
                                         })() : null}

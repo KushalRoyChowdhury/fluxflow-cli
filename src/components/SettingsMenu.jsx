@@ -303,7 +303,7 @@ export default function SettingsMenu({
         <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%" minHeight={32}>
             {/* Title Bar */}
             <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="gray" width="100%">
-                <Text color="gray" bold>SYSTEM CONFIGURATION</Text>
+                <Text color="white" bold>SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
