@@ -2679,8 +2679,11 @@ var init_text = __esm({
       let activeBlock = null;
       let pendingChunk = [];
       let pendingChunkType = null;
-      const flushPending = () => {
+      const flushPending = (force = false) => {
         if (!pendingChunk.length) return;
+        if (msg.isStreaming && !force) {
+          return;
+        }
         const batch = pendingChunk;
         pendingChunk = [];
         pendingChunkType = null;
@@ -2692,10 +2695,10 @@ var init_text = __esm({
         });
       };
       const enqueue = (block) => {
-        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
+        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending(true);
         pendingChunk.push(block);
         pendingChunkType = block.type;
-        if (pendingChunk.length >= CHUNK_SIZE) flushPending();
+        if (pendingChunk.length >= CHUNK_SIZE) flushPending(false);
       };
       if (msg.role === "think") {
         completedBlocks.push(getBlock(`${msg.id}-header`, "think-header", ""));
@@ -4793,7 +4796,7 @@ var init_StatusBar = __esm({
         },
         /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "MEM: "), /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, isMemoryEnabled ? "ON" : "OFF"))),
         /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", italic: true }, truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", /* @__PURE__ */ React5.createElement(Text5, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "PAID"))))
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", /* @__PURE__ */ React5.createElement(Text5, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "PAID"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -6361,8 +6364,8 @@ ${projectContextBlock}
 -- FORMATTING --
 - GFM Supported
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
-- Short headsup about actions before firing tools
-- Task Complete & Results Verified? End response with summary of changes made and files edited
+- Short headsup summary of actions before firing tools
+- Task Complete & Results Verified? End response with summary of changes made (why) and files edited
 - Basic LaTeX${mode === "Flux" ? "" : ". Kaomojis"}
 === END SYSTEM PROMPT ===`.trim();
     };

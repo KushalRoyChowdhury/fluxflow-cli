@@ -703,8 +703,12 @@ export const parseMessageToBlocks = (msg, columns) => {
     let pendingChunk = [];
     let pendingChunkType = null;
 
-    const flushPending = () => {
+    const flushPending = (force = false) => {
         if (!pendingChunk.length) return;
+        // If we are streaming and not forcing, keep the last chunk in active blocks
+        if (msg.isStreaming && !force) {
+            return;
+        }
         const batch = pendingChunk;
         pendingChunk = [];  // fresh array; old one handed off — no spread needed
         pendingChunkType = null;
@@ -718,10 +722,10 @@ export const parseMessageToBlocks = (msg, columns) => {
 
     // Enqueue a per-line block. Flushes on type change or when CHUNK_SIZE is reached.
     const enqueue = (block) => {
-        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
+        if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending(true);
         pendingChunk.push(block);
         pendingChunkType = block.type;
-        if (pendingChunk.length >= CHUNK_SIZE) flushPending();
+        if (pendingChunk.length >= CHUNK_SIZE) flushPending(false);
     };
     // ─────────────────────────────────────────────────────────────────────────
 
