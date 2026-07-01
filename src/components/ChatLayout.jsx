@@ -459,42 +459,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
 
     const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
 
-    // 🔍 Reconstruct and align hunk if rendering single diff-line blocks
     let finalPairContent = pairContent;
-    if (!finalPairContent && parentText && (isRemoval || isAddition)) {
-        const match = parentText.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
-        const diffBody = match ? match[1].trim() : '';
-        const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
-
-        const parsedLines = diffLines.map(l => {
-            return {
-                line: l,
-                parsed: parseLineInfo(l),
-                pairContent: null
-            };
-        });
-
-        let currentGroup = [];
-        for (let idx = 0; idx < parsedLines.length; idx++) {
-            const item = parsedLines[idx];
-            if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
-                currentGroup.push(item);
-            } else {
-                if (currentGroup.length > 0) {
-                    alignChangeGroup(currentGroup);
-                    currentGroup = [];
-                }
-            }
-        }
-        if (currentGroup.length > 0) {
-            alignChangeGroup(currentGroup);
-        }
-
-        const matchedItem = parsedLines.find(item => item.parsed && item.parsed.num === lineNum && item.parsed.isR === isRemoval);
-        if (matchedItem) {
-            finalPairContent = matchedItem.pairContent;
-        }
-    }
 
     // 🔍 1. Compute fine-grained tokens
     let words = [];
@@ -622,7 +587,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
 });
 
 const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
-    const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
+    const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
 
@@ -1169,7 +1134,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 });
 
 export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
-    const { msg, type, text, isStreaming } = block;
+    const { msg, type, text, isStreamingMsg, workedDuration } = block;
 
     // Batch chunk — renders up to CHUNK_SIZE sub-blocks committed together to <Static>
     if (type === 'chunk') {
@@ -1204,7 +1169,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'think-header') {
         return (
             <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
-                {msg.isStreaming ? (
+                {isStreamingMsg ? (
                     <Text bold color="white">✧ Thinking...</Text>
                 ) : (
                     <Text bold color="white">✦ Thought...</Text>
@@ -1228,7 +1193,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             );
         }
 
-        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         const trimmed = animatedText.trim();
         const isUnordered = /^[\*\-\+]\s/.test(trimmed);
         const isOrdered = /^\d+\.\s/.test(trimmed);
@@ -1271,7 +1236,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         if (!text || text.trim() === '') {
             return <Box height={1} />;
         }
-        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
                 <CodeRenderer text={animatedText} columns={columns} />
@@ -1306,7 +1271,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 <DiffLine
                     line={text}
                     pairContent={block.pairContent}
-                    parentText={msg?.text} // 🎯 THIS FIXES STREAMING MATCHES!
+                    parentText={undefined} // No longer needed
                     columns={columns}
                 />
                 {isLastLine && renderPaddingLine(true)}
@@ -1457,7 +1422,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         return (
             <Box marginTop={1} marginBottom={2} paddingX={1} width="100%">
                 <Text>[</Text><Text color="gray">
-                    Worked for <Text bold color="white">{formatThinkingDuration(msg.workedDuration)}</Text>
+                    Worked for <Text bold color="white">{formatThinkingDuration(workedDuration)}</Text>
                 </Text><Text>]</Text>
             </Box>
         );

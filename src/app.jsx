@@ -3554,9 +3554,9 @@ export default function App({ args = [] }) {
                                             transitionContent = parts.slice(1).join('</think>') || '';
                                             const startTime = next[i].startTime || parseInt(String(next[i].id).split('-')[1]) || Date.now();
                                             const duration = Date.now() - startTime;
-                                            next[i] = { ...next[i], text: (' ' + parts[0]).slice(1), isStreaming: false, duration };
+                                            next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
                                         } else {
-                                            next[i] = { ...next[i], text: (' ' + newText).slice(1), isStreaming: true };
+                                            next[i] = { ...next[i], text: newText, isStreaming: true };
                                         }
                                         break;
                                     }
@@ -3585,7 +3585,7 @@ export default function App({ args = [] }) {
                                     // Iterate backwards to update active text without array cloning overhead
                                     for (let i = next.length - 1; i >= 0; i--) {
                                         if (next[i].id === currentAgentId) {
-                                            next[i] = { ...next[i], text: (' ' + next[i].text + chunkText).slice(1), isStreaming: true };
+                                            next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
                                             break;
                                         }
                                     }

@@ -587,12 +587,26 @@ export const parseMessageToBlocks = (msg, columns) => {
         ) {
             return existing;
         }
+
+        // V8 Memory Leak Fix: Flatten strings so cached blocks don't retain the giant growing streaming strings.
+        const flatText = typeof textContent === 'string' ? (' ' + textContent).slice(1) : textContent;
+
+        const flatExtra = { ...extra };
+        if (typeof flatExtra.pairContent === 'string') {
+            flatExtra.pairContent = (' ' + flatExtra.pairContent).slice(1);
+        }
+        if (Array.isArray(flatExtra.wrappedLines)) {
+            flatExtra.wrappedLines = flatExtra.wrappedLines.map(l => typeof l === 'string' ? (' ' + l).slice(1) : l);
+        }
+
         return {
             key,
-            msg,
+            isStreamingMsg: !!msg.isStreaming,
+            workedDuration: msg.workedDuration,
             type,
-            text: textContent,
-            ...extra
+            text: flatText,
+            msg: type === 'full-message' ? msg : undefined, // Only full-message requires role/meta checks
+            ...flatExtra
         };
     };
 
@@ -620,7 +634,7 @@ export const parseMessageToBlocks = (msg, columns) => {
             const batch = writeChunk;
             writeChunk = [];  // fresh array; old one handed off — no spread needed
             completedBlocks.push(batch.length === 1 ? batch[0] : {
-                key: `${batch[0].key}-chunk`, msg, type: 'chunk', blocks: batch
+                key: `${batch[0].key}-chunk`, type: 'chunk', blocks: batch
             });
         };
 
@@ -645,7 +659,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     }
 
     if (text.includes('[DIFF_START]')) {
-        const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
+        const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : '';
         const diffLines = diffBody.split('\n').map(l => l.replace(/\r$/, ''));
 
@@ -671,7 +685,7 @@ export const parseMessageToBlocks = (msg, columns) => {
             const batch = diffChunk;
             diffChunk = [];  // fresh array; old one handed off — no spread needed
             completedBlocks.push(batch.length === 1 ? batch[0] : {
-                key: `${batch[0].key}-chunk`, msg, type: 'chunk', blocks: batch
+                key: `${batch[0].key}-chunk`, type: 'chunk', blocks: batch
             });
         };
 
@@ -723,7 +737,6 @@ export const parseMessageToBlocks = (msg, columns) => {
         pendingChunkType = null;
         completedBlocks.push(batch.length === 1 ? batch[0] : {
             key: `${msg.id || 'x'}-chunk-${batch[0].key}`,
-            msg,
             type: 'chunk',
             blocks: batch
         });
@@ -750,7 +763,7 @@ export const parseMessageToBlocks = (msg, columns) => {
         });
         if (!msg.isStreaming) {
             flushPending();
-            completedBlocks.push({ key: `${msg.id}-footer-padding`, msg, type: 'think-footer-padding', text: '' });
+            completedBlocks.push({ key: `${msg.id}-footer-padding`, type: 'think-footer-padding', text: '' });
         }
     } else {
         const lines = text.split('\n');
@@ -814,7 +827,6 @@ export const parseMessageToBlocks = (msg, columns) => {
         // pendingChunk goes out of scope here — assign directly, no spread needed
         activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : {
             key: `${msg.id || 'x'}-chunk-active-${pendingChunk[0].key}`,
-            msg,
             type: 'chunk',
             blocks: pendingChunk
         };
@@ -882,25 +894,8 @@ export const TOOL_LABELS = {
 // ============================================================================
 const REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
-const REGEX_SYSTEM = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi;
-const REGEX_THINK = /<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi;
-const REGEX_ANSWER = /\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi;
-const REGEX_TOOL_RES = /\[TOOL RESULT\]:?\s*/gi;
-// The (\r?\n)? perfectly mimics the old .split().filter().join() behavior
-const REGEX_SUCCESS_ERROR = /^\s*(SUCCESS|ERROR):.*(\r?\n)?/gm;
-const REGEX_TURN_1 = /\[\s*turn\s*:\s*(continue|finish)\s*\]/gi;
-const REGEX_END = /\[\[END\]\]/gi;
-const REGEX_TURN_2 = /\[\s*turn\s*:?.*?$/gi;
-const REGEX_TURN_3 = /\n\s*turn\s*:?.*?$/gi;
-const REGEX_OPEN_BRACKET = /\[\s*$/gi;
-const REGEX_RESPONDED = /\n\nResponded on .*/g;
-const REGEX_PROMPTED = /\n\n\[Prompted on: .*\]/g;
-const REGEX_ARROWS = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi;
-const REGEX_ARROWS_L = /(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi;
-const REGEX_ARROWS_U = /(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi;
-const REGEX_ARROWS_D = /(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi;
-const REGEX_ARROWS_LR = /(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
-const REGEX_TERMINAL = /@\[TerminalName:.*?, ProcessId:.*?\]/gi;
+const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
+const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 
 export const cleanSignals = (text) => {
@@ -920,11 +915,9 @@ export const cleanSignals = (text) => {
             let triggerIdx = lowerResult.indexOf(trigger);
             if (triggerIdx === -1) break;
 
-            // [HARDENING] Check for outer bracket
             let startIdx = triggerIdx;
             let hasOuterBracket = false;
 
-            // Look back for '[' (ignoring whitespace)
             let k = triggerIdx - 1;
             while (k >= 0 && /\s/.test(result[k])) k--;
             if (k >= 0 && result[k] === '[') {
@@ -939,8 +932,6 @@ export const cleanSignals = (text) => {
 
             while (j < result.length) {
                 const char = result[j];
-
-                // String immunity
                 if (!inString && (char === "'" || char === '"' || char === '`')) {
                     inString = char;
                 } else if (inString && char === inString && result[j - 1] !== '\\') {
@@ -957,7 +948,6 @@ export const cleanSignals = (text) => {
                 }
 
                 if (foundStart && balance === 0 && !inString) {
-                    // If we have outer bracket, look for closing ']'
                     let endIdx = j;
                     if (hasOuterBracket) {
                         let m = j + 1;
@@ -969,41 +959,32 @@ export const cleanSignals = (text) => {
                     result = result.substring(0, startIdx) + result.substring(endIdx + 1);
                     break;
                 }
-
                 j++;
-
-                // [SAFETY] If we reached the end without finding a closing boundary,
-                // it's a partial call. Strip it and break to prevent infinite loop.
                 if (j === result.length) {
                     result = result.substring(0, startIdx);
-                    return result; // Immediate exit
+                    return result;
                 }
             }
         }
     }
 
-    // Secondary cleanup for protocol signals and success/error markers
-    return result
-        .replaceAll(REGEX_SYSTEM, '')
-        .replaceAll(REGEX_THINK, '')
-        .replace(REGEX_ANSWER, '')
-        .replaceAll(REGEX_TOOL_RES, '')
-        .replaceAll(REGEX_SUCCESS_ERROR, '') // This replaces the memory-heavy .split().filter().join()
-        .replaceAll(REGEX_TURN_1, '')
-        .replaceAll(REGEX_END, '')
-        .replaceAll(REGEX_TURN_2, '')
-        .replaceAll(REGEX_TURN_3, '')
-        .replaceAll(REGEX_OPEN_BRACKET, '')
-        .replaceAll(REGEX_RESPONDED, '')
-        .replaceAll(REGEX_PROMPTED, '')
-        .replaceAll(REGEX_ARROWS, '→')
-        .replaceAll(REGEX_ARROWS_L, '←')
-        .replaceAll(REGEX_ARROWS_U, '↑')
-        .replaceAll(REGEX_ARROWS_D, '↓')
-        .replaceAll(REGEX_ARROWS_LR, '↔')
-        .replaceAll(REGEX_TERMINAL, '')
-        .replaceAll(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match)
-        .trim();
+    // Consolidated regex pass eliminates string allocations scaling linearly with replace rules
+    result = result.replace(REGEX_CLEAN_SIGNALS, '');
+
+    // Single pass for all formatting arrows
+    result = result.replace(REGEX_ARROWS_ALL, (match) => {
+        const lower = match.toLowerCase();
+        if (lower.includes('leftrightarrow')) return '↔';
+        if (lower.includes('rightarrow')) return '→';
+        if (lower.includes('leftarrow')) return '←';
+        if (lower.includes('uparrow')) return '↑';
+        if (lower.includes('downarrow')) return '↓';
+        return match;
+    });
+
+    result = result.replace(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match);
+
+    return result.trim();
 };
 
 export const clearBlocksCache = () => {
