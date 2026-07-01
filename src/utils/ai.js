@@ -1918,7 +1918,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 });
 
                 ideBlock += `Focused File: ${relFocused}\nCursor Line: ${ideCtx.cursor_line}\n`;
-                if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"\n`;
+                if (ideCtx.selected) {
+                    let sel = ideCtx.selected;
+                    const lines = sel.split('\n');
+                    if (lines.length > 256) {
+                        sel = lines.slice(0, 240).join('\n') + '\n... [truncated] ...\n' + lines.slice(-16).join('\n');
+                    }
+                    if (sel.length > 2048) {
+                        sel = sel.slice(0, 1920) + '\n... [truncated] ...\n' + sel.slice(-128);
+                    }
+                    ideBlock += `Current Selection: "${sel}"\n`;
+                }
                 if (ideCtx.manual_edits) {
                     let edits = ideCtx.manual_edits;
                     const lines = edits.split('\n');

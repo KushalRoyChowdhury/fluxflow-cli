@@ -4144,7 +4144,7 @@ var init_ChatLayout = __esm({
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, bold: true, color: "white" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(2, -2), color: "white" }));
         }
         if (part.startsWith("*") && part.endsWith("*")) {
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, italic: true, color: "gray" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(1, -1), color: "gray" }));
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, italic: true, color: "white" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(1, -1), color: "white", italic }));
         }
         if (part.startsWith("`") && part.endsWith("`")) {
           const content = part.slice(1, -1);
@@ -11384,8 +11384,18 @@ ${currentSummary}
             ideBlock += `Focused File: ${relFocused}
 Cursor Line: ${ideCtx.cursor_line}
 `;
-            if (ideCtx.selected) ideBlock += `Current Selection: "${ideCtx.selected}"
+            if (ideCtx.selected) {
+              let sel = ideCtx.selected;
+              const lines = sel.split("\n");
+              if (lines.length > 256) {
+                sel = lines.slice(0, 240).join("\n") + "\n... [truncated] ...\n" + lines.slice(-16).join("\n");
+              }
+              if (sel.length > 2048) {
+                sel = sel.slice(0, 1920) + "\n... [truncated] ...\n" + sel.slice(-128);
+              }
+              ideBlock += `Current Selection: "${sel}"
 `;
+            }
             if (ideCtx.manual_edits) {
               let edits = ideCtx.manual_edits;
               const lines = edits.split("\n");

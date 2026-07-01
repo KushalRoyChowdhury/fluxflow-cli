@@ -233,7 +233,7 @@ const InlineMarkdown = React.memo(({ text, color, italic }) => {
 
                 // 🏷️ Recursive Italic
                 if (part.startsWith('*') && part.endsWith('*')) {
-                    return <Text key={j} italic color="gray"><InlineMarkdown text={part.slice(1, -1)} color="gray" /></Text>;
+                    return <Text key={j} italic color="white"><InlineMarkdown text={part.slice(1, -1)} color="white" italic={italic} /></Text>;
                 }
 
                 if (part.startsWith('`') && part.endsWith('`')) {
