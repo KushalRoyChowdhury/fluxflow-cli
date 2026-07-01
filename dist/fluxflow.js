@@ -18419,7 +18419,7 @@ Selection: ${val}`,
       aiProvider,
       version: versionFluxflow
     }
-  ))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 1, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React15.createElement(
+  ))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 0, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React15.createElement(
     BlockItem,
     {
       key: block.key,
