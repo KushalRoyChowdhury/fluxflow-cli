@@ -141,7 +141,9 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     const cleanOutput = processPTY(output).replace(/\n{3,}/g, '\n\n');
 
     // Bypass wrapText for PTY output to let the native terminal handling do its work
-    const displayOutput = isPty ? cleanOutput : (cleanOutput ? wrapText(cleanOutput, columns - 6) : '');
+    const rawLines = isPty 
+        ? (cleanOutput ? cleanOutput.split('\n') : [])
+        : (cleanOutput ? wrapText(cleanOutput, columns - 6) : []);
 
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -151,7 +153,6 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         }
     }, { isActive: isFocused });
 
-    const rawLines = displayOutput ? displayOutput.split('\n') : [];
     const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 20));
     const hasCollapsibleContent = rawLines.length > limit;
     const collapsedCount = rawLines.length - limit;

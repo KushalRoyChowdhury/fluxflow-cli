@@ -2104,17 +2104,18 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
+var ANSI_REGEX, ANSI_REGEX_TEST, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
+    ANSI_REGEX = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+    ANSI_REGEX_TEST = /\x1B\[[0-?]*[ -/]*[@-~]/;
     wrapText = (text, width) => {
-      if (!text) return "";
-      const ansiRegex2 = /\x1B\[[0-?]*[ -/]*[@-~]/g;
+      if (!text) return [];
       const sourceLines = text.split("\n");
       let finalLines = [];
-      if (width <= 5) return text;
-      const getVisibleLength = (str) => str.replace(ansiRegex2, "").length;
+      if (width <= 5) return [text];
+      const getVisibleLength = (str) => str.replace(ANSI_REGEX, "").length;
       sourceLines.forEach((sLine) => {
         const visibleLength = getVisibleLength(sLine);
         if (visibleLength <= width) {
@@ -2135,7 +2136,7 @@ var init_text = __esm({
               currentLine = indent + token;
               currentVisibleLength = getVisibleLength(currentLine);
             } else {
-              if (ansiRegex2.test(token)) {
+              if (ANSI_REGEX_TEST.test(token)) {
                 finalLines.push(token);
                 currentLine = indent;
                 currentVisibleLength = getVisibleLength(currentLine);
@@ -2158,7 +2159,7 @@ var init_text = __esm({
           finalLines.push(currentLine.trimEnd());
         }
       });
-      return finalLines.join("\n");
+      return finalLines;
     };
     formatTokens = (tokens) => {
       if (!tokens && tokens !== 0) return "0.0k";
@@ -2465,21 +2466,26 @@ var init_text = __esm({
       if (!s1 || !s2) return 0;
       const l1 = s1.length;
       const l2 = s2.length;
-      const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
-      for (let i = 0; i <= l1; i++) dp[i][0] = i;
-      for (let j = 0; j <= l2; j++) dp[0][j] = j;
+      let prev = new Int32Array(l2 + 1);
+      let curr = new Int32Array(l2 + 1);
+      for (let j = 0; j <= l2; j++) prev[j] = j;
       for (let i = 1; i <= l1; i++) {
+        curr[0] = i;
         for (let j = 1; j <= l2; j++) {
           if (s1[i - 1] === s2[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1];
+            curr[j] = prev[j - 1];
           } else {
-            dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+            curr[j] = Math.min(prev[j], curr[j - 1], prev[j - 1]) + 1;
           }
         }
+        const temp = prev;
+        prev = curr;
+        curr = temp;
       }
+      const distance = prev[l2];
       const maxLen = Math.max(l1, l2);
       if (maxLen === 0) return 1;
-      return 1 - dp[l1][l2] / maxLen;
+      return 1 - distance / maxLen;
     };
     alignChangeGroup = (group) => {
       const removals = [];
@@ -2494,40 +2500,44 @@ var init_text = __esm({
       const N = removals.length;
       const M = additions.length;
       if (N === 0 || M === 0) return;
-      const dp = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
-      const choices = Array.from({ length: N + 1 }, () => Array(M + 1).fill(""));
-      for (let i2 = 1; i2 <= N; i2++) choices[i2][0] = "up";
-      for (let j2 = 1; j2 <= M; j2++) choices[0][j2] = "left";
-      const simMatrix = Array.from({ length: N }, () => Array(M).fill(0));
+      const size = (N + 1) * (M + 1);
+      const dp = new Float32Array(size);
+      const choices = new Uint8Array(size);
+      const getIdx = (r, c) => r * (M + 1) + c;
+      for (let i2 = 1; i2 <= N; i2++) choices[getIdx(i2, 0)] = 2;
+      for (let j2 = 1; j2 <= M; j2++) choices[getIdx(0, j2)] = 3;
+      const simMatrix = new Float32Array(N * M);
       for (let i2 = 0; i2 < N; i2++) {
+        const remContentTrim = removals[i2].content.trim();
         for (let j2 = 0; j2 < M; j2++) {
-          simMatrix[i2][j2] = getSimilarity(removals[i2].content.trim(), additions[j2].content.trim());
+          simMatrix[i2 * M + j2] = getSimilarity(remContentTrim, additions[j2].content.trim());
         }
       }
       for (let i2 = 1; i2 <= N; i2++) {
         for (let j2 = 1; j2 <= M; j2++) {
-          const matchScore = simMatrix[i2 - 1][j2 - 1];
+          const matchScore = simMatrix[(i2 - 1) * M + (j2 - 1)];
           const score = matchScore >= 0.2 ? matchScore : -10;
-          const diag = dp[i2 - 1][j2 - 1] + score;
-          const up = dp[i2 - 1][j2];
-          const left = dp[i2][j2 - 1];
+          const diag = dp[getIdx(i2 - 1, j2 - 1)] + score;
+          const up = dp[getIdx(i2 - 1, j2)];
+          const left = dp[getIdx(i2, j2 - 1)];
           if (diag >= up && diag >= left) {
-            dp[i2][j2] = diag;
-            choices[i2][j2] = "diag";
+            dp[getIdx(i2, j2)] = diag;
+            choices[getIdx(i2, j2)] = 1;
           } else if (up >= left) {
-            dp[i2][j2] = up;
-            choices[i2][j2] = "up";
+            dp[getIdx(i2, j2)] = up;
+            choices[getIdx(i2, j2)] = 2;
           } else {
-            dp[i2][j2] = left;
-            choices[i2][j2] = "left";
+            dp[getIdx(i2, j2)] = left;
+            choices[getIdx(i2, j2)] = 3;
           }
         }
       }
       let i = N;
       let j = M;
       while (i > 0 || j > 0) {
-        if (choices[i][j] === "diag") {
-          const matchScore = simMatrix[i - 1][j - 1];
+        const choice = choices[getIdx(i, j)];
+        if (choice === 1) {
+          const matchScore = simMatrix[(i - 1) * M + (j - 1)];
           if (matchScore >= 0.2) {
             const rIdx = removals[i - 1].index;
             const aIdx = additions[j - 1].index;
@@ -2536,7 +2546,7 @@ var init_text = __esm({
           }
           i--;
           j--;
-        } else if (choices[i][j] === "up") {
+        } else if (choice === 2) {
           i--;
         } else {
           j--;
@@ -2545,7 +2555,7 @@ var init_text = __esm({
     };
     blocksCache = /* @__PURE__ */ new Map();
     streamingBlocksCache = /* @__PURE__ */ new Map();
-    MAX_CACHE_SIZE = 200;
+    MAX_CACHE_SIZE = 15;
     CHUNK_SIZE = 6;
     indexBlockIntoMap = (b, map) => {
       map.set(b.key, b);
@@ -2569,15 +2579,53 @@ var init_text = __esm({
       const getBlock = (key, type, textContent, extra = {}) => {
         const existing = cachedBlocks.get(key);
         if (existing && existing.text === textContent && existing.type === type && !!existing.isActiveBlock === !!extra.isActiveBlock && !!existing.isStreaming === !!extra.isStreaming && existing.pairContent === extra.pairContent) {
-          return existing;
+          if (existing.isStreaming === msg.isStreaming && existing.workedDuration === msg.workedDuration) {
+            return existing;
+          }
+          const updated = {
+            ...existing,
+            isStreaming: msg.isStreaming,
+            workedDuration: msg.workedDuration
+          };
+          cachedBlocks.set(key, updated);
+          return updated;
         }
-        return {
+        const flatText = typeof textContent === "string" ? (" " + textContent).slice(1) : textContent;
+        const newBlock = {
           key,
-          msg,
+          msgId: msg.id,
+          isStreaming: msg.isStreaming,
+          workedDuration: msg.workedDuration,
+          isMeta: msg.isMeta,
           type,
-          text: textContent,
+          text: flatText,
+          msg: type === "full-message" ? msg : void 0,
           ...extra
         };
+        cachedBlocks.set(key, newBlock);
+        return newBlock;
+      };
+      const getChunkBlock = (key, batch) => {
+        const existing = cachedBlocks.get(key);
+        if (existing && existing.type === "chunk" && existing.blocks.length === batch.length && existing.isStreaming === msg.isStreaming) {
+          let allMatch = true;
+          for (let i = 0; i < batch.length; i++) {
+            if (existing.blocks[i] !== batch[i]) {
+              allMatch = false;
+              break;
+            }
+          }
+          if (allMatch) return existing;
+        }
+        const newChunk = {
+          key,
+          msgId: msg.id,
+          isStreaming: msg.isStreaming,
+          type: "chunk",
+          blocks: batch
+        };
+        cachedBlocks.set(key, newChunk);
+        return newChunk;
       };
       if (text.includes("- Content Preview:")) {
         let extension = "";
@@ -2598,17 +2646,12 @@ var init_text = __esm({
           if (!writeChunk.length) return;
           const batch = writeChunk;
           writeChunk = [];
-          completedBlocks2.push(batch.length === 1 ? batch[0] : {
-            key: `${batch[0].key}-chunk`,
-            msg,
-            type: "chunk",
-            blocks: batch
-          });
+          completedBlocks2.push(batch.length === 1 ? batch[0] : getChunkBlock(`${batch[0].key}-chunk`, batch));
         };
         const innerWidth = columns - (gutterWidth + 6);
         codeLines.forEach((line, idx) => {
           const isLast = idx === codeLines.length - 1;
-          const wrappedLines = wrapText(line, innerWidth).split("\n");
+          const wrappedLines = wrapText(line, innerWidth);
           const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, "write-line", line, {
             gutterWidth,
             lineNum: idx + 1,
@@ -2653,19 +2696,14 @@ var init_text = __esm({
           if (!diffChunk.length) return;
           const batch = diffChunk;
           diffChunk = [];
-          completedBlocks2.push(batch.length === 1 ? batch[0] : {
-            key: `${batch[0].key}-chunk`,
-            msg,
-            type: "chunk",
-            blocks: batch
-          });
+          completedBlocks2.push(batch.length === 1 ? batch[0] : getChunkBlock(`${batch[0].key}-chunk`, batch));
         };
         diffLines.forEach((line, i) => {
           const isLast = i === diffLines.length - 1;
           const parsed = parsedLines[i].parsed;
           let wrappedLines = null;
           if (parsed) {
-            wrappedLines = wrapText(parsed.content, columns - 17).split("\n");
+            wrappedLines = wrapText(parsed.content, columns - 17);
           }
           const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, "diff-line", line, {
             isFirstLine: i === 0,
@@ -2699,12 +2737,7 @@ var init_text = __esm({
         const batch = pendingChunk;
         pendingChunk = [];
         pendingChunkType = null;
-        completedBlocks.push(batch.length === 1 ? batch[0] : {
-          key: `${msg.id || "x"}-chunk-${batch[0].key}`,
-          msg,
-          type: "chunk",
-          blocks: batch
-        });
+        completedBlocks.push(batch.length === 1 ? batch[0] : getChunkBlock(`${msg.id || "x"}-chunk-${batch[0].key}`, batch));
       };
       const enqueue = (block, isLastOfMessage = false) => {
         if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
@@ -2779,12 +2812,7 @@ var init_text = __esm({
         }
       }
       if (msg.isStreaming && pendingChunk.length > 0) {
-        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : {
-          key: `${msg.id || "x"}-chunk-active-${pendingChunk[0].key}`,
-          msg,
-          type: "chunk",
-          blocks: pendingChunk
-        };
+        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : getChunkBlock(`${msg.id || "x"}-chunk-active-${pendingChunk[0].key}`, pendingChunk);
       } else {
         flushPending();
       }
@@ -2863,9 +2891,9 @@ var init_text = __esm({
       if (!text) return text;
       let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, "");
       const trigger = "tool:functions.";
-      if (result.toLowerCase().includes(trigger)) {
+      let lowerResult = result.toLowerCase();
+      if (lowerResult.includes(trigger)) {
         while (true) {
-          const lowerResult = result.toLowerCase();
           let triggerIdx = lowerResult.indexOf(trigger);
           if (triggerIdx === -1) break;
           let startIdx = triggerIdx;
@@ -2905,6 +2933,7 @@ var init_text = __esm({
                 }
               }
               result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+              lowerResult = lowerResult.substring(0, startIdx) + lowerResult.substring(endIdx + 1);
               break;
             }
             j++;
@@ -2994,8 +3023,7 @@ function computeVisualMatrix(value, cursorIndex, wrapWidth, formatText, pasteBlo
       currentIdx += 1;
       continue;
     }
-    const wrapped = wrapText(line, wrapWidth);
-    const wrappedLines = wrapped.split("\n");
+    const wrappedLines = wrapText(line, wrapWidth);
     let lastMatchEnd = 0;
     const chunks = [];
     for (let j = 0; j < wrappedLines.length; j++) {
@@ -3689,14 +3717,13 @@ var init_TerminalBox = __esm({
         return resultLines.join("\n");
       };
       const cleanOutput = processPTY(output).replace(/\n{3,}/g, "\n\n");
-      const displayOutput = isPty ? cleanOutput : cleanOutput ? wrapText(cleanOutput, columns - 6) : "";
+      const rawLines = isPty ? cleanOutput ? cleanOutput.split("\n") : [] : cleanOutput ? wrapText(cleanOutput, columns - 6) : [];
       const [isExpanded, setIsExpanded] = useState3(false);
       useInput2((input, key) => {
         if (isFocused && key.ctrl && (input === "o" || input === "")) {
           setIsExpanded((prev) => !prev);
         }
       }, { isActive: isFocused });
-      const rawLines = displayOutput ? displayOutput.split("\n") : [];
       const limit = Math.max(5, completed ? terminalHeight - 10 : terminalHeight - 20);
       const hasCollapsibleContent = rawLines.length > limit;
       const collapsedCount = rawLines.length - limit;
@@ -4021,7 +4048,7 @@ var init_ChatLayout = __esm({
           const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
           const code = match ? match[2] : part.replace(/^```\w*\n?/, "").replace(/```$/, "");
           const wrappedCode = wrapText(code.trimEnd(), availableWidth);
-          return /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, wrappedCode.split("\n").map((line, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "cyan" }, line)));
+          return /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, wrappedCode.map((line, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "cyan" }, line)));
         }
         let cleanPart = part;
         if (i > 0) {
@@ -4175,7 +4202,8 @@ var init_ChatLayout = __esm({
         return renderLatexText(part, j);
       }));
     });
-    TableRenderer = React4.memo(({ buffer, terminalWidth = 80 }) => {
+    TableRenderer = React4.memo(({ text, terminalWidth = 80 }) => {
+      const buffer = React4.useMemo(() => text.split("\n"), [text]);
       if (buffer.length < 2) return null;
       const rows = buffer.map((line) => {
         const parts = line.split("|");
@@ -4190,7 +4218,7 @@ var init_ChatLayout = __esm({
       const colChars = Math.floor(availableWidth / header.length) - 2;
       return (
         // Table MarginY here
-        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
+        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars).join("\n"), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars).join("\n"), color: "white" }))))))
       );
     });
     MarkdownText = React4.memo(({ text, color = "white", columns = 80, italic = false }) => {
@@ -4243,18 +4271,17 @@ var init_ChatLayout = __esm({
           const isUnordered = /^[\*\-\+]\s/.test(trimmed);
           const isOrdered = /^\d+\.\s/.test(trimmed);
           const isAsciiArt = line.includes("\u2588") || line.includes("\u2554") || line.includes("\u255A") || line.includes("\u2550");
-          let content = "";
+          let linesOfContent;
           if (isAsciiArt) {
-            content = line;
+            linesOfContent = [line];
           } else if (isUnordered || isOrdered) {
             const bullet = isUnordered ? "  \u2022 " : trimmed.match(/^\d+\.\s/)[0];
             const indent = " ".repeat(bullet.length);
-            const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 6));
-            content = bullet + wrappedPart.split("\n").join("\n" + indent);
+            const wrappedPartLines = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 6));
+            linesOfContent = wrappedPartLines.map((l, idx) => idx === 0 ? bullet + l : indent + l);
           } else {
-            content = wrapText(trimmed, columns - 4);
+            linesOfContent = wrapText(trimmed, columns - 4);
           }
-          const linesOfContent = content.split("\n");
           result.push(
             /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, linesOfContent.map((l, lIdx) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: lIdx, text: l, color, italic })))
           );
@@ -4263,7 +4290,7 @@ var init_ChatLayout = __esm({
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
+    DiffLine = React4.memo(({ line, pairContent, columns = 80, extension }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
@@ -4271,51 +4298,22 @@ var init_ChatLayout = __esm({
       }
       const parsedCurrent = parseLineInfo(line);
       if (!parsedCurrent) {
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14).join("\n"))));
       }
       const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
       let finalPairContent = pairContent;
-      if (!finalPairContent && parentText && (isRemoval || isAddition)) {
-        const match = parentText.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
-        const diffBody = match ? match[1].trim() : "";
-        const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
-        const parsedLines = diffLines.map((l) => {
-          return {
-            line: l,
-            parsed: parseLineInfo(l),
-            pairContent: null
-          };
-        });
-        let currentGroup = [];
-        for (let idx = 0; idx < parsedLines.length; idx++) {
-          const item = parsedLines[idx];
-          if (item.parsed && (item.parsed.isR || item.parsed.isA)) {
-            currentGroup.push(item);
-          } else {
-            if (currentGroup.length > 0) {
-              alignChangeGroup(currentGroup);
-              currentGroup = [];
-            }
+      const words = React4.useMemo(() => {
+        if (finalPairContent !== void 0 && finalPairContent !== null) {
+          const oldStr = isRemoval ? content : finalPairContent;
+          const newStr = isRemoval ? finalPairContent : content;
+          try {
+            return diffWordsWithSpace(oldStr, newStr);
+          } catch (e) {
+            return [];
           }
         }
-        if (currentGroup.length > 0) {
-          alignChangeGroup(currentGroup);
-        }
-        const matchedItem = parsedLines.find((item) => item.parsed && item.parsed.num === lineNum && item.parsed.isR === isRemoval);
-        if (matchedItem) {
-          finalPairContent = matchedItem.pairContent;
-        }
-      }
-      let words = [];
-      if (finalPairContent !== void 0 && finalPairContent !== null) {
-        const oldStr = isRemoval ? content : finalPairContent;
-        const newStr = isRemoval ? finalPairContent : content;
-        try {
-          words = diffWordsWithSpace(oldStr, newStr);
-        } catch (e) {
-          words = [];
-        }
-      }
+        return [];
+      }, [content, finalPairContent, isRemoval]);
       const hasInlineChange = words.some((part) => isRemoval && part.removed || isAddition && part.added);
       const isPureUnpairedBlock = !finalPairContent && (isRemoval || isAddition);
       const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
@@ -4325,12 +4323,12 @@ var init_ChatLayout = __esm({
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
           const blockColor = isRemoval ? "#ffdddd" : "#ddffdd";
-          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          const wrappedLines = wrapText(content, columns - 14);
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
           const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
-          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          const wrappedLines = wrapText(content, columns - 14);
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor))));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
@@ -4338,7 +4336,7 @@ var init_ChatLayout = __esm({
           if (isRemoval) {
             const isSurroundedByRemoval = words[idx - 1]?.removed || words[idx + 1]?.removed;
             if (part.removed || isWhitespace && isSurroundedByRemoval) {
-              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#ff3333" }, part.value);
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#ff3333", backgroundColor: "#5a1818" }, part.value);
             }
             if (part.added) return null;
             return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#885555" }, part.value);
@@ -4346,7 +4344,7 @@ var init_ChatLayout = __esm({
           if (isAddition) {
             const isSurroundedByAddition = words[idx - 1]?.added || words[idx + 1]?.added;
             if (part.added || isWhitespace && isSurroundedByAddition) {
-              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#33ff66" }, part.value);
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#33ff66", backgroundColor: "#185a25" }, part.value);
             }
             if (part.removed) return null;
             return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#558866" }, part.value);
@@ -4645,12 +4643,12 @@ var init_ChatLayout = __esm({
           wrapText(
             finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
             columns - 7
-          ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
+          ).map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
         ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]")) : null))
       );
     });
     BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
-      const { msg, type, text, isStreaming } = block;
+      const { msg, type, text, isStreaming, workedDuration } = block;
       if (type === "chunk") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, block.blocks.map((b) => /* @__PURE__ */ React4.createElement(
           BlockItem,
@@ -4677,27 +4675,26 @@ var init_ChatLayout = __esm({
         );
       }
       if (type === "think-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, msg.isStreaming ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreaming ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
       }
       if (type === "think-line") {
         if (!showFullThinking) return null;
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "));
         }
-        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreaming, block.isActiveBlock);
         const trimmed = animatedText.trim();
         const isUnordered = /^[\*\-\+]\s/.test(trimmed);
         const isOrdered = /^\d+\.\s/.test(trimmed);
-        let content = animatedText;
+        let wrappedLines;
         if (isUnordered || isOrdered) {
           const bullet = isUnordered ? "  \u2022 " : trimmed.match(/^\d+\.\s/)[0];
           const indent = " ".repeat(bullet.length);
-          const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 10));
-          content = bullet + wrappedPart.split("\n").join("\n" + indent);
+          const wrappedPartLines = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 10));
+          wrappedLines = wrappedPartLines.map((l, idx) => idx === 0 ? bullet + l : indent + l);
         } else {
-          content = wrapText(animatedText, columns - 10);
+          wrappedLines = wrapText(animatedText, columns - 10);
         }
-        const wrappedLines = content.split("\n");
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, wrappedLines.map((wLine, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wLine, color: "gray", italic: true })))));
       }
       if (type === "think-footer-padding") {
@@ -4708,11 +4705,11 @@ var init_ChatLayout = __esm({
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { height: 1 });
         }
-        const animatedText = useStreamingText(text, msg.isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreaming, block.isActiveBlock);
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns }));
       }
       if (type === "table") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { text, terminalWidth: columns }));
       }
       if (type === "diff-line") {
         const { isFirstLine, isLastLine } = block;
@@ -4722,7 +4719,6 @@ var init_ChatLayout = __esm({
           {
             line: text,
             pairContent: block.pairContent,
-            parentText: msg?.text,
             columns
           }
         ), isLastLine && renderPaddingLine(true));
@@ -4824,7 +4820,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
       }
       if (type === "worked-duration") {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]"));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]"));
       }
       return null;
     });
@@ -4873,7 +4869,7 @@ var init_StatusBar = __esm({
         getMemoryInfo();
         const interval = setInterval(() => {
           getMemoryInfo();
-        }, 3e3);
+        }, 2e3);
         return () => clearInterval(interval);
       }, []);
       let maxLimit = 256e3;
@@ -5825,7 +5821,7 @@ function SettingsMenu({
     getMemoryStats();
     const interval = setInterval(() => {
       getMemoryStats();
-    }, 5e3);
+    }, 3e4);
     return () => clearInterval(interval);
   }, []);
   const getCategoryItems = (catId) => {
@@ -11312,6 +11308,7 @@ Provide a consolidated summary of the entire session.`;
           });
           return result;
         };
+        yield { type: "status", content: "[start]" };
         yield { type: "status", content: "Gathering Context..." };
         await new Promise((resolve) => setTimeout(resolve, 500));
         const totalFolders = countFolders(process.cwd());
@@ -13412,6 +13409,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
             } else {
               modifiedHistory.push({ role: "agent", text: cleanedFullResponse });
             }
+            yield { type: "status", content: "[end]" };
           }
           if (isActuallyFinished) break;
           const nextAgentMsg = cleanedTurnText.trim() || "*Working...*";
@@ -14500,6 +14498,7 @@ import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
+  let lastGCTime = null;
   const [confirmExit, setConfirmExit] = useState14(false);
   const [exitCountdown, setExitCountdown] = useState14(10);
   const { stdout } = useStdout2();
@@ -14530,9 +14529,24 @@ function App({ args = [] }) {
         setShowBridgePromo(false);
       }
     }, 1e3);
+    const memInterval = setInterval(() => {
+      if (lastGCTime) {
+        const diff = Date.now() - lastGCTime;
+        if (diff > 3e4) {
+          if (global.gc) {
+            try {
+              global.gc();
+              lastGCTime = Date.now();
+            } catch (e) {
+            }
+          }
+        }
+      }
+    }, 3e4);
     return () => {
       clearTimeout(graceTimer);
       clearInterval(interval);
+      clearInterval(memInterval);
     };
   }, []);
   const parsedArgs = useMemo2(() => {
@@ -14801,6 +14815,7 @@ function App({ args = [] }) {
   const PLAYGROUND_CHAT_ID = "flow-playground";
   const [chatId, setChatId] = useState14(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
   useEffect11(() => {
+    if (chatLoadingRef.current) return;
     const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
     setChatTokens(nextTokens);
     if (chatId) {
@@ -14948,6 +14963,8 @@ function App({ args = [] }) {
   const [statusText, setStatusText] = useState14(null);
   const [wittyPhrase, setWittyPhrase] = useState14("");
   const [hasPasteBlock, setHasPasteBlock] = useState14(false);
+  const [activeTime, setActiveTime] = useState14(0);
+  let interval_for_timer;
   useEffect11(() => {
     let interval;
     if (statusText) {
@@ -14960,7 +14977,9 @@ function App({ args = [] }) {
     } else {
       setWittyPhrase("");
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [statusText]);
   const [isSpinnerActive, setIsSpinnerActive] = useState14(true);
   const [isProcessing, setIsProcessing] = useState14(false);
@@ -14970,6 +14989,14 @@ function App({ args = [] }) {
   const [escPressCount, setEscPressCount] = useState14(0);
   const [recentPrompts, setRecentPrompts] = useState14([]);
   const escDoubleTimerRef = useRef3(null);
+  const chatLoadingRef = useRef3(false);
+  useEffect11(() => {
+    return () => {
+      if (escDoubleTimerRef.current) {
+        clearTimeout(escDoubleTimerRef.current);
+      }
+    };
+  }, []);
   const didSignalTerminationRef = useRef3(false);
   const [queuedPrompt, setQueuedPrompt] = useState14(null);
   const [resolutionData, setResolutionData] = useState14(null);
@@ -15053,7 +15080,9 @@ function App({ args = [] }) {
     completedIndex: 0,
     columns: 0,
     historicalBlocks: [],
-    seenSelections: /* @__PURE__ */ new Set()
+    seenSelections: /* @__PURE__ */ new Set(),
+    chatId: "",
+    clearKey: 0
   });
   const parsedBlocks = useMemo2(() => {
     const columns = terminalSize.columns || 80;
@@ -15062,7 +15091,9 @@ function App({ args = [] }) {
     let seenAskSelections = /* @__PURE__ */ new Set();
     const isResize = cachedHistoryRef.current.columns !== columns;
     const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
-    if (isResize || isClear) {
+    const isChatChanged = cachedHistoryRef.current.chatId !== chatId;
+    const isClearKeyChanged = cachedHistoryRef.current.clearKey !== clearKey;
+    if (isResize || isClear || isChatChanged || isClearKeyChanged) {
       const completedMsgs = messages.slice(0, completedIndex);
       for (let i = 0; i < completedMsgs.length; i++) {
         const msg = completedMsgs[i];
@@ -15082,7 +15113,9 @@ function App({ args = [] }) {
         completedIndex,
         columns,
         historicalBlocks,
-        seenSelections: new Set(seenAskSelections)
+        seenSelections: new Set(seenAskSelections),
+        chatId,
+        clearKey
       };
     } else {
       historicalBlocks = cachedHistoryRef.current.historicalBlocks;
@@ -15109,7 +15142,9 @@ function App({ args = [] }) {
           completedIndex,
           columns,
           historicalBlocks,
-          seenSelections: seenAskSelections
+          seenSelections: seenAskSelections,
+          chatId,
+          clearKey
         };
       }
     }
@@ -15129,7 +15164,10 @@ function App({ args = [] }) {
       for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
       for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
     }
-    const finalCompleted = historicalBlocks.concat(streamingCompletedBlocks);
+    const finalCompleted = [...historicalBlocks];
+    for (let j = 0; j < streamingCompletedBlocks.length; j++) {
+      finalCompleted.push(streamingCompletedBlocks[j]);
+    }
     if (finalCompleted.length >= 75e3) {
       finalCompleted.push({
         key: `memory-warning-block-${finalCompleted.length}`,
@@ -15146,7 +15184,7 @@ function App({ args = [] }) {
       completed: finalCompleted,
       active: activeBlocks
     };
-  }, [messages, completedIndex, terminalSize.columns]);
+  }, [messages, completedIndex, terminalSize.columns, clearKey, chatId]);
   const isTerminalWaitingForInput = useMemo2(() => {
     if (!activeCommand || !execOutput) return false;
     const lastChunk = execOutput.trim();
@@ -15278,10 +15316,18 @@ function App({ args = [] }) {
         setConfirmExit(false);
         return;
       }
-      if (isProcessing || activeCommand) {
+      if (isProcessing || activeCommand || pendingApproval || pendingAsk) {
         didSignalTerminationRef.current = true;
         signalTermination();
         terminateActiveCommand();
+        if (pendingApproval) {
+          pendingApproval.resolve("deny");
+          setPendingApproval(null);
+        }
+        if (pendingAsk) {
+          pendingAsk.resolve(null);
+          setPendingAsk(null);
+        }
         setEscPressed(false);
         if (escTimer) clearTimeout(escTimer);
       } else {
@@ -15515,9 +15561,11 @@ function App({ args = [] }) {
         const h = await loadHistory();
         const id = parsedArgs.resume;
         if (h[id]) {
+          chatLoadingRef.current = true;
           setChatId(id);
           const savedData = await loadChatContext(id);
           chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+          chatLoadingRef.current = false;
           setChatTokens(savedData.total);
           setSessionStats({ tokens: savedData.context });
           const resumedMsgs = [...h[id].messages];
@@ -16060,9 +16108,11 @@ ${cleanText}`, color: "magenta" }];
               if (target) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
                 clearBlocksCache();
+                chatLoadingRef.current = true;
                 setChatId(targetId);
                 const savedData = await loadChatContext(targetId);
                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                chatLoadingRef.current = false;
                 setChatTokens(savedData.total);
                 setSessionStats({ tokens: savedData.context });
                 const resumedMsgs = [...target.messages];
@@ -16193,6 +16243,7 @@ ${cleanText}`, color: "magenta" }];
             if (global.gc) {
               try {
                 global.gc();
+                lastGCTime = Date.now();
               } catch (e) {
               }
             }
@@ -16216,6 +16267,7 @@ ${cleanText}`, color: "magenta" }];
             if (global.gc) {
               try {
                 global.gc();
+                lastGCTime = Date.now();
               } catch (e) {
               }
             }
@@ -17042,20 +17094,22 @@ Selection: ${val}`,
           let toolCallBalance = 0;
           let inToolCallString = null;
           const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
-          const bullyTheBug = path20.join(DATA_DIR, "padding");
           for await (const packet of stream) {
-            if (packet.type === "interactive_turn_finished") {
-              fs22.writeFileSync(bullyTheBug, "pad_0xa\n");
-            } else {
-              fs22.appendFileSync(bullyTheBug, "\r");
-              parsedBlocks.completed = [];
-            }
             if (isFirstPacket && packet.type === "text") {
               apiStart = Date.now();
               isFirstPacket = false;
             }
             if (packet.type === "status") {
               setStatusText(packet.content);
+              if (packet.content?.includes("[start]")) {
+                clearInterval(interval_for_timer);
+                interval_for_timer = setInterval(() => {
+                  setActiveTime((prev) => prev + 1);
+                }, 1e3);
+              } else if (packet.content?.includes("[end]")) {
+                setActiveTime(0);
+                clearInterval(interval_for_timer);
+              }
               if (isBridgeConnected()) {
                 sendStatus(packet.content);
               }
@@ -17103,6 +17157,7 @@ Selection: ${val}`,
                 if (global.gc) {
                   try {
                     global.gc();
+                    lastGCTime = Date.now();
                   } catch (e) {
                   }
                 }
@@ -17111,6 +17166,8 @@ Selection: ${val}`,
             }
             if (packet.type === "interactive_turn_finished") {
               setIsProcessing(false);
+              setActiveTime(0);
+              clearInterval(interval_for_timer);
               if (isBridgeConnected()) {
                 sendStatus(null);
               }
@@ -17129,6 +17186,15 @@ Selection: ${val}`,
                   onBackgroundIncrement: () => setSessionBackgroundCalls((prev) => prev + 1)
                 }
               );
+              setTimeout(() => {
+                if (global.gc) {
+                  try {
+                    global.gc();
+                    lastGCTime = Date.now();
+                  } catch (e) {
+                  }
+                }
+              }, 500);
               continue;
             }
             if (packet.type === "visual_feedback") {
@@ -17376,6 +17442,15 @@ Selection: ${val}`,
           if (didSignalTerminationRef.current) {
             appendCancelMessage();
           }
+          setTimeout(() => {
+            if (global.gc) {
+              try {
+                global.gc();
+                lastGCTime = Date.now();
+              } catch (e) {
+              }
+            }
+          }, 1500);
           if (!hasFiredJanitor) {
             if (process.stdout.isTTY) {
               process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
@@ -18119,16 +18194,15 @@ Selection: ${val}`,
           {
             prompts: recentPrompts,
             onSelect: async (txId) => {
+              if (stdout) {
+                stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                if (stdout.isTTY) {
+                  stdout.write("\x1B[?2004h");
+                }
+              }
               try {
                 const result = await RevertManager.rollbackToBefore(txId);
                 if (result.success) {
-                  if (stdout) {
-                    stdout.write("\x1B[2J\x1B[3J\x1B[H");
-                    if (stdout.isTTY) {
-                      stdout.write("\x1B[?2004h");
-                    }
-                    await new Promise((resolve) => setTimeout(resolve, 300));
-                  }
                   const { targetPrompt } = result;
                   deleteChatSummary(chatId);
                   setClearKey((prev) => prev + 1);
@@ -18192,9 +18266,11 @@ Selection: ${val}`,
               if (h[id]) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
                 clearBlocksCache();
+                chatLoadingRef.current = true;
                 setChatId(id);
                 const savedData = await loadChatContext(id);
                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                chatLoadingRef.current = false;
                 setChatTokens(savedData.total);
                 setSessionStats({ tokens: savedData.context });
                 const resumedMsgs = [...h[id].messages];
@@ -18406,7 +18482,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box15, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, null, statusText ? /* @__PURE__ */ React15.createElement(Box15, { gap: 1 }, /* @__PURE__ */ React15.createElement(dist_default, { colors: ["#001a1a", "#080510", "#12021c"] }, /* @__PURE__ */ React15.createElement(build_default, null)), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true, italic: true }, statusText)) : /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box15, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box15, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box15, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, null, statusText ? /* @__PURE__ */ React15.createElement(Box15, { gap: 1 }, /* @__PURE__ */ React15.createElement(dist_default, { colors: ["#001a1a", "#080510", "#12021c"] }, /* @__PURE__ */ React15.createElement(build_default, null)), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true, italic: true }, statusText), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true, dimColor: true }, activeTime > 0 ? ` [${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box15, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Text16, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, "[ "), /* @__PURE__ */ React15.createElement(Text16, { color: "white" }, tempModelOverride || activeModel), /* @__PURE__ */ React15.createElement(Text16, { color: "gray", bold: true }, " ]"))), /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box15, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
           Box15,
           {
             backgroundColor: "#555555",
@@ -18443,7 +18519,7 @@ Selection: ${val}`,
         ), /* @__PURE__ */ React15.createElement(Box15, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text16, { color: "#555555" }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
     }
   };
-  return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, showBridgePromo ? /* @__PURE__ */ React15.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex }) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Static, { key: `static-${clearKey}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React15.createElement(
+  return /* @__PURE__ */ React15.createElement(Box15, { flexDirection: "column", width: "100%" }, showBridgePromo ? /* @__PURE__ */ React15.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex }) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box15, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React15.createElement(
     BlockItem,
     {
       key: block.key,
@@ -18853,11 +18929,12 @@ var isBundled = fileURLToPath2(import.meta.url).endsWith(".js");
 if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-size"))) {
   if (!Number.isNaN(_allocValue)) {
     console.log(`
-[MEMORY] Starting with: '${_allocValue > _maxAllowed ? _maxAllowed : _allocValue} MB' Allocation ${_allocValue > _maxAllowed ? "(Max allowed: '" + _maxAllowed + " MB')" : ""}. Please Wait...`);
+[MEMORY] Starting with: '${_allocValue > _maxAllowed ? _maxAllowed : _allocValue} MB' Allocation${_allocValue > _maxAllowed ? " (Max allowed: '" + _maxAllowed + " MB')" : ""}. Please Wait...`);
     await new Promise((resolve) => setTimeout(resolve, 5e3));
   }
   const cp = spawn3(process.execPath, [
     `--max-old-space-size=${HEAP_LIMIT}`,
+    `--expose-gc`,
     fileURLToPath2(import.meta.url),
     ...process.argv.slice(2)
   ], { stdio: "inherit" });

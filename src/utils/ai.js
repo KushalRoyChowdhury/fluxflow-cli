@@ -1850,6 +1850,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             return result;
         };
 
+        yield { type: 'status', content: '[start]' };
         yield { type: 'status', content: 'Gathering Context...' };
         // Add a 500ms sleep for something
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -4208,6 +4209,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } else {
                     modifiedHistory.push({ role: 'agent', text: cleanedFullResponse });
                 }
+
+                yield { type: 'status', content: '[end]' };
 
                 // History baselines are updated directly during compression events; no end-of-turn overrides are needed.
             }

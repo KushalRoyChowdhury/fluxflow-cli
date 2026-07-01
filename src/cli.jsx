@@ -32,7 +32,7 @@ const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
 if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
     if (!Number.isNaN(_allocValue)) {
-        console.log(`\n[MEMORY] Starting with: '${ _allocValue > _maxAllowed ? _maxAllowed : _allocValue } MB' Allocation ${ _allocValue > _maxAllowed ? "(Max allowed: '" + _maxAllowed + " MB')" : "" }. Please Wait...`);
+        console.log(`\n[MEMORY] Starting with: '${ _allocValue > _maxAllowed ? _maxAllowed : _allocValue } MB' Allocation${ _allocValue > _maxAllowed ? " (Max allowed: '" + _maxAllowed + " MB')" : "" }. Please Wait...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
     // else {
@@ -40,7 +40,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     // }
 
     const cp = spawn(process.execPath, [
-        `--max-old-space-size=${HEAP_LIMIT}`, `--expose-gc`,
+        `--max-old-space-size=${HEAP_LIMIT}`, `--expose-gc`, `--max-semi-space-size=1`,
         fileURLToPath(import.meta.url),
         ...process.argv.slice(2)
     ], { stdio: 'inherit' });

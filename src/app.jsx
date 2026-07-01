@@ -205,6 +205,7 @@ const versionFluxflow = packageJson.version;
 const updatedOn = packageJson.date || '2026-05-20';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+let interval_for_timer;
 
 const StatusSpinner = () => {
     const [tick, setTick] = useState(0);
@@ -373,7 +374,7 @@ const getProjectFiles = (() => {
 let cachedShortcut = '\\ + Enter';
 
 export default function App({ args = [] }) {
-    let lastGCTime = null;
+    let lastGCTime = 1;
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
     const { stdout } = useStdout();
@@ -412,16 +413,20 @@ export default function App({ args = [] }) {
         }, 1000);
 
         // If there is no GC in last 30s invoke a GC
+        lastGCTime = Date.now();
         const memInterval = setInterval(() => {
+            // console.log("[GC] Memory check");
             if (lastGCTime) {
-                const diff = Date.now() - lastGCTime;
+                const diff = Date.now() - lastGCTime || 0;
                 if (diff > 30000) {
                     if (global.gc) {
                         try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
                     }
                 }
+                // else console.log(lastGCTime, diff);
             }
-        }, 30000);
+        }, 3000);
+        // console.log(lastGCTime, memInterval);
 
         return () => {
             clearTimeout(graceTimer);
@@ -711,6 +716,7 @@ export default function App({ args = [] }) {
     const [chatId, setChatId] = useState(args.includes('--playground') ? PLAYGROUND_CHAT_ID : generateChatId());
 
     useEffect(() => {
+        if (chatLoadingRef.current) return;
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
         setChatTokens(nextTokens);
         if (chatId) {
@@ -875,9 +881,12 @@ export default function App({ args = [] }) {
     const [statusText, setStatusText] = useState(null);
     const [wittyPhrase, setWittyPhrase] = useState('');
     const [hasPasteBlock, setHasPasteBlock] = useState(false);
+    const [activeTime, setActiveTime] = useState(0);
+    let interval_for_timer;
 
     useEffect(() => {
         let interval;
+
         if (statusText) {
             const updatePhrase = () => {
                 const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
@@ -888,7 +897,10 @@ export default function App({ args = [] }) {
         } else {
             setWittyPhrase('');
         }
-        return () => clearInterval(interval);
+
+        return () => {
+            clearInterval(interval);
+        }
     }, [statusText]);
 
     const [isSpinnerActive, setIsSpinnerActive] = useState(true);
@@ -899,6 +911,16 @@ export default function App({ args = [] }) {
     const [escPressCount, setEscPressCount] = useState(0);
     const [recentPrompts, setRecentPrompts] = useState([]);
     const escDoubleTimerRef = useRef(null);
+    const chatLoadingRef = useRef(false);
+
+    useEffect(() => {
+        return () => {
+            if (escDoubleTimerRef.current) {
+                clearTimeout(escDoubleTimerRef.current);
+            }
+        };
+    }, []);
+
     const didSignalTerminationRef = useRef(false);
     const [queuedPrompt, setQueuedPrompt] = useState(null);
     const [resolutionData, setResolutionData] = useState(null);
@@ -995,7 +1017,9 @@ export default function App({ args = [] }) {
         completedIndex: 0,
         columns: 0,
         historicalBlocks: [],
-        seenSelections: new Set()
+        seenSelections: new Set(),
+        chatId: '',
+        clearKey: 0
     });
 
     const parsedBlocks = useMemo(() => {
@@ -1005,12 +1029,14 @@ export default function App({ args = [] }) {
         let historicalBlocks = [];
         let seenAskSelections = new Set();
 
-        // Check if terminal resized or chat was cleared
+        // Check if terminal resized, chat was cleared, session switched, or cleared manually
         const isResize = cachedHistoryRef.current.columns !== columns;
         const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
+        const isChatChanged = cachedHistoryRef.current.chatId !== chatId;
+        const isClearKeyChanged = cachedHistoryRef.current.clearKey !== clearKey;
 
-        if (isResize || isClear) {
-            // SLOW PATH: User resized terminal or cleared chat. Re-parse history once.
+        if (isResize || isClear || isChatChanged || isClearKeyChanged) {
+            // SLOW PATH: User resized terminal, cleared chat, reverted, or switched sessions. Re-parse history once.
             const completedMsgs = messages.slice(0, completedIndex);
             for (let i = 0; i < completedMsgs.length; i++) {
                 const msg = completedMsgs[i];
@@ -1032,7 +1058,9 @@ export default function App({ args = [] }) {
                 completedIndex,
                 columns,
                 historicalBlocks,
-                seenSelections: new Set(seenAskSelections)
+                seenSelections: new Set(seenAskSelections),
+                chatId,
+                clearKey
             };
         } else {
             // FAST PATH: We are chatting or streaming.
@@ -1067,7 +1095,9 @@ export default function App({ args = [] }) {
                     completedIndex,
                     columns,
                     historicalBlocks,
-                    seenSelections: seenAskSelections
+                    seenSelections: seenAskSelections,
+                    chatId,
+                    clearKey
                 };
             }
         }
@@ -1092,8 +1122,11 @@ export default function App({ args = [] }) {
         }
 
         // Combine history cache + newly completed lines from the active stream
-        // Using .concat() is highly optimized in V8 for memory
-        const finalCompleted = historicalBlocks.concat(streamingCompletedBlocks);
+        // V8 optimized for React reference checks
+        const finalCompleted = [...historicalBlocks];
+        for (let j = 0; j < streamingCompletedBlocks.length; j++) {
+            finalCompleted.push(streamingCompletedBlocks[j]);
+        }
 
         // Give warning so the user can manually clear, preventing real OOM
         if (finalCompleted.length >= 75000) {
@@ -1114,7 +1147,7 @@ export default function App({ args = [] }) {
             active: activeBlocks
         };
 
-    }, [messages, completedIndex, terminalSize.columns]);
+    }, [messages, completedIndex, terminalSize.columns, clearKey, chatId]);
 
     // useEffect(() => {
     //     fs.writeFileSync('DEBUG.json', JSON.stringify(parsedBlocks.completed, null, 4));
@@ -1269,10 +1302,18 @@ export default function App({ args = [] }) {
                 setConfirmExit(false);
                 return;
             }
-            if (isProcessing || activeCommand) {
+            if (isProcessing || activeCommand || pendingApproval || pendingAsk) {
                 didSignalTerminationRef.current = true;
                 signalTermination();
                 terminateActiveCommand();
+                if (pendingApproval) {
+                    pendingApproval.resolve('deny');
+                    setPendingApproval(null);
+                }
+                if (pendingAsk) {
+                    pendingAsk.resolve(null);
+                    setPendingAsk(null);
+                }
                 setEscPressed(false);
                 if (escTimer) clearTimeout(escTimer);
             } else {
@@ -1554,9 +1595,11 @@ export default function App({ args = [] }) {
                 const h = await loadHistory();
                 const id = parsedArgs.resume;
                 if (h[id]) {
+                    chatLoadingRef.current = true;
                     setChatId(id);
                     const savedData = await loadChatContext(id);
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                    chatLoadingRef.current = false;
                     setChatTokens(savedData.total);
                     setSessionStats({ tokens: savedData.context });
 
@@ -1756,7 +1799,7 @@ export default function App({ args = [] }) {
                     lastSavedTimeRef.current += deltaSecs * 1000;
                 }
             }
-        }, 2000); // 2s "vibe" interval
+        }, 5000); // 5s "vibe" interval
         return () => clearInterval(interval);
     }, [isInitializing]);
 
@@ -2166,10 +2209,12 @@ export default function App({ args = [] }) {
                             if (target) {
                                 stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                 clearBlocksCache();
+                                chatLoadingRef.current = true;
                                 setChatId(targetId);
 
                                 const savedData = await loadChatContext(targetId);
                                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                chatLoadingRef.current = false;
                                 setChatTokens(savedData.total);
                                 setSessionStats({ tokens: savedData.context });
 
@@ -2261,6 +2306,14 @@ export default function App({ args = [] }) {
                     setCompletedIndex(1);
                     setClearKey(prev => prev + 1);
                     clearBlocksCache();
+                    cachedHistoryRef.current = {
+                        completedIndex: 0,
+                        columns: terminalSize.columns,
+                        historicalBlocks: [],
+                        seenSelections: new Set(),
+                        chatId: chatId,
+                        clearKey: clearKey + 1
+                    };
                     // /clear always exits playground mode by resetting to a fresh session
                     if (parsedArgs.playground) {
                         parsedArgs.playground = false;
@@ -3169,24 +3222,28 @@ export default function App({ args = [] }) {
                     const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
-                    const bullyTheBug = path.join(DATA_DIR, 'padding');
                     for await (const packet of stream) {
                         // fs.appendFileSync('DEBUG.txt', JSON.stringify(packet, null, 2));
-                        if (packet.type === 'interactive_turn_finished') {
-                            fs.writeFileSync(bullyTheBug, 'pad_0xa\n');
-                        }
-                        else {
-                            fs.appendFileSync(bullyTheBug, '\r');
-                            // Clear parsedBlocks.completed
-                            parsedBlocks.completed = [];
-                        }
 
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
                             isFirstPacket = false;
                         }
                         if (packet.type === 'status') {
+
                             setStatusText(packet.content);
+
+                            if (packet.content?.includes('[start]')) {
+                                clearInterval(interval_for_timer);
+                                setActiveTime(0);
+                                interval_for_timer = setInterval(() => {
+                                    setActiveTime(prev => prev + 1);
+                                }, 1000);
+                            } else if (packet.content?.includes('[end]')) {
+                                setActiveTime(0);
+                                clearInterval(interval_for_timer);
+                            }
+
                             if (isBridgeConnected()) {
                                 sendStatus(packet.content);
                             }
@@ -3243,6 +3300,8 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
+                            setActiveTime(0);
+                            clearInterval(interval_for_timer);
                             if (isBridgeConnected()) {
                                 sendStatus(null);
                             }
@@ -3386,6 +3445,10 @@ export default function App({ args = [] }) {
 
                         let chunkText = packet.content;
                         if (packet.type === 'text' && chunkText.includes('Request Cancelled')) {
+                            if (global.gc) {
+                                global.gc();
+                                lastGCTime = Date.now();
+                            }
                             continue;
                         }
                         const chunkLower = chunkText.toLowerCase();
@@ -3491,9 +3554,9 @@ export default function App({ args = [] }) {
                                             transitionContent = parts.slice(1).join('</think>') || '';
                                             const startTime = next[i].startTime || parseInt(String(next[i].id).split('-')[1]) || Date.now();
                                             const duration = Date.now() - startTime;
-                                            next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
+                                            next[i] = { ...next[i], text: (' ' + parts[0]).slice(1), isStreaming: false, duration };
                                         } else {
-                                            next[i] = { ...next[i], text: newText, isStreaming: true };
+                                            next[i] = { ...next[i], text: (' ' + newText).slice(1), isStreaming: true };
                                         }
                                         break;
                                     }
@@ -3522,7 +3585,7 @@ export default function App({ args = [] }) {
                                     // Iterate backwards to update active text without array cloning overhead
                                     for (let i = next.length - 1; i >= 0; i--) {
                                         if (next[i].id === currentAgentId) {
-                                            next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
+                                            next[i] = { ...next[i], text: (' ' + next[i].text + chunkText).slice(1), isStreaming: true };
                                             break;
                                         }
                                     }
@@ -3545,6 +3608,16 @@ export default function App({ args = [] }) {
                     if (didSignalTerminationRef.current) {
                         appendCancelMessage();
                     }
+
+                    // Add this aggressive GC cleanup specifically for end-of-stream
+                    setTimeout(() => {
+                        if (global.gc) {
+                            try {
+                                global.gc();
+                                lastGCTime = Date.now();
+                            } catch(e) {}
+                        }
+                    }, 1500);
 
                     if (!hasFiredJanitor) {
                         if (process.stdout.isTTY) {
@@ -3582,6 +3655,12 @@ export default function App({ args = [] }) {
                         let foundLastAgent = false;
                         const newMsgs = [...prev].reverse().map(m => {
                             let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
+
+                            // Flatten final strings to free V8 ConsString memory permanently
+                            if (updated.text) {
+                                updated.text = (' ' + updated.text).slice(1);
+                            }
+
                             if (!foundLastAgent && updated.role === 'agent') {
                                 foundLastAgent = true;
                                 updated = { ...updated, workedDuration: totalDuration };
@@ -4710,9 +4789,11 @@ export default function App({ args = [] }) {
                                         clearBlocksCache();
                                         cachedHistoryRef.current = {
                                             completedIndex: 0,
-                                            columns: 0,
+                                            columns: terminalSize.columns,
                                             historicalBlocks: [],
-                                            seenSelections: new Set()
+                                            seenSelections: new Set(),
+                                            chatId: chatId,
+                                            clearKey: clearKey + 1
                                         };
 
                                         // Find index of reverted user message
@@ -4778,10 +4859,12 @@ export default function App({ args = [] }) {
                                 if (h[id]) {
                                     stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
                                     clearBlocksCache();
+                                    chatLoadingRef.current = true;
                                     setChatId(id);
 
                                     const savedData = await loadChatContext(id);
                                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                    chatLoadingRef.current = false;
                                     setChatTokens(savedData.total);
                                     setSessionStats({ tokens: savedData.context });
 
@@ -5076,7 +5159,7 @@ export default function App({ args = [] }) {
                                         <Gradient colors={['#001a1a', '#080510', '#12021c']}>
                                             <Spinner />
                                         </Gradient>
-                                        <Text color="gray" bold italic>{statusText}</Text>
+                                        <Text color="gray" bold italic>{statusText}</Text><Text color={'gray'} italic dimColor>{activeTime > 0 ? ` [${activeTime.toFixed(0)}s]` : ""}</Text>
                                     </Box>
                                 ) : (
                                     <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
@@ -5167,7 +5250,7 @@ export default function App({ args = [] }) {
             ) : (
                 <>
                     <Box paddingX={1} flexDirection="column" width="100%">
-                        <Static key={`static-${clearKey}-${terminalSize.columns}-${terminalSize.rows}`} items={parsedBlocks.completed}>
+                        <Static key={`static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`} items={parsedBlocks.completed}>
                             {(block) => (
                                 <BlockItem
                                     key={block.key}

@@ -33,7 +33,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         getMemoryInfo();
         const interval = setInterval(() => {
             getMemoryInfo();
-        }, 500);
+        }, 30000);
 
         // Keep it clean! 🧹
         return () => clearInterval(interval);
