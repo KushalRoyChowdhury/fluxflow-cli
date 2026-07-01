@@ -2104,18 +2104,17 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var ANSI_REGEX, ANSI_REGEX_TEST, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_SYSTEM, REGEX_THINK, REGEX_ANSWER, REGEX_TOOL_RES, REGEX_SUCCESS_ERROR, REGEX_TURN_1, REGEX_END, REGEX_TURN_2, REGEX_TURN_3, REGEX_OPEN_BRACKET, REGEX_RESPONDED, REGEX_PROMPTED, REGEX_ARROWS, REGEX_ARROWS_L, REGEX_ARROWS_U, REGEX_ARROWS_D, REGEX_ARROWS_LR, REGEX_TERMINAL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
+var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
-    ANSI_REGEX = /\x1B\[[0-?]*[ -/]*[@-~]/g;
-    ANSI_REGEX_TEST = /\x1B\[[0-?]*[ -/]*[@-~]/;
     wrapText = (text, width) => {
-      if (!text) return [];
+      if (!text) return "";
+      const ansiRegex2 = /\x1B\[[0-?]*[ -/]*[@-~]/g;
       const sourceLines = text.split("\n");
       let finalLines = [];
-      if (width <= 5) return [text];
-      const getVisibleLength = (str) => str.replace(ANSI_REGEX, "").length;
+      if (width <= 5) return text;
+      const getVisibleLength = (str) => str.replace(ansiRegex2, "").length;
       sourceLines.forEach((sLine) => {
         const visibleLength = getVisibleLength(sLine);
         if (visibleLength <= width) {
@@ -2136,7 +2135,7 @@ var init_text = __esm({
               currentLine = indent + token;
               currentVisibleLength = getVisibleLength(currentLine);
             } else {
-              if (ANSI_REGEX_TEST.test(token)) {
+              if (ansiRegex2.test(token)) {
                 finalLines.push(token);
                 currentLine = indent;
                 currentVisibleLength = getVisibleLength(currentLine);
@@ -2159,7 +2158,7 @@ var init_text = __esm({
           finalLines.push(currentLine.trimEnd());
         }
       });
-      return finalLines;
+      return finalLines.join("\n");
     };
     formatTokens = (tokens) => {
       if (!tokens && tokens !== 0) return "0.0k";
@@ -2466,26 +2465,21 @@ var init_text = __esm({
       if (!s1 || !s2) return 0;
       const l1 = s1.length;
       const l2 = s2.length;
-      let prev = new Int32Array(l2 + 1);
-      let curr = new Int32Array(l2 + 1);
-      for (let j = 0; j <= l2; j++) prev[j] = j;
+      const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
+      for (let i = 0; i <= l1; i++) dp[i][0] = i;
+      for (let j = 0; j <= l2; j++) dp[0][j] = j;
       for (let i = 1; i <= l1; i++) {
-        curr[0] = i;
         for (let j = 1; j <= l2; j++) {
           if (s1[i - 1] === s2[j - 1]) {
-            curr[j] = prev[j - 1];
+            dp[i][j] = dp[i - 1][j - 1];
           } else {
-            curr[j] = Math.min(prev[j], curr[j - 1], prev[j - 1]) + 1;
+            dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
           }
         }
-        const temp = prev;
-        prev = curr;
-        curr = temp;
       }
-      const distance = prev[l2];
       const maxLen = Math.max(l1, l2);
       if (maxLen === 0) return 1;
-      return 1 - distance / maxLen;
+      return 1 - dp[l1][l2] / maxLen;
     };
     alignChangeGroup = (group) => {
       const removals = [];
@@ -2500,44 +2494,40 @@ var init_text = __esm({
       const N = removals.length;
       const M = additions.length;
       if (N === 0 || M === 0) return;
-      const size = (N + 1) * (M + 1);
-      const dp = new Float32Array(size);
-      const choices = new Uint8Array(size);
-      const getIdx = (r, c) => r * (M + 1) + c;
-      for (let i2 = 1; i2 <= N; i2++) choices[getIdx(i2, 0)] = 2;
-      for (let j2 = 1; j2 <= M; j2++) choices[getIdx(0, j2)] = 3;
-      const simMatrix = new Float32Array(N * M);
+      const dp = Array.from({ length: N + 1 }, () => Array(M + 1).fill(0));
+      const choices = Array.from({ length: N + 1 }, () => Array(M + 1).fill(""));
+      for (let i2 = 1; i2 <= N; i2++) choices[i2][0] = "up";
+      for (let j2 = 1; j2 <= M; j2++) choices[0][j2] = "left";
+      const simMatrix = Array.from({ length: N }, () => Array(M).fill(0));
       for (let i2 = 0; i2 < N; i2++) {
-        const remContentTrim = removals[i2].content.trim();
         for (let j2 = 0; j2 < M; j2++) {
-          simMatrix[i2 * M + j2] = getSimilarity(remContentTrim, additions[j2].content.trim());
+          simMatrix[i2][j2] = getSimilarity(removals[i2].content.trim(), additions[j2].content.trim());
         }
       }
       for (let i2 = 1; i2 <= N; i2++) {
         for (let j2 = 1; j2 <= M; j2++) {
-          const matchScore = simMatrix[(i2 - 1) * M + (j2 - 1)];
+          const matchScore = simMatrix[i2 - 1][j2 - 1];
           const score = matchScore >= 0.2 ? matchScore : -10;
-          const diag = dp[getIdx(i2 - 1, j2 - 1)] + score;
-          const up = dp[getIdx(i2 - 1, j2)];
-          const left = dp[getIdx(i2, j2 - 1)];
+          const diag = dp[i2 - 1][j2 - 1] + score;
+          const up = dp[i2 - 1][j2];
+          const left = dp[i2][j2 - 1];
           if (diag >= up && diag >= left) {
-            dp[getIdx(i2, j2)] = diag;
-            choices[getIdx(i2, j2)] = 1;
+            dp[i2][j2] = diag;
+            choices[i2][j2] = "diag";
           } else if (up >= left) {
-            dp[getIdx(i2, j2)] = up;
-            choices[getIdx(i2, j2)] = 2;
+            dp[i2][j2] = up;
+            choices[i2][j2] = "up";
           } else {
-            dp[getIdx(i2, j2)] = left;
-            choices[getIdx(i2, j2)] = 3;
+            dp[i2][j2] = left;
+            choices[i2][j2] = "left";
           }
         }
       }
       let i = N;
       let j = M;
       while (i > 0 || j > 0) {
-        const choice = choices[getIdx(i, j)];
-        if (choice === 1) {
-          const matchScore = simMatrix[(i - 1) * M + (j - 1)];
+        if (choices[i][j] === "diag") {
+          const matchScore = simMatrix[i - 1][j - 1];
           if (matchScore >= 0.2) {
             const rIdx = removals[i - 1].index;
             const aIdx = additions[j - 1].index;
@@ -2546,7 +2536,7 @@ var init_text = __esm({
           }
           i--;
           j--;
-        } else if (choice === 2) {
+        } else if (choices[i][j] === "up") {
           i--;
         } else {
           j--;
@@ -2555,7 +2545,7 @@ var init_text = __esm({
     };
     blocksCache = /* @__PURE__ */ new Map();
     streamingBlocksCache = /* @__PURE__ */ new Map();
-    MAX_CACHE_SIZE = 15;
+    MAX_CACHE_SIZE = 200;
     CHUNK_SIZE = 6;
     indexBlockIntoMap = (b, map) => {
       map.set(b.key, b);
@@ -2579,53 +2569,26 @@ var init_text = __esm({
       const getBlock = (key, type, textContent, extra = {}) => {
         const existing = cachedBlocks.get(key);
         if (existing && existing.text === textContent && existing.type === type && !!existing.isActiveBlock === !!extra.isActiveBlock && !!existing.isStreaming === !!extra.isStreaming && existing.pairContent === extra.pairContent) {
-          if (existing.isStreaming === msg.isStreaming && existing.workedDuration === msg.workedDuration) {
-            return existing;
-          }
-          const updated = {
-            ...existing,
-            isStreaming: msg.isStreaming,
-            workedDuration: msg.workedDuration
-          };
-          cachedBlocks.set(key, updated);
-          return updated;
+          return existing;
         }
         const flatText = typeof textContent === "string" ? (" " + textContent).slice(1) : textContent;
-        const newBlock = {
+        const flatExtra = { ...extra };
+        if (typeof flatExtra.pairContent === "string") {
+          flatExtra.pairContent = (" " + flatExtra.pairContent).slice(1);
+        }
+        if (Array.isArray(flatExtra.wrappedLines)) {
+          flatExtra.wrappedLines = flatExtra.wrappedLines.map((l) => typeof l === "string" ? (" " + l).slice(1) : l);
+        }
+        return {
           key,
-          msgId: msg.id,
-          isStreaming: msg.isStreaming,
+          isStreamingMsg: !!msg.isStreaming,
           workedDuration: msg.workedDuration,
-          isMeta: msg.isMeta,
           type,
           text: flatText,
           msg: type === "full-message" ? msg : void 0,
-          ...extra
+          // Only full-message requires role/meta checks
+          ...flatExtra
         };
-        cachedBlocks.set(key, newBlock);
-        return newBlock;
-      };
-      const getChunkBlock = (key, batch) => {
-        const existing = cachedBlocks.get(key);
-        if (existing && existing.type === "chunk" && existing.blocks.length === batch.length && existing.isStreaming === msg.isStreaming) {
-          let allMatch = true;
-          for (let i = 0; i < batch.length; i++) {
-            if (existing.blocks[i] !== batch[i]) {
-              allMatch = false;
-              break;
-            }
-          }
-          if (allMatch) return existing;
-        }
-        const newChunk = {
-          key,
-          msgId: msg.id,
-          isStreaming: msg.isStreaming,
-          type: "chunk",
-          blocks: batch
-        };
-        cachedBlocks.set(key, newChunk);
-        return newChunk;
       };
       if (text.includes("- Content Preview:")) {
         let extension = "";
@@ -2646,12 +2609,16 @@ var init_text = __esm({
           if (!writeChunk.length) return;
           const batch = writeChunk;
           writeChunk = [];
-          completedBlocks2.push(batch.length === 1 ? batch[0] : getChunkBlock(`${batch[0].key}-chunk`, batch));
+          completedBlocks2.push(batch.length === 1 ? batch[0] : {
+            key: `${batch[0].key}-chunk`,
+            type: "chunk",
+            blocks: batch
+          });
         };
         const innerWidth = columns - (gutterWidth + 6);
         codeLines.forEach((line, idx) => {
           const isLast = idx === codeLines.length - 1;
-          const wrappedLines = wrapText(line, innerWidth);
+          const wrappedLines = wrapText(line, innerWidth).split("\n");
           const block = getBlock(`${msg.id || Date.now()}-write-line-${idx}`, "write-line", line, {
             gutterWidth,
             lineNum: idx + 1,
@@ -2672,7 +2639,7 @@ var init_text = __esm({
         return { completed: completedBlocks2, active: activeBlock2 ? [activeBlock2] : [] };
       }
       if (text.includes("[DIFF_START]")) {
-        const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
+        const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
         const diffBody = match ? match[1].trim() : "";
         const diffLines = diffBody.split("\n").map((l) => l.replace(/\r$/, ""));
         const parsedLines = diffLines.map((line) => ({ line, parsed: parseLineInfo(line), pairContent: null }));
@@ -2696,14 +2663,18 @@ var init_text = __esm({
           if (!diffChunk.length) return;
           const batch = diffChunk;
           diffChunk = [];
-          completedBlocks2.push(batch.length === 1 ? batch[0] : getChunkBlock(`${batch[0].key}-chunk`, batch));
+          completedBlocks2.push(batch.length === 1 ? batch[0] : {
+            key: `${batch[0].key}-chunk`,
+            type: "chunk",
+            blocks: batch
+          });
         };
         diffLines.forEach((line, i) => {
           const isLast = i === diffLines.length - 1;
           const parsed = parsedLines[i].parsed;
           let wrappedLines = null;
           if (parsed) {
-            wrappedLines = wrapText(parsed.content, columns - 17);
+            wrappedLines = wrapText(parsed.content, columns - 17).split("\n");
           }
           const block = getBlock(`${msg.id || Date.now()}-diff-${i}`, "diff-line", line, {
             isFirstLine: i === 0,
@@ -2737,7 +2708,11 @@ var init_text = __esm({
         const batch = pendingChunk;
         pendingChunk = [];
         pendingChunkType = null;
-        completedBlocks.push(batch.length === 1 ? batch[0] : getChunkBlock(`${msg.id || "x"}-chunk-${batch[0].key}`, batch));
+        completedBlocks.push(batch.length === 1 ? batch[0] : {
+          key: `${msg.id || "x"}-chunk-${batch[0].key}`,
+          type: "chunk",
+          blocks: batch
+        });
       };
       const enqueue = (block, isLastOfMessage = false) => {
         if (pendingChunkType !== null && pendingChunkType !== block.type) flushPending();
@@ -2757,7 +2732,7 @@ var init_text = __esm({
         });
         if (!msg.isStreaming) {
           flushPending();
-          completedBlocks.push({ key: `${msg.id}-footer-padding`, msg, type: "think-footer-padding", text: "" });
+          completedBlocks.push({ key: `${msg.id}-footer-padding`, type: "think-footer-padding", text: "" });
         }
       } else {
         const lines = text.split("\n");
@@ -2812,7 +2787,11 @@ var init_text = __esm({
         }
       }
       if (msg.isStreaming && pendingChunk.length > 0) {
-        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : getChunkBlock(`${msg.id || "x"}-chunk-active-${pendingChunk[0].key}`, pendingChunk);
+        activeBlock = pendingChunk.length === 1 ? pendingChunk[0] : {
+          key: `${msg.id || "x"}-chunk-active-${pendingChunk[0].key}`,
+          type: "chunk",
+          blocks: pendingChunk
+        };
       } else {
         flushPending();
       }
@@ -2868,32 +2847,16 @@ var init_text = __esm({
     };
     REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
     REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
-    REGEX_SYSTEM = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]/gi;
-    REGEX_THINK = /<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)/gi;
-    REGEX_ANSWER = /\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)/gi;
-    REGEX_TOOL_RES = /\[TOOL RESULT\]:?\s*/gi;
-    REGEX_SUCCESS_ERROR = /^\s*(SUCCESS|ERROR):.*(\r?\n)?/gm;
-    REGEX_TURN_1 = /\[\s*turn\s*:\s*(continue|finish)\s*\]/gi;
-    REGEX_END = /\[\[END\]\]/gi;
-    REGEX_TURN_2 = /\[\s*turn\s*:?.*?$/gi;
-    REGEX_TURN_3 = /\n\s*turn\s*:?.*?$/gi;
-    REGEX_OPEN_BRACKET = /\[\s*$/gi;
-    REGEX_RESPONDED = /\n\nResponded on .*/g;
-    REGEX_PROMPTED = /\n\n\[Prompted on: .*\]/g;
-    REGEX_ARROWS = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)/gi;
-    REGEX_ARROWS_L = /(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)/gi;
-    REGEX_ARROWS_U = /(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)/gi;
-    REGEX_ARROWS_D = /(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)/gi;
-    REGEX_ARROWS_LR = /(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
-    REGEX_TERMINAL = /@\[TerminalName:.*?, ProcessId:.*?\]/gi;
+    REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
+    REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
     cleanSignals = (text) => {
       if (!text) return text;
       let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, "");
       const trigger = "tool:functions.";
-      let lowerResult = result.toLowerCase();
-      if (lowerResult.includes(trigger)) {
+      if (result.toLowerCase().includes(trigger)) {
         while (true) {
+          const lowerResult = result.toLowerCase();
           let triggerIdx = lowerResult.indexOf(trigger);
           if (triggerIdx === -1) break;
           let startIdx = triggerIdx;
@@ -2933,7 +2896,6 @@ var init_text = __esm({
                 }
               }
               result = result.substring(0, startIdx) + result.substring(endIdx + 1);
-              lowerResult = lowerResult.substring(0, startIdx) + lowerResult.substring(endIdx + 1);
               break;
             }
             j++;
@@ -2944,7 +2906,18 @@ var init_text = __esm({
           }
         }
       }
-      return result.replaceAll(REGEX_SYSTEM, "").replaceAll(REGEX_THINK, "").replace(REGEX_ANSWER, "").replaceAll(REGEX_TOOL_RES, "").replaceAll(REGEX_SUCCESS_ERROR, "").replaceAll(REGEX_TURN_1, "").replaceAll(REGEX_END, "").replaceAll(REGEX_TURN_2, "").replaceAll(REGEX_TURN_3, "").replaceAll(REGEX_OPEN_BRACKET, "").replaceAll(REGEX_RESPONDED, "").replaceAll(REGEX_PROMPTED, "").replaceAll(REGEX_ARROWS, "\u2192").replaceAll(REGEX_ARROWS_L, "\u2190").replaceAll(REGEX_ARROWS_U, "\u2191").replaceAll(REGEX_ARROWS_D, "\u2193").replaceAll(REGEX_ARROWS_LR, "\u2194").replaceAll(REGEX_TERMINAL, "").replaceAll(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match).trim();
+      result = result.replace(REGEX_CLEAN_SIGNALS, "");
+      result = result.replace(REGEX_ARROWS_ALL, (match) => {
+        const lower = match.toLowerCase();
+        if (lower.includes("leftrightarrow")) return "\u2194";
+        if (lower.includes("rightarrow")) return "\u2192";
+        if (lower.includes("leftarrow")) return "\u2190";
+        if (lower.includes("uparrow")) return "\u2191";
+        if (lower.includes("downarrow")) return "\u2193";
+        return match;
+      });
+      result = result.replace(REGEX_TOOLS, (match) => TOOL_LABELS[match.toLowerCase()] || match);
+      return result.trim();
     };
     clearBlocksCache = () => {
       blocksCache.clear();
@@ -3023,7 +2996,8 @@ function computeVisualMatrix(value, cursorIndex, wrapWidth, formatText, pasteBlo
       currentIdx += 1;
       continue;
     }
-    const wrappedLines = wrapText(line, wrapWidth);
+    const wrapped = wrapText(line, wrapWidth);
+    const wrappedLines = wrapped.split("\n");
     let lastMatchEnd = 0;
     const chunks = [];
     for (let j = 0; j < wrappedLines.length; j++) {
@@ -3557,7 +3531,7 @@ var init_MultilineInput = __esm({
               } else {
                 pasteTimerRef.current = setTimeout(() => {
                   finalizePasteTransaction();
-                }, 100);
+                }, 80);
               }
             } else {
               adjustPasteBlocksOnEdit(curIdx, cleanInput.length);
@@ -4048,7 +4022,7 @@ var init_ChatLayout = __esm({
           const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
           const code = match ? match[2] : part.replace(/^```\w*\n?/, "").replace(/```$/, "");
           const wrappedCode = wrapText(code.trimEnd(), availableWidth);
-          return /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, wrappedCode.map((line, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "cyan" }, line)));
+          return /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, wrappedCode.split("\n").map((line, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "cyan" }, line)));
         }
         let cleanPart = part;
         if (i > 0) {
@@ -4202,8 +4176,7 @@ var init_ChatLayout = __esm({
         return renderLatexText(part, j);
       }));
     });
-    TableRenderer = React4.memo(({ text, terminalWidth = 80 }) => {
-      const buffer = React4.useMemo(() => text.split("\n"), [text]);
+    TableRenderer = React4.memo(({ buffer, terminalWidth = 80 }) => {
       if (buffer.length < 2) return null;
       const rows = buffer.map((line) => {
         const parts = line.split("|");
@@ -4218,7 +4191,7 @@ var init_ChatLayout = __esm({
       const colChars = Math.floor(availableWidth / header.length) - 2;
       return (
         // Table MarginY here
-        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars).join("\n"), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars).join("\n"), color: "white" }))))))
+        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
       );
     });
     MarkdownText = React4.memo(({ text, color = "white", columns = 80, italic = false }) => {
@@ -4271,17 +4244,18 @@ var init_ChatLayout = __esm({
           const isUnordered = /^[\*\-\+]\s/.test(trimmed);
           const isOrdered = /^\d+\.\s/.test(trimmed);
           const isAsciiArt = line.includes("\u2588") || line.includes("\u2554") || line.includes("\u255A") || line.includes("\u2550");
-          let linesOfContent;
+          let content = "";
           if (isAsciiArt) {
-            linesOfContent = [line];
+            content = line;
           } else if (isUnordered || isOrdered) {
             const bullet = isUnordered ? "  \u2022 " : trimmed.match(/^\d+\.\s/)[0];
             const indent = " ".repeat(bullet.length);
-            const wrappedPartLines = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 6));
-            linesOfContent = wrappedPartLines.map((l, idx) => idx === 0 ? bullet + l : indent + l);
+            const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 6));
+            content = bullet + wrappedPart.split("\n").join("\n" + indent);
           } else {
-            linesOfContent = wrapText(trimmed, columns - 4);
+            content = wrapText(trimmed, columns - 4);
           }
+          const linesOfContent = content.split("\n");
           result.push(
             /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, linesOfContent.map((l, lIdx) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: lIdx, text: l, color, italic })))
           );
@@ -4290,7 +4264,7 @@ var init_ChatLayout = __esm({
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, pairContent, columns = 80, extension }) => {
+    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
@@ -4298,22 +4272,20 @@ var init_ChatLayout = __esm({
       }
       const parsedCurrent = parseLineInfo(line);
       if (!parsedCurrent) {
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14).join("\n"))));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
       }
       const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
       let finalPairContent = pairContent;
-      const words = React4.useMemo(() => {
-        if (finalPairContent !== void 0 && finalPairContent !== null) {
-          const oldStr = isRemoval ? content : finalPairContent;
-          const newStr = isRemoval ? finalPairContent : content;
-          try {
-            return diffWordsWithSpace(oldStr, newStr);
-          } catch (e) {
-            return [];
-          }
+      let words = [];
+      if (finalPairContent !== void 0 && finalPairContent !== null) {
+        const oldStr = isRemoval ? content : finalPairContent;
+        const newStr = isRemoval ? finalPairContent : content;
+        try {
+          words = diffWordsWithSpace(oldStr, newStr);
+        } catch (e) {
+          words = [];
         }
-        return [];
-      }, [content, finalPairContent, isRemoval]);
+      }
       const hasInlineChange = words.some((part) => isRemoval && part.removed || isAddition && part.added);
       const isPureUnpairedBlock = !finalPairContent && (isRemoval || isAddition);
       const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
@@ -4323,12 +4295,12 @@ var init_ChatLayout = __esm({
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
           const blockColor = isRemoval ? "#ffdddd" : "#ddffdd";
-          const wrappedLines = wrapText(content, columns - 14);
+          const wrappedLines = wrapText(content, columns - 14).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
           const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
-          const wrappedLines = wrapText(content, columns - 14);
+          const wrappedLines = wrapText(content, columns - 14).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor))));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
@@ -4355,7 +4327,7 @@ var init_ChatLayout = __esm({
       return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
     });
     DiffBlock = React4.memo(({ text, columns = 80, extension }) => {
-      const match = text.match(/\[DIFF_START\]([\s\S]*?)\[DIFF_END\]/);
+      const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
       const parsedLines = diffLines.map((line) => {
@@ -4643,12 +4615,12 @@ var init_ChatLayout = __esm({
           wrapText(
             finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
             columns - 7
-          ).map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
+          ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
         ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]")) : null))
       );
     });
     BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
-      const { msg, type, text, isStreaming, workedDuration } = block;
+      const { msg, type, text, isStreamingMsg, workedDuration } = block;
       if (type === "chunk") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, block.blocks.map((b) => /* @__PURE__ */ React4.createElement(
           BlockItem,
@@ -4675,26 +4647,27 @@ var init_ChatLayout = __esm({
         );
       }
       if (type === "think-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreaming ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
       }
       if (type === "think-line") {
         if (!showFullThinking) return null;
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "));
         }
-        const animatedText = useStreamingText(text, isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         const trimmed = animatedText.trim();
         const isUnordered = /^[\*\-\+]\s/.test(trimmed);
         const isOrdered = /^\d+\.\s/.test(trimmed);
-        let wrappedLines;
+        let content = animatedText;
         if (isUnordered || isOrdered) {
           const bullet = isUnordered ? "  \u2022 " : trimmed.match(/^\d+\.\s/)[0];
           const indent = " ".repeat(bullet.length);
-          const wrappedPartLines = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 10));
-          wrappedLines = wrappedPartLines.map((l, idx) => idx === 0 ? bullet + l : indent + l);
+          const wrappedPart = wrapText(trimmed.replace(/^[\*\-\d+\.]+\s/, ""), columns - (bullet.length + 10));
+          content = bullet + wrappedPart.split("\n").join("\n" + indent);
         } else {
-          wrappedLines = wrapText(animatedText, columns - 10);
+          content = wrapText(animatedText, columns - 10);
         }
+        const wrappedLines = content.split("\n");
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, wrappedLines.map((wLine, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wLine, color: "gray", italic: true })))));
       }
       if (type === "think-footer-padding") {
@@ -4705,11 +4678,11 @@ var init_ChatLayout = __esm({
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { height: 1 });
         }
-        const animatedText = useStreamingText(text, isStreaming, block.isActiveBlock);
+        const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns }));
       }
       if (type === "table") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { text, terminalWidth: columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns }));
       }
       if (type === "diff-line") {
         const { isFirstLine, isLastLine } = block;
@@ -4719,6 +4692,7 @@ var init_ChatLayout = __esm({
           {
             line: text,
             pairContent: block.pairContent,
+            parentText: void 0,
             columns
           }
         ), isLastLine && renderPaddingLine(true));
@@ -4869,7 +4843,7 @@ var init_StatusBar = __esm({
         getMemoryInfo();
         const interval = setInterval(() => {
           getMemoryInfo();
-        }, 2e3);
+        }, 3e4);
         return () => clearInterval(interval);
       }, []);
       let maxLimit = 256e3;
@@ -14498,7 +14472,7 @@ import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
-  let lastGCTime = null;
+  let lastGCTime = 1;
   const [confirmExit, setConfirmExit] = useState14(false);
   const [exitCountdown, setExitCountdown] = useState14(10);
   const { stdout } = useStdout2();
@@ -14529,9 +14503,10 @@ function App({ args = [] }) {
         setShowBridgePromo(false);
       }
     }, 1e3);
+    lastGCTime = Date.now();
     const memInterval = setInterval(() => {
       if (lastGCTime) {
-        const diff = Date.now() - lastGCTime;
+        const diff = Date.now() - lastGCTime || 0;
         if (diff > 3e4) {
           if (global.gc) {
             try {
@@ -14542,7 +14517,7 @@ function App({ args = [] }) {
           }
         }
       }
-    }, 3e4);
+    }, 3e3);
     return () => {
       clearTimeout(graceTimer);
       clearInterval(interval);
@@ -15743,7 +15718,7 @@ function App({ args = [] }) {
           lastSavedTimeRef.current += deltaSecs * 1e3;
         }
       }
-    }, 2e3);
+    }, 5e3);
     return () => clearInterval(interval);
   }, [isInitializing]);
   const COMMANDS = [
@@ -16194,6 +16169,14 @@ ${cleanText}`, color: "magenta" }];
           setCompletedIndex(1);
           setClearKey((prev) => prev + 1);
           clearBlocksCache();
+          cachedHistoryRef.current = {
+            completedIndex: 0,
+            columns: terminalSize.columns,
+            historicalBlocks: [],
+            seenSelections: /* @__PURE__ */ new Set(),
+            chatId,
+            clearKey: clearKey + 1
+          };
           if (parsedArgs.playground) {
             parsedArgs.playground = false;
             deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
@@ -17103,6 +17086,7 @@ Selection: ${val}`,
               setStatusText(packet.content);
               if (packet.content?.includes("[start]")) {
                 clearInterval(interval_for_timer);
+                setActiveTime(0);
                 interval_for_timer = setInterval(() => {
                   setActiveTime((prev) => prev + 1);
                 }, 1e3);
@@ -17149,19 +17133,28 @@ Selection: ${val}`,
               toolCallEncounteredInTurn = false;
               thinkConsumedInTurn = false;
               setMessages((prev) => {
-                const newMsgs = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+                const newMsgs = prev.map((m) => {
+                  if (m.isStreaming) {
+                    const flatText = m.text ? (" " + m.text).slice(1) : m.text;
+                    const flatFullText = m.fullText ? (" " + m.fullText).slice(1) : m.fullText;
+                    return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
+                  }
+                  return m;
+                });
                 setCompletedIndex(newMsgs.length);
                 return newMsgs;
               });
-              setTimeout(() => {
-                if (global.gc) {
-                  try {
-                    global.gc();
+              clearBlocksCache();
+              if (global.gc) {
+                try {
+                  global.gc();
+                  setTimeout(() => {
+                    if (global.gc) global.gc();
                     lastGCTime = Date.now();
-                  } catch (e) {
-                  }
+                  }, 100);
+                } catch (e) {
                 }
-              }, 100);
+              }
               continue;
             }
             if (packet.type === "interactive_turn_finished") {
@@ -17172,6 +17165,7 @@ Selection: ${val}`,
                 sendStatus(null);
               }
               hasFiredJanitor = true;
+              clearBlocksCache();
               runJanitorTask(
                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
                 packet.data.agentText,
@@ -17186,15 +17180,16 @@ Selection: ${val}`,
                   onBackgroundIncrement: () => setSessionBackgroundCalls((prev) => prev + 1)
                 }
               );
-              setTimeout(() => {
-                if (global.gc) {
-                  try {
-                    global.gc();
+              if (global.gc) {
+                try {
+                  global.gc();
+                  setTimeout(() => {
+                    if (global.gc) global.gc();
                     lastGCTime = Date.now();
-                  } catch (e) {
-                  }
+                  }, 150);
+                } catch (e) {
                 }
-              }, 500);
+              }
               continue;
             }
             if (packet.type === "visual_feedback") {
@@ -17309,6 +17304,10 @@ Selection: ${val}`,
             }
             let chunkText = packet.content;
             if (packet.type === "text" && chunkText.includes("Request Cancelled")) {
+              if (global.gc) {
+                global.gc();
+                lastGCTime = Date.now();
+              }
               continue;
             }
             const chunkLower = chunkText.toLowerCase();
@@ -17439,18 +17438,22 @@ Selection: ${val}`,
         } finally {
           setIsProcessing(false);
           setStatusText(null);
+          setActiveTime(0);
+          clearInterval(interval_for_timer);
           if (didSignalTerminationRef.current) {
             appendCancelMessage();
           }
-          setTimeout(() => {
-            if (global.gc) {
-              try {
-                global.gc();
+          clearBlocksCache();
+          if (global.gc) {
+            try {
+              global.gc();
+              setTimeout(() => {
+                if (global.gc) global.gc();
                 lastGCTime = Date.now();
-              } catch (e) {
-              }
+              }, 500);
+            } catch (e) {
             }
-          }, 1500);
+          }
           if (!hasFiredJanitor) {
             if (process.stdout.isTTY) {
               process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
@@ -17481,6 +17484,9 @@ Selection: ${val}`,
             let foundLastAgent = false;
             const newMsgs = [...prev].reverse().map((m) => {
               let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
+              if (updated.text) {
+                updated.text = (" " + updated.text).slice(1);
+              }
               if (!foundLastAgent && updated.role === "agent") {
                 foundLastAgent = true;
                 updated = { ...updated, workedDuration: totalDuration };
@@ -18209,9 +18215,11 @@ Selection: ${val}`,
                   clearBlocksCache();
                   cachedHistoryRef.current = {
                     completedIndex: 0,
-                    columns: 0,
+                    columns: terminalSize.columns,
                     historicalBlocks: [],
-                    seenSelections: /* @__PURE__ */ new Set()
+                    seenSelections: /* @__PURE__ */ new Set(),
+                    chatId,
+                    clearKey: clearKey + 1
                   };
                   const targetIdx = messages.findLastIndex(
                     (m) => m.role === "user" && m.text && (m.text.startsWith(targetPrompt) || m.text.includes(targetPrompt))
@@ -18935,6 +18943,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const cp = spawn3(process.execPath, [
     `--max-old-space-size=${HEAP_LIMIT}`,
     `--expose-gc`,
+    `--max-semi-space-size=1`,
     fileURLToPath2(import.meta.url),
     ...process.argv.slice(2)
   ], { stdio: "inherit" });

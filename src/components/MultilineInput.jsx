@@ -717,7 +717,7 @@ export const MultilineInput = ({
                     } else {
                         pasteTimerRef.current = setTimeout(() => {
                             finalizePasteTransaction();
-                        }, 100);
+                        }, 80);
                     }
                 } else {
                     adjustPasteBlocksOnEdit(curIdx, cleanInput.length);

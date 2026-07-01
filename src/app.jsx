@@ -420,7 +420,7 @@ export default function App({ args = [] }) {
                 const diff = Date.now() - lastGCTime || 0;
                 if (diff > 30000) {
                     if (global.gc) {
-                        try { global.gc(); setTimeout(() => { global.gc() }, 50); lastGCTime = Date.now(); } catch (e) { }
+                        try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
                     }
                 }
                 // else console.log(lastGCTime, diff);
@@ -3285,16 +3285,30 @@ export default function App({ args = [] }) {
                             toolCallEncounteredInTurn = false;
                             thinkConsumedInTurn = false;
                             setMessages(prev => {
-                                const newMsgs = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                const newMsgs = prev.map(m => {
+                                    if (m.isStreaming) {
+                                        // V8 ConsString memory flush: Sever fragmented string trees immediately mid-stream
+                                        const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
+                                        const flatFullText = m.fullText ? (' ' + m.fullText).slice(1) : m.fullText;
+                                        return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
+                                    }
+                                    return m;
+                                });
                                 setCompletedIndex(newMsgs.length);
                                 return newMsgs;
                             });
 
-                            setTimeout(() => {
-                                if (global.gc) {
-                                    try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
-                                }
-                            }, 100);
+                            clearBlocksCache();
+
+                            if (global.gc) {
+                                try {
+                                    global.gc(); // Pass 1: Mark & sweep flattened strings and dropped caches
+                                    setTimeout(() => {
+                                        if (global.gc) global.gc(); // Pass 2: Compaction of surviving old-gen
+                                        lastGCTime = Date.now();
+                                    }, 100);
+                                } catch (e) { }
+                            }
 
                             continue;
                         }
@@ -3306,6 +3320,8 @@ export default function App({ args = [] }) {
                                 sendStatus(null);
                             }
                             hasFiredJanitor = true;
+
+                            clearBlocksCache();
 
                             runJanitorTask(
                                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
@@ -3322,11 +3338,15 @@ export default function App({ args = [] }) {
                                 }
                             );
 
-                            setTimeout(() => {
-                                if (global.gc) {
-                                    try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
-                                }
-                            }, 500);
+                            if (global.gc) {
+                                try {
+                                    global.gc();
+                                    setTimeout(() => {
+                                        if (global.gc) global.gc();
+                                        lastGCTime = Date.now();
+                                    }, 150);
+                                } catch (e) { }
+                            }
 
                             continue;
                         }
@@ -3604,20 +3624,25 @@ export default function App({ args = [] }) {
                 } finally {
                     setIsProcessing(false);
                     setStatusText(null);
+                    setActiveTime(0);
+                    clearInterval(interval_for_timer);
 
                     if (didSignalTerminationRef.current) {
                         appendCancelMessage();
                     }
 
-                    // Add this aggressive GC cleanup specifically for end-of-stream
-                    setTimeout(() => {
-                        if (global.gc) {
-                            try {
-                                global.gc();
+                    clearBlocksCache();
+
+                    // Add this aggressive double-GC cleanup specifically for end-of-stream
+                    if (global.gc) {
+                        try {
+                            global.gc();
+                            setTimeout(() => {
+                                if (global.gc) global.gc();
                                 lastGCTime = Date.now();
-                            } catch(e) {}
-                        }
-                    }, 1500);
+                            }, 500);
+                        } catch(e) {}
+                    }
 
                     if (!hasFiredJanitor) {
                         if (process.stdout.isTTY) {
