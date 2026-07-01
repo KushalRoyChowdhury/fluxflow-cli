@@ -232,8 +232,18 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.16.0"]
+        const stableVersions = ["2.16.1"]
         const changelogData = {
+            "2.16.1": {
+                "note": "JULY 2 - Bug Fixes.",
+                "added": [
+                    "Added support for PowerShell 7.6 in Windows with graceful handover to PowerShell 5.1 when needed."
+                ],
+                "changed": [],
+                "fixes": [
+                    "Fixed app crash on terminal execution."
+                ]
+            },
             "2.16.0": {
                 "note": "JULY 1.",
                 "added": [

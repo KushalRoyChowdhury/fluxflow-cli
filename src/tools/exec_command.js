@@ -546,10 +546,26 @@ export const exec_command = async (args, options = {}) => {
     }
 
     return new Promise((resolve) => {
-        const attempt = (usePowerShell) => {
-            const command = adjustWindowsCommand(rawCommand, usePowerShell);
-            let shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
-            let shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+        const attempt = (shellType) => {
+            const isPowerShell = shellType === 'pwsh' || shellType === 'powershell';
+            const command = adjustWindowsCommand(rawCommand, isPowerShell);
+
+            let shell;
+            if (isWin) {
+                if (shellType === 'pwsh') {
+                    shell = 'C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe';
+                } else if (shellType === 'powershell') {
+                    shell = 'powershell.exe';
+                } else {
+                    shell = 'cmd.exe';
+                }
+            } else {
+                shell = process.env.SHELL || 'bash';
+            }
+
+            let shellArgs = isWin 
+                ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) 
+                : ['-c', command];
 
             // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING 🔒 ---
             if (systemSettings.networkAccess === false && !isWin) {
@@ -615,25 +631,27 @@ export const exec_command = async (args, options = {}) => {
                     });
                     return true;
                 } catch (err) {
-                    if (isWin && usePowerShell && err.code === 'ENOENT') {
-                        return false; // Trigger CMD attempt
+                    if (isWin && (shellType === 'pwsh' || shellType === 'powershell') && err.code === 'ENOENT') {
+                        return false; // Trigger fallback attempt
                     }
                     // Fallback to child_process if pty fails for other reasons
-                    runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
+                    runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
                     return true;
                 }
             } else {
-                runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
+                runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
                 return true;
             }
         };
 
         if (isWin) {
-            if (!attempt(true)) {
-                attempt(false);
+            if (!attempt('pwsh')) {
+                if (!attempt('powershell')) {
+                    attempt('cmd');
+                }
             }
         } else {
-            attempt(false);
+            attempt('bash');
         }
     });
 };
@@ -641,10 +659,26 @@ export const exec_command = async (args, options = {}) => {
 /**
  * Standard child_process.spawn fallback
  */
-const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true, systemSettings = {}) => {
+const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellType = 'powershell', systemSettings = {}) => {
     const isWin = process.platform === 'win32';
-    let shell = isWin ? (usePowerShell ? 'powershell.exe' : 'cmd.exe') : (process.env.SHELL || 'bash');
-    let shellArgs = isWin ? (usePowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) : ['-c', command];
+    const isPowerShell = shellType === 'pwsh' || shellType === 'powershell';
+
+    let shell;
+    if (isWin) {
+        if (shellType === 'pwsh') {
+            shell = 'C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe';
+        } else if (shellType === 'powershell') {
+            shell = 'powershell.exe';
+        } else {
+            shell = 'cmd.exe';
+        }
+    } else {
+        shell = process.env.SHELL || 'bash';
+    }
+
+    let shellArgs = isWin 
+        ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) 
+        : ['-c', command];
 
     // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING FOR FALLBACK ---
     if (systemSettings.networkAccess === false && !isWin) {
@@ -732,10 +766,14 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowe
     });
 
     child.on('error', (err) => {
-        if (isWin && usePowerShell && err.code === 'ENOENT') {
-            // PowerShell missing, retry with CMD
-            const cmdCommand = adjustWindowsCommand(rawCommand, false);
-            return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false, systemSettings);
+        if (isWin && err.code === 'ENOENT') {
+            if (shellType === 'pwsh') {
+                const nextCommand = adjustWindowsCommand(rawCommand, true);
+                return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, 'powershell', systemSettings);
+            } else if (shellType === 'powershell') {
+                const nextCommand = adjustWindowsCommand(rawCommand, false);
+                return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, 'cmd', systemSettings);
+            }
         }
         activeChildProcess = null;
         const errorMsg = err instanceof Error ? err.message : String(err);

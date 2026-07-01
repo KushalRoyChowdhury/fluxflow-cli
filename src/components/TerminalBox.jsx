@@ -162,6 +162,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         : rawLines;
 
     const renderedOutput = visibleLines.join('\n');
+    const displayOutput = rawLines.length > 0;
 
     return (
         <Box
@@ -174,7 +175,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             borderColor="#555555"
             paddingLeft={2}
             paddingRight={0}
-            paddingY={completed ? 0 : 1}
+            paddingY={1}
             marginTop={1}
             width="100%"
         >

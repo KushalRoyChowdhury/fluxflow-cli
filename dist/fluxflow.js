@@ -3703,6 +3703,7 @@ var init_TerminalBox = __esm({
       const collapsedCount = rawLines.length - limit;
       const visibleLines = hasCollapsibleContent && !isExpanded ? rawLines.slice(rawLines.length - limit) : rawLines;
       const renderedOutput = visibleLines.join("\n");
+      const displayOutput = rawLines.length > 0;
       return /* @__PURE__ */ React3.createElement(
         Box2,
         {
@@ -3715,7 +3716,7 @@ var init_TerminalBox = __esm({
           borderColor: "#555555",
           paddingLeft: 2,
           paddingRight: 0,
-          paddingY: completed ? 0 : 1,
+          paddingY: 1,
           marginTop: 1,
           width: "100%"
         },
@@ -5576,10 +5577,22 @@ var init_exec_command = __esm({
         netEnv.NO_PROXY = "localhost,127.0.0.1";
       }
       return new Promise((resolve) => {
-        const attempt = (usePowerShell) => {
-          const command = adjustWindowsCommand(rawCommand, usePowerShell);
-          let shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
-          let shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
+        const attempt = (shellType) => {
+          const isPowerShell = shellType === "pwsh" || shellType === "powershell";
+          const command = adjustWindowsCommand(rawCommand, isPowerShell);
+          let shell;
+          if (isWin) {
+            if (shellType === "pwsh") {
+              shell = "C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe";
+            } else if (shellType === "powershell") {
+              shell = "powershell.exe";
+            } else {
+              shell = "cmd.exe";
+            }
+          } else {
+            shell = process.env.SHELL || "bash";
+          }
+          let shellArgs = isWin ? isPowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
           if (systemSettings.networkAccess === false && !isWin) {
             const originalShell = shell;
             const originalArgs = [...shellArgs];
@@ -5641,30 +5654,44 @@ ${finalOutput}`);
               });
               return true;
             } catch (err) {
-              if (isWin && usePowerShell && err.code === "ENOENT") {
+              if (isWin && (shellType === "pwsh" || shellType === "powershell") && err.code === "ENOENT") {
                 return false;
               }
-              runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
+              runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
               return true;
             }
           } else {
-            runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, usePowerShell, systemSettings);
+            runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
             return true;
           }
         };
         if (isWin) {
-          if (!attempt(true)) {
-            attempt(false);
+          if (!attempt("pwsh")) {
+            if (!attempt("powershell")) {
+              attempt("cmd");
+            }
           }
         } else {
-          attempt(false);
+          attempt("bash");
         }
       });
     };
-    runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, usePowerShell = true, systemSettings = {}) => {
+    runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellType = "powershell", systemSettings = {}) => {
       const isWin = process.platform === "win32";
-      let shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
-      let shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
+      const isPowerShell = shellType === "pwsh" || shellType === "powershell";
+      let shell;
+      if (isWin) {
+        if (shellType === "pwsh") {
+          shell = "C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe";
+        } else if (shellType === "powershell") {
+          shell = "powershell.exe";
+        } else {
+          shell = "cmd.exe";
+        }
+      } else {
+        shell = process.env.SHELL || "bash";
+      }
+      let shellArgs = isWin ? isPowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
       if (systemSettings.networkAccess === false && !isWin) {
         const originalShell = shell;
         const originalArgs = [...shellArgs];
@@ -5742,9 +5769,14 @@ ${finalOutput}`);
         }
       });
       child.on("error", (err) => {
-        if (isWin && usePowerShell && err.code === "ENOENT") {
-          const cmdCommand = adjustWindowsCommand(rawCommand, false);
-          return runStandardSpawn(resolve, cmdCommand, rawCommand, netEnv, onChunk, false, systemSettings);
+        if (isWin && err.code === "ENOENT") {
+          if (shellType === "pwsh") {
+            const nextCommand = adjustWindowsCommand(rawCommand, true);
+            return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, "powershell", systemSettings);
+          } else if (shellType === "powershell") {
+            const nextCommand = adjustWindowsCommand(rawCommand, false);
+            return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, "cmd", systemSettings);
+          }
         }
         activeChildProcess = null;
         const errorMsg = err instanceof Error ? err.message : String(err);
