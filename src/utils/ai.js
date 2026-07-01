@@ -1853,7 +1853,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         yield { type: 'status', content: '[start]' };
         yield { type: 'status', content: 'Gathering Context...' };
         // Add a 500ms sleep for something
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
         if (totalFolders > 4096) dynamicMaxDepth = 1;
@@ -2406,7 +2406,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {
-                        yield { type: 'status', content: 'Checking Code...' };
+                        yield { type: 'status', content: 'Verifying...' };
                         await new Promise(resolve => setTimeout(resolve, 2500)); // Buffer for IDE to parse the code
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;

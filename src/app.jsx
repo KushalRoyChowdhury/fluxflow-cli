@@ -5181,22 +5181,20 @@ export default function App({ args = [] }) {
                             <Box>
                                 {statusText ? (
                                     <Box gap={1}>
-                                        <Gradient colors={['#001a1a', '#080510', '#12021c']}>
-                                            <Spinner />
-                                        </Gradient>
-                                        <Text color="gray" bold italic>{statusText}</Text><Text color={'gray'} italic dimColor>{activeTime > 0 ? ` [${activeTime.toFixed(0)}s]` : ""}</Text>
+                                        <Spinner />
+                                        <Text color="white" bold italic>{statusText.trimEnd()}</Text><Text color={'gray'}>{activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : ""}</Text>
                                     </Box>
                                 ) : (
-                                    <Text color="gray" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
+                                    <Text color="white" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
                                 {wittyPhrase && (
                                     <Text color="gray" italic>{wittyPhrase} </Text>
                                 )}
-                                <Text color="gray" bold>[ </Text>
+                                {/* <Text color="gray" bold>[ </Text> */}
                                 <Text color="white">{tempModelOverride || activeModel}</Text>
-                                <Text color="gray" bold> ]</Text>
+                                {/* <Text color="gray" bold> ]</Text> */}
                             </Box>
                         </Box>
 
