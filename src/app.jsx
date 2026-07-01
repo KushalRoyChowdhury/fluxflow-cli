@@ -3007,7 +3007,7 @@ export default function App({ args = [] }) {
                         const newMsgs = [...updatedPrev, {
                             id: 'cancel-' + Date.now(),
                             role: 'system',
-                            text: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m',
+                            text: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m',
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -3698,7 +3698,7 @@ export default function App({ args = [] }) {
                             }
                             return updated;
                         }).reverse();
-                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isMeta);
+                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && (!m.isMeta || (m.text && m.text.includes('Request Cancelled'))));
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);
                         setCompletedIndex(newMsgs.length);
@@ -4845,7 +4845,7 @@ export default function App({ args = [] }) {
                                         setIsExpanded(targetPrompt.split('\n').length > 2);
 
                                         // Persist reverted history
-                                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && !m.isMeta);
+                                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && (!m.isMeta || (m.text && m.text.includes('Request Cancelled'))));
                                         await saveChat(chatId, null, historyToSave);
 
                                         const s = emojiSpace(2);

@@ -11659,7 +11659,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           }
           if (TERMINATION_SIGNAL) {
             yield { type: "status", content: "Request Cancelled" };
-            yield { type: "text", content: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m" };
+            yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
             break;
           }
           if (steeringCallback) {
@@ -12110,7 +12110,7 @@ ${ideErr} [/ERROR]`;
                 }
                 if (TERMINATION_SIGNAL) {
                   yield { type: "status", content: "Request Cancelled" };
-                  yield { type: "text", content: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m" };
+                  yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
                   break;
                 }
                 let chunkText = "";
@@ -13248,7 +13248,7 @@ ${colorMainWords(output)}` };
             } catch (err) {
               if (TERMINATION_SIGNAL) {
                 yield { type: "status", content: "Request Cancelled" };
-                yield { type: "text", content: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m" };
+                yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
                 break;
               }
               if (String(err).includes("Incomplete JSON segment at the end")) {
@@ -16771,7 +16771,7 @@ ${timestamp}` };
             const newMsgs = [...updatedPrev, {
               id: "cancel-" + Date.now(),
               role: "system",
-              text: "\n\n\x1B[33m\u2139 Request Cancelled\x1B[0m",
+              text: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m",
               isMeta: true
             }];
             setCompletedIndex(newMsgs.length);
@@ -17386,7 +17386,7 @@ Selection: ${val}`,
               }
               return updated;
             }).reverse();
-            const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && !m.isMeta);
+            const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && (!m.isMeta || m.text && m.text.includes("Request Cancelled")));
             saveChat(chatId, null, historyToSave);
             setCompletedIndex(newMsgs.length);
             return newMsgs;
@@ -18125,7 +18125,7 @@ Selection: ${val}`,
                   setCompletedIndex(newMsgs.length);
                   setInput(targetPrompt);
                   setIsExpanded(targetPrompt.split("\n").length > 2);
-                  const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && !m.isMeta);
+                  const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && (!m.isMeta || m.text && m.text.includes("Request Cancelled")));
                   await saveChat(chatId, null, historyToSave);
                   const s = emojiSpace(2);
                   setMessages((prev) => {

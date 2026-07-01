@@ -2233,7 +2233,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
             if (TERMINATION_SIGNAL) {
                 yield { type: 'status', content: 'Request Cancelled' };
-                yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
+                yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
                 break;
             }
 
@@ -2752,7 +2752,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                         if (TERMINATION_SIGNAL) {
                             yield { type: 'status', content: 'Request Cancelled' };
-                            yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
+                            yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
                             break;
                         }
 
@@ -4002,7 +4002,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 } catch (err) {
                     if (TERMINATION_SIGNAL) {
                         yield { type: 'status', content: 'Request Cancelled' };
-                        yield { type: 'text', content: '\n\n\u001b[33mℹ Request Cancelled\u001b[0m' };
+                        yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
                         break;
                     }
                     if (String(err).includes('Incomplete JSON segment at the end')) {
