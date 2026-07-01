@@ -75,7 +75,10 @@ export const saveChat = async (id, name, messages) => {
 
         // [CLEANUP] Filter out ephemeral messages (like update notices or transient meta alerts)
         // These should only exist in the live UI session.
-        const persistentMessages = (messages || []).filter(m => !m.isUpdateNotification && !m.isMeta);
+        const persistentMessages = (messages || []).filter(m => 
+            !m.isUpdateNotification && 
+            (!m.isMeta || (m.text && m.text.includes('Request Cancelled')))
+        );
 
         // Defensive name selection:
         // 1. Provided name

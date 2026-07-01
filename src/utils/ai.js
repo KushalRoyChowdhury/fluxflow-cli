@@ -49,6 +49,7 @@ const MULTIMODAL_MODELS = [
     "stepfun-ai/step-3.7-flash",
     "google/gemma-4-31b-it",
     "mistralai/mistral-medium-3.5-128b",
+    "qwen/qwen3.5-397b-a17b"
 
     // Google models
     // No need. All models on Gemini API is Multimodal
@@ -336,6 +337,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isMistral = model.includes('mistral');
     const isMinimax = model.includes('minimax');
     const isGPT = model.includes('gpt');
+    const isQwen = model.includes('qwen');
 
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
@@ -375,6 +377,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         body.reasoning_effort = isThinking ? 'high' : 'none';
     } else if (isMinimax && model.includes('minimax-m3')) {
         body.chat_template_kwargs = { thinking_mode: isThinking ? 'enabled' : 'disabled' };
+    } else if (isQwen) {
+        body.chat_template_kwargs = { enable_thinking: isThinking };
     }
 
     const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {

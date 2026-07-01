@@ -6738,7 +6738,9 @@ var init_history = __esm({
         await fs7.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
-        const persistentMessages = (messages || []).filter((m) => !m.isUpdateNotification && !m.isMeta);
+        const persistentMessages = (messages || []).filter(
+          (m) => !m.isUpdateNotification && (!m.isMeta || m.text && m.text.includes("Request Cancelled"))
+        );
         const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
         const chatFile = path6.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
@@ -9690,7 +9692,8 @@ var init_ai = __esm({
       "moonshotai/kimi-k2.6",
       "stepfun-ai/step-3.7-flash",
       "google/gemma-4-31b-it",
-      "mistralai/mistral-medium-3.5-128b"
+      "mistralai/mistral-medium-3.5-128b",
+      "qwen/qwen3.5-397b-a17b"
       // Google models
       // No need. All models on Gemini API is Multimodal
     ];
@@ -9937,6 +9940,7 @@ var init_ai = __esm({
       const isMistral = model.includes("mistral");
       const isMinimax = model.includes("minimax");
       const isGPT = model.includes("gpt");
+      const isQwen = model.includes("qwen");
       const GPT_THINKING_LEVELS = {
         "Fast": "low",
         "Low": "low",
@@ -9972,6 +9976,8 @@ var init_ai = __esm({
         body.reasoning_effort = isThinking ? "high" : "none";
       } else if (isMinimax && model.includes("minimax-m3")) {
         body.chat_template_kwargs = { thinking_mode: isThinking ? "enabled" : "disabled" };
+      } else if (isQwen) {
+        body.chat_template_kwargs = { enable_thinking: isThinking };
       }
       const response = await fetchWithBackoff("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
@@ -15789,6 +15795,11 @@ function App({ args = [] }) {
         {
           cmd: "minimaxai/minimax-m3",
           desc: "Text Only"
+        },
+        // QWEN
+        {
+          cmd: "qwen/qwen3.5-397b-a17b",
+          desc: "Multimodal"
         }
       ] : apiTier === "Free" ? [
         {
@@ -18372,7 +18383,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
           Box14,
           {
             backgroundColor: "#555555",

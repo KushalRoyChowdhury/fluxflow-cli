@@ -2009,6 +2009,12 @@ export default function App({ args = [] }) {
                                 cmd: 'minimaxai/minimax-m3',
                                 desc: 'Text Only'
                             },
+
+                            // QWEN
+                            {
+                                cmd: 'qwen/qwen3.5-397b-a17b',
+                                desc: 'Multimodal'
+                            }
                         ]
 
                         : (apiTier === 'Free'
@@ -5190,7 +5196,7 @@ export default function App({ args = [] }) {
                             </Box>
                             <Box>
                                 {wittyPhrase && (
-                                    <Text color="gray" italic>{wittyPhrase} </Text>
+                                    <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 )}
                                 {/* <Text color="gray" bold>[ </Text> */}
                                 <Text color="white">{tempModelOverride || activeModel}</Text>
