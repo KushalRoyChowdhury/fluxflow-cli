@@ -420,7 +420,7 @@ export default function App({ args = [] }) {
                 const diff = Date.now() - lastGCTime || 0;
                 if (diff > 30000) {
                     if (global.gc) {
-                        try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                        try { global.gc(); setTimeout(() => { global.gc() }, 50); lastGCTime = Date.now(); } catch (e) { }
                     }
                 }
                 // else console.log(lastGCTime, diff);
