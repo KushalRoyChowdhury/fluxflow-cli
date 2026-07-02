@@ -1,5 +1,6 @@
 import { subagentProgress } from '../utils/subagent_state.js';
 import { parseArgs } from '../utils/arg_parser.js';
+// import fs from 'fs';
 
 export const invoke = async (args, context = {}) => {
     const { runSubagent } = await import('../utils/ai.js');
@@ -28,7 +29,7 @@ export const invoke = async (args, context = {}) => {
     }
 
     const taskId = `subagent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
+
     const taskEntry = {
         id: taskId,
         title: title || task.substring(0, 30),
@@ -36,6 +37,10 @@ export const invoke = async (args, context = {}) => {
         status: 'running',
         progress: [] // Array of arrays containing logs for each turn
     };
+
+    // setInterval(() => {
+    //     fs.writeFileSync(`SUBAGENT_DEBUG_ENTRY-{${taskEntry.id}}.json`, JSON.stringify(taskEntry, null, 4));
+    // }, 1000);
 
     subagentProgress.push(taskEntry);
     if (context.onSubagentUpdate) {
@@ -52,7 +57,7 @@ export const invoke = async (args, context = {}) => {
                 currentTurnLogs = [];
             }
         }
-        
+
         if (logMessage.includes('[Executing Tool]')) {
             const m = logMessage.match(/\[Executing Tool\]\s*([a-zA-Z0-9_]+)/);
             if (m) {

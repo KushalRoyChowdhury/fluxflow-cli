@@ -5125,13 +5125,13 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
-9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop
+9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS --
-USE PROACTIVELY WHEN BENEFICIAL
-- Invocation Types: invoke (async, background worker for parallel tasks, upto 5 parallel agents, might take long time), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
+USE PROACTIVELY TO PARALLELIZE TASK RECOMMENDED
+- Invocation Types: invoke (async, background worker for parallel tasks, upto 5 parallel agents (3+ calls allowed), might take long time), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
 1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? await >>> spamming getProgress`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? do your own task OR await (exponentially longer after 2nd check) >>> spamming getProgress`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -11150,7 +11150,44 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             config: {
               systemInstruction,
               temperature,
-              thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+              thinkingConfig: (() => {
+                const modelLower = (model || "").toLowerCase();
+                const isGemma4 = modelLower.includes("gemma-4") || modelLower.startsWith("gemma");
+                const isGemini3 = modelLower.includes("gemini-3");
+                if (isGemma4 || isGemini3) {
+                  if (isGemma4) {
+                    if (thinkingLevel.toLowerCase() !== "xhigh" || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                    else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+                  }
+                  return {
+                    includeThoughts: true,
+                    thinkingLevel: {
+                      "Fast": modelLower.includes("pro") ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                      "Low": ThinkingLevel.LOW,
+                      "Medium": ThinkingLevel.MEDIUM,
+                      "Standard": ThinkingLevel.MEDIUM,
+                      "High": ThinkingLevel.HIGH,
+                      "xHigh": ThinkingLevel.HIGH
+                    }[thinkingLevel] || ThinkingLevel.MEDIUM
+                  };
+                } else {
+                  const budget = {
+                    "Fast": 0,
+                    "Low": 512,
+                    "Medium": 2048,
+                    "Standard": 2048,
+                    "High": 16384,
+                    "xHigh": 24576
+                  }[thinkingLevel] || 2048;
+                  if (budget === 0) {
+                    return { includeThoughts: false };
+                  }
+                  return {
+                    includeThoughts: true,
+                    thinkingBudget: budget
+                  };
+                }
+              })()
             }
           });
           stream = genStream;
@@ -12843,8 +12880,8 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName === "await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
-                      if (sec < 5) sec = 5;
-                      if (sec > 120) sec = 120;
+                      if (sec < 10) sec = 10;
+                      if (sec > 180) sec = 180;
                       const formatTime = (s) => {
                         if (s >= 60) {
                           const m = Math.floor(s / 60);
@@ -13927,28 +13964,42 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
       const mergedSettings = { ...savedSettings, ...settings };
       const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const SUBAGENT_TOOL_DEFINITIONS = {
-        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs.',
-        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats.',
-        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports.',
-        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files.',
-        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file.',
-        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search.',
-        "writepdf": '- [tool:functions.WritePDF(path="...", content="...", orientation="...")]. Generates PDF documents.',
-        "writedoc": '- [tool:functions.WriteDoc(path="...", content="...")]. Generates Word documents.',
-        "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search.',
-        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape.'
+        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs',
+        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats',
+        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
+        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
+        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
+        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
+        "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
+        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape'
       };
-      const providedToolsSection = `
-
--- Provided Tools --
+      const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
+To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+TOOL POLICY:
+- MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
+- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 HIGHLY RECOMMENDED
+- FileMap >>> ReadFile to understand file efficiently
+- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
+- HUGE FILES? SearchKeyword >> FileMap/Full Read
+-- PROVIDED TOOLS --
 ${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}`;
-      const systemInstruction = `You are a subagent helping the main FluxFlow CLI agent.
+      const systemInstruction = `=== START SYSTEM PROMPT ===
+You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
-You have access to the same tools as the main agent. Execute tools as needed using the [tool:functions.ToolName(args)] syntax${providedToolsSection}
+
+${providedToolsSection.trimEnd()}
+
+-- THINKING POLICY --
+NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
+
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a concise final structured summary preferebly in Tables/Bullet Points. Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, "$3-$1-$2").replace(":", "-")}`;
+Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points, if any task failed report back in detail, no hallucination
+
+CWD: ${process.cwd()}
+Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, "$3-$1-$2").replace(":", "-")}
+=== END SYSTEM PROMPT ===`;
       const subagentHistory = [
-        { role: "user", text: `Please execute this task: ${task}` }
+        { role: "user", text: `Complete this task: ${task}` }
       ];
       let turn = 0;
       let finalAnswer = "";

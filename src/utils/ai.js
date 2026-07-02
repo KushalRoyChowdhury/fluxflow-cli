@@ -1387,7 +1387,46 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 config: {
                     systemInstruction: systemInstruction,
                     temperature: temperature,
-                    thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                    thinkingConfig: (() => {
+                        const modelLower = (model || "").toLowerCase();
+                        const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
+                        const isGemini3 = modelLower.includes('gemini-3');
+
+                        if (isGemma4 || isGemini3) {
+                            if (isGemma4) {
+                                if (thinkingLevel.toLowerCase() !== 'xhigh' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+                            }
+                            return {
+                                includeThoughts: true,
+                                thinkingLevel: {
+                                    'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                                    'Low': ThinkingLevel.LOW,
+                                    'Medium': ThinkingLevel.MEDIUM,
+                                    'Standard': ThinkingLevel.MEDIUM,
+                                    'High': ThinkingLevel.HIGH,
+                                    'xHigh': ThinkingLevel.HIGH
+                                }[thinkingLevel] || ThinkingLevel.MEDIUM
+                            };
+                        } else {
+                            const budget = {
+                                'Fast': 0,
+                                'Low': 512,
+                                'Medium': 2048,
+                                'Standard': 2048,
+                                'High': 16384,
+                                'xHigh': 24576
+                            }[thinkingLevel] || 2048;
+
+                            if (budget === 0) {
+                                return { includeThoughts: false };
+                            }
+                            return {
+                                includeThoughts: true,
+                                thinkingBudget: budget
+                            };
+                        }
+                    })()
                 }
             });
             stream = genStream;
@@ -3202,8 +3241,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'await') {
                                     const { time } = parseArgs(toolCall.args);
                                     let sec = parseFloat(time) || 0;
-                                    if (sec < 5) sec = 5;
-                                    if (sec > 120) sec = 120;
+                                    if (sec < 10) sec = 10;
+                                    if (sec > 180) sec = 180;
                                     const formatTime = (s) => {
                                         if (s >= 60) {
                                             const m = Math.floor(s / 60);
@@ -4407,28 +4446,42 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
 
     const SUBAGENT_TOOL_DEFINITIONS = {
-        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs.',
-        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats.',
-        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports.',
-        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files.',
-        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file.',
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search.',
-        'writepdf': '- [tool:functions.WritePDF(path="...", content="...", orientation="...")]. Generates PDF documents.',
-        'writedoc': '- [tool:functions.WriteDoc(path="...", content="...")]. Generates Word documents.',
-        'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search.',
-        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape.'
+        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs',
+        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats',
+        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
+        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
+        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
+        'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
+        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape'
     };
 
-    const providedToolsSection = `\n\n-- Provided Tools --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}`;
+    const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
+To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+TOOL POLICY:
+- MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
+- USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
+- FileMap >>> ReadFile to understand file efficiently
+- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
+- HUGE FILES? SearchKeyword >> FileMap/Full Read\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}`;
 
-    const systemInstruction = `You are a subagent helping the main FluxFlow CLI agent.
+    const systemInstruction = `=== START SYSTEM PROMPT ===
+You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
-You have access to the same tools as the main agent. Execute tools as needed using the [tool:functions.ToolName(args)] syntax${providedToolsSection}
+
+${providedToolsSection.trimEnd()}
+
+-- THINKING POLICY --
+NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
+
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a concise final structured summary preferebly in Tables/Bullet Points. Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}`;
+Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points, if any task failed report back in detail, no hallucination
+
+CWD: ${process.cwd()}
+Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}\n=== END SYSTEM PROMPT ===`;
 
     const subagentHistory = [
-        { role: 'user', text: `Please execute this task: ${task}` }
+        { role: 'user', text: `Complete this task: ${task}` }
     ];
 
     let turn = 0;
@@ -4529,6 +4582,7 @@ Once you have fully completed the task, provide a concise final structured summa
         subagentHistory.push({ role: 'user', text: toolResultsStr.trim() });
         turn++;
     }
+    // fs.writeFileSync("SUBAGENT_DEBUG.txt", finalAnswer);
 
     return finalAnswer;
 };

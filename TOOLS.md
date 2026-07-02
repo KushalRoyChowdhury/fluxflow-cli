@@ -8,12 +8,13 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | :--- | :---: | :---: |
 | **Communication (Ask)** | ✅ | ✅ |
 | **Web Search & Scrape** | ✅ | ✅ |
+| **Creative (PDF/DOCX/Image)** | ❌ | ✅ |
 | **File System (Read/Write)** | ✅ | ❌ |
 | **Terminal Execution** | ✅ | ❌ |
 | **Search Keyword** | ✅ | ❌ |
 | **File Map** | ✅ | ❌ |
 | **Todo (Planning)** | ✅ | ❌ |
-| **Creative (PDF/DOCX/Image)** | ❌ | ✅ |
+| **Multi Agent (sync/async)** | ✅ | ❌ |
 
 ---
 
