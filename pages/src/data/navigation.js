@@ -13,7 +13,7 @@ export const navItems = [
         children: [
             { title: 'Architecture', path: '/architecture' },
             { title: 'Tools', path: '/tools' },
-            { title: 'Stable Models', path: '/models' },
+            { title: 'Supported Models', path: '/models' },
         ],
     },
 ]

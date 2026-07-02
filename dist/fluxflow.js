@@ -3357,6 +3357,9 @@ var init_MultilineInput = __esm({
           setPasteBlocks([]);
           return;
         }
+        if (key.ctrl && (cleanInput.toLowerCase() === "r" || cleanInput === "" || cleanInput === "")) {
+          return;
+        }
         const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
         if (isArrowKey) {
           flushPasteTransaction();
@@ -4819,37 +4822,51 @@ var init_ChatLayout = __esm({
 import React5 from "react";
 import { Box as Box4, Text as Text5 } from "ink";
 import { useState as useState5, useEffect as useEffect4 } from "react";
-var StatusBar, StatusBar_default;
+function getMemoryInfo() {
+  if (activeGetMemoryInfo) {
+    activeGetMemoryInfo();
+  }
+}
+var activeGetMemoryInfo, StatusBar, StatusBar_default;
 var init_StatusBar = __esm({
   "src/components/StatusBar.jsx"() {
     init_text();
-    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google" }) => {
+    activeGetMemoryInfo = null;
+    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "" }) => {
       const modeIcon = mode === "Flux" ? "" : "";
       const [memoryUsage, setMemoryUsage] = useState5(0);
       const [memoryLimit, setMemoryLimit] = useState5(0);
       const [memoryUnit, setMemoryUnit] = useState5("MB");
-      useEffect4(() => {
-        const getMemoryInfo = () => {
-          const usage = process.memoryUsage();
-          const isGB = usage.heapTotal / (1024 * 1024) >= 1024;
-          const currentUnit = isGB ? "GB" : "MB";
-          const formatToNumber = (bytes, toGB) => {
-            const converted = bytes / (1024 * 1024 * (toGB ? 1024 : 1));
-            return toGB ? parseFloat(converted.toFixed(2)) : Math.round(converted);
-          };
-          setMemoryUnit(currentUnit);
-          setMemoryLimit(formatToNumber(usage.heapTotal, isGB));
-          setMemoryUsage(formatToNumber(usage.heapUsed, isGB));
+      const updateMemory = () => {
+        const usage = process.memoryUsage();
+        const isGB = usage.heapTotal / (1024 * 1024) >= 1024;
+        const currentUnit = isGB ? "GB" : "MB";
+        const formatToNumber = (bytes, toGB) => {
+          const converted = bytes / (1024 * 1024 * (toGB ? 1024 : 1));
+          return toGB ? parseFloat(converted.toFixed(2)) : Math.round(converted);
         };
-        getMemoryInfo();
+        setMemoryUnit(currentUnit);
+        setMemoryLimit(formatToNumber(usage.heapTotal, isGB));
+        setMemoryUsage(formatToNumber(usage.heapUsed, isGB));
+      };
+      useEffect4(() => {
+        activeGetMemoryInfo = updateMemory;
+        updateMemory();
         const interval = setInterval(() => {
-          getMemoryInfo();
+          updateMemory();
         }, 3e4);
-        return () => clearInterval(interval);
+        return () => {
+          clearInterval(interval);
+          if (activeGetMemoryInfo === updateMemory) {
+            activeGetMemoryInfo = null;
+          }
+        };
       }, []);
-      let maxLimit = 256e3;
-      if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
-        maxLimit = 4e5;
+      let maxLimit = 262144;
+      if (aiProvider === "NVIDIA" && (activeModel?.includes("glm") || activeModel?.includes("gpt") || activeModel?.includes("qwen"))) {
+        maxLimit = 128e3;
+      } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
+        maxLimit = 409600;
       }
       return /* @__PURE__ */ React5.createElement(
         Box4,
@@ -9941,6 +9958,7 @@ var init_ai = __esm({
       const isMinimax = model.includes("minimax");
       const isGPT = model.includes("gpt");
       const isQwen = model.includes("qwen");
+      const isNemotron = model.includes("nemotron");
       const GPT_THINKING_LEVELS = {
         "Fast": "low",
         "Low": "low",
@@ -9978,6 +9996,16 @@ var init_ai = __esm({
         body.chat_template_kwargs = { thinking_mode: isThinking ? "enabled" : "disabled" };
       } else if (isQwen) {
         body.chat_template_kwargs = { enable_thinking: isThinking };
+      } else if (isNemotron) {
+        if (apiLevel === "High") {
+          body.reasoning_budget = 12e3;
+          body.chat_template_kwargs = { enable_thinking: true };
+        } else if (apiLevel === "Standard") {
+          body.reasoning_budget = 12e3;
+          body.chat_template_kwargs = { enable_thinking: true, medium_effort: true };
+        } else {
+          body.chat_template_kwargs = { enable_thinking: false };
+        }
       }
       const response = await fetchWithBackoff("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: "POST",
@@ -11067,11 +11095,14 @@ Provide a consolidated summary of the entire session.`;
             modifiedHistory = slicedHistory;
           }
         }
-        let contextCompressionCount = 252e3;
-        let contextTruncationCount = 254e3;
-        if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
-          contextCompressionCount = 396e3;
-          contextTruncationCount = 4e5;
+        let contextCompressionCount = 255e3;
+        let contextTruncationCount = 26e4;
+        if (aiProvider === "NVIDIA" && (modelName?.includes("glm") || modelName?.includes("gpt") || modelName?.includes("qwen"))) {
+          contextCompressionCount = 122e3;
+          contextTruncationCount = 126e3;
+        } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
+          contextCompressionCount = 4e5;
+          contextTruncationCount = 405e3;
         }
         if ((sessionStats?.tokens || 0) > contextCompressionCount) {
           yield { type: "status_history", content: "Context Limit Reached. Condensing session history..." };
@@ -15067,6 +15098,10 @@ function App({ args = [] }) {
     if (inputText === "\x1B[I" || inputText === "\x1B[O" || inputText === "[I" || inputText === "[O") {
       return;
     }
+    if (key.ctrl && (inputText.toLowerCase() === "r" || inputText === "" || inputText === "")) {
+      getMemoryInfo();
+      return;
+    }
     if (activeView === "stats") {
       if (key.tab && !key.shift) {
         setStatsMode((prev) => {
@@ -15810,6 +15845,11 @@ function App({ args = [] }) {
         {
           cmd: "qwen/qwen3.5-397b-a17b",
           desc: "Multimodal"
+        },
+        // NVIDIA NEMOTRON
+        {
+          cmd: "nvidia/nemotron-3-ultra-550b-a55b",
+          desc: "Text Only [EXPERIMENTAL]"
         }
       ] : apiTier === "Free" ? [
         {
@@ -18546,7 +18586,8 @@ Selection: ${val}`,
       chatId,
       isMemoryEnabled: systemSettings.memory,
       apiTier,
-      aiProvider
+      aiProvider,
+      activeModel
     }
   )), activeView === "exit" && (() => {
     const wallTimeMs = Date.now() - SESSION_START_TIME;

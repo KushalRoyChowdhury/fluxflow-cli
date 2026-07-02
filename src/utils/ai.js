@@ -338,6 +338,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isMinimax = model.includes('minimax');
     const isGPT = model.includes('gpt');
     const isQwen = model.includes('qwen');
+    const isNemotron = model.includes('nemotron');
 
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
@@ -379,6 +380,16 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         body.chat_template_kwargs = { thinking_mode: isThinking ? 'enabled' : 'disabled' };
     } else if (isQwen) {
         body.chat_template_kwargs = { enable_thinking: isThinking };
+    } else if (isNemotron) {
+        if (apiLevel === 'High') {
+            body.reasoning_budget = 12000;
+            body.chat_template_kwargs = { enable_thinking: true };
+        } else if (apiLevel === 'Standard') {
+            body.reasoning_budget = 12000;
+            body.chat_template_kwargs = { enable_thinking: true, medium_effort: true };
+        } else {
+            body.chat_template_kwargs = { enable_thinking: false };
+        }
     }
 
     const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -1657,12 +1668,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         // Truncation & Condensation Logic (Compression 0.0)
-        let contextCompressionCount = 252000;
-        let contextTruncationCount = 254000;
+        let contextCompressionCount = 255000;
+        let contextTruncationCount = 260000;
 
-        if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
-            contextCompressionCount = 396000;
-            contextTruncationCount = 400000;
+        if (aiProvider === 'NVIDIA' && (modelName?.includes('glm') || modelName?.includes('gpt') || modelName?.includes('qwen'))) {
+            contextCompressionCount = 122000;
+            contextTruncationCount = 126000;
+        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+            contextCompressionCount = 400000;
+            contextTruncationCount = 405000;
         }
 
         if ((sessionStats?.tokens || 0) > contextCompressionCount) {

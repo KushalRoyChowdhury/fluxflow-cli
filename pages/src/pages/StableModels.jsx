@@ -162,6 +162,11 @@ export default function StableModels() {
                             <td><code>z-ai/glm-5.1</code></td>
                             <td>Text Only</td>
                         </tr>
+
+                        <tr>
+                            <td><code>nvidia/nemotron-3-ultra-550b-a55b</code></td>
+                            <td>Text Only [EXPERIMENTAL]</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>

@@ -519,6 +519,11 @@ export const MultilineInput = ({
             return;
         }
 
+        // Support Ctrl+R refresh shortcut (swallowed here so it doesn't type 'r')
+        if (key.ctrl && (cleanInput.toLowerCase() === 'r' || cleanInput === '\x12' || cleanInput === '\u0012')) {
+            return;
+        }
+
         // Rate-limiting throttle for arrow keys
         const isArrowKey = key.upArrow || key.downArrow || key.leftArrow || key.rightArrow;
         if (isArrowKey) {

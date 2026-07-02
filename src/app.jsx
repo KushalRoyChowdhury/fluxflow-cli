@@ -10,7 +10,7 @@ import { MultilineInput } from './components/MultilineInput.jsx';
 import TextInput from 'ink-text-input';
 import SelectInput from 'ink-select-input';
 import ChatLayout, { MessageItem, CodeRenderer, BlockItem } from './components/ChatLayout.jsx';
-import StatusBar from './components/StatusBar.jsx';
+import StatusBar, { getMemoryInfo } from './components/StatusBar.jsx';
 import CommandMenu from './components/CommandMenu.jsx';
 import SettingsMenu from './components/SettingsMenu.jsx';
 import ProfileForm from './components/ProfileForm.jsx';
@@ -1168,6 +1168,12 @@ export default function App({ args = [] }) {
             return;
         }
 
+        // ctrl+r triggers memory info refresh
+        if (key.ctrl && (inputText.toLowerCase() === 'r' || inputText === '\x12' || inputText === '\u0012')) {
+            getMemoryInfo();
+            return;
+        }
+
         if (activeView === 'stats') {
             if (key.tab && !key.shift) {
                 setStatsMode(prev => {
@@ -2014,6 +2020,12 @@ export default function App({ args = [] }) {
                             {
                                 cmd: 'qwen/qwen3.5-397b-a17b',
                                 desc: 'Multimodal'
+                            },
+
+                            // NVIDIA NEMOTRON
+                            {
+                                cmd: 'nvidia/nemotron-3-ultra-550b-a55b',
+                                desc: 'Text Only [EXPERIMENTAL]'
                             }
                         ]
 
@@ -5494,6 +5506,7 @@ export default function App({ args = [] }) {
                                 isMemoryEnabled={systemSettings.memory}
                                 apiTier={apiTier}
                                 aiProvider={aiProvider}
+                                activeModel={activeModel}
                             />
                         </Box>
 
