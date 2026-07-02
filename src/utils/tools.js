@@ -19,6 +19,8 @@ import { todo } from '../tools/todo.js';
 import { invokeSync } from '../tools/invokeSync.js';
 import { invoke } from '../tools/invoke.js';
 import { getProgress } from '../tools/getProgress.js';
+import { awaitTool } from '../tools/await.js';
+
 
 const TOOL_MAP = {
     web_search,
@@ -72,7 +74,9 @@ const TOOL_MAP = {
     TODO: todo,
     InvokeSync: invokeSync,
     Invoke: invoke,
-    GetProgress: getProgress
+    GetProgress: getProgress,
+    await: awaitTool,
+    Await: awaitTool
 };
 
 /**
@@ -86,7 +90,7 @@ export const dispatchTool = async (toolName, args, context = {}) => {
     const normalized = toolName.toLowerCase();
 
     // 1. SYSTEM & COMMON TOOLS (Always Allowed)
-    const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape'];
+    const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape', 'await'];
     const isSystem = systemTools.some(t => normalized.includes(t)) || normalized === 'ask';
 
     if (!isSystem) {

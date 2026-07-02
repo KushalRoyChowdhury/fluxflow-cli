@@ -5125,12 +5125,13 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
+9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop
 
 -- SUB AGENTS --
-IN NEW LINE, use when needed
-- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
+USE PROACTIVELY WHEN BENEFICIAL
+- Invocation Types: invoke (async, background worker for parallel tasks, upto 5 parallel agents), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
 1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths & required folder structure provided
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, might take time, DONT SPAM & focus on other task if any`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, MIGHT TAKE LONG TIME, DONT SPAM TOOL, WAIT IF NEEDED`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -9694,6 +9695,41 @@ ${task.finalAnswer}
   }
 });
 
+// src/tools/await.js
+var awaitTool;
+var init_await = __esm({
+  "src/tools/await.js"() {
+    init_arg_parser();
+    awaitTool = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const timeStr = parsed.time;
+      if (!timeStr) {
+        return 'ERROR: Missing "time" argument for await.';
+      }
+      let seconds = parseFloat(timeStr);
+      if (isNaN(seconds)) {
+        return `ERROR: Invalid time value "${timeStr}". Must be a number.`;
+      }
+      if (seconds < 10) {
+        seconds = 10;
+      } else if (seconds > 180) {
+        seconds = 180;
+      }
+      const formatTime = (s) => {
+        if (s >= 60) {
+          const m = Math.floor(s / 60);
+          const rem = s % 60;
+          return `${m}m${rem > 0 ? ` ${rem}s` : ""}`;
+        }
+        return `${s}s`;
+      };
+      const formatted = formatTime(seconds);
+      await new Promise((resolve) => setTimeout(resolve, seconds * 1e3));
+      return `SUCCESS: Waited for ${formatted}${seconds > 180 ? " (Max: 180s)" : ""}${seconds < 10 ? " (Min: 10s)" : ""}.`;
+    };
+  }
+});
+
 // src/utils/tools.js
 var TOOL_MAP, dispatchTool;
 var init_tools = __esm({
@@ -9719,6 +9755,7 @@ var init_tools = __esm({
     init_invokeSync();
     init_invoke();
     init_getProgress();
+    init_await();
     TOOL_MAP = {
       web_search,
       web_scrape,
@@ -9770,12 +9807,14 @@ var init_tools = __esm({
       TODO: todo,
       InvokeSync: invokeSync,
       Invoke: invoke,
-      GetProgress: getProgress
+      GetProgress: getProgress,
+      await: awaitTool,
+      Await: awaitTool
     };
     dispatchTool = async (toolName, args, context = {}) => {
       const mode = context.mode ? context.mode.toLowerCase() : "flux";
       const normalized = toolName.toLowerCase();
-      const systemTools = ["memory", "chat", "savesummary", "addmemscore", "add_mem_score", "ask", "web_search", "web_scrape"];
+      const systemTools = ["memory", "chat", "savesummary", "addmemscore", "add_mem_score", "ask", "web_search", "web_scrape", "await"];
       const isSystem = systemTools.some((t) => normalized.includes(t)) || normalized === "ask";
       if (!isSystem) {
         if (mode === "flow") {
@@ -9942,7 +9981,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label2) => {
       if (!label2) return label2;
-      return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -10530,7 +10569,8 @@ var init_ai = __esm({
       "Todo": "Planning",
       "invoke_sync": "Spawning SubAgent",
       "invoke": "Spawning SubAgent",
-      "get_progress": "Checking SubAgent"
+      "get_progress": "Checking SubAgent",
+      "await": "Waiting"
     };
     getToolDetail = (toolName, argsStr) => {
       try {
@@ -12531,17 +12571,20 @@ ${ideErr} [/ERROR]`;
                       "Todo": "todo",
                       "invoke": "invoke",
                       "invokeSync": "invoke_sync",
-                      "getProgress": "get_progress"
+                      "getProgress": "get_progress",
+                      "await": "await",
+                      "Await": "await"
                     };
                     const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                     const partialArgs = toolContext.args || "";
                     let detail = null;
-                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map", "invoke", "invoke_sync", "get_progress"].includes(potentialTool)) {
+                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map", "invoke", "invoke_sync", "get_progress", "await"].includes(potentialTool)) {
                       const pArgs = parseArgs(partialArgs);
                       const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                       const keyword = pArgs.keyword;
                       const title = pArgs.title || pArgs.task;
                       const id = pArgs.id || pArgs.taskId;
+                      const timeVal = pArgs.time;
                       if (keyword) {
                         detail = keyword.replace(/["']/g, "");
                       } else if (filePath) {
@@ -12550,6 +12593,23 @@ ${ideErr} [/ERROR]`;
                         detail = title.replace(/["']/g, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
                         detail = id.replace(/["']/g, "");
+                      } else if (timeVal && potentialTool === "await") {
+                        let sec = parseFloat(timeVal.replace(/["']/g, ""));
+                        if (!isNaN(sec)) {
+                          if (sec < 5) sec = 5;
+                          if (sec > 120) sec = 120;
+                          const formatTime = (s) => {
+                            if (s >= 60) {
+                              const m = Math.floor(s / 60);
+                              const rem = s % 60;
+                              return `${m}m${rem > 0 ? ` ${rem}s` : ""}`;
+                            }
+                            return `${s}s`;
+                          };
+                          detail = formatTime(sec);
+                        } else {
+                          detail = timeVal.replace(/["']/g, "");
+                        }
                       } else {
                         const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
                         if (m) {
@@ -12712,7 +12772,9 @@ ${ideErr} [/ERROR]`;
                       "Todo": "todo",
                       "invoke": "invoke",
                       "invokeSync": "invoke_sync",
-                      "getProgress": "get_progress"
+                      "getProgress": "get_progress",
+                      "await": "await",
+                      "Await": "await"
                     };
                     const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
                     const displayLabel = TOOL_LABELS2[normToolName] || toolCall.toolName;
@@ -12778,6 +12840,20 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName === "get_progress") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
                       label2 = `\u2714  Checked${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "await") {
+                      const { time } = parseArgs(toolCall.args);
+                      let sec = parseFloat(time) || 0;
+                      if (sec < 5) sec = 5;
+                      if (sec > 120) sec = 120;
+                      const formatTime = (s) => {
+                        if (s >= 60) {
+                          const m = Math.floor(s / 60);
+                          const rem = s % 60;
+                          return `${m}m${rem > 0 ? ` ${rem}s` : ""}`;
+                        }
+                        return `${s}s`;
+                      };
+                      label2 = `\u2714  Awaiting \u2192 ${formatTime(sec)}`;
                     } else if (normToolName === "exec_command" || normToolName === "ask") {
                       label2 = "";
                     } else {
@@ -13929,6 +14005,20 @@ ${cleanResponse}
           } else if (normalizedToolName === "file_map") {
             const path21 = parseArgs(toolCall.args).path || "...";
             label2 = `\u2714  \x1B[95mGet Map\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "await") {
+            const { time } = parseArgs(toolCall.args);
+            let sec = parseFloat(time) || 0;
+            if (sec < 5) sec = 5;
+            if (sec > 120) sec = 120;
+            const formatTime = (s) => {
+              if (s >= 60) {
+                const m = Math.floor(s / 60);
+                const rem = s % 60;
+                return `${m}m${rem > 0 ? ` ${rem}s` : ""}`;
+              }
+              return `${s}s`;
+            };
+            label2 = `\u2714  \x1B[95mAwaiting\x1B[0m \u2192 ${formatTime(sec)}`;
           } else {
             const displayLabel = TOOL_LABELS2[normalizedToolName] || toolCall.toolName;
             const detail = getToolDetail(normalizedToolName, toolCall.args);

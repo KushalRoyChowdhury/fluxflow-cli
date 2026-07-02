@@ -23,7 +23,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -692,7 +692,8 @@ const TOOL_LABELS = {
     'Todo': 'Planning',
     'invoke_sync': 'Spawning SubAgent',
     'invoke': 'Spawning SubAgent',
-    'get_progress': 'Checking SubAgent'
+    'get_progress': 'Checking SubAgent',
+    'await': 'Waiting'
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -2905,19 +2906,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
                                     'GenerateImage': 'generate_image', 'generate_image': 'generate_image',
-                                    'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress'
+                                                                    'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress',
+                                    'await': 'await', 'Await': 'await'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
 
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
-                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress'].includes(potentialTool)) {
+                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await'].includes(potentialTool)) {
                                     const pArgs = parseArgs(partialArgs);
                                     const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                                     const keyword = pArgs.keyword;
                                     const title = pArgs.title || pArgs.task;
                                     const id = pArgs.id || pArgs.taskId;
+                                    const timeVal = pArgs.time;
 
                                     if (keyword) {
                                         detail = keyword.replace(/["']/g, '');
@@ -2927,6 +2930,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         detail = title.replace(/["']/g, '').substring(0, 30);
                                     } else if (id && potentialTool === 'get_progress') {
                                         detail = id.replace(/["']/g, '');
+                                    } else if (timeVal && potentialTool === 'await') {
+                                        let sec = parseFloat(timeVal.replace(/["']/g, ''));
+                                        if (!isNaN(sec)) {
+                                            if (sec < 5) sec = 5;
+                                            if (sec > 120) sec = 120;
+                                            const formatTime = (s) => {
+                                                if (s >= 60) {
+                                                    const m = Math.floor(s / 60);
+                                                    const rem = s % 60;
+                                                    return `${m}m${rem > 0 ? ` ${rem}s` : ''}`;
+                                                }
+                                                return `${s}s`;
+                                            };
+                                            detail = formatTime(sec);
+                                        } else {
+                                            detail = timeVal.replace(/["']/g, '');
+                                        }
                                     } else {
                                         // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords/ids/titles
                                         const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
@@ -3106,7 +3126,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
                                     'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
-                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress'
+                                                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress',
+                                    'await': 'await', 'Await': 'await'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3178,6 +3199,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'get_progress') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
                                     label = `✔  Checked${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'await') {
+                                    const { time } = parseArgs(toolCall.args);
+                                    let sec = parseFloat(time) || 0;
+                                    if (sec < 5) sec = 5;
+                                    if (sec > 120) sec = 120;
+                                    const formatTime = (s) => {
+                                        if (s >= 60) {
+                                            const m = Math.floor(s / 60);
+                                            const rem = s % 60;
+                                            return `${m}m${rem > 0 ? ` ${rem}s` : ''}`;
+                                        }
+                                        return `${s}s`;
+                                    };
+                                    label = `✔  Awaiting → ${formatTime(sec)}`;
                                 } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                     label = '';
                                 } else {
@@ -4454,6 +4489,20 @@ Once you have fully completed the task, provide a concise final structured summa
             } else if (normalizedToolName === 'file_map') {
                 const path = parseArgs(toolCall.args).path || '...';
                 label = `✔  \x1b[95mGet Map\x1b[0m: ${path}`;
+            } else if (normalizedToolName === 'await') {
+                const { time } = parseArgs(toolCall.args);
+                let sec = parseFloat(time) || 0;
+                if (sec < 5) sec = 5;
+                if (sec > 120) sec = 120;
+                const formatTime = (s) => {
+                    if (s >= 60) {
+                        const m = Math.floor(s / 60);
+                        const rem = s % 60;
+                        return `${m}m${rem > 0 ? ` ${rem}s` : ''}`;
+                    }
+                    return `${s}s`;
+                };
+                label = `✔  \x1b[95mAwaiting\x1b[0m → ${formatTime(sec)}`;
             } else {
                 const displayLabel = TOOL_LABELS[normalizedToolName] || toolCall.toolName;
                 const detail = getToolDetail(normalizedToolName, toolCall.args);
