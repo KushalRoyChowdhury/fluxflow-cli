@@ -5128,9 +5128,9 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 
 -- SUB AGENTS --
 IN NEW LINE, use when needed
-- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, usage: task delegation, repeatetive work)
+- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
 1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths & required folder structure provided
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, dont spam`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, might take time, DONT SPAM & focus on other task if any`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}

@@ -41,9 +41,9 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 
 -- SUB AGENTS --
 IN NEW LINE, use when needed
-- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, usage: task delegation, repeatetive work)
+- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
 1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths & required folder structure provided
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, dont spam`.trim()
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, might take time, DONT SPAM & focus on other task if any`.trim()
     :
 
 
