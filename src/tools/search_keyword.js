@@ -166,7 +166,7 @@ export const search_keyword = async (args) => {
         const fileGroups = [];
         let totalMatches = 0;
         for (const result of settledResults) {
-            if (!result) continue;
+            if (!result || !result.matches) continue;
             if (totalMatches >= maxMatches) break;
             const remaining = maxMatches - totalMatches;
             const trimmedMatches = result.matches.slice(0, remaining);

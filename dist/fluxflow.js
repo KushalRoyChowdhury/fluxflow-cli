@@ -8666,7 +8666,7 @@ var init_search_keyword = __esm({
         const fileGroups = [];
         let totalMatches = 0;
         for (const result of settledResults) {
-          if (!result) continue;
+          if (!result || !result.matches) continue;
           if (totalMatches >= maxMatches) break;
           const remaining = maxMatches - totalMatches;
           const trimmedMatches = result.matches.slice(0, remaining);
@@ -12422,7 +12422,7 @@ ${ideErr} [/ERROR]`;
                     let label2 = "";
                     if (normToolName === "web_search") {
                       const { query, limit = 10 } = parseArgs(toolCall.args);
-                      label2 = `\u2714  Searched: ${query}`;
+                      label2 = `\u2714  Searched: ${query} \u2192 ${limit}`;
                     } else if (normToolName === "web_scrape") {
                       const url = parseArgs(toolCall.args).url || "...";
                       label2 = `\u2714  Visited: ${url}`;
@@ -12453,7 +12453,7 @@ ${ideErr} [/ERROR]`;
                       } else if (isImage) {
                         label2 = `\u2714  Viewed: ${targetPath2}`;
                       } else {
-                        label2 = `\u2714  Read: ${targetPath2} \u2192 Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
+                        label2 = `${totalLines !== "..." ? "\u2714" : "\u2717"}  Read: ${targetPath2} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Viewed";
@@ -13028,7 +13028,7 @@ ${boxMid}`) };
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
+                            const deniedLabel = `\u2717  ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -13134,7 +13134,8 @@ ${boxBottom}`}`) };
                       const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                       const boxBottom = ` ${" ".repeat(boxWidth)} `;
                       yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}`) };
+${boxMid}
+`) };
                     }
                     if (normToolName === "todo") {
                       const { method, tasks, markDone } = parseArgs(toolCall.args);
@@ -16822,7 +16823,7 @@ ${timestamp}` };
               id: "cancel-" + Date.now(),
               role: "system",
               text: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m",
-              isMeta: true
+              isMeta: false
             }];
             setCompletedIndex(newMsgs.length);
             return newMsgs;

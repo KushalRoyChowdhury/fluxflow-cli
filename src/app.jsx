@@ -3020,7 +3020,7 @@ export default function App({ args = [] }) {
                             id: 'cancel-' + Date.now(),
                             role: 'system',
                             text: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m',
-                            isMeta: true
+                            isMeta: false
                         }];
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;

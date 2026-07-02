@@ -3077,7 +3077,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'web_search') {
                                     const { query, limit = 10 } = parseArgs(toolCall.args);
-                                    label = `✔  Searched: ${query}`;
+                                    label = `✔  Searched: ${query} → ${limit}`;
                                 } else if (normToolName === 'web_scrape') {
                                     const url = parseArgs(toolCall.args).url || '...';
                                     label = `✔  Visited: ${url}`;
@@ -3110,7 +3110,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } else if (isImage) {
                                         label = `✔  Viewed: ${targetPath}`;
                                     } else {
-                                        label = `✔  Read: ${targetPath} → Lines ${sLine} - ${actualEndLine} of ${totalLines}`;
+                                        label = `${totalLines !== '...' ? '✔' : '✗'}  Read: ${targetPath} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Viewed';
@@ -3714,7 +3714,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✗  ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -3829,7 +3829,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
                                 }
 
                                 if (normToolName === 'todo') {
