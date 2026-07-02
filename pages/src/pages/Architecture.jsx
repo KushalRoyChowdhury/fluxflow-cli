@@ -4,6 +4,7 @@ const headings = [
     { id: 'ui-layer', text: 'UI Layer: React & Ink', level: 2 },
     { id: 'agentic-loop', text: 'The Agentic Loop', level: 2 },
     { id: 'dual-model-system', text: 'Dual-Model System', level: 2 },
+    { id: 'subagent-system', text: 'The Subagent System', level: 2 },
     { id: 'ide-bridge', text: 'IDE Bridge (Companion)', level: 2 },
     { id: 'multimodal-pipeline', text: 'Multimodal Pipeline', level: 2 },
     { id: 'persistence-safety', text: 'Persistence & Safety', level: 2 },
@@ -51,6 +52,18 @@ export default function Architecture() {
             <ul>
                 <li><strong>The Main Agent</strong> — Handles direct interaction, reasoning, and tool execution. It focuses on the user's immediate problem.</li>
                 <li><strong>The Memory Agent</strong> — A silent background process responsible for system maintenance, memory extraction, and chat summarization without blocking the main UI.</li>
+            </ul>
+
+            <h2 id="subagent-system">The Subagent System</h2>
+            <p>
+                FluxFlow provides a robust, multi-agent execution system to delegate sub-tasks and
+                run parallel operations without blocking the main workflow:
+            </p>
+            <ul>
+                <li><strong>Sync/Async Execution Modes</strong> — Spawns blocking subagents (<code>invokeSync</code>) or asynchronous background subagents (<code>invoke</code>) with distinct telemetry tracking.</li>
+                <li><strong>Isolated Context</strong> — Subagents operate independently, without access to the main conversation history, receiving only system prompts and their specific assignment.</li>
+                <li><strong>Permanent Tool Access</strong> — Subagents are provided a permanent set of 10 system tools (including ReadFile, FileMap, PatchFile, WebSearch), with safety restrictions blocking command execution (<code>Run</code> is disabled).</li>
+                <li><strong>Reversion Security</strong> — All files modified by background subagents are logged chronologically under the session's active transaction for secure Git-less rollbacks.</li>
             </ul>
 
             <h2 id="ide-bridge">IDE Bridge (Companion Extension)</h2>

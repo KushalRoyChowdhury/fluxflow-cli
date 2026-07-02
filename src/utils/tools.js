@@ -16,6 +16,9 @@ import { saveSummary } from '../tools/saveSummary.js';
 import { addMemScore } from '../tools/addMemScore.js';
 import { file_map } from '../tools/file_map.js';
 import { todo } from '../tools/todo.js';
+import { invokeSync } from '../tools/invokeSync.js';
+import { invoke } from '../tools/invoke.js';
+import { getProgress } from '../tools/getProgress.js';
 
 const TOOL_MAP = {
     web_search,
@@ -35,6 +38,11 @@ const TOOL_MAP = {
     addMemScore,
     file_map,
     todo,
+    invokeSync,
+    invoke,
+    getProgress,
+    invoke_sync: invokeSync,
+    get_progress: getProgress,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -61,7 +69,10 @@ const TOOL_MAP = {
     AddMemoryScore: addMemScore,
     FileMap: file_map,
     Todo: todo,
-    TODO: todo
+    TODO: todo,
+    InvokeSync: invokeSync,
+    Invoke: invoke,
+    GetProgress: getProgress
 };
 
 /**

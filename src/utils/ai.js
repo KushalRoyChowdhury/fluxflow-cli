@@ -11,6 +11,7 @@ import fs from 'fs';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
+import { loadSettings } from './settings.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
@@ -22,9 +23,39 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
+};
+
+const withRetry = async (fn, maxRetries = 8, initialDelayMs = 1000, maxDelayMs = 8000, signal = null) => {
+    let attempt = 0;
+    while (true) {
+        if (signal?.aborted) {
+            throw new DOMException('The user aborted a request.', 'AbortError');
+        }
+        try {
+            return await fn();
+        } catch (error) {
+            if (signal?.aborted || error?.name === 'AbortError') {
+                throw error;
+            }
+            attempt++;
+            if (attempt >= maxRetries) {
+                throw error;
+            }
+            const delay = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+            await new Promise((resolve, reject) => {
+                const timer = setTimeout(resolve, delay);
+                if (signal) {
+                    signal.addEventListener('abort', () => {
+                        clearTimeout(timer);
+                        reject(new DOMException('The user aborted a request.', 'AbortError'));
+                    });
+                }
+            });
+        }
+    }
 };
 
 let TERMINATION_SIGNAL = false;
@@ -658,12 +689,22 @@ const TOOL_LABELS = {
     'write_docx': 'Creating',
     'generate_image': 'Generating',
     'todo': 'Planning',
-    'Todo': 'Planning'
+    'Todo': 'Planning',
+    'invoke_sync': 'Spawning SubAgent',
+    'invoke': 'Spawning SubAgent',
+    'get_progress': 'Checking SubAgent'
 };
 
 const getToolDetail = (toolName, argsStr) => {
     try {
         const pArgs = parseArgs(argsStr);
+        const normToolName = toolName.toLowerCase().replace(/_/g, '');
+        if (normToolName === 'invokesync' || normToolName === 'invoke') {
+            return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
+        }
+        if (normToolName === 'getprogress') {
+            return pArgs.id || pArgs.taskId;
+        }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
         // Normalize backslashes to forward slashes and strip quotes before extracting basename
         return filePath ? path.basename(filePath.replace(/["']/g, '').replace(/\\/g, '/')) : null;
@@ -1245,7 +1286,7 @@ const detectToolCalls = (text) => {
     // Strip any thinking blocks first to ensure no tool calls are detected inside them
     const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
     const results = [];
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 
     let match;
     while ((match = toolRegex.exec(cleanText)) !== null) {
@@ -1320,46 +1361,69 @@ export const initAI = (apiKey, settings = {}) => {
 /**
  * Generic helper to generate non-streaming content from any provider
  */
-const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.75) => {
-    const { aiProvider = 'Google', apiKey, mode } = settings;
-    let fullText = '';
-    let usageMetadata = null;
+const generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = 'Fast', temperature = 0.75, usageKey = 'agent') => {
+    return withRetry(async () => {
+        const { aiProvider = 'Google', apiKey, mode } = settings;
+        let fullText = '';
+        let usageMetadata = null;
 
-    // Normalize string prompt to GenAI content array format
-    const normalizedContents = typeof contents === 'string'
-        ? [{ role: 'user', parts: [{ text: contents }] }]
-        : contents;
+        // Normalize string prompt to GenAI content array format
+        const normalizedContents = typeof contents === 'string'
+            ? [{ role: 'user', parts: [{ text: contents }] }]
+            : contents;
 
-    let stream;
-    if (aiProvider === 'OpenRouter') {
-        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-    } else if (aiProvider === 'DeepSeek') {
-        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-    } else if (aiProvider === 'NVIDIA') {
-        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-    } else {
-        const genStream = await client.models.generateContentStream({
-            model: model,
-            contents: normalizedContents,
-            config: {
-                systemInstruction: systemInstruction,
-                temperature: temperature,
-                thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+        let stream;
+        if (aiProvider === 'OpenRouter') {
+            stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else if (aiProvider === 'DeepSeek') {
+            stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else if (aiProvider === 'NVIDIA') {
+            stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else {
+            const genStream = await client.models.generateContentStream({
+                model: model,
+                contents: normalizedContents,
+                config: {
+                    systemInstruction: systemInstruction,
+                    temperature: temperature,
+                    thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+                }
+            });
+            stream = genStream;
+        }
+
+        for await (const chunk of stream) {
+            if (chunk.candidates?.[0]?.content?.parts) {
+                for (const part of chunk.candidates[0].content.parts) {
+                    if (part.text && !part.thought) fullText += part.text;
+                }
             }
-        });
-        stream = genStream;
-    }
+            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+        }
 
-    for await (const chunk of stream) {
-        if (chunk.candidates?.[0]?.content?.parts) {
-            for (const part of chunk.candidates[0].content.parts) {
-                if (part.text && !part.thought) fullText += part.text;
+        if (usageMetadata) {
+            const total = usageMetadata.totalTokenCount || 0;
+            const cached = usageMetadata.cachedContentTokenCount || 0;
+            const candidates = (usageMetadata.candidatesTokenCount || 0) + (usageMetadata.thoughtsTokenCount || 0);
+            await addToUsage('tokens', total, aiProvider, model);
+            if (cached > 0) {
+                await addToUsage('cachedTokens', cached, aiProvider, model);
+            }
+            if (candidates > 0) {
+                await addToUsage('candidateTokens', candidates, aiProvider, model);
+            }
+            if (settings && typeof settings.onUsage === 'function') {
+                settings.onUsage({
+                    totalTokenCount: total,
+                    cachedContentTokenCount: cached,
+                    candidatesTokenCount: candidates
+                });
             }
         }
-        if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
-    }
+        await incrementUsage(usageKey, aiProvider);
 
-    return { text: fullText, usageMetadata };
+        return { text: fullText, usageMetadata };
+    });
 };
 
 /**
@@ -1428,7 +1492,7 @@ Chats to process:
         while (attempts <= maxAttempts && !success) {
             attempts++;
             try {
-                const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast');
+                const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast', 0.75, 'background');
 
                 const responseText = response.text || '';
                 const janitorToolCalls = detectToolCalls(responseText);
@@ -1444,19 +1508,7 @@ Chats to process:
                     }
                 }
 
-                if (response.usageMetadata) {
-                    const meta = response.usageMetadata;
-                    const total = meta.totalTokenCount || 0;
-                    const cached = meta.cachedContentTokenCount || 0;
-                    const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-                    await addToUsage('tokens', total, aiProvider, targetModel);
-                    if (cached > 0) {
-                        await addToUsage('cachedTokens', cached, aiProvider, targetModel);
-                    }
-                    if (candidates > 0) {
-                        await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
-                    }
-                }
+
 
                 success = true;
             } catch (err) {
@@ -1518,19 +1570,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
             attempts++;
             try {
                 response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, 'Fast');
-                if (response && response.usageMetadata) {
-                    const meta = response.usageMetadata;
-                    const total = meta.totalTokenCount || 0;
-                    const cached = meta.cachedContentTokenCount || 0;
-                    const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-                    await addToUsage('tokens', total, aiProvider, targetModel);
-                    if (cached > 0) {
-                        await addToUsage('cachedTokens', cached, aiProvider, targetModel);
-                    }
-                    if (candidates > 0) {
-                        await addToUsage('candidateTokens', candidates, aiProvider, targetModel);
-                    }
-                }
+
                 success = true;
             } catch (err) {
                 if (attempts > 3) {
@@ -1538,19 +1578,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
                         try {
                             const fallbackModel = 'gemini-3.1-flash-lite';
                             const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, 'Fast');
-                            if (fallback && fallback.usageMetadata) {
-                                const meta = fallback.usageMetadata;
-                                const total = meta.totalTokenCount || 0;
-                                const cached = meta.cachedContentTokenCount || 0;
-                                const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-                                await addToUsage('tokens', total, aiProvider, fallbackModel);
-                                if (cached > 0) {
-                                    await addToUsage('cachedTokens', cached, aiProvider, fallbackModel);
-                                }
-                                if (candidates > 0) {
-                                    await addToUsage('candidateTokens', candidates, aiProvider, fallbackModel);
-                                }
-                            }
+
                             return fallback.text || '';
                         } catch (e) {
                             return '';
@@ -2609,8 +2637,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         let remaining = text;
                         while (remaining.length > 0) {
                             if (!isBufferingToolCall) {
-                                // Match the actual protocol starts: [tool:functions. or [[END]]
+                                // Match the actual protocol starts: [tool:functions., [agent:generalist. or [[END]]
                                 const toolIdx = remaining.indexOf('[tool');
+                                const agentIdx = remaining.indexOf('[agent');
                                 const endIdx = remaining.indexOf('[[END]]');
                                 const kimiSectionIdx = remaining.indexOf('<|tool_calls_section_begin|>');
                                 const kimiCallIdx = remaining.indexOf('<|tool_call_begin|>');
@@ -2618,6 +2647,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // Find the earliest occurrence of any tag
                                 const indices = [
                                     { type: 'tool', idx: toolIdx, start: '[tool', end: ']' },
+                                    { type: 'agent', idx: agentIdx, start: '[agent', end: ']' },
                                     { type: 'end', idx: endIdx, start: '[[END]]', end: '[[END]]' },
                                     { type: 'kimi_section', idx: kimiSectionIdx, start: '<|tool_calls_section_begin|>', end: '<|tool_calls_section_end|>' },
                                     { type: 'kimi_call', idx: kimiCallIdx, start: '<|tool_call_begin|>', end: '<|tool_call_end|>' }
@@ -2636,7 +2666,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else {
                                     // Check if the end of 'remaining' looks like the START of a tag (potential split)
                                     // We only buffer if it's very likely the start of a protocol tag
-                                    const potentialStarts = ['[tool', '[[END]]', '<|tool_calls_section_begin|>', '<|tool_call_begin|>'];
+                                    const potentialStarts = ['[tool', '[agent', '[[END]]', '<|tool_calls_section_begin|>', '<|tool_call_begin|>'];
                                     let splitPoint = -1;
                                     for (const start of potentialStarts) {
                                         for (let len = start.length - 1; len > 0; len--) {
@@ -2644,8 +2674,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 splitPoint = remaining.length - len;
                                                 const idx = potentialStarts.indexOf(start);
                                                 if (idx === 0) activeBufferType = 'tool';
-                                                else if (idx === 1) activeBufferType = 'end';
-                                                else if (idx === 2) activeBufferType = 'kimi_section';
+                                                else if (idx === 1) activeBufferType = 'agent';
+                                                else if (idx === 2) activeBufferType = 'end';
+                                                else if (idx === 3) activeBufferType = 'kimi_section';
                                                 else activeBufferType = 'kimi_call';
                                                 break;
                                             }
@@ -2670,10 +2701,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // [HEURISTIC] If we're buffering a tool call but it doesn't match the protocol prefix, FLUSH.
                                 // This prevents vanishing output when the model writes code like `[some_array]` or `| [ ] |`.
-                                if (activeBufferType === 'tool') {
-                                    const protocolPrefix = '[tool:functions.';
-                                    // If we have enough chars to check the prefix and it doesn't match, or if it doesn't even start with '[tool'
-                                    if (!combined.startsWith('[tool') || (combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix))) {
+                                if (activeBufferType === 'tool' || activeBufferType === 'agent') {
+                                    const protocolPrefix = activeBufferType === 'tool' ? '[tool:functions.' : '[agent:generalist.';
+                                    const startPrefix = activeBufferType === 'tool' ? '[tool' : '[agent';
+                                    // If we have enough chars to check the prefix and it doesn't match, or if it doesn't even start with the prefix
+                                    if (!combined.startsWith(startPrefix) || (combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix))) {
                                         msgs.push({ type: 'text', content: combined });
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false;
@@ -2685,7 +2717,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 let endIdx = -1;
                                 let endTag = ']';
-                                if (activeBufferType === 'tool') {
+                                if (activeBufferType === 'tool' || activeBufferType === 'agent') {
                                     let balance = 0;
                                     let inString = null;
                                     let bracketBalance = 0;
@@ -2865,7 +2897,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const toolContext = getActiveToolContext(turnText);
                             if (toolContext.inside) {
                                 if (!lastToolEventTime) lastToolEventTime = Date.now();
-                                const rawToolName = toolContext.toolName;
                                 const NORMALIZE_MAP = {
                                     'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
@@ -2873,28 +2904,39 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
                                     'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
-                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image'
+                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image',
+                                    'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress'
                                 };
-                                const potentialTool = NORMALIZE_MAP[rawToolName] || rawToolName;
+                                const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
 
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
-                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map'].includes(potentialTool)) {
+                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress'].includes(potentialTool)) {
                                     const pArgs = parseArgs(partialArgs);
                                     const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                                     const keyword = pArgs.keyword;
+                                    const title = pArgs.title || pArgs.task;
+                                    const id = pArgs.id || pArgs.taskId;
 
                                     if (keyword) {
                                         detail = keyword.replace(/["']/g, '');
                                     } else if (filePath) {
                                         detail = path.basename(filePath.replace(/["']/g, '').replace(/\\/g, '/'));
+                                    } else if (title && (potentialTool === 'invoke' || potentialTool === 'invoke_sync')) {
+                                        detail = title.replace(/["']/g, '').substring(0, 30);
+                                    } else if (id && potentialTool === 'get_progress') {
+                                        detail = id.replace(/["']/g, '');
                                     } else {
-                                        // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords
-                                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                                        // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords/ids/titles
+                                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
                                         if (m) {
                                             const val = m[1].replace(/["']/g, '');
-                                            detail = (potentialTool === 'search_keyword' || potentialTool === 'file_map') ? val : path.basename(val.replace(/\\/g, '/'));
+                                            if (potentialTool === 'invoke' || potentialTool === 'invoke_sync' || potentialTool === 'get_progress') {
+                                                detail = val.substring(0, 30);
+                                            } else {
+                                                detail = (potentialTool === 'search_keyword' || potentialTool === 'file_map') ? val : path.basename(val.replace(/\\/g, '/'));
+                                            }
                                         }
                                     }
                                 }
@@ -3064,7 +3106,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
                                     'file_map': 'file_map', 'FileMap': 'file_map',
                                     'Chat': 'chat', 'chat': 'chat',
-                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo'
+                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3130,7 +3172,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
                                     const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
                                     label = `✔  Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
-                                } else if (normToolName.toLowerCase() === 'exec_command' || normToolName.toLowerCase() === 'ask') {
+                                } else if (normToolName === 'invoke_sync' || normToolName === 'invoke') {
+                                    const detail = getToolDetail(normToolName, toolCall.args);
+                                    label = `✔  Elevating SubAgent${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'get_progress') {
+                                    const detail = getToolDetail(normToolName, toolCall.args);
+                                    label = `✔  Checked${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                     label = '';
                                 } else {
                                     label = `Executed: ${toolCall.toolName}`;
@@ -3675,7 +3723,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const feedbackLabel = `✔  ${action}: ${filePath || '...'}`;
+                                            const feedbackLabel = `✔ ${action}: ${filePath || '...'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -3714,7 +3762,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✗  ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✗ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -3763,12 +3811,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 yield { type: 'spinner', content: false };
 
-                                // CRITICAL: Sync with IDE buffer one last time before execution if approved
                                 let execToolContext = {
                                     chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
                                     systemSettings: settings.systemSettings,
                                     mode,
-                                    isMultiModal: isModelMultimodal(targetModel)
+                                    isMultiModal: isModelMultimodal(targetModel),
+                                    onVisualFeedback: settings.onVisualFeedback,
+                                    onSubagentUpdate: settings.onSubagentUpdate,
+                                    modelName: targetModel,
+                                    aiProvider: settings.aiProvider,
+                                    apiKey: settings.apiKey,
+                                    onUsage: settings.onUsage
                                 };
 
                                 if (normToolName === 'write_file' || normToolName === 'update_file') {
@@ -4309,4 +4362,124 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         await RevertManager.commitTransaction();
     }
     yield { type: 'status', content: null };
+};
+
+
+
+export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 20, logCallback = null) => {
+    const savedSettings = await loadSettings();
+    const mergedSettings = { ...savedSettings, ...settings };
+    const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
+
+    const SUBAGENT_TOOL_DEFINITIONS = {
+        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs.',
+        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats.',
+        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports.',
+        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files.',
+        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file.',
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search.',
+        'writepdf': '- [tool:functions.WritePDF(path="...", content="...", orientation="...")]. Generates PDF documents.',
+        'writedoc': '- [tool:functions.WriteDoc(path="...", content="...")]. Generates Word documents.',
+        'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search.',
+        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape.'
+    };
+
+    const providedToolsSection = `\n\n-- Provided Tools --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}`;
+
+    const systemInstruction = `You are a subagent helping the main FluxFlow CLI agent.
+Your task is: "${task}"
+You have access to the same tools as the main agent. Execute tools as needed using the [tool:functions.ToolName(args)] syntax${providedToolsSection}
+Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
+Once you have fully completed the task, provide a concise final structured summary preferebly in Tables/Bullet Points. Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}`;
+
+    const subagentHistory = [
+        { role: 'user', text: `Please execute this task: ${task}` }
+    ];
+
+    let turn = 0;
+    let finalAnswer = '';
+
+    while (turn < maxTurns) {
+        const contents = subagentHistory.map(m => ({
+            role: m.role === 'user' ? 'user' : 'model',
+            parts: [{ text: m.text }]
+        }));
+
+        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
+
+        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstruction, 'Fast');
+        const responseText = response.text || '';
+        const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
+        finalAnswer = cleanResponse;
+
+        if (logCallback) logCallback(`[Subagent Response]\n${cleanResponse}\n`);
+
+        subagentHistory.push({ role: 'agent', text: cleanResponse });
+
+        const toolCalls = detectToolCalls(cleanResponse);
+        if (toolCalls.length === 0) {
+            break;
+        }
+
+        let toolResultsStr = '';
+        for (const toolCall of toolCalls) {
+            const normalizedToolName = toolCall.toolName.toLowerCase();
+            const allowed = allowedTools ? allowedTools.some(t => t.toLowerCase() === normalizedToolName) : true;
+            if (!allowed) {
+                const errorMsg = `ERROR: Tool [${toolCall.toolName}] is not in the allowed tools list for this subagent.`;
+                if (logCallback) logCallback(`[Blocked Tool Call] ${toolCall.toolName} - not allowed\n`);
+                toolResultsStr += `${errorMsg}\n\n`;
+                continue;
+            }
+
+            let label = '';
+            if (normalizedToolName === 'web_search') {
+                const { query, limit = 10 } = parseArgs(toolCall.args);
+                label = `✔  \x1b[95mSearched\x1b[0m: ${query} → ${limit}`;
+            } else if (normalizedToolName === 'web_scrape') {
+                const url = parseArgs(toolCall.args).url || '...';
+                label = `✔  \x1b[95mVisited\x1b[0m: ${url}`;
+            } else if (normalizedToolName === 'view_file') {
+                const { path: targetPath } = parseArgs(toolCall.args);
+                label = `✔  \x1b[95mRead\x1b[0m: ${targetPath}`;
+            } else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder') {
+                const path = parseArgs(toolCall.args).path || '...';
+                label = `✔  \x1b[95mViewed\x1b[0m: ${path}`;
+            } else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
+                const path = parseArgs(toolCall.args).path || '...';
+                label = `✔  \x1b[95mCreated\x1b[0m: ${path}`;
+            } else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file') {
+                const path = parseArgs(toolCall.args).path || '...';
+                label = `✔  \x1b[95mEdited\x1b[0m: ${path}`;
+            } else if (normalizedToolName === 'file_map') {
+                const path = parseArgs(toolCall.args).path || '...';
+                label = `✔  \x1b[95mGet Map\x1b[0m: ${path}`;
+            } else {
+                const displayLabel = TOOL_LABELS[normalizedToolName] || toolCall.toolName;
+                const detail = getToolDetail(normalizedToolName, toolCall.args);
+                label = `✔  \x1b[95m${displayLabel}\x1b[0m${detail ? `: ${detail}` : ''}`;
+            }
+
+            if (settings.onVisualFeedback && label) {
+                settings.onVisualFeedback(label);
+            }
+
+            if (logCallback) logCallback(`[Executing Tool] ${toolCall.toolName}(${toolCall.args})...`);
+
+            try {
+                const result = await dispatchTool(toolCall.toolName, toolCall.args, { ...settings, mode: 'Flux' });
+                if (logCallback) logCallback(`[Tool Result]\n${result}\n`);
+                toolResultsStr += `[TOOL RESULT for ${toolCall.toolName}]: ${result}\n\n`;
+            } catch (e) {
+                const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
+                if (logCallback) logCallback(`[Tool Error] ${errorMsg}\n`);
+                toolResultsStr += `${errorMsg}\n\n`;
+            }
+        }
+
+        subagentHistory.push({ role: 'user', text: toolResultsStr.trim() });
+        turn++;
+    }
+
+    return finalAnswer;
 };

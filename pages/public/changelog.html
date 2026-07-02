@@ -232,8 +232,21 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["2.16.9"]
+        const stableVersions = ["3.0.0"]
         const changelogData = {
+            "3.0.0": {
+                "note": "JULY 3 - MultiAgent Architecture.",
+                "added": [
+                    "Added SubAgent & MultiAgent Architecture. With 2 invocation methods when agent decides, `invokeSync` & `invoke` based on task complexity and parallelism benefits. May consume HUGE amount of token if used aggressively.",
+                    "Current subagent is `generalist`. More `Specialist Agents` coming soon"
+                ],
+                "changed": [
+                    "Depricated GLM 5.1 on NVIDIA API."
+                ],
+                "fixes": [
+                    "See you in v3.0.1 soon."
+                ]
+            },
             "2.16.9": {
                 "note": "JULY 2.",
                 "added": [

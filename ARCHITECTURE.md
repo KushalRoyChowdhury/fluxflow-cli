@@ -61,6 +61,18 @@ To maintain a fast, snappy UI while still performing complex data management, Fl
 - **Behavior**: After the Main Agent finishes its loop, the entire context (User Prompt + Agent Raws) is sent to the Janitor model.
 - **Headless Operation**: The Janitor is explicitly instructed to be a "silent background system process" with "no mouth." It *only* outputs valid tool calls (e.g., updating the chat title or saving a new user preference to the persistent memory vault).
 
+## The Subagent System
+
+Flux Flow provides a robust, multi-agent execution system to delegate sub-tasks and run parallel operations without blocking the main workflow:
+
+- **Sync/Async Execution Modes**:
+  - **`invokeSync`**: Spawns a blocking subagent. The main loop waits for the subagent to complete its assignment before continuing. Best used for immediate, sequential task delegations.
+  - **`invoke`**: Spawns an asynchronous background subagent. The main agent receives a unique Task ID and can continue working or poll for progress asynchronously.
+- **Isolated System Context**: Subagents operate independently and have no direct context of the main conversation chat. They only receive the custom system instructions and the specific task query assigned by the main agent.
+- **Permanent Tool Suite**: Subagents are equipped with a permanent suite of 10 system tools (ReadFile, ReadFolder, FileMap, PatchFile, WriteFile, SearchKeyword, WritePDF, WriteDoc, WebSearch, and WebScrape), but are restricted from executing commands or prompt prompts (`Run`, `Ask`, and `Todo` are disabled for safety).
+- **Silent Logging and Telemetry**: Background subagent operations are logged quietly and report status updates to the CLI's active subagents UI block.
+- **Transaction-Safe Reversion**: All file modifications made by asynchronous background subagents are logged chronologically under the session's active transaction. This ensures that any subagent modifications can be fully reverted/undone by the user at any point.
+
 ## Data Persistence & Safety
 
 - **High-Fidelity Lock**: Because both the UI and the Janitor model may attempt to write to the `history.json` file simultaneously, a Promise-based `WRITE_LOCK` (`src/utils/history.js`) is utilized. This prevents race conditions and ensures data integrity.

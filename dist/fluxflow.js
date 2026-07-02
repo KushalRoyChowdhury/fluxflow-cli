@@ -2846,7 +2846,7 @@ var init_text = __esm({
       "GenerateImage": "GenerateImage"
     };
     REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
-    REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
+    REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
     REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
     REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
@@ -2854,14 +2854,22 @@ var init_text = __esm({
       if (!text) return text;
       let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, "");
       const trigger = "tool:functions.";
-      if (result.toLowerCase().includes(trigger)) {
+      const subagentTrigger = "agent:generalist.";
+      if (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger)) {
         while (true) {
           const lowerResult = result.toLowerCase();
           let triggerIdx = lowerResult.indexOf(trigger);
-          if (triggerIdx === -1) break;
-          let startIdx = triggerIdx;
+          let subagentIdx = lowerResult.indexOf(subagentTrigger);
+          let currentTrigger = trigger;
+          let triggerIdxToUse = triggerIdx;
+          if (triggerIdx === -1 || subagentIdx !== -1 && subagentIdx < triggerIdx) {
+            currentTrigger = subagentTrigger;
+            triggerIdxToUse = subagentIdx;
+          }
+          if (triggerIdxToUse === -1) break;
+          let startIdx = triggerIdxToUse;
           let hasOuterBracket = false;
-          let k = triggerIdx - 1;
+          let k = triggerIdxToUse - 1;
           while (k >= 0 && /\s/.test(result[k])) k--;
           if (k >= 0 && result[k] === "[") {
             startIdx = k;
@@ -2870,7 +2878,7 @@ var init_text = __esm({
           let balance = 0;
           let foundStart = false;
           let inString = null;
-          let j = triggerIdx;
+          let j = triggerIdxToUse;
           while (j < result.length) {
             const char = result[j];
             if (!inString && (char === "'" || char === '"' || char === "`")) {
@@ -5116,7 +5124,13 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
+
+-- SUB AGENTS --
+IN NEW LINE, use when needed
+- Invocation Types: invoke (async, background worker for parallel tasks), invokeSync (sync, blocking main agent loop, usage: task delegation, repeatetive work)
+1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths & required folder structure provided
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, dont spam`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -6559,15 +6573,17 @@ async function restoreWithRetry(change, tx, maxAttempts = 7) {
   }
   return false;
 }
-var currentTransaction, RevertManager;
+var currentTransaction, lastChatId, RevertManager;
 var init_revert = __esm({
   "src/utils/revert.js"() {
     init_paths();
     init_crypto();
     fs6.ensureDirSync(BACKUPS_DIR);
     currentTransaction = null;
+    lastChatId = null;
     RevertManager = {
       async startTransaction(chatId, promptText) {
+        lastChatId = chatId;
         currentTransaction = {
           id: `tx_prompt_${Date.now()}`,
           chatId,
@@ -6579,8 +6595,37 @@ var init_revert = __esm({
         writeEncryptedJson(ACTIVE_TX_FILE, currentTransaction);
       },
       async recordFileChange(absolutePath, forcedContent = null) {
-        if (!currentTransaction) return;
         try {
+          if (!currentTransaction) {
+            if (lastChatId) {
+              const ledger = readEncryptedJson(LEDGER_FILE, []);
+              const lastTx = [...ledger].reverse().find((tx) => tx.chatId === lastChatId);
+              if (lastTx) {
+                const alreadyBackedUp2 = lastTx.changes.some((c) => c.filePath === absolutePath);
+                if (alreadyBackedUp2) return;
+                const fileExists2 = await fs6.pathExists(absolutePath);
+                let type2 = fileExists2 || forcedContent ? "update" : "create";
+                let backupFile2 = null;
+                if (type2 === "update") {
+                  const fileName = path5.basename(absolutePath);
+                  backupFile2 = `${lastTx.id}_${fileName}.bak`;
+                  const chatBackupDir = path5.join(BACKUPS_DIR, lastTx.chatId);
+                  await fs6.ensureDir(chatBackupDir);
+                  const backupPath = path5.join(chatBackupDir, backupFile2);
+                  let content = forcedContent !== null ? forcedContent : await fs6.readFile(absolutePath, "utf8").catch(() => null);
+                  if (content !== null) {
+                    writeEncryptedJson(backupPath, { data: encryptAes(content) });
+                  } else {
+                    type2 = "create";
+                    backupFile2 = null;
+                  }
+                }
+                lastTx.changes.push({ filePath: absolutePath, type: type2, backupFile: backupFile2 });
+                writeEncryptedJson(LEDGER_FILE, ledger);
+              }
+            }
+            return;
+          }
           const alreadyBackedUp = currentTransaction.changes.some((c) => c.filePath === absolutePath);
           if (alreadyBackedUp) return;
           const fileExists = await fs6.pathExists(absolutePath);
@@ -9462,6 +9507,193 @@ ${content}`;
   }
 });
 
+// src/tools/invokeSync.js
+var invokeSync;
+var init_invokeSync = __esm({
+  "src/tools/invokeSync.js"() {
+    init_arg_parser();
+    invokeSync = async (args, context = {}) => {
+      const { runSubagent: runSubagent2 } = await init_ai().then(() => ai_exports);
+      const parsed = parseArgs(args);
+      const task = parsed.task || parsed.instruction || parsed.prompt;
+      const model = parsed.model || null;
+      const toolsRaw = parsed.tools || null;
+      if (!task) {
+        return 'ERROR: Missing "task" argument for invokeSync.';
+      }
+      let allowedTools = null;
+      if (toolsRaw) {
+        try {
+          let cleaned = toolsRaw.trim();
+          if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+            cleaned = cleaned.substring(1, cleaned.length - 1);
+          }
+          allowedTools = cleaned.split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+        } catch (e) {
+        }
+      }
+      const title = parsed.title || task.substring(0, 30);
+      try {
+        if (context.onVisualFeedback) {
+          context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title}`);
+        }
+        const result = await runSubagent2(task, context, model, allowedTools, 20);
+        if (context.onVisualFeedback) {
+          context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title} [COMPLETED]
+`);
+        }
+        return result;
+      } catch (err) {
+        if (context.onVisualFeedback) {
+          context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title} [FAILED]
+`);
+        }
+        return `ERROR: Subagent execution failed: ${err.message}`;
+      }
+    };
+  }
+});
+
+// src/utils/subagent_state.js
+var subagentProgress;
+var init_subagent_state = __esm({
+  "src/utils/subagent_state.js"() {
+    subagentProgress = [];
+  }
+});
+
+// src/tools/invoke.js
+var invoke;
+var init_invoke = __esm({
+  "src/tools/invoke.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    invoke = async (args, context = {}) => {
+      const { runSubagent: runSubagent2 } = await init_ai().then(() => ai_exports);
+      const parsed = parseArgs(args);
+      const task = parsed.task || parsed.instruction || parsed.prompt;
+      const model = parsed.model || null;
+      const title = parsed.title || null;
+      const toolsRaw = parsed.tools || null;
+      if (!task) {
+        return 'ERROR: Missing "task" argument for invoke.';
+      }
+      let allowedTools = null;
+      if (toolsRaw) {
+        try {
+          let cleaned = toolsRaw.trim();
+          if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+            cleaned = cleaned.substring(1, cleaned.length - 1);
+          }
+          allowedTools = cleaned.split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
+        } catch (e) {
+        }
+      }
+      const taskId = `subagent-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
+      const taskEntry = {
+        id: taskId,
+        title: title || task.substring(0, 30),
+        task,
+        status: "running",
+        progress: []
+        // Array of arrays containing logs for each turn
+      };
+      subagentProgress.push(taskEntry);
+      if (context.onSubagentUpdate) {
+        context.onSubagentUpdate();
+      }
+      let currentTurnLogs = [];
+      const subagentContext = { ...context, onVisualFeedback: null };
+      runSubagent2(task, subagentContext, model, allowedTools, 20, (logMessage) => {
+        if (logMessage.startsWith("[Subagent Turn")) {
+          if (currentTurnLogs.length > 0) {
+            taskEntry.progress.push([...currentTurnLogs]);
+            currentTurnLogs = [];
+          }
+        }
+        if (logMessage.includes("[Executing Tool]")) {
+          const m = logMessage.match(/\[Executing Tool\]\s*([a-zA-Z0-9_]+)/);
+          if (m) {
+            taskEntry.currentTool = m[1];
+          }
+        }
+        let displayLog = logMessage;
+        if (displayLog.startsWith("[Tool Result]")) {
+          const lines = displayLog.split("\n");
+          if (lines.length > 5) {
+            displayLog = lines.slice(0, 4).join("\n") + "\n... [Content/Diff Truncated from Logs] ...";
+          }
+        }
+        currentTurnLogs.push(displayLog);
+        if (context.onSubagentUpdate) {
+          context.onSubagentUpdate();
+        }
+      }).then((finalAnswer) => {
+        currentTurnLogs.push(`[SUBAGENT SUCCESS] Final Answer:
+${finalAnswer}`);
+        taskEntry.progress.push([...currentTurnLogs]);
+        taskEntry.status = "completed";
+        taskEntry.finalAnswer = finalAnswer;
+        if (context.onSubagentUpdate) {
+          context.onSubagentUpdate();
+        }
+      }).catch((err) => {
+        currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
+        taskEntry.progress.push([...currentTurnLogs]);
+        taskEntry.status = "failed";
+        taskEntry.error = err.message;
+        if (context.onSubagentUpdate) {
+          context.onSubagentUpdate();
+        }
+      });
+      return `SUCCESS: Background subagent started. Task ID: ${taskId}`;
+    };
+  }
+});
+
+// src/tools/getProgress.js
+var getProgress;
+var init_getProgress = __esm({
+  "src/tools/getProgress.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    getProgress = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const id = parsed.id;
+      if (!id) {
+        return 'ERROR: Missing "id" argument for getProgress.';
+      }
+      const task = subagentProgress.find((t) => t.id === id);
+      if (!task) {
+        return `ERROR: Subagent task with ID [${id}] not found.`;
+      }
+      let output = `Subagent Task Status: ${task.status.toUpperCase()}
+`;
+      output += `Title: ${task.title}
+`;
+      output += `Task: ${task.task}
+
+`;
+      output += `Progress Log:
+`;
+      task.progress.forEach((turnLogs, index) => {
+        output += `--- Turn ${index + 1} ---
+`;
+        output += turnLogs.join("\n") + "\n\n";
+      });
+      if (task.status === "completed" && task.finalAnswer) {
+        output += `Final Answer:
+${task.finalAnswer}
+`;
+      } else if (task.status === "failed" && task.error) {
+        output += `Failure Error: ${task.error}
+`;
+      }
+      return output.trim();
+    };
+  }
+});
+
 // src/utils/tools.js
 var TOOL_MAP, dispatchTool;
 var init_tools = __esm({
@@ -9484,6 +9716,9 @@ var init_tools = __esm({
     init_addMemScore();
     init_file_map();
     init_todo();
+    init_invokeSync();
+    init_invoke();
+    init_getProgress();
     TOOL_MAP = {
       web_search,
       web_scrape,
@@ -9502,6 +9737,11 @@ var init_tools = __esm({
       addMemScore,
       file_map,
       todo,
+      invokeSync,
+      invoke,
+      getProgress,
+      invoke_sync: invokeSync,
+      get_progress: getProgress,
       ask: ask_user,
       // PascalCase Normalizations for Token Efficiency
       Ask: ask_user,
@@ -9527,7 +9767,10 @@ var init_tools = __esm({
       AddMemoryScore: addMemScore,
       FileMap: file_map,
       Todo: todo,
-      TODO: todo
+      TODO: todo,
+      InvokeSync: invokeSync,
+      Invoke: invoke,
+      GetProgress: getProgress
     };
     dispatchTool = async (toolName, args, context = {}) => {
       const mode = context.mode ? context.mode.toLowerCase() : "flux";
@@ -9664,10 +9907,22 @@ var init_editor = __esm({
 });
 
 // src/utils/ai.js
+var ai_exports = {};
+__export(ai_exports, {
+  compressHistory: () => compressHistory,
+  deleteChatSummary: () => deleteChatSummary,
+  getAIStream: () => getAIStream,
+  getCleanGroupedLength: () => getCleanGroupedLength,
+  initAI: () => initAI,
+  isModelMultimodal: () => isModelMultimodal,
+  runJanitorTask: () => runJanitorTask,
+  runSubagent: () => runSubagent,
+  signalTermination: () => signalTermination
+});
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path19 from "path";
 import fs20 from "fs";
-var client, globalSettings, colorMainWords, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream;
+var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -9679,6 +9934,7 @@ var init_ai = __esm({
     init_view_file();
     init_terminal();
     init_text();
+    init_settings();
     init_paths();
     init_revert();
     init_editor();
@@ -9686,9 +9942,38 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label2) => {
       if (!label2) return label2;
-      return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
+    };
+    withRetry = async (fn, maxRetries = 8, initialDelayMs = 1e3, maxDelayMs = 8e3, signal = null) => {
+      let attempt = 0;
+      while (true) {
+        if (signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
+        try {
+          return await fn();
+        } catch (error) {
+          if (signal?.aborted || error?.name === "AbortError") {
+            throw error;
+          }
+          attempt++;
+          if (attempt >= maxRetries) {
+            throw error;
+          }
+          const delay = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(resolve, delay);
+            if (signal) {
+              signal.addEventListener("abort", () => {
+                clearTimeout(timer);
+                reject(new DOMException("The user aborted a request.", "AbortError"));
+              });
+            }
+          });
+        }
+      }
     };
     TERMINATION_SIGNAL = false;
     MULTIMODAL_MODELS = [
@@ -10242,11 +10527,21 @@ var init_ai = __esm({
       "write_docx": "Creating",
       "generate_image": "Generating",
       "todo": "Planning",
-      "Todo": "Planning"
+      "Todo": "Planning",
+      "invoke_sync": "Spawning SubAgent",
+      "invoke": "Spawning SubAgent",
+      "get_progress": "Checking SubAgent"
     };
     getToolDetail = (toolName, argsStr) => {
       try {
         const pArgs = parseArgs(argsStr);
+        const normToolName = toolName.toLowerCase().replace(/_/g, "");
+        if (normToolName === "invokesync" || normToolName === "invoke") {
+          return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
+        }
+        if (normToolName === "getprogress") {
+          return pArgs.id || pArgs.taskId;
+        }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
         return filePath ? path19.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
       } catch (e) {
@@ -10736,7 +11031,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       const translatedText = translateKimiToolCalls(text);
       const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
       const results = [];
-      const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+      const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
       let match;
       while ((match = toolRegex.exec(cleanText)) !== null) {
         const toolName = match[1];
@@ -10795,39 +11090,61 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       client = new GoogleGenAI({ apiKey });
       return client;
     };
-    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.75) => {
-      const { aiProvider = "Google", apiKey, mode } = settings;
-      let fullText = "";
-      let usageMetadata = null;
-      const normalizedContents = typeof contents === "string" ? [{ role: "user", parts: [{ text: contents }] }] : contents;
-      let stream;
-      if (aiProvider === "OpenRouter") {
-        stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-      } else if (aiProvider === "DeepSeek") {
-        stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-      } else if (aiProvider === "NVIDIA") {
-        stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-      } else {
-        const genStream = await client.models.generateContentStream({
-          model,
-          contents: normalizedContents,
-          config: {
-            systemInstruction,
-            temperature,
-            thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+    generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.75, usageKey = "agent") => {
+      return withRetry(async () => {
+        const { aiProvider = "Google", apiKey, mode } = settings;
+        let fullText = "";
+        let usageMetadata = null;
+        const normalizedContents = typeof contents === "string" ? [{ role: "user", parts: [{ text: contents }] }] : contents;
+        let stream;
+        if (aiProvider === "OpenRouter") {
+          stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else if (aiProvider === "DeepSeek") {
+          stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else if (aiProvider === "NVIDIA") {
+          stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
+        } else {
+          const genStream = await client.models.generateContentStream({
+            model,
+            contents: normalizedContents,
+            config: {
+              systemInstruction,
+              temperature,
+              thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL }
+            }
+          });
+          stream = genStream;
+        }
+        for await (const chunk of stream) {
+          if (chunk.candidates?.[0]?.content?.parts) {
+            for (const part of chunk.candidates[0].content.parts) {
+              if (part.text && !part.thought) fullText += part.text;
+            }
           }
-        });
-        stream = genStream;
-      }
-      for await (const chunk of stream) {
-        if (chunk.candidates?.[0]?.content?.parts) {
-          for (const part of chunk.candidates[0].content.parts) {
-            if (part.text && !part.thought) fullText += part.text;
+          if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+        }
+        if (usageMetadata) {
+          const total = usageMetadata.totalTokenCount || 0;
+          const cached = usageMetadata.cachedContentTokenCount || 0;
+          const candidates = (usageMetadata.candidatesTokenCount || 0) + (usageMetadata.thoughtsTokenCount || 0);
+          await addToUsage("tokens", total, aiProvider, model);
+          if (cached > 0) {
+            await addToUsage("cachedTokens", cached, aiProvider, model);
+          }
+          if (candidates > 0) {
+            await addToUsage("candidateTokens", candidates, aiProvider, model);
+          }
+          if (settings && typeof settings.onUsage === "function") {
+            settings.onUsage({
+              totalTokenCount: total,
+              cachedContentTokenCount: cached,
+              candidatesTokenCount: candidates
+            });
           }
         }
-        if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
-      }
-      return { text: fullText, usageMetadata };
+        await incrementUsage(usageKey, aiProvider);
+        return { text: fullText, usageMetadata };
+      });
     };
     consolidatePastMemories = async (currentChatId, settings) => {
       try {
@@ -10885,7 +11202,7 @@ ${newMemoryListStr}
         while (attempts <= maxAttempts && !success) {
           attempts++;
           try {
-            const response = await generateSimpleContent(settings, targetModel, prompt, null, "Fast");
+            const response = await generateSimpleContent(settings, targetModel, prompt, null, "Fast", 0.75, "background");
             const responseText = response.text || "";
             const janitorToolCalls = detectToolCalls(responseText);
             if (janitorToolCalls.length === 0) {
@@ -10895,19 +11212,6 @@ ${newMemoryListStr}
               const toolName = janitorToolCall.toolName;
               if (["saveSummary", "saveSumary", "SaveSummary", "SaveSumary"].includes(toolName)) {
                 await dispatchTool(toolName, janitorToolCall.args, { chatId: currentChatId });
-              }
-            }
-            if (response.usageMetadata) {
-              const meta = response.usageMetadata;
-              const total = meta.totalTokenCount || 0;
-              const cached = meta.cachedContentTokenCount || 0;
-              const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-              await addToUsage("tokens", total, aiProvider, targetModel);
-              if (cached > 0) {
-                await addToUsage("cachedTokens", cached, aiProvider, targetModel);
-              }
-              if (candidates > 0) {
-                await addToUsage("candidateTokens", candidates, aiProvider, targetModel);
               }
             }
             success = true;
@@ -10969,19 +11273,6 @@ Provide a consolidated summary of the entire session.`;
           attempts++;
           try {
             response = await generateSimpleContent(settings, targetModel, prompt, systemInstruction, "Fast");
-            if (response && response.usageMetadata) {
-              const meta = response.usageMetadata;
-              const total = meta.totalTokenCount || 0;
-              const cached = meta.cachedContentTokenCount || 0;
-              const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-              await addToUsage("tokens", total, aiProvider, targetModel);
-              if (cached > 0) {
-                await addToUsage("cachedTokens", cached, aiProvider, targetModel);
-              }
-              if (candidates > 0) {
-                await addToUsage("candidateTokens", candidates, aiProvider, targetModel);
-              }
-            }
             success = true;
           } catch (err) {
             if (attempts > 3) {
@@ -10989,19 +11280,6 @@ Provide a consolidated summary of the entire session.`;
                 try {
                   const fallbackModel = "gemini-3.1-flash-lite";
                   const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, "Fast");
-                  if (fallback && fallback.usageMetadata) {
-                    const meta = fallback.usageMetadata;
-                    const total = meta.totalTokenCount || 0;
-                    const cached = meta.cachedContentTokenCount || 0;
-                    const candidates = (meta.candidatesTokenCount || 0) + (meta.thoughtsTokenCount || 0);
-                    await addToUsage("tokens", total, aiProvider, fallbackModel);
-                    if (cached > 0) {
-                      await addToUsage("cachedTokens", cached, aiProvider, fallbackModel);
-                    }
-                    if (candidates > 0) {
-                      await addToUsage("candidateTokens", candidates, aiProvider, fallbackModel);
-                    }
-                  }
                   return fallback.text || "";
                 } catch (e) {
                   return "";
@@ -12006,11 +12284,13 @@ ${ideErr} [/ERROR]`;
                 while (remaining.length > 0) {
                   if (!isBufferingToolCall) {
                     const toolIdx = remaining.indexOf("[tool");
+                    const agentIdx = remaining.indexOf("[agent");
                     const endIdx = remaining.indexOf("[[END]]");
                     const kimiSectionIdx = remaining.indexOf("<|tool_calls_section_begin|>");
                     const kimiCallIdx = remaining.indexOf("<|tool_call_begin|>");
                     const indices = [
                       { type: "tool", idx: toolIdx, start: "[tool", end: "]" },
+                      { type: "agent", idx: agentIdx, start: "[agent", end: "]" },
                       { type: "end", idx: endIdx, start: "[[END]]", end: "[[END]]" },
                       { type: "kimi_section", idx: kimiSectionIdx, start: "<|tool_calls_section_begin|>", end: "<|tool_calls_section_end|>" },
                       { type: "kimi_call", idx: kimiCallIdx, start: "<|tool_call_begin|>", end: "<|tool_call_end|>" }
@@ -12025,7 +12305,7 @@ ${ideErr} [/ERROR]`;
                       toolCallBuffer = "";
                       remaining = remaining.substring(match2.idx);
                     } else {
-                      const potentialStarts = ["[tool", "[[END]]", "<|tool_calls_section_begin|>", "<|tool_call_begin|>"];
+                      const potentialStarts = ["[tool", "[agent", "[[END]]", "<|tool_calls_section_begin|>", "<|tool_call_begin|>"];
                       let splitPoint = -1;
                       for (const start of potentialStarts) {
                         for (let len = start.length - 1; len > 0; len--) {
@@ -12033,8 +12313,9 @@ ${ideErr} [/ERROR]`;
                             splitPoint = remaining.length - len;
                             const idx = potentialStarts.indexOf(start);
                             if (idx === 0) activeBufferType = "tool";
-                            else if (idx === 1) activeBufferType = "end";
-                            else if (idx === 2) activeBufferType = "kimi_section";
+                            else if (idx === 1) activeBufferType = "agent";
+                            else if (idx === 2) activeBufferType = "end";
+                            else if (idx === 3) activeBufferType = "kimi_section";
                             else activeBufferType = "kimi_call";
                             break;
                           }
@@ -12055,9 +12336,10 @@ ${ideErr} [/ERROR]`;
                     }
                   } else {
                     const combined = toolCallBuffer + remaining;
-                    if (activeBufferType === "tool") {
-                      const protocolPrefix = "[tool:functions.";
-                      if (!combined.startsWith("[tool") || combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix)) {
+                    if (activeBufferType === "tool" || activeBufferType === "agent") {
+                      const protocolPrefix = activeBufferType === "tool" ? "[tool:functions." : "[agent:generalist.";
+                      const startPrefix = activeBufferType === "tool" ? "[tool" : "[agent";
+                      if (!combined.startsWith(startPrefix) || combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix)) {
                         msgs.push({ type: "text", content: combined });
                         toolCallBuffer = "";
                         isBufferingToolCall = false;
@@ -12068,7 +12350,7 @@ ${ideErr} [/ERROR]`;
                     }
                     let endIdx = -1;
                     let endTag = "]";
-                    if (activeBufferType === "tool") {
+                    if (activeBufferType === "tool" || activeBufferType === "agent") {
                       let balance = 0;
                       let inString = null;
                       let bracketBalance = 0;
@@ -12226,7 +12508,6 @@ ${ideErr} [/ERROR]`;
                   const toolContext = getActiveToolContext(turnText);
                   if (toolContext.inside) {
                     if (!lastToolEventTime) lastToolEventTime = Date.now();
-                    const rawToolName = toolContext.toolName;
                     const NORMALIZE_MAP = {
                       "Ask": "ask",
                       "WebSearch": "web_search",
@@ -12245,24 +12526,39 @@ ${ideErr} [/ERROR]`;
                       "Chat": "chat",
                       "chat": "chat",
                       "GenerateImage": "generate_image",
-                      "generate_image": "generate_image"
+                      "generate_image": "generate_image",
+                      "todo": "todo",
+                      "Todo": "todo",
+                      "invoke": "invoke",
+                      "invokeSync": "invoke_sync",
+                      "getProgress": "get_progress"
                     };
-                    const potentialTool = NORMALIZE_MAP[rawToolName] || rawToolName;
+                    const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                     const partialArgs = toolContext.args || "";
                     let detail = null;
-                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map"].includes(potentialTool)) {
+                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map", "invoke", "invoke_sync", "get_progress"].includes(potentialTool)) {
                       const pArgs = parseArgs(partialArgs);
                       const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                       const keyword = pArgs.keyword;
+                      const title = pArgs.title || pArgs.task;
+                      const id = pArgs.id || pArgs.taskId;
                       if (keyword) {
                         detail = keyword.replace(/["']/g, "");
                       } else if (filePath) {
                         detail = path19.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
+                      } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
+                        detail = title.replace(/["']/g, "").substring(0, 30);
+                      } else if (id && potentialTool === "get_progress") {
+                        detail = id.replace(/["']/g, "");
                       } else {
-                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
                         if (m) {
                           const val = m[1].replace(/["']/g, "");
-                          detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path19.basename(val.replace(/\\/g, "/"));
+                          if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
+                            detail = val.substring(0, 30);
+                          } else {
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path19.basename(val.replace(/\\/g, "/"));
+                          }
                         }
                       }
                     }
@@ -12413,7 +12709,10 @@ ${ideErr} [/ERROR]`;
                       "GenerateImage": "generate_image",
                       "generate_image": "generate_image",
                       "todo": "todo",
-                      "Todo": "todo"
+                      "Todo": "todo",
+                      "invoke": "invoke",
+                      "invokeSync": "invoke_sync",
+                      "getProgress": "get_progress"
                     };
                     const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
                     const displayLabel = TOOL_LABELS2[normToolName] || toolCall.toolName;
@@ -12473,7 +12772,13 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName.toLowerCase() === "generate_image") {
                       const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
                       label2 = `\u2714  Generated: ${argPath || outputPath || output || "generated_image.png"}`;
-                    } else if (normToolName.toLowerCase() === "exec_command" || normToolName.toLowerCase() === "ask") {
+                    } else if (normToolName === "invoke_sync" || normToolName === "invoke") {
+                      const detail2 = getToolDetail(normToolName, toolCall.args);
+                      label2 = `\u2714  Elevating SubAgent${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "get_progress") {
+                      const detail2 = getToolDetail(normToolName, toolCall.args);
+                      label2 = `\u2714  Checked${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "exec_command" || normToolName === "ask") {
                       label2 = "";
                     } else {
                       label2 = `Executed: ${toolCall.toolName}`;
@@ -12994,7 +13299,7 @@ ${snippet2}
 [SYSTEM] Check the content preview for verification [/SYSTEM]`;
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
-                          const feedbackLabel = `\u2714  ${action}: ${filePath || "..."}`;
+                          const feedbackLabel = `\u2714 ${action}: ${filePath || "..."}`;
                           let terminalWidth = 115;
                           if (process.stdout.isTTY) {
                             terminalWidth = process.stdout.columns - 5 || 120;
@@ -13028,7 +13333,7 @@ ${boxMid}`) };
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2717  ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
+                            const deniedLabel = `\u2717 ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -13080,7 +13385,13 @@ ${boxBottom}`}`) };
                       onAskUser: settings.onAskUser,
                       systemSettings: settings.systemSettings,
                       mode,
-                      isMultiModal: isModelMultimodal(targetModel)
+                      isMultiModal: isModelMultimodal(targetModel),
+                      onVisualFeedback: settings.onVisualFeedback,
+                      onSubagentUpdate: settings.onSubagentUpdate,
+                      modelName: targetModel,
+                      aiProvider: settings.aiProvider,
+                      apiKey: settings.apiKey,
+                      onUsage: settings.onUsage
                     };
                     if (normToolName === "write_file" || normToolName === "update_file") {
                       try {
@@ -13534,6 +13845,120 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         await RevertManager.commitTransaction();
       }
       yield { type: "status", content: null };
+    };
+    runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 20, logCallback = null) => {
+      const savedSettings = await loadSettings();
+      const mergedSettings = { ...savedSettings, ...settings };
+      const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
+      const SUBAGENT_TOOL_DEFINITIONS = {
+        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs.',
+        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats.',
+        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports.',
+        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files.',
+        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file.',
+        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search.',
+        "writepdf": '- [tool:functions.WritePDF(path="...", content="...", orientation="...")]. Generates PDF documents.',
+        "writedoc": '- [tool:functions.WriteDoc(path="...", content="...")]. Generates Word documents.',
+        "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search.',
+        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape.'
+      };
+      const providedToolsSection = `
+
+-- Provided Tools --
+${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}`;
+      const systemInstruction = `You are a subagent helping the main FluxFlow CLI agent.
+Your task is: "${task}"
+You have access to the same tools as the main agent. Execute tools as needed using the [tool:functions.ToolName(args)] syntax${providedToolsSection}
+Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
+Once you have fully completed the task, provide a concise final structured summary preferebly in Tables/Bullet Points. Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, "$3-$1-$2").replace(":", "-")}`;
+      const subagentHistory = [
+        { role: "user", text: `Please execute this task: ${task}` }
+      ];
+      let turn = 0;
+      let finalAnswer = "";
+      while (turn < maxTurns) {
+        const contents = subagentHistory.map((m) => ({
+          role: m.role === "user" ? "user" : "model",
+          parts: [{ text: m.text }]
+        }));
+        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
+        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstruction, "Fast");
+        const responseText = response.text || "";
+        const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, "").trim();
+        finalAnswer = cleanResponse;
+        if (logCallback) logCallback(`[Subagent Response]
+${cleanResponse}
+`);
+        subagentHistory.push({ role: "agent", text: cleanResponse });
+        const toolCalls = detectToolCalls(cleanResponse);
+        if (toolCalls.length === 0) {
+          break;
+        }
+        let toolResultsStr = "";
+        for (const toolCall of toolCalls) {
+          const normalizedToolName = toolCall.toolName.toLowerCase();
+          const allowed = allowedTools ? allowedTools.some((t) => t.toLowerCase() === normalizedToolName) : true;
+          if (!allowed) {
+            const errorMsg = `ERROR: Tool [${toolCall.toolName}] is not in the allowed tools list for this subagent.`;
+            if (logCallback) logCallback(`[Blocked Tool Call] ${toolCall.toolName} - not allowed
+`);
+            toolResultsStr += `${errorMsg}
+
+`;
+            continue;
+          }
+          let label2 = "";
+          if (normalizedToolName === "web_search") {
+            const { query, limit = 10 } = parseArgs(toolCall.args);
+            label2 = `\u2714  \x1B[95mSearched\x1B[0m: ${query} \u2192 ${limit}`;
+          } else if (normalizedToolName === "web_scrape") {
+            const url = parseArgs(toolCall.args).url || "...";
+            label2 = `\u2714  \x1B[95mVisited\x1B[0m: ${url}`;
+          } else if (normalizedToolName === "view_file") {
+            const { path: targetPath } = parseArgs(toolCall.args);
+            label2 = `\u2714  \x1B[95mRead\x1B[0m: ${targetPath}`;
+          } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder") {
+            const path21 = parseArgs(toolCall.args).path || "...";
+            label2 = `\u2714  \x1B[95mViewed\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
+            const path21 = parseArgs(toolCall.args).path || "...";
+            label2 = `\u2714  \x1B[95mCreated\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file") {
+            const path21 = parseArgs(toolCall.args).path || "...";
+            label2 = `\u2714  \x1B[95mEdited\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "file_map") {
+            const path21 = parseArgs(toolCall.args).path || "...";
+            label2 = `\u2714  \x1B[95mGet Map\x1B[0m: ${path21}`;
+          } else {
+            const displayLabel = TOOL_LABELS2[normalizedToolName] || toolCall.toolName;
+            const detail = getToolDetail(normalizedToolName, toolCall.args);
+            label2 = `\u2714  \x1B[95m${displayLabel}\x1B[0m${detail ? `: ${detail}` : ""}`;
+          }
+          if (settings.onVisualFeedback && label2) {
+            settings.onVisualFeedback(label2);
+          }
+          if (logCallback) logCallback(`[Executing Tool] ${toolCall.toolName}(${toolCall.args})...`);
+          try {
+            const result = await dispatchTool(toolCall.toolName, toolCall.args, { ...settings, mode: "Flux" });
+            if (logCallback) logCallback(`[Tool Result]
+${result}
+`);
+            toolResultsStr += `[TOOL RESULT for ${toolCall.toolName}]: ${result}
+
+`;
+          } catch (e) {
+            const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
+            if (logCallback) logCallback(`[Tool Error] ${errorMsg}
+`);
+            toolResultsStr += `${errorMsg}
+
+`;
+          }
+        }
+        subagentHistory.push({ role: "user", text: toolResultsStr.trim() });
+        turn++;
+      }
+      return finalAnswer;
     };
   }
 });
@@ -14744,6 +15169,7 @@ function App({ args = [] }) {
   const [activeCommand, setActiveCommand] = useState14(null);
   const [execOutput, setExecOutput] = useState14("");
   const [isTerminalFocused, setIsTerminalFocused] = useState14(false);
+  const [activeSubagents, setActiveSubagents] = useState14([]);
   const [tick, setTick] = useState14(0);
   const isFirstRender = useRef3(true);
   const isSecondRender = useRef3(true);
@@ -15831,7 +16257,7 @@ function App({ args = [] }) {
         // --- GLM (Zhipu AI) ---
         {
           cmd: "z-ai/glm-5.1",
-          desc: "Text Only"
+          desc: "Text Only [DEPRICATED]"
         },
         // --- MiniMax Family ---
         {
@@ -16883,6 +17309,15 @@ ${timestamp}` };
               apiTier,
               cols: terminalSize.columns - 6,
               rows: 30,
+              onVisualFeedback: (content) => {
+                setMessages((prev) => {
+                  const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+                  return [...updatedPrev, { id: "visual-" + Date.now(), role: "system", text: content, isVisualFeedback: true }];
+                });
+              },
+              onSubagentUpdate: () => {
+                setActiveSubagents([...subagentProgress]);
+              },
               onExecStart: (cmd) => {
                 setActiveCommand(cmd);
                 setExecOutput("");
@@ -16978,6 +17413,20 @@ Selection: ${val}`,
                   });
                   setActiveView("ask");
                 });
+              },
+              onUsage: (usage) => {
+                const total = usage.totalTokenCount || 0;
+                const cached = usage.cachedContentTokenCount || 0;
+                const candidates = usage.candidatesTokenCount || 0;
+                setSessionStats({ tokens: total });
+                setSessionTotalTokens((prev) => prev + total);
+                if (cached > 0) {
+                  setSessionTotalCachedTokens((prev) => prev + cached);
+                }
+                if (candidates > 0) {
+                  setSessionTotalCandidateTokens((prev) => prev + candidates);
+                }
+                setSessionAgentCalls((prev) => prev + 1);
               }
             },
             async () => {
@@ -17256,11 +17705,11 @@ Selection: ${val}`,
             }
             const chunkLower = chunkText.toLowerCase();
             if (chunkText.includes("```")) inCodeBlock = !inCodeBlock;
-            if (chunkLower.includes("tool:functions.")) {
+            if (chunkLower.includes("tool:functions.") || chunkLower.includes("agent:generalist.")) {
               inToolCall = true;
               toolCallBalance = 0;
               inToolCallString = null;
-              if (chunkText.includes("[tool:functions.")) toolCallBalance = 0;
+              if (chunkText.includes("[tool:functions.") || chunkText.includes("[agent:generalist.")) toolCallBalance = 0;
             }
             if (inToolCall) {
               for (let j = 0; j < chunkText.length; j++) {
@@ -17352,7 +17801,7 @@ Selection: ${val}`,
               });
             } else if (!inThinkMode) {
               const chunkLower2 = chunkText.toLowerCase();
-              if (!toolCallEncounteredInTurn && chunkLower2.includes("tool:functions.")) {
+              if (!toolCallEncounteredInTurn && (chunkLower2.includes("tool:functions.") || chunkLower2.includes("agent:generalist."))) {
                 toolCallEncounteredInTurn = true;
               }
               if (!currentAgentId) {
@@ -18434,7 +18883,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React15.createElement(Box14, { key: sa.id, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Executing: ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active")))))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, wittyPhrase && /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
           Box14,
           {
             backgroundColor: "#555555",
@@ -18613,6 +19062,7 @@ var init_app = __esm({
     init_AskUserModal();
     init_secrets();
     await init_ai();
+    init_subagent_state();
     init_settings();
     init_history();
     init_ResumeModal();
@@ -18752,7 +19202,7 @@ var init_app = __esm({
     )));
     parseAgentText = (text) => {
       const blocks = [];
-      const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+      const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
       let lastIdx = 0;
       let match;
       while ((match = toolRegex.exec(text)) !== null) {

@@ -69,8 +69,11 @@ async function restoreWithRetry(change, tx, maxAttempts = 7) {
     return false;
 }
 
+let lastChatId = null;
+
 export const RevertManager = {
     async startTransaction(chatId, promptText) {
+        lastChatId = chatId;
         currentTransaction = {
             id: `tx_prompt_${Date.now()}`,
             chatId,
@@ -83,8 +86,42 @@ export const RevertManager = {
     },
 
     async recordFileChange(absolutePath, forcedContent = null) {
-        if (!currentTransaction) return;
         try {
+            if (!currentTransaction) {
+                if (lastChatId) {
+                    const ledger = readEncryptedJson(LEDGER_FILE, []);
+                    const lastTx = [...ledger].reverse().find(tx => tx.chatId === lastChatId);
+                    if (lastTx) {
+                        const alreadyBackedUp = lastTx.changes.some(c => c.filePath === absolutePath);
+                        if (alreadyBackedUp) return;
+
+                        const fileExists = await fs.pathExists(absolutePath);
+                        let type = (fileExists || forcedContent) ? 'update' : 'create';
+                        let backupFile = null;
+
+                        if (type === 'update') {
+                            const fileName = path.basename(absolutePath);
+                            backupFile = `${lastTx.id}_${fileName}.bak`;
+                            const chatBackupDir = path.join(BACKUPS_DIR, lastTx.chatId);
+                            await fs.ensureDir(chatBackupDir);
+                            const backupPath = path.join(chatBackupDir, backupFile);
+
+                            let content = forcedContent !== null ? forcedContent : await fs.readFile(absolutePath, 'utf8').catch(() => null);
+                            if (content !== null) {
+                                writeEncryptedJson(backupPath, { data: encryptAes(content) });
+                            } else {
+                                type = 'create';
+                                backupFile = null;
+                            }
+                        }
+
+                        lastTx.changes.push({ filePath: absolutePath, type, backupFile });
+                        writeEncryptedJson(LEDGER_FILE, ledger);
+                    }
+                }
+                return;
+            }
+
             const alreadyBackedUp = currentTransaction.changes.some(c => c.filePath === absolutePath);
             if (alreadyBackedUp) return;
 

@@ -44,6 +44,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
+- **Autonomous Subagent System**: Spawns subagents in either blocking mode (`invokeSync`) or asynchronous mode (`invoke`) to offload tasks. Runs with a permanent suite of 10 system tools (e.g. ReadFile, PatchFile, WebSearch, WritePDF), excluding shell commands (`Run` is disabled). Telemetry is quietly tracked in the CLI's active subagents UI block and backed up in transaction-safe restoration records.
 - **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.
 
 ## 🚀 Quick Start

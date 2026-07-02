@@ -18,6 +18,7 @@ import AskUserModal from './components/AskUserModal.jsx';
 import gradient from 'gradient-string';
 import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPIKey } from './utils/secrets.js';
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
+import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs, saveChatContext, loadChatContext } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
@@ -251,7 +252,7 @@ const ResolutionModal = ({ data, onResolve, onEdit }) => (
 
 const parseAgentText = (text) => {
     const blocks = [];
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 
     let lastIdx = 0;
     let match;
@@ -740,6 +741,7 @@ export default function App({ args = [] }) {
     const [activeCommand, setActiveCommand] = useState(null);
     const [execOutput, setExecOutput] = useState('');
     const [isTerminalFocused, setIsTerminalFocused] = useState(false);
+    const [activeSubagents, setActiveSubagents] = useState([]);
 
     const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
     const isFirstRender = useRef(true);
@@ -2003,7 +2005,7 @@ export default function App({ args = [] }) {
                             // --- GLM (Zhipu AI) ---
                             {
                                 cmd: 'z-ai/glm-5.1',
-                                desc: 'Text Only'
+                                desc: 'Text Only [DEPRICATED]'
                             },
 
                             // --- MiniMax Family ---
@@ -3090,6 +3092,15 @@ export default function App({ args = [] }) {
                             apiTier,
                             cols: terminalSize.columns - 6,
                             rows: 30,
+                            onVisualFeedback: (content) => {
+                                setMessages(prev => {
+                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                    return [...updatedPrev, { id: 'visual-' + Date.now(), role: 'system', text: content, isVisualFeedback: true }];
+                                });
+                            },
+                            onSubagentUpdate: () => {
+                                setActiveSubagents([...subagentProgress]);
+                            },
                             onExecStart: (cmd) => {
                                 setActiveCommand(cmd);
                                 setExecOutput('');
@@ -3190,6 +3201,20 @@ export default function App({ args = [] }) {
                                     });
                                     setActiveView('ask');
                                 });
+                            },
+                            onUsage: (usage) => {
+                                const total = usage.totalTokenCount || 0;
+                                const cached = usage.cachedContentTokenCount || 0;
+                                const candidates = usage.candidatesTokenCount || 0;
+                                setSessionStats({ tokens: total });
+                                setSessionTotalTokens(prev => prev + total);
+                                if (cached > 0) {
+                                    setSessionTotalCachedTokens(prev => prev + cached);
+                                }
+                                if (candidates > 0) {
+                                    setSessionTotalCandidateTokens(prev => prev + candidates);
+                                }
+                                setSessionAgentCalls(prev => prev + 1);
                             }
                         },
                         async () => {
@@ -3494,12 +3519,12 @@ export default function App({ args = [] }) {
                         // [CONTEXT TRACKING] Update state based on chunk content
                         if (chunkText.includes('```')) inCodeBlock = !inCodeBlock;
 
-                        if (chunkLower.includes('tool:functions.')) {
+                        if (chunkLower.includes('tool:functions.') || chunkLower.includes('agent:generalist.')) {
                             inToolCall = true;
                             // [HARDENING] Reset balance and look for outer bracket in context
                             toolCallBalance = 0;
                             inToolCallString = null;
-                            if (chunkText.includes('[tool:functions.')) toolCallBalance = 0; // The '[' will be counted in the loop
+                            if (chunkText.includes('[tool:functions.') || chunkText.includes('[agent:generalist.')) toolCallBalance = 0; // The '[' will be counted in the loop
                         }
 
                         if (inToolCall) {
@@ -3610,7 +3635,7 @@ export default function App({ args = [] }) {
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
-                            if (!toolCallEncounteredInTurn && chunkLower.includes('tool:functions.')) {
+                            if (!toolCallEncounteredInTurn && (chunkLower.includes('tool:functions.') || chunkLower.includes('agent:generalist.'))) {
                                 toolCallEncounteredInTurn = true;
                             }
 
@@ -3659,7 +3684,7 @@ export default function App({ args = [] }) {
                                 if (global.gc) global.gc();
                                 lastGCTime = Date.now();
                             }, 500);
-                        } catch(e) {}
+                        } catch (e) { }
                     }
 
                     if (!hasFiredJanitor) {
@@ -3795,7 +3820,7 @@ export default function App({ args = [] }) {
         }, {});
         setPbsSelected(initialSelected);
         setPbsCursor(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeView]);
 
     // Effect: when activeView becomes 'providerBudgetFlow', set up the input chain for the current provider
@@ -3872,7 +3897,7 @@ export default function App({ args = [] }) {
             }
         });
         setActiveView('input');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeView, providerBudgetCursor]);
 
     const CustomMenuItem = ({ label, isSelected }) => {
@@ -5191,6 +5216,22 @@ export default function App({ args = [] }) {
                                 </Box>
                                 <Box marginTop={1} width="100%">
                                     <CodeRenderer text={btwResponse} columns={terminalSize.columns - 6} />
+                                </Box>
+                            </Box>
+                        )}
+                        {/* 🤖 ACTIVE SUBAGENTS BOX */}
+                        {activeSubagents.filter(sa => sa.status === 'running').length > 0 && (
+                            <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={2} paddingY={0} width="100%" marginBottom={1}>
+                                <Box justifyContent="space-between" width="100%">
+                                    <Text color="white" bold>ACTIVE SUBAGENTS</Text>
+                                </Box>
+                                <Box flexDirection="column" marginTop={1} width="100%">
+                                    {activeSubagents.filter(sa => sa.status === 'running').map(sa => (
+                                        <Box key={sa.id} justifyContent="space-between" width="100%">
+                                            <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
+                                            <Text color="white">Executing: <Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text></Text>
+                                        </Box>
+                                    ))}
                                 </Box>
                             </Box>
                         )}

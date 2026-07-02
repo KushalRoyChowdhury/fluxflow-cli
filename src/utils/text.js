@@ -893,7 +893,7 @@ export const TOOL_LABELS = {
 // Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
 // ============================================================================
 const REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
-const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|\s*turn\s*:))/gi;
+const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
 const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
@@ -906,19 +906,28 @@ export const cleanSignals = (text) => {
         .replace(REGEX_INITIAL_TOOL, '');
 
     const trigger = 'tool:functions.';
+    const subagentTrigger = 'agent:generalist.';
 
     // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present
-    if (result.toLowerCase().includes(trigger)) {
+    if (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger)) {
         // Greedy loop to strip all tool calls
         while (true) {
             const lowerResult = result.toLowerCase();
             let triggerIdx = lowerResult.indexOf(trigger);
-            if (triggerIdx === -1) break;
+            let subagentIdx = lowerResult.indexOf(subagentTrigger);
+            
+            let currentTrigger = trigger;
+            let triggerIdxToUse = triggerIdx;
+            if (triggerIdx === -1 || (subagentIdx !== -1 && subagentIdx < triggerIdx)) {
+                currentTrigger = subagentTrigger;
+                triggerIdxToUse = subagentIdx;
+            }
+            if (triggerIdxToUse === -1) break;
 
-            let startIdx = triggerIdx;
+            let startIdx = triggerIdxToUse;
             let hasOuterBracket = false;
 
-            let k = triggerIdx - 1;
+            let k = triggerIdxToUse - 1;
             while (k >= 0 && /\s/.test(result[k])) k--;
             if (k >= 0 && result[k] === '[') {
                 startIdx = k;
@@ -928,7 +937,7 @@ export const cleanSignals = (text) => {
             let balance = 0;
             let foundStart = false;
             let inString = null;
-            let j = triggerIdx;
+            let j = triggerIdxToUse;
 
             while (j < result.length) {
                 const char = result[j];
