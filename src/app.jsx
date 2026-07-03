@@ -374,23 +374,70 @@ const getProjectFiles = (() => {
 
 let cachedShortcut = '\\ + Enter';
 
+const getLatencyColor = (delay) => {
+    if (delay <= 400) return '#00a564'; // Deep green
+    if (delay >= 5000) return '#ff0000'; // Pure red
+
+    const points = [
+        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 800, r: 120, g: 220, b: 80 },
+        { t: 1500, r: 250, g: 210, b: 40 },
+        { t: 3000, r: 255, g: 120, b: 0 },
+        { t: 5000, r: 255, g: 0, b: 0 }
+    ];
+
+    for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i+1];
+        if (delay >= p1.t && delay <= p2.t) {
+            const ratio = (delay - p1.t) / (p2.t - p1.t);
+            const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
+            const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
+            const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
+            return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        }
+    }
+    return '#ff0000';
+};
+
 const SubagentRow = React.memo(({ sa }) => {
     const [dotColor, setDotColor] = useState('green');
+    const chunkTimesRef = useRef([]);
 
     useEffect(() => {
-        if (sa.status !== 'running') return;
+        if (sa.status !== 'running') {
+            chunkTimesRef.current = [];
+            return;
+        }
+
+        const lastChunkTime = sa.lastChunkTime;
+        if (lastChunkTime > 0) {
+            const times = chunkTimesRef.current;
+            if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
+                times.push(lastChunkTime);
+                if (times.length > 5) {
+                    times.shift();
+                }
+            }
+        }
 
         const checkLatency = () => {
-            const delay = Date.now() - (sa.lastChunkTime || Date.now());
-            if (delay < 700) {
-                setDotColor('green');
-            } else if (delay <= 1200) {
-                setDotColor('yellow');
-            } else if (delay <= 2000) {
-                setDotColor('#ff9f43'); // Orange
-            } else {
-                setDotColor('#d63031'); // Deep red
+            if (!lastChunkTime) {
+                setDotColor('#00a564');
+                return;
             }
+            const times = chunkTimesRef.current;
+            let averageInterval = 0;
+            if (times.length > 1) {
+                let sum = 0;
+                for (let i = 1; i < times.length; i++) {
+                    sum += (times[i] - times[i - 1]);
+                }
+                averageInterval = sum / (times.length - 1);
+            }
+            const timeSinceLast = Date.now() - lastChunkTime;
+            const delay = Math.max(averageInterval, timeSinceLast);
+            setDotColor(getLatencyColor(delay));
         };
 
         checkLatency();

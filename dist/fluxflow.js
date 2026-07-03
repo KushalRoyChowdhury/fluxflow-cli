@@ -4829,36 +4829,78 @@ var init_ChatLayout = __esm({
 // src/components/StatusBar.jsx
 import React5 from "react";
 import { Box as Box4, Text as Text5 } from "ink";
-import { useState as useState5, useEffect as useEffect4 } from "react";
+import { useState as useState5, useEffect as useEffect4, useRef as useRef3 } from "react";
 function getMemoryInfo() {
   if (activeGetMemoryInfo) {
     activeGetMemoryInfo();
   }
 }
-var activeGetMemoryInfo, StatusBar, StatusBar_default;
+var activeGetMemoryInfo, getLatencyColor, StatusBar, StatusBar_default;
 var init_StatusBar = __esm({
   "src/components/StatusBar.jsx"() {
     init_text();
     activeGetMemoryInfo = null;
+    getLatencyColor = (delay) => {
+      if (delay <= 400) return "#00a564";
+      if (delay >= 5e3) return "#ff0000";
+      const points = [
+        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 800, r: 120, g: 220, b: 80 },
+        { t: 1500, r: 250, g: 210, b: 40 },
+        { t: 3e3, r: 255, g: 120, b: 0 },
+        { t: 5e3, r: 255, g: 0, b: 0 }
+      ];
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        if (delay >= p1.t && delay <= p2.t) {
+          const ratio = (delay - p1.t) / (p2.t - p1.t);
+          const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
+          const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
+          const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
+          return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        }
+      }
+      return "#ff0000";
+    };
     StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0 }) => {
       const modeIcon = mode === "Flux" ? "" : "";
       const [memoryUsage, setMemoryUsage] = useState5(0);
       const [memoryLimit, setMemoryLimit] = useState5(0);
       const [memoryUnit, setMemoryUnit] = useState5("MB");
       const [dotColor, setDotColor] = useState5("green");
+      const chunkTimesRef = useRef3([]);
       useEffect4(() => {
-        if (!isProcessing) return;
-        const checkLatency = () => {
-          const delay = Date.now() - lastChunkTime;
-          if (delay < 700) {
-            setDotColor("green");
-          } else if (delay <= 1200) {
-            setDotColor("yellow");
-          } else if (delay <= 2e3) {
-            setDotColor("#ff9f43");
-          } else {
-            setDotColor("#d63031");
+        if (!isProcessing) {
+          chunkTimesRef.current = [];
+          return;
+        }
+        if (lastChunkTime > 0) {
+          const times = chunkTimesRef.current;
+          if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
+            times.push(lastChunkTime);
+            if (times.length > 5) {
+              times.shift();
+            }
           }
+        }
+        const checkLatency = () => {
+          if (!lastChunkTime) {
+            setDotColor("#00a564");
+            return;
+          }
+          const times = chunkTimesRef.current;
+          let averageInterval = 0;
+          if (times.length > 1) {
+            let sum = 0;
+            for (let i = 1; i < times.length; i++) {
+              sum += times[i] - times[i - 1];
+            }
+            averageInterval = sum / (times.length - 1);
+          }
+          const timeSinceLast = Date.now() - lastChunkTime;
+          const delay = Math.max(averageInterval, timeSinceLast);
+          setDotColor(getLatencyColor(delay));
         };
         checkLatency();
         const timer = setInterval(checkLatency, 100);
@@ -15001,7 +15043,7 @@ __export(app_exports, {
   default: () => App
 });
 import os4 from "os";
-import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef3, useMemo as useMemo2 } from "react";
+import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
 import fs22 from "fs-extra";
 import path20 from "path";
@@ -15027,8 +15069,8 @@ function App({ args = [] }) {
   const [isFilePickerDismissed, setIsFilePickerDismissed] = useState14(false);
   const [showBridgePromo, setShowBridgePromo] = useState14(false);
   const [promoSelectedIndex, setPromoSelectedIndex] = useState14(0);
-  const suggestionOffsetRef = useRef3(0);
-  const persistedModelRef = useRef3(null);
+  const suggestionOffsetRef = useRef4(0);
+  const persistedModelRef = useRef4(null);
   useEffect11(() => {
     const ideName = getIDEName();
     const isIDE = !["Terminal", "Windows Terminal"].includes(ideName) || !!process.env.VSC_TERMINAL_URL;
@@ -15242,7 +15284,7 @@ function App({ args = [] }) {
   const [janitorModel, setJanitorModel] = useState14("gemma-4-26b-a4b-it");
   const [isInitializing, setIsInitializing] = useState14(true);
   const [isAppFocused, setIsAppFocused] = useState14(true);
-  const lastFocusEventTime = useRef3(0);
+  const lastFocusEventTime = useRef4(0);
   const [apiKey, setApiKey] = useState14(null);
   const [tempKey, setTempKey] = useState14("");
   const addShiftEnterBinding = async (ideName) => {
@@ -15313,7 +15355,7 @@ function App({ args = [] }) {
   const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState14(0);
   const [sessionTotalTokens, setSessionTotalTokens] = useState14(0);
   const [chatTokens, setChatTokens] = useState14(0);
-  const chatTokenStartRef = useRef3(0);
+  const chatTokenStartRef = useRef4(0);
   const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState14(0);
   const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState14(0);
   const [sessionToolSuccess, setSessionToolSuccess] = useState14(0);
@@ -15356,12 +15398,12 @@ function App({ args = [] }) {
   const [isTerminalFocused, setIsTerminalFocused] = useState14(false);
   const [activeSubagents, setActiveSubagents] = useState14([]);
   const [tick, setTick] = useState14(0);
-  const isFirstRender = useRef3(true);
-  const isSecondRender = useRef3(true);
-  const isThirdRender = useRef3(true);
-  const prevProviderRef = useRef3(aiProvider);
-  const originalAllowExternalAccessRef = useRef3(false);
-  const originalMemoryRef = useRef3(true);
+  const isFirstRender = useRef4(true);
+  const isSecondRender = useRef4(true);
+  const isThirdRender = useRef4(true);
+  const prevProviderRef = useRef4(aiProvider);
+  const originalAllowExternalAccessRef = useRef4(false);
+  const originalMemoryRef = useRef4(true);
   useEffect11(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
@@ -15447,8 +15489,8 @@ function App({ args = [] }) {
       }
     };
   }, []);
-  const activeCommandRef = useRef3(null);
-  const execOutputRef = useRef3("");
+  const activeCommandRef = useRef4(null);
+  const execOutputRef = useRef4("");
   useEffect11(() => {
     activeCommandRef.current = activeCommand;
   }, [activeCommand]);
@@ -15504,8 +15546,8 @@ function App({ args = [] }) {
   const [escTimer, setEscTimer] = useState14(null);
   const [escPressCount, setEscPressCount] = useState14(0);
   const [recentPrompts, setRecentPrompts] = useState14([]);
-  const escDoubleTimerRef = useRef3(null);
-  const chatLoadingRef = useRef3(false);
+  const escDoubleTimerRef = useRef4(null);
+  const chatLoadingRef = useRef4(false);
   useEffect11(() => {
     return () => {
       if (escDoubleTimerRef.current) {
@@ -15513,7 +15555,7 @@ function App({ args = [] }) {
       }
     };
   }, []);
-  const didSignalTerminationRef = useRef3(false);
+  const didSignalTerminationRef = useRef4(false);
   const [queuedPrompt, setQueuedPrompt] = useState14(null);
   const [resolutionData, setResolutionData] = useState14(null);
   const [tempModelOverride, setTempModelOverride] = useState14(null);
@@ -15566,11 +15608,11 @@ function App({ args = [] }) {
       return next;
     });
   };
-  const queuedPromptRef = useRef3(null);
+  const queuedPromptRef = useRef4(null);
   const [btwResponse, setBtwResponse] = useState14("");
   const [showBtwBox, setShowBtwBox] = useState14(false);
-  const btwResponseRef = useRef3("");
-  const btwClosedRef = useRef3(null);
+  const btwResponseRef = useRef4("");
+  const btwClosedRef = useRef4(null);
   useEffect11(() => {
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
@@ -15591,8 +15633,8 @@ function App({ args = [] }) {
   }, [messages]);
   const [completedIndex, setCompletedIndex] = useState14(messages.length);
   const [clearKey, setClearKey] = useState14(0);
-  const lastCompletedBlocksRef = useRef3([]);
-  const cachedHistoryRef = useRef3({
+  const lastCompletedBlocksRef = useRef4([]);
+  const cachedHistoryRef = useRef4({
     completedIndex: 0,
     columns: 0,
     historicalBlocks: [],
@@ -16234,7 +16276,7 @@ function App({ args = [] }) {
       setTempKey("");
     }
   };
-  const lastSavedTimeRef = useRef3(SESSION_START_TIME);
+  const lastSavedTimeRef = useRef4(SESSION_START_TIME);
   useEffect11(() => {
     if (activeView === "exit") {
       const flush = async () => {
@@ -19243,7 +19285,7 @@ Selection: ${val}`,
     return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2713 ", sessionToolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2715 ", sessionToolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, SubagentRow;
+var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_build();
@@ -19499,21 +19541,64 @@ var init_app = __esm({
       };
     })();
     cachedShortcut = "\\ + Enter";
+    getLatencyColor2 = (delay) => {
+      if (delay <= 400) return "#00a564";
+      if (delay >= 5e3) return "#ff0000";
+      const points = [
+        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 800, r: 120, g: 220, b: 80 },
+        { t: 1500, r: 250, g: 210, b: 40 },
+        { t: 3e3, r: 255, g: 120, b: 0 },
+        { t: 5e3, r: 255, g: 0, b: 0 }
+      ];
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        if (delay >= p1.t && delay <= p2.t) {
+          const ratio = (delay - p1.t) / (p2.t - p1.t);
+          const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
+          const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
+          const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
+          return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        }
+      }
+      return "#ff0000";
+    };
     SubagentRow = React15.memo(({ sa }) => {
       const [dotColor, setDotColor] = useState14("green");
+      const chunkTimesRef = useRef4([]);
       useEffect11(() => {
-        if (sa.status !== "running") return;
-        const checkLatency = () => {
-          const delay = Date.now() - (sa.lastChunkTime || Date.now());
-          if (delay < 700) {
-            setDotColor("green");
-          } else if (delay <= 1200) {
-            setDotColor("yellow");
-          } else if (delay <= 2e3) {
-            setDotColor("#ff9f43");
-          } else {
-            setDotColor("#d63031");
+        if (sa.status !== "running") {
+          chunkTimesRef.current = [];
+          return;
+        }
+        const lastChunkTime = sa.lastChunkTime;
+        if (lastChunkTime > 0) {
+          const times = chunkTimesRef.current;
+          if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
+            times.push(lastChunkTime);
+            if (times.length > 5) {
+              times.shift();
+            }
           }
+        }
+        const checkLatency = () => {
+          if (!lastChunkTime) {
+            setDotColor("#00a564");
+            return;
+          }
+          const times = chunkTimesRef.current;
+          let averageInterval = 0;
+          if (times.length > 1) {
+            let sum = 0;
+            for (let i = 1; i < times.length; i++) {
+              sum += times[i] - times[i - 1];
+            }
+            averageInterval = sum / (times.length - 1);
+          }
+          const timeSinceLast = Date.now() - lastChunkTime;
+          const delay = Math.max(averageInterval, timeSinceLast);
+          setDotColor(getLatencyColor2(delay));
         };
         checkLatency();
         const timer = setInterval(checkLatency, 100);
