@@ -2263,7 +2263,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const boxWidth = Math.min(maxLen + 4, terminalWidth);
                                 const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
                                 const boxBottom = `${' '.repeat(boxWidth)}`;
-                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
+                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
                                 // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                                 // const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                 // const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
@@ -3229,9 +3229,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     label = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'file_map') {
                                     label = `✔  Get Map: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {

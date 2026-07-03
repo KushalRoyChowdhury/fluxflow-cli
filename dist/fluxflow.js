@@ -5156,7 +5156,7 @@ Invocation Types:
 2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
-- WORKSPACE TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
+- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
@@ -12040,7 +12040,8 @@ ${boxMid}`) };
                     const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
                     const boxBottom = `${" ".repeat(boxWidth)}`;
                     yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}`) };
+${boxMid}
+`) };
                   }
                 }
               }
@@ -12899,9 +12900,11 @@ ${ideErr} [/ERROR]`;
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label2 = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "write_pdf") {
-                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+`;
                     } else if (normToolName === "write_docx") {
-                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}`;
+                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+`;
                     } else if (normToolName === "file_map") {
                       label2 = `\u2714  Get Map: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
