@@ -5128,9 +5128,10 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-USE PROACTIVELY TO PARALLELIZE TASK, HIGHLY RECOMMENDED
-- Invocation Types: invoke (async, usage: background worker for parallel tasks, upto 5 parallel agents (3+ calls allowed), might take long time), invokeSync (sync, usage: blocking main agent loop, task delegation, repeatetive work, sequential tasks)
-1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, with file paths, imports/exports, dependency, folder structure
+USE PROACTIVELY TO PARALLELIZE TASK QUICKLY **USE OF SUB AGENTS HIGHLY RECOMENDED**
+- Invocation Types: invoke (async, usage: background worker for parallel tasks, upto 5 parallel agents (3+ calls allowed), might take long time, uses more tokens), invokeSync (sync, usage: blocking main agent loop, task delegation, repeatetive work, sequential tasks, can save tokens)
+
+1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, with exact file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? do your own task OR await (exponentially longer after 2nd check) >>> spamming getProgress`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
