@@ -5110,7 +5110,7 @@ Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. *
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)" : ""}. Next Turn, verify tool results, plan next**
 ${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >>> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full Read\n- No tool spamming\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EVERY TURN***" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish. Suggest best options; don't ask for preferences
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences
 
 - WEB TOOLS -
 1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown info/docs
@@ -5127,10 +5127,10 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
--- SUB AGENTS --
-USE PROACTIVELY TO PARALLELIZE TASK RECOMMENDED
-- Invocation Types: invoke (async, background worker for parallel tasks, upto 5 parallel agents (3+ calls allowed), might take long time), invokeSync (sync, blocking main agent loop, task delegation, repeatetive work, sequencial tasks)
-1. [agent:generalist.invocationType(title="...", task="...")]. Usage: delegate repeatative task or work in background, Task must me detailed, with file paths, imports/exports, dependency, folder structure
+-- SUB AGENTS DEFINITIONS --
+USE PROACTIVELY TO PARALLELIZE TASK, HIGHLY RECOMMENDED
+- Invocation Types: invoke (async, usage: background worker for parallel tasks, upto 5 parallel agents (3+ calls allowed), might take long time), invokeSync (sync, usage: blocking main agent loop, task delegation, repeatetive work, sequential tasks)
+1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, with file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? do your own task OR await (exponentially longer after 2nd check) >>> spamming getProgress`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
@@ -13971,7 +13971,8 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
         "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
         "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
-        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape'
+        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
+        "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
 To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**

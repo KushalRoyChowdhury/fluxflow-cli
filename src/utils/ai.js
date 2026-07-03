@@ -4453,7 +4453,8 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
         'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
         'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
-        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape'
+        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape',
+        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences`
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
