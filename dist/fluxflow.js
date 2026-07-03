@@ -5147,12 +5147,12 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-USE PROACTIVELY TO PARALLELIZE TASK QUICKLY **USE OF SUB AGENTS HIGHLY RECOMENDED**
+USE PROACTIVELY A LOT **USE OF SUB AGENTS HIGHLY RECOMENDED**
 Invocation Types:
-- invoke (async, usage: background worker for parallel tasks, upto 7 parallel agents (3+ calls allowed), can take long time, if invoked DO NOT do the task yourself unless explicit ERROR)
-- invokeSync (sync, usage: blocking main agent loop, task delegation, repeatetive work, sequential tasks, can save tokens)
+- invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
+- invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
-1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, with exact file paths, imports/exports, dependency, folder structure
+1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? do your own task OR await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) >>> spamming getProgress`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
@@ -14016,7 +14016,7 @@ ${providedToolsSection.trimEnd()}
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points, if any task failed report back in detail, no hallucination
+Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
 
 CWD: ${process.cwd()}
 Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, "$3-$1-$2").replace(":", "-")}

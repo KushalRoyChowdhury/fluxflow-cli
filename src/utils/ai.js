@@ -4476,7 +4476,7 @@ ${providedToolsSection.trimEnd()}
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points, if any task failed report back in detail, no hallucination
+Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
 
 CWD: ${process.cwd()}
 Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}\n=== END SYSTEM PROMPT ===`;
