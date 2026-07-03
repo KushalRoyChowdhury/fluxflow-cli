@@ -416,12 +416,9 @@ const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic =
                 content = wrapText(trimmed, columns - 4);
             }
 
-            const linesOfContent = content.split('\n');
             result.push(
                 <Box key={i} flexDirection="column" width="100%">
-                    {linesOfContent.map((l, lIdx) => (
-                        <InlineMarkdown key={lIdx} text={l} color={color} italic={italic} />
-                    ))}
+                    <InlineMarkdown text={content} color={color} italic={italic} />
                 </Box>
             );
         }

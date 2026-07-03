@@ -448,7 +448,7 @@ const SubagentRow = React.memo(({ sa }) => {
     return (
         <Box justifyContent="space-between" width="100%">
             <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
-            <Text color="white">Executing: <Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text></Text>
+            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text></Text>
         </Box>
     );
 });
@@ -2087,6 +2087,10 @@ export default function App({ args = [] }) {
                                 cmd: 'z-ai/glm-5.1',
                                 desc: 'Text Only [DEPRICATED]'
                             },
+                            {
+                                cmd: 'z-ai/glm-5.2',
+                                desc: 'Text Only'
+                            },
 
                             // --- MiniMax Family ---
                             {
@@ -3183,7 +3187,7 @@ export default function App({ args = [] }) {
                                 });
                             },
                             onSubagentUpdate: () => {
-                                setActiveSubagents([...subagentProgress]);
+                                setActiveSubagents(subagentProgress.map(sa => ({ ...sa })));
                             },
                             onExecStart: (cmd) => {
                                 setActiveCommand(cmd);
@@ -4693,11 +4697,11 @@ export default function App({ args = [] }) {
                                     <Box>
                                         <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
                                         <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
-                                        <Text color="green">✓ {sessionToolSuccess}</Text>
+                                        <Text color="green">✔ {sessionToolSuccess}</Text>
                                         <Text color="white"> </Text>
                                         <Text color="yellow">⊘ {sessionToolDenied}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="red">✕ {sessionToolFailure}</Text>
+                                        <Text color="red">✘ {sessionToolFailure}</Text>
                                         <Text color="white"> )</Text>
                                     </Box>
                                 </Box>
@@ -4759,11 +4763,11 @@ export default function App({ args = [] }) {
                                     <Box>
                                         <Box width={25}><Text color="blue">{toolCallsLabel}</Text></Box>
                                         <Text color="white">{(u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0)} ( </Text>
-                                        <Text color="green">✓ {u?.toolSuccess || 0}</Text>
+                                        <Text color="green">✔ {u?.toolSuccess || 0}</Text>
                                         <Text color="white"> </Text>
                                         <Text color="yellow">⊘ {u?.toolDenied || 0}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="red">✕ {u?.toolFailure || 0}</Text>
+                                        <Text color="red">✘ {u?.toolFailure || 0}</Text>
                                         <Text color="white"> )</Text>
                                     </Box>
                                 </Box>
@@ -5663,7 +5667,7 @@ export default function App({ args = [] }) {
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✓ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✕ {sessionToolFailure}</Text> )</Text>
+                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✘ {sessionToolFailure}</Text> )</Text>
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Success Rate:</Text></Box>

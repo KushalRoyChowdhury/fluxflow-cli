@@ -52,9 +52,22 @@ export const invoke = async (args, context = {}) => {
     let currentTurnLogs = [];
     const subagentContext = {
         ...context,
-        onVisualFeedback: null,
+        onVisualFeedback: (feedbackLabel) => {
+            taskEntry.lastChunkTime = Date.now();
+            const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, '');
+            const match = clean.match(/[✔✘✗✖🔍📖→➕↻•]\s*([A-Za-z0-9\s-]+)/);
+            if (match) {
+                taskEntry.currentTool = match[1].trim();
+            } else {
+                taskEntry.currentTool = clean;
+            }
+            if (context.onSubagentUpdate) {
+                context.onSubagentUpdate();
+            }
+        },
         onTokenChunk: () => {
             taskEntry.lastChunkTime = Date.now();
+            taskEntry.currentTool = 'Thinking';
             if (context.onSubagentUpdate) {
                 context.onSubagentUpdate();
             }
@@ -71,7 +84,10 @@ export const invoke = async (args, context = {}) => {
         if (logMessage.includes('[Executing Tool]')) {
             const m = logMessage.match(/\[Executing Tool\]\s*([a-zA-Z0-9_]+)/);
             if (m) {
-                taskEntry.currentTool = m[1];
+                // If not already set by onVisualFeedback, fall back to parsed tool name
+                if (!taskEntry.currentTool || taskEntry.currentTool === 'Thinking') {
+                    taskEntry.currentTool = m[1];
+                }
             }
         }
 

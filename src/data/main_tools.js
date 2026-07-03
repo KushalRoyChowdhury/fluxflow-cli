@@ -41,7 +41,9 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-USE PROACTIVELY A LOT **USE OF SUB AGENTS HIGHLY RECOMENDED**
+**USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
+USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
+
 Invocation Types:
 - invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
 - invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings

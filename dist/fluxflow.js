@@ -4267,9 +4267,8 @@ var init_ChatLayout = __esm({
           } else {
             content = wrapText(trimmed, columns - 4);
           }
-          const linesOfContent = content.split("\n");
           result.push(
-            /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, linesOfContent.map((l, lIdx) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: lIdx, text: l, color, italic })))
+            /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: content, color, italic }))
           );
         }
       });
@@ -4987,8 +4986,8 @@ function CommandMenu({ title, subtitle, items, onSelect }) {
 var CustomItem;
 var init_CommandMenu = __esm({
   "src/components/CommandMenu.jsx"() {
-    CustomItem = ({ label: label2, isSelected }) => {
-      const isCancel = label2 === "Cancel" || label2 === "Back" || label2.toLowerCase().includes("exit") || label2.toLowerCase().includes("back");
+    CustomItem = ({ label, isSelected }) => {
+      const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
       return /* @__PURE__ */ React6.createElement(
         Box5,
         {
@@ -4997,7 +4996,7 @@ var init_CommandMenu = __esm({
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React6.createElement(Text6, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label2)
+        /* @__PURE__ */ React6.createElement(Text6, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
       );
     };
   }
@@ -5189,7 +5188,9 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-USE PROACTIVELY A LOT **USE OF SUB AGENTS HIGHLY RECOMENDED**
+**USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
+USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
+
 Invocation Types:
 - invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
 - invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
@@ -8412,10 +8413,10 @@ var init_ask_user = __esm({
         if (key.startsWith("option")) {
           const val = parsed[key];
           if (typeof val === "string" && val.includes("::")) {
-            const [label2, desc] = val.split("::");
+            const [label, desc] = val.split("::");
             options.push({
               id: key,
-              label: label2.trim(),
+              label: label.trim(),
               description: desc.trim()
             });
           } else {
@@ -9282,13 +9283,13 @@ function traverse(node, depth = 0, isLast = true, prefix = "", parentName = null
     const startLine = node.startPosition.row + 1;
     const endLine = node.endPosition.row + 1;
     const camelType = toCamelCase(type);
-    const label2 = name ? `${camelType} [${name}]` : camelType;
+    const label = name ? `${camelType} [${name}]` : camelType;
     if (depth === 0) {
       result += `\u{1F4C1} ROOT (Lines: ${startLine}-${endLine})
 `;
       nextPrefix = prefix;
     } else {
-      result += `${prefix}${isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 "}${label2} (Lines: ${startLine}-${endLine})
+      result += `${prefix}${isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 "}${label} (Lines: ${startLine}-${endLine})
 `;
       nextPrefix += isLast ? "    " : "\u2502   ";
     }
@@ -9671,9 +9672,22 @@ var init_invoke = __esm({
       let currentTurnLogs = [];
       const subagentContext = {
         ...context,
-        onVisualFeedback: null,
+        onVisualFeedback: (feedbackLabel) => {
+          taskEntry.lastChunkTime = Date.now();
+          const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, "");
+          const match = clean.match(/[✔✘✗✖🔍📖→➕↻•]\s*([A-Za-z0-9\s-]+)/);
+          if (match) {
+            taskEntry.currentTool = match[1].trim();
+          } else {
+            taskEntry.currentTool = clean;
+          }
+          if (context.onSubagentUpdate) {
+            context.onSubagentUpdate();
+          }
+        },
         onTokenChunk: () => {
           taskEntry.lastChunkTime = Date.now();
+          taskEntry.currentTool = "Thinking";
           if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
           }
@@ -9689,7 +9703,9 @@ var init_invoke = __esm({
         if (logMessage.includes("[Executing Tool]")) {
           const m = logMessage.match(/\[Executing Tool\]\s*([a-zA-Z0-9_]+)/);
           if (m) {
-            taskEntry.currentTool = m[1];
+            if (!taskEntry.currentTool || taskEntry.currentTool === "Thinking") {
+              taskEntry.currentTool = m[1];
+            }
           }
         }
         let displayLog = logMessage;
@@ -9727,6 +9743,7 @@ ${finalAnswer}`);
 });
 
 // src/tools/getProgress.js
+import fs20 from "fs";
 var getProgress;
 var init_getProgress = __esm({
   "src/tools/getProgress.js"() {
@@ -9754,7 +9771,72 @@ var init_getProgress = __esm({
       task.progress.forEach((turnLogs, index) => {
         output += `--- Turn ${index + 1} ---
 `;
-        output += turnLogs.join("\n") + "\n\n";
+        const processedLogs = turnLogs.map((log) => {
+          if (log.startsWith("[Subagent Response]")) {
+            const header = "[Subagent Response]";
+            const body = log.substring(header.length);
+            let result = body;
+            const trigger = "tool:functions.";
+            while (true) {
+              const lowerResult = result.toLowerCase();
+              const triggerIdx = lowerResult.indexOf(trigger);
+              if (triggerIdx === -1) break;
+              let startIdx = triggerIdx;
+              let hasOuterBracket = false;
+              let k = triggerIdx - 1;
+              while (k >= 0 && /\s/.test(result[k])) k--;
+              if (k >= 0 && result[k] === "[") {
+                startIdx = k;
+                hasOuterBracket = true;
+              }
+              let balance = 0;
+              let foundStart = false;
+              let inString = null;
+              let j = triggerIdx;
+              while (j < result.length) {
+                const char = result[j];
+                if (!inString && (char === "'" || char === '"' || char === "`")) {
+                  inString = char;
+                } else if (inString && char === inString && result[j - 1] !== "\\") {
+                  inString = null;
+                }
+                if (!inString) {
+                  if (char === "(") {
+                    balance++;
+                    foundStart = true;
+                  } else if (char === ")") {
+                    balance--;
+                  }
+                }
+                if (foundStart && balance === 0 && !inString) {
+                  let endIdx = j;
+                  if (hasOuterBracket) {
+                    let m = j + 1;
+                    while (m < result.length && /\s/.test(result[m])) m++;
+                    if (m < result.length && result[m] === "]") {
+                      endIdx = m;
+                    }
+                  }
+                  result = result.substring(0, startIdx) + result.substring(endIdx + 1);
+                  break;
+                }
+                j++;
+                if (j === result.length) {
+                  result = result.substring(0, startIdx);
+                  break;
+                }
+              }
+            }
+            return header + "\n" + result.trim();
+          }
+          if (log.startsWith("[Executing Tool]")) {
+            if (log.length > 256) {
+              return log.substring(0, 256) + "...[truncated from logs]";
+            }
+          }
+          return log;
+        });
+        output += processedLogs.join("\n") + "\n\n";
       });
       if (task.status === "completed" && task.finalAnswer) {
         output += `Final Answer:
@@ -9764,6 +9846,7 @@ ${task.finalAnswer}
         output += `Failure Error: ${task.error}
 `;
       }
+      fs20.writeFileSync("progress.txt", output.trim());
       return output.trim();
     };
   }
@@ -10034,7 +10117,7 @@ __export(ai_exports, {
 });
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path19 from "path";
-import fs20 from "fs";
+import fs21 from "fs";
 var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
@@ -10053,9 +10136,9 @@ var init_ai = __esm({
     init_editor();
     client = null;
     globalSettings = {};
-    colorMainWords = (label2) => {
-      if (!label2) return label2;
-      return label2.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    colorMainWords = (label) => {
+      if (!label) return label;
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Unsupported Modality|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -10899,8 +10982,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
           const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-          if (!fs20.existsSync(janitorErrDir)) fs20.mkdirSync(janitorErrDir, { recursive: true });
-          fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          if (!fs21.existsSync(janitorErrDir)) fs21.mkdirSync(janitorErrDir, { recursive: true });
+          fs21.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -10910,7 +10993,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       }
       if (attempts) {
         const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-        fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        fs21.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
         if (attempts >= MAX_JANITOR_RETRIES) {
@@ -11385,8 +11468,8 @@ ${newMemoryListStr}
         })() : String(err);
         ;
         const janitorLogDir = path19.join(LOGS_DIR, "janitor");
-        if (!fs20.existsSync(janitorLogDir)) fs20.mkdirSync(janitorLogDir, { recursive: true });
-        fs20.appendFileSync(
+        if (!fs21.existsSync(janitorLogDir)) fs21.mkdirSync(janitorLogDir, { recursive: true });
+        fs21.appendFileSync(
           path19.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
@@ -11470,7 +11553,7 @@ Provide a consolidated summary of the entire session.`;
     deleteChatSummary = (chatId) => {
       try {
         const summariesFile = path19.join(SECRET_DIR, "chat-summaries.json");
-        if (fs20.existsSync(summariesFile)) {
+        if (fs21.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -11713,7 +11796,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs20.readdirSync(dir, { withFileTypes: true });
+            return fs21.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -12003,8 +12086,8 @@ ${ideCtx.warnings}
               filePath = tagClean.slice(0, matchRange.index);
             }
             const absPath = path19.resolve(process.cwd(), filePath);
-            if (fs20.existsSync(absPath)) {
-              const stats = fs20.statSync(absPath);
+            if (fs21.existsSync(absPath)) {
+              const stats = fs21.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -12013,6 +12096,7 @@ ${ideCtx.warnings}
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
                 const isSupported = aiProvider === "Google" || MULTIMODAL_MODELS.includes(modelName);
                 if (isMultimodalFile && !isSupported) {
+                  const label = `\u2718 Unsupported Modality: ${path19.basename(filePath)}`;
                   let terminalWidth = 115;
                   if (process.stdout.isTTY) {
                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -12024,7 +12108,8 @@ ${ideCtx.warnings}
                   const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
                   const boxBottom = `${" ".repeat(boxWidth)}`;
                   yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}`) };
+${boxMid}
+`) };
                   continue;
                 }
                 const finalStart = startLine !== null ? startLine : 1;
@@ -12054,29 +12139,29 @@ ${boxMid}`) };
                   isError = true;
                 }
                 if (!isError) {
-                  let label2 = "";
+                  let label = "";
                   if (isImage) {
-                    label2 = `\u2714  Viewed: ${filePath}`;
+                    label = `\u2714  Viewed: ${filePath}`;
                     attachedBinaryPart = binPart;
                   } else if (isPdf || isOfficeFile) {
-                    label2 = `\u2714  Viewed: ${filePath}`;
+                    label = `\u2714  Viewed: ${filePath}`;
                     attachedBinaryPart = binPart;
                   } else {
                     let totalLines = "...";
                     try {
-                      const content = fs20.readFileSync(absPath, "utf8");
+                      const content = fs21.readFileSync(absPath, "utf8");
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
-                    label2 = `\u2714  Auto-Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                    label = `\u2714  Auto-Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                     taggedContextBlocks.push(textResult);
                   }
-                  if (label2) {
+                  if (label) {
                     let terminalWidth = 115;
                     if (process.stdout.isTTY) {
                       terminalWidth = process.stdout.columns - 5 || 120;
                     }
-                    const boxLines = [label2];
+                    const boxLines = [label];
                     const maxLen = Math.max(...boxLines.map((l) => l.length));
                     const boxWidth = Math.min(maxLen + 4, terminalWidth);
                     const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
@@ -12712,7 +12797,7 @@ ${ideErr} [/ERROR]`;
                       } else if (id && potentialTool === "get_progress") {
                         detail = id.replace(/["']/g, "");
                       } else if (timeVal && potentialTool === "await") {
-                        let sec = parseFloat(timeVal.replace(/["']/g, ""));
+                        let sec = parseFloat(String(timeVal).replace(/["']/g, ""));
                         if (!isNaN(sec)) {
                           if (sec < 5) sec = 5;
                           if (sec > 120) sec = 120;
@@ -12726,7 +12811,7 @@ ${ideErr} [/ERROR]`;
                           };
                           detail = formatTime(sec);
                         } else {
-                          detail = timeVal.replace(/["']/g, "");
+                          detail = String(timeVal).replace(/["']/g, "");
                         }
                       } else {
                         const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
@@ -12898,13 +12983,13 @@ ${ideErr} [/ERROR]`;
                     const displayLabel = TOOL_LABELS2[normToolName] || toolCall.toolName;
                     const detail = getToolDetail(normToolName, toolCall.args);
                     yield { type: "status", content: `${displayLabel}${detail ? ` (${detail})` : ""}...` };
-                    let label2 = "";
+                    let label = "";
                     if (normToolName === "web_search") {
                       const { query, limit = 10 } = parseArgs(toolCall.args);
-                      label2 = `\u2714  Searched: ${query} \u2192 ${limit}`;
+                      label = `\u2714  Searched: ${query} \u2192 ${limit}`;
                     } else if (normToolName === "web_scrape") {
                       const url = parseArgs(toolCall.args).url || "...";
-                      label2 = `\u2714  Visited: ${url}`;
+                      label = `\u2714  Visited: ${url}`;
                     } else if (normToolName === "view_file") {
                       const { path: targetPath2, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
                       const rawStart = StartLine || start_line || startLine;
@@ -12915,8 +13000,8 @@ ${ideErr} [/ERROR]`;
                       let actualEndLine = eLine;
                       try {
                         const absPath = path19.resolve(process.cwd(), targetPath2);
-                        if (fs20.existsSync(absPath)) {
-                          const content = fs20.readFileSync(absPath, "utf8");
+                        if (fs21.existsSync(absPath)) {
+                          const content = fs21.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           actualEndLine = Math.min(eLine, lines);
@@ -12928,38 +13013,38 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label2 = `\u2714  Viewed: ${targetPath2}`;
+                        label = `\u2714  Analyzed: ${targetPath2}`;
                       } else if (isImage) {
-                        label2 = `\u2714  Viewed: ${targetPath2}`;
+                        label = `\u2714  Analyzed: ${targetPath2}`;
                       } else {
-                        label2 = `${totalLines !== "..." ? "\u2714" : "\u2717"}  Read: ${targetPath2} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
+                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${targetPath2} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
-                      const action = normToolName === "list_files" ? "List" : "Viewed";
+                      const action = normToolName === "list_files" ? "List" : "Browsed";
                       const path21 = parseArgs(toolCall.args).path;
-                      label2 = `\u2714  ${action}: ${path21 === "." ? "./" : path21}`;
+                      label = `\u2714  ${action}: ${path21 === "." ? "./" : path21}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
-                      label2 = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
+                      label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "write_pdf") {
-                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+                      label = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "write_docx") {
-                      label2 = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+                      label = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "file_map") {
-                      label2 = `\u2714  Get Map: ${parseArgs(toolCall.args).path || "..."}`;
+                      label = `\u2714  Indexed: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
-                      label2 = "";
+                      label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
                       const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
-                      label2 = `\u2714  Generated: ${argPath || outputPath || output || "generated_image.png"}`;
+                      label = `\u2714  Generated: ${argPath || outputPath || output || "generated_image.png"}`;
                     } else if (normToolName === "invoke_sync" || normToolName === "invoke") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
-                      label2 = `\u2714  Elevating SubAgent${detail2 ? `: ${detail2}` : ""}`;
+                      label = `\u2714  Elevating SubAgent${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "get_progress") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
-                      label2 = `\u2714  Checked${detail2 ? `: ${detail2}` : ""}`;
+                      label = `\u2714  Checked${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
@@ -12973,11 +13058,11 @@ ${ideErr} [/ERROR]`;
                         }
                         return `${s}s`;
                       };
-                      label2 = `\u2714  Awaiting \u2192 ${formatTime(sec)}`;
+                      label = `\u2714  Awaiting \u2192 ${formatTime(sec)}`;
                     } else if (normToolName === "exec_command" || normToolName === "ask") {
-                      label2 = "";
+                      label = "";
                     } else {
-                      label2 = `Executed: ${toolCall.toolName}`;
+                      label = `Executed: ${toolCall.toolName}`;
                     }
                     yield* flushGoogleBuffer2();
                     if (normToolName === "exec_command") {
@@ -13119,7 +13204,7 @@ ${ideErr} [/ERROR]`;
                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                         if (normToolName === "write_file" || normToolName === "update_file") {
                           const action = normToolName === "write_file" ? "Write Canceled" : "Edit Canceled";
-                          const deniedLabel = `\u2717 ${action}: ${parsedArgs.path || "..."}`;
+                          const deniedLabel = `\u2718 ${action}: ${parsedArgs.path || "..."}`;
                           let terminalWidth = 115;
                           if (process.stdout.isTTY) {
                             terminalWidth = process.stdout.columns - 5 || 120;
@@ -13313,8 +13398,8 @@ ${boxMid}`) };
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs20.existsSync(absPath)) {
-                                  originalContent = fs20.readFileSync(absPath, "utf8");
+                                } else if (fs21.existsSync(absPath)) {
+                                  originalContent = fs21.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -13368,10 +13453,10 @@ ${boxMid}}`) };
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs20.existsSync(absPath)) {
+                                  if (!fs21.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs20.mkdirSync(path19.dirname(absPath), { recursive: true });
-                                    fs20.writeFileSync(absPath, "", "utf8");
+                                    fs21.mkdirSync(path19.dirname(absPath), { recursive: true });
+                                    fs21.writeFileSync(absPath, "", "utf8");
                                   }
                                   yield { type: "status", content: `Opening New File Diff in IDE: ${path19.basename(absPath)}...` };
                                   showDiffInIDE(absPath, "", modifiedContent);
@@ -13411,9 +13496,9 @@ ${boxMid}}`) };
                             if (filePath) {
                               const absPath = path19.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs20.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs21.existsSync(absPath)) {
                                 try {
-                                  fs20.unlinkSync(absPath);
+                                  fs21.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -13430,8 +13515,8 @@ ${boxMid}}`) };
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs20.existsSync(absPath)) {
-                            finalContent = fs20.readFileSync(absPath, "utf8");
+                          } else if (fs21.existsSync(absPath)) {
+                            finalContent = fs21.readFileSync(absPath, "utf8");
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -13529,7 +13614,7 @@ ${boxMid}`) };
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2717 ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
+                            const deniedLabel = `\u2718 ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -13555,13 +13640,13 @@ ${boxMid}`) };
                         }
                       }
                     }
-                    if (label2) {
+                    if (label) {
                       let terminalWidth = 115;
                       if (process.stdout.isTTY) {
                         terminalWidth = process.stdout.columns - 5 || 120;
                       }
-                      const boxWidth = Math.min(label2.length + 4, terminalWidth);
-                      const boxMid = `${label2.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                      const boxWidth = Math.min(label.length + 4, terminalWidth);
+                      const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                       const boxBottom = ` ${" ".repeat(boxWidth)} `;
                       yield { type: "visual_feedback", content: colorMainWords(`
 ${boxMid}${boxMid.includes("Created") || boxMid.includes("Edited") || boxMid.includes("Written") ? "" : `
@@ -13719,7 +13804,7 @@ ${colorMainWords(output)}` };
                     anyToolExecutedInThisTurn = true;
                     let uiContent = `[TOOL RESULT]: ${result || ""}`;
                     if (normToolName === "view_file" || normToolName === "web_scrape" || normToolName === "file_map") {
-                      uiContent = `[TOOL RESULT]: ${label2} (Context Locked for UI Clarity)`;
+                      uiContent = `[TOOL RESULT]: ${label} (Context Locked for UI Clarity)`;
                     }
                     yield { type: "tool_result", content: uiContent, aiContent, binaryPart, toolName: normToolName };
                     if (normToolName === "memory" && result.includes("SUCCESS")) yield { type: "memory_updated" };
@@ -13853,8 +13938,8 @@ ${colorMainWords(output)}` };
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
               const agentErrDir = path19.join(LOGS_DIR, "agent");
-              if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
-              fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
+              fs21.appendFileSync(path19.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14024,8 +14109,8 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path19.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
-        if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
-        fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
+        if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
+        fs21.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14119,33 +14204,28 @@ ${cleanResponse}
 `;
             continue;
           }
-          let label2 = "";
-          if (normalizedToolName === "web_search") {
-            const { query, limit = 10 } = parseArgs(toolCall.args);
-            label2 = `\u2714  \x1B[95mSearched\x1B[0m: ${query} \u2192 ${limit}`;
-          } else if (normalizedToolName === "web_scrape") {
-            const url = parseArgs(toolCall.args).url || "...";
-            label2 = `\u2714  \x1B[95mVisited\x1B[0m: ${url}`;
-          } else if (normalizedToolName === "view_file") {
-            const { path: targetPath } = parseArgs(toolCall.args);
-            label2 = `\u2714  \x1B[95mRead\x1B[0m: ${targetPath}`;
-          } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder") {
-            const path21 = parseArgs(toolCall.args).path || "...";
-            label2 = `\u2714  \x1B[95mViewed\x1B[0m: ${path21}`;
+          let label = "";
+          if (normalizedToolName === "web_search" || normalizedToolName === "websearch") {
+            label = `\u2714 \x1B[95mSearched\x1B[0m`;
+          } else if (normalizedToolName === "web_scrape" || normalizedToolName === "webscrape") {
+            label = `\u2714 \x1B[95mScraped\x1B[0m`;
+          } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
+            label = `\u2714 \x1B[95mRead File\x1B[0m`;
+          } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
+            label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
             const path21 = parseArgs(toolCall.args).path || "...";
-            label2 = `\u2714  \x1B[95mCreated\x1B[0m: ${path21}`;
-          } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file") {
+            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
             const path21 = parseArgs(toolCall.args).path || "...";
-            label2 = `\u2714  \x1B[95mEdited\x1B[0m: ${path21}`;
-          } else if (normalizedToolName === "file_map") {
-            const path21 = parseArgs(toolCall.args).path || "...";
-            label2 = `\u2714  \x1B[95mGet Map\x1B[0m: ${path21}`;
+            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path21}`;
+          } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
+            label = `\u2714 \x1B[95mIndexed\x1B[0m`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;
-            if (sec < 5) sec = 5;
-            if (sec > 120) sec = 120;
+            if (sec < 10) sec = 10;
+            if (sec > 180) sec = 180;
             const formatTime = (s) => {
               if (s >= 60) {
                 const m = Math.floor(s / 60);
@@ -14154,14 +14234,14 @@ ${cleanResponse}
               }
               return `${s}s`;
             };
-            label2 = `\u2714  \x1B[95mAwaiting\x1B[0m \u2192 ${formatTime(sec)}`;
+            label = `\u2714 \x1B[95mAwaiting\x1B[0m \u2192 ${formatTime(sec)}`;
           } else {
             const displayLabel = TOOL_LABELS2[normalizedToolName] || toolCall.toolName;
             const detail = getToolDetail(normalizedToolName, toolCall.args);
-            label2 = `\u2714  \x1B[95m${displayLabel}\x1B[0m${detail ? `: ${detail}` : ""}`;
+            label = `\u2714 \x1B[95m${displayLabel}\x1B[0m${detail ? `: ${detail}` : ""}`;
           }
-          if (settings.onVisualFeedback && label2) {
-            settings.onVisualFeedback(label2);
+          if (settings.onVisualFeedback && label) {
+            settings.onVisualFeedback(label);
           }
           if (logCallback) logCallback(`[Executing Tool] ${toolCall.toolName}(${toolCall.args})...`);
           try {
@@ -15004,7 +15084,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs21 from "fs";
+import fs22 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -15012,7 +15092,7 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs21.existsSync(exePath);
+        const exists = exePath && fs22.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -15045,7 +15125,7 @@ __export(app_exports, {
 import os4 from "os";
 import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs22 from "fs-extra";
+import fs23 from "fs-extra";
 import path20 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath } from "url";
@@ -15291,10 +15371,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs22.ensureDir(path20.dirname(kbPath));
+      await fs23.ensureDir(path20.dirname(kbPath));
       let bindings = [];
-      if (fs22.existsSync(kbPath)) {
-        const content = fs22.readFileSync(kbPath, "utf8").trim();
+      if (fs23.existsSync(kbPath)) {
+        const content = fs23.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -15314,7 +15394,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs22.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs23.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -15990,7 +16070,7 @@ function App({ args = [] }) {
   useEffect11(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs22.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs23.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -16113,7 +16193,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
+        fs23.remove(path20.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -16149,7 +16229,7 @@ function App({ args = [] }) {
       if (parsedArgs.playground) {
         const playgroundDir = path20.join(DATA_DIR, "playground");
         try {
-          fs22.ensureDirSync(playgroundDir);
+          fs23.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -16190,8 +16270,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs22.existsSync(kbPath)) {
-              const content = fs22.readFileSync(kbPath, "utf8").trim();
+            if (fs23.existsSync(kbPath)) {
+              const content = fs23.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -16486,6 +16566,10 @@ function App({ args = [] }) {
           cmd: "z-ai/glm-5.1",
           desc: "Text Only [DEPRICATED]"
         },
+        {
+          cmd: "z-ai/glm-5.2",
+          desc: "Text Only"
+        },
         // --- MiniMax Family ---
         {
           cmd: "minimaxai/minimax-m2.7",
@@ -16728,9 +16812,9 @@ ${cleanText}`, color: "magenta" }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs22.ensureDir(dest);
+              await fs23.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs22.copy(src, dest, {
+              await fs23.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
                   const relative = path20.relative(src, srcPath);
@@ -16795,7 +16879,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs22.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
+              fs23.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -17144,7 +17228,7 @@ ${cleanText}`, color: "magenta" }];
           }
           const fileContent = exportLines.join("\n");
           try {
-            fs22.writeFileSync(exportPath, fileContent, "utf8");
+            fs23.writeFileSync(exportPath, fileContent, "utf8");
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
               return [...prev, {
@@ -17191,12 +17275,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs22.existsSync(LOGS_DIR)) fs22.removeSync(LOGS_DIR);
-              if (fs22.existsSync(SECRET_DIR)) fs22.removeSync(SECRET_DIR);
-              if (fs22.existsSync(SETTINGS_FILE)) fs22.removeSync(SETTINGS_FILE);
+              if (fs23.existsSync(LOGS_DIR)) fs23.removeSync(LOGS_DIR);
+              if (fs23.existsSync(SECRET_DIR)) fs23.removeSync(SECRET_DIR);
+              if (fs23.existsSync(SETTINGS_FILE)) fs23.removeSync(SETTINGS_FILE);
               try {
-                const items = fs22.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs22.removeSync(FLUXFLOW_DIR);
+                const items = fs23.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs23.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -17319,14 +17403,14 @@ ${list || "No saved chats found."}`, isMeta: true }];
 - [Define custom step-by-step recipes for this project here]
 `;
             const filePath = path20.join(process.cwd(), "FluxFlow.md");
-            if (fs22.pathExistsSync(filePath)) {
+            if (fs23.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs22.writeFileSync(filePath, template);
+                fs23.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -17547,7 +17631,7 @@ ${timestamp}` };
                 });
               },
               onSubagentUpdate: () => {
-                setActiveSubagents([...subagentProgress]);
+                setActiveSubagents(subagentProgress.map((sa) => ({ ...sa })));
               },
               onExecStart: (cmd) => {
                 setActiveCommand(cmd);
@@ -18259,8 +18343,8 @@ Selection: ${val}`,
     });
     setActiveView("input");
   }, [activeView, providerBudgetCursor]);
-  const CustomMenuItem = ({ label: label2, isSelected }) => {
-    const isCancel = label2 === "Cancel" || label2 === "Back" || label2.toLowerCase().includes("exit") || label2.toLowerCase().includes("back");
+  const CustomMenuItem = ({ label, isSelected }) => {
+    const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
     return /* @__PURE__ */ React15.createElement(
       Box14,
       {
@@ -18269,10 +18353,10 @@ Selection: ${val}`,
         paddingX: 1,
         width: "100%"
       },
-      /* @__PURE__ */ React15.createElement(Text15, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label2)
+      /* @__PURE__ */ React15.createElement(Text15, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
     );
   };
-  const renderProgressBar = (label2, current, limit) => {
+  const renderProgressBar = (label, current, limit) => {
     const percent = limit > 0 ? Math.min(100, Math.round(current / limit * 100)) : 0;
     const barWidth = 15;
     const filledCount = Math.round(percent / 100 * barWidth);
@@ -18283,10 +18367,10 @@ Selection: ${val}`,
     } else if (percent > 80) {
       barColor = "red";
     }
-    const isTokens = label2.toLowerCase().includes("token");
+    const isTokens = label.toLowerCase().includes("token");
     const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
     const displayCurrent = isTokens ? formatTokens(current) : current;
-    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, label2, ": ")), /* @__PURE__ */ React15.createElement(Text15, { color: barColor }, barStr), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
+    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, label, ": ")), /* @__PURE__ */ React15.createElement(Text15, { color: barColor }, barStr), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
@@ -18702,7 +18786,7 @@ Selection: ${val}`,
         return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
           const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
           return /* @__PURE__ */ React15.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 40 }, /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React15.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 36 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React15.createElement(Box14, { width: 31 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2713 ", sessionToolSuccess), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", sessionToolDenied), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2715 ", sessionToolFailure), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, timeLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2713 ", u?.toolSuccess || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", u?.toolDenied || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2715 ", u?.toolFailure || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )")))), /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+        })) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", sessionToolSuccess), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", sessionToolDenied), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", sessionToolFailure), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, timeLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", u?.toolDenied || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )")))), /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "autoExecDanger":
         return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
@@ -19217,18 +19301,18 @@ Selection: ${val}`,
       },
       /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") ? /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, "(Use '#Lstart-Lend' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
         let url = "https://aistudio.google.com/billing";
-        let label2 = "billing";
+        let label = "billing";
         if (aiProvider === "DeepSeek") {
           url = "https://platform.deepseek.com/usage";
-          label2 = "billing";
+          label = "billing";
         } else if (aiProvider === "OpenRouter") {
           url = "https://openrouter.ai/settings/profile";
-          label2 = "profile";
+          label = "profile";
         } else if (aiProvider === "NVIDIA") {
           url = "https://build.nvidia.com/settings/api-keys";
-          label2 = "billing";
+          label = "billing";
         }
-        return /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label2}\x1B]8;;\x07`), " & /settings");
+        return /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
       })() : null),
       visible.map((s, i) => {
         const actualIdx = startIdx + i;
@@ -19282,7 +19366,7 @@ Selection: ${val}`,
     const agentActiveMs = sessionApiTime + sessionToolTime;
     const apiPercent = agentActiveMs > 0 ? (sessionApiTime / agentActiveMs * 100).toFixed(1) : "0.0";
     const toolPercent = agentActiveMs > 0 ? (sessionToolTime / agentActiveMs * 100).toFixed(1) : "0.0";
-    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2713 ", sessionToolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2715 ", sessionToolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
+    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", sessionToolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u2298 ", sessionToolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", sessionToolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
 var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
@@ -19419,7 +19503,7 @@ var init_app = __esm({
     linesAdded = 0;
     linesRemoved = 0;
     packageJsonPath = path20.join(path20.dirname(fileURLToPath(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs22.readFileSync(packageJsonPath, "utf8"));
+    packageJson = JSON.parse(fs23.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React15.createElement(
@@ -19515,13 +19599,13 @@ var init_app = __esm({
         const fileList = [];
         const scan = (currentDir) => {
           try {
-            const files = fs22.readdirSync(currentDir);
+            const files = fs23.readdirSync(currentDir);
             for (const file of files) {
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
               const filePath = path20.join(currentDir, file);
-              const stat = fs22.statSync(filePath);
+              const stat = fs23.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
@@ -19604,7 +19688,7 @@ var init_app = __esm({
         const timer = setInterval(checkLatency, 100);
         return () => clearInterval(timer);
       }, [sa.status, sa.lastChunkTime]);
-      return /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Executing: ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React15.createElement(Text15, { color: dotColor }, " \u25CF")));
+      return /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React15.createElement(Text15, { color: dotColor }, " \u25CF")));
     });
   }
 });
@@ -19650,11 +19734,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isVersion = args.includes("--version") || args.includes("-v");
   const isUpdate = args[0] === "--update";
   if (isVersion || isHelp || isHelpCommands || isUpdate) {
-    const fs23 = await import("fs");
+    const fs24 = await import("fs");
     const path21 = await import("path");
     const { fileURLToPath: fileURLToPath3 } = await import("url");
     const packageJsonPath2 = path21.join(path21.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs23.readFileSync(packageJsonPath2, "utf8"));
+    const packageJson2 = JSON.parse(fs24.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isVersion) {
       console.log(`v${versionFluxflow2}`);
@@ -19771,8 +19855,8 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
                 { label: "Bun", value: "bun" },
                 { label: "Custom Command", value: "custom" }
               ];
-              const CustomItem2 = ({ label: label2, isSelected }) => {
-                return /* @__PURE__ */ React17.createElement(Box15, { width: "100%" }, /* @__PURE__ */ React17.createElement(Text16, { bold: isSelected }, "\u2514\u2500 ", isSelected ? "\x1B[32m\u25CF\x1B[0m" : "\u25CB", " ", label2));
+              const CustomItem2 = ({ label, isSelected }) => {
+                return /* @__PURE__ */ React17.createElement(Box15, { width: "100%" }, /* @__PURE__ */ React17.createElement(Text16, { bold: isSelected }, "\u2514\u2500 ", isSelected ? "\x1B[32m\u25CF\x1B[0m" : "\u25CB", " ", label));
               };
               let unmountFn;
               const PromptComponent = () => {

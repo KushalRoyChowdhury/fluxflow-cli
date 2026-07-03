@@ -23,7 +23,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✗✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Elevating SubAgent|Checking SubAgent Work|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Unsupported Modality|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -2190,6 +2190,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const isSupported = aiProvider === 'Google' || MULTIMODAL_MODELS.includes(modelName);
 
                         if (isMultimodalFile && !isSupported) {
+                            // console.log(isMultimodalFile, isSupported); // This executing
+                            const label = `✘ Unsupported Modality: ${path.basename(filePath)}`;
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                                 terminalWidth = process.stdout.columns - 5 || 120;
@@ -2199,8 +2201,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const boxWidth = Math.min(maxLen + 4, terminalWidth);
                             const boxTop = `${' '.repeat(boxWidth)}`;
                             const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
+                            // console.log(boxMid) // This not executing
                             const boxBottom = `${' '.repeat(boxWidth)}`;
-                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
+                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
                             // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             continue;
                         }
@@ -2977,7 +2980,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } else if (id && potentialTool === 'get_progress') {
                                         detail = id.replace(/["']/g, '');
                                     } else if (timeVal && potentialTool === 'await') {
-                                        let sec = parseFloat(timeVal.replace(/["']/g, ''));
+                                        let sec = parseFloat(String(timeVal).replace(/["']/g, ''));
                                         if (!isNaN(sec)) {
                                             if (sec < 5) sec = 5;
                                             if (sec > 120) sec = 120;
@@ -2991,7 +2994,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             };
                                             detail = formatTime(sec);
                                         } else {
-                                            detail = timeVal.replace(/["']/g, '');
+                                            detail = String(timeVal).replace(/["']/g, '');
                                         }
                                     } else {
                                         // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords/ids/titles
@@ -3215,14 +3218,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                     if (isPdf || isOfficeFile) {
-                                        label = `✔  Viewed: ${targetPath}`;
+                                        label = `✔  Analyzed: ${targetPath}`;
                                     } else if (isImage) {
-                                        label = `✔  Viewed: ${targetPath}`;
+                                        label = `✔  Analyzed: ${targetPath}`;
                                     } else {
-                                        label = `${totalLines !== '...' ? '✔' : '✗'}  Read: ${targetPath} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
+                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${targetPath} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
-                                    const action = normToolName === 'list_files' ? 'List' : 'Viewed';
+                                    const action = normToolName === 'list_files' ? 'List' : 'Browsed';
                                     const path = parseArgs(toolCall.args).path;
                                     label = `✔  ${action}: ${path === '.' ? './' : path}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
@@ -3233,7 +3236,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'write_docx') {
                                     label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'file_map') {
-                                    label = `✔  Get Map: ${parseArgs(toolCall.args).path || '...'}`;
+                                    label = `✔  Indexed: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
@@ -3428,7 +3431,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                                         if (normToolName === 'write_file' || normToolName === 'update_file') {
                                             const action = normToolName === 'write_file' ? 'Write Canceled' : 'Edit Canceled';
-                                            const deniedLabel = `✗ ${action}: ${parsedArgs.path || '...'}`;
+                                            const deniedLabel = `✘ ${action}: ${parsedArgs.path || '...'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -3843,7 +3846,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✗ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -4529,33 +4532,43 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
                 continue;
             }
 
+            // fs.writeFileSync("SUBAGENT-DEBUG.txt", normalizedToolName);
             let label = '';
-            if (normalizedToolName === 'web_search') {
-                const { query, limit = 10 } = parseArgs(toolCall.args);
-                label = `✔  \x1b[95mSearched\x1b[0m: ${query} → ${limit}`;
-            } else if (normalizedToolName === 'web_scrape') {
-                const url = parseArgs(toolCall.args).url || '...';
-                label = `✔  \x1b[95mVisited\x1b[0m: ${url}`;
-            } else if (normalizedToolName === 'view_file') {
-                const { path: targetPath } = parseArgs(toolCall.args);
-                label = `✔  \x1b[95mRead\x1b[0m: ${targetPath}`;
-            } else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder') {
+            if (normalizedToolName === 'web_search' || normalizedToolName === 'websearch') {
+                label = `✔ \x1b[95mSearched\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'web_scrape' || normalizedToolName === 'webscrape') {
+                label = `✔ \x1b[95mScraped\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
+                label = `✔ \x1b[95mRead File\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
+                label = `✔ \x1b[95mBrowsed Folder\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
                 const path = parseArgs(toolCall.args).path || '...';
-                label = `✔  \x1b[95mViewed\x1b[0m: ${path}`;
-            } else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
+                label = `✔ \x1b[95mFile Created\x1b[0m: ${path}`;
+            }
+
+            else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
                 const path = parseArgs(toolCall.args).path || '...';
-                label = `✔  \x1b[95mCreated\x1b[0m: ${path}`;
-            } else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file') {
-                const path = parseArgs(toolCall.args).path || '...';
-                label = `✔  \x1b[95mEdited\x1b[0m: ${path}`;
-            } else if (normalizedToolName === 'file_map') {
-                const path = parseArgs(toolCall.args).path || '...';
-                label = `✔  \x1b[95mGet Map\x1b[0m: ${path}`;
-            } else if (normalizedToolName === 'await') {
+                label = `✔ \x1b[95mFile Edited\x1b[0m: ${path}`;
+            }
+
+            else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {
+                label = `✔ \x1b[95mIndexed\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'await') {
                 const { time } = parseArgs(toolCall.args);
                 let sec = parseFloat(time) || 0;
-                if (sec < 5) sec = 5;
-                if (sec > 120) sec = 120;
+                if (sec < 10) sec = 10;
+                if (sec > 180) sec = 180;
                 const formatTime = (s) => {
                     if (s >= 60) {
                         const m = Math.floor(s / 60);
@@ -4564,11 +4577,11 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
                     }
                     return `${s}s`;
                 };
-                label = `✔  \x1b[95mAwaiting\x1b[0m → ${formatTime(sec)}`;
+                label = `✔ \x1b[95mAwaiting\x1b[0m → ${formatTime(sec)}`;
             } else {
                 const displayLabel = TOOL_LABELS[normalizedToolName] || toolCall.toolName;
                 const detail = getToolDetail(normalizedToolName, toolCall.args);
-                label = `✔  \x1b[95m${displayLabel}\x1b[0m${detail ? `: ${detail}` : ''}`;
+                label = `✔ \x1b[95m${displayLabel}\x1b[0m${detail ? `: ${detail}` : ''}`;
             }
 
             if (settings.onVisualFeedback && label) {
