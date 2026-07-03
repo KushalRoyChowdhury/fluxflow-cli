@@ -694,6 +694,7 @@ export default function App({ args = [] }) {
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
+    const [lastChunkTime, setLastChunkTime] = useState(0);
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
@@ -3031,6 +3032,7 @@ export default function App({ args = [] }) {
 
                 let hasFiredJanitor = false;
                 setIsProcessing(true);
+                setLastChunkTime(Date.now());
                 setIsExpanded(false);
                 let apiStart = Date.now();
                 let isFirstPacket = true;
@@ -3267,6 +3269,10 @@ export default function App({ args = [] }) {
 
                     for await (const packet of stream) {
                         // fs.appendFileSync('DEBUG.txt', JSON.stringify(packet, null, 2));
+
+                        if (packet.type === 'text') {
+                            setLastChunkTime(Date.now());
+                        }
 
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
@@ -5248,9 +5254,11 @@ export default function App({ args = [] }) {
                                 )}
                             </Box>
                             <Box>
-                                {wittyPhrase && (
+                                {isProcessing && (Date.now() - lastChunkTime > 15000) ? (
+                                    <Box><Text color="yellow" bold>Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
+                                ) : wittyPhrase ? (
                                     <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>
-                                )}
+                                ) : null}
                                 {/* <Text color="gray" bold>[ </Text> */}
                                 <Text color="white">{tempModelOverride || activeModel}</Text>
                                 {/* <Text color="gray" bold> ]</Text> */}
@@ -5548,6 +5556,8 @@ export default function App({ args = [] }) {
                                 apiTier={apiTier}
                                 aiProvider={aiProvider}
                                 activeModel={activeModel}
+                                isProcessing={isProcessing}
+                                lastChunkTime={lastChunkTime}
                             />
                         </Box>
 

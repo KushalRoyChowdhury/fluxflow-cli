@@ -11,12 +11,35 @@ export function getMemoryInfo() {
     }
 }
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '' }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0 }) => {
     // const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
     const modeIcon = mode === 'Flux' ? '' : '';
     const [memoryUsage, setMemoryUsage] = useState(0);
     const [memoryLimit, setMemoryLimit] = useState(0);
     const [memoryUnit, setMemoryUnit] = useState('MB');
+
+    const [dotColor, setDotColor] = useState('green');
+
+    useEffect(() => {
+        if (!isProcessing) return;
+
+        const checkLatency = () => {
+            const delay = Date.now() - lastChunkTime;
+            if (delay < 700) {
+                setDotColor('green');
+            } else if (delay <= 1200) {
+                setDotColor('yellow');
+            } else if (delay <= 2000) {
+                setDotColor('#ff9f43'); // Orange
+            } else {
+                setDotColor('#d63031'); // Deep red
+            }
+        };
+
+        checkLatency();
+        const timer = setInterval(checkLatency, 100);
+        return () => clearInterval(timer);
+    }, [isProcessing, lastChunkTime]);
 
     const updateMemory = () => {
         const usage = process.memoryUsage();
@@ -97,7 +120,11 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
             {/* 🔋 PERFORMANCE & ID ZONE */}
             <Box>
-
+                {isProcessing ? (
+                    <Box marginRight={0}>
+                        <Text color={dotColor}>●</Text>
+                    </Box>
+                ) : <Text> </Text>}
                 <Box marginX={1}>
                     <Text color="white">{formatTokens(tokensTotal)} <Text dimColor>{((tokens / maxLimit) * 100).toFixed(0)}%</Text></Text>
                 </Box>
