@@ -35,6 +35,7 @@ export const invoke = async (args, context = {}) => {
         title: title || task.substring(0, 30),
         task: task,
         status: 'running',
+        lastChunkTime: Date.now(),
         progress: [] // Array of arrays containing logs for each turn
     };
 
@@ -49,7 +50,16 @@ export const invoke = async (args, context = {}) => {
 
     // Run the subagent asynchronously
     let currentTurnLogs = [];
-    const subagentContext = { ...context, onVisualFeedback: null };
+    const subagentContext = {
+        ...context,
+        onVisualFeedback: null,
+        onTokenChunk: () => {
+            taskEntry.lastChunkTime = Date.now();
+            if (context.onSubagentUpdate) {
+                context.onSubagentUpdate();
+            }
+        }
+    };
     runSubagent(task, subagentContext, model, allowedTools, 20, (logMessage) => {
         if (logMessage.startsWith('[Subagent Turn')) {
             if (currentTurnLogs.length > 0) {

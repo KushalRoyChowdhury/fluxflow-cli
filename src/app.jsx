@@ -374,6 +374,38 @@ const getProjectFiles = (() => {
 
 let cachedShortcut = '\\ + Enter';
 
+const SubagentRow = React.memo(({ sa }) => {
+    const [dotColor, setDotColor] = useState('green');
+
+    useEffect(() => {
+        if (sa.status !== 'running') return;
+
+        const checkLatency = () => {
+            const delay = Date.now() - (sa.lastChunkTime || Date.now());
+            if (delay < 700) {
+                setDotColor('green');
+            } else if (delay <= 1200) {
+                setDotColor('yellow');
+            } else if (delay <= 2000) {
+                setDotColor('#ff9f43'); // Orange
+            } else {
+                setDotColor('#d63031'); // Deep red
+            }
+        };
+
+        checkLatency();
+        const timer = setInterval(checkLatency, 100);
+        return () => clearInterval(timer);
+    }, [sa.status, sa.lastChunkTime]);
+
+    return (
+        <Box justifyContent="space-between" width="100%">
+            <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
+            <Text color="white">Executing: <Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text></Text>
+        </Box>
+    );
+});
+
 export default function App({ args = [] }) {
     let lastGCTime = 1;
     const [confirmExit, setConfirmExit] = useState(false);
@@ -3094,6 +3126,9 @@ export default function App({ args = [] }) {
                             apiTier,
                             cols: terminalSize.columns - 6,
                             rows: 30,
+                            onTokenChunk: () => {
+                                setLastChunkTime(Date.now());
+                            },
                             onVisualFeedback: (content) => {
                                 setMessages(prev => {
                                     const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
@@ -5233,10 +5268,7 @@ export default function App({ args = [] }) {
                                 </Box>
                                 <Box flexDirection="column" marginTop={1} width="100%">
                                     {activeSubagents.filter(sa => sa.status === 'running').map(sa => (
-                                        <Box key={sa.id} justifyContent="space-between" width="100%">
-                                            <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
-                                            <Text color="white">Executing: <Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text></Text>
-                                        </Box>
+                                        <SubagentRow key={sa.id} sa={sa} />
                                     ))}
                                 </Box>
                             </Box>
@@ -5254,8 +5286,8 @@ export default function App({ args = [] }) {
                                 )}
                             </Box>
                             <Box>
-                                {isProcessing && (Date.now() - lastChunkTime > 15000) ? (
-                                    <Box><Text color="yellow" bold>Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
+                                {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running') ? (
+                                    <Box><Text color="white" bold>Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : wittyPhrase ? (
                                     <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : null}

@@ -1433,6 +1433,9 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         }
 
         for await (const chunk of stream) {
+            if (settings && typeof settings.onTokenChunk === 'function') {
+                settings.onTokenChunk();
+            }
             if (chunk.candidates?.[0]?.content?.parts) {
                 for (const part of chunk.candidates[0].content.parts) {
                     if (part.text && !part.thought) fullText += part.text;
@@ -2532,7 +2535,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
-                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`); break;
+                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     const abortPromise = new Promise((_, reject) => {
@@ -2840,6 +2843,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortPromise
                         ]);
                         if (done) break;
+
+                        if (settings && typeof settings.onTokenChunk === 'function') {
+                            settings.onTokenChunk();
+                        }
 
                         if (isFirstChunk) {
                             yield { type: 'status', content: 'Thinking...' };
@@ -3892,6 +3899,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     isMultiModal: isModelMultimodal(targetModel),
                                     onVisualFeedback: settings.onVisualFeedback,
                                     onSubagentUpdate: settings.onSubagentUpdate,
+                                    onTokenChunk: settings.onTokenChunk,
                                     modelName: targetModel,
                                     aiProvider: settings.aiProvider,
                                     apiKey: settings.apiKey,

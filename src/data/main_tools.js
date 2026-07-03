@@ -47,7 +47,7 @@ Invocation Types:
 - invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
 1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? do your own task OR await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) >>> spamming getProgress`.trim()
+2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING`.trim()
 :
 
 
