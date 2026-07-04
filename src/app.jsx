@@ -3183,7 +3183,7 @@ export default function App({ args = [] }) {
                             onVisualFeedback: (content) => {
                                 setMessages(prev => {
                                     const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                    return [...updatedPrev, { id: 'visual-' + Date.now(), role: 'system', text: content, isVisualFeedback: true }];
+                                    return [...updatedPrev, { id: 'visual-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9), role: 'system', text: content, isVisualFeedback: true }];
                                 });
                             },
                             onSubagentUpdate: () => {
@@ -4701,7 +4701,7 @@ export default function App({ args = [] }) {
                                         <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
                                         <Text color="green">✔ {sessionToolSuccess}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="yellow">⊘ {sessionToolDenied}</Text>
+                                        <Text color="yellow">🛇 {sessionToolDenied}</Text>
                                         <Text color="white"> </Text>
                                         <Text color="red">✘ {sessionToolFailure}</Text>
                                         <Text color="white"> )</Text>
@@ -4767,7 +4767,7 @@ export default function App({ args = [] }) {
                                         <Text color="white">{(u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0)} ( </Text>
                                         <Text color="green">✔ {u?.toolSuccess || 0}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="yellow">⊘ {u?.toolDenied || 0}</Text>
+                                        <Text color="yellow">🛇 {u?.toolDenied || 0}</Text>
                                         <Text color="white"> </Text>
                                         <Text color="red">✘ {u?.toolFailure || 0}</Text>
                                         <Text color="white"> )</Text>
@@ -5669,7 +5669,7 @@ export default function App({ args = [] }) {
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="yellow">⊘ {sessionToolDenied}</Text> <Text color="red">✘ {sessionToolFailure}</Text> )</Text>
+                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="yellow">🛇 {sessionToolDenied}</Text> <Text color="red">✘ {sessionToolFailure}</Text> )</Text>
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Success Rate:</Text></Box>
