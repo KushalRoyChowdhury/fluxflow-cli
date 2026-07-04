@@ -9,7 +9,7 @@
 
 **A Beautiful, Autonomous Terminal AI Agent**
 
-📖 **[Official Documentatio]n(https://fluxflow-cli.onrender.com/)**
+📖 **[Official Documentation](https://fluxflow-cli.onrender.com/)**
 
 Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
 
@@ -20,10 +20,10 @@ Whether you need a conversational partner or an autonomous developer that can wr
 ## ✨ Features
 
 - **Multi-Provider Support**: Choose your preferred engine!
-- **Google GenAI** (Gemini & Gemma models)
-- **DeepSeek** (Native DeepSeek API)
-- **OpenRouter** (Access to hundreds of models; *Experimental*)
-- **NVIDIA** (Access to selected models)
+  - **Google GenAI** (Gemini & Gemma models)
+  - **DeepSeek** (Native DeepSeek API)
+  - **OpenRouter** (Access to hundreds of models; *Experimental*)
+  - **NVIDIA** (Access to many models)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
   - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.
