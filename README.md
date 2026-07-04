@@ -9,7 +9,7 @@
 
 **A Beautiful, Autonomous Terminal AI Agent**
 
-📖 **[Official Documentatio]n(https://fluxflow-cli.onrender.com/)**
+📖 **[Official Documentation](https://fluxflow-cli.onrender.com/)**
 
 Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
 
