@@ -3486,6 +3486,8 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
+                            // Do a small 150ms delay here
+                            await new Promise(resolve => setTimeout(resolve, 150));
                             setMessages(prev => {
                                 const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
                                 const newMsgs = [...updatedPrev, {

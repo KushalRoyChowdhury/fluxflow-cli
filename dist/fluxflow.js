@@ -17989,6 +17989,7 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
+              await new Promise((resolve) => setTimeout(resolve, 150));
               setMessages((prev) => {
                 const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
                 const newMsgs = [...updatedPrev, {
