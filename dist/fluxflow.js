@@ -7850,6 +7850,121 @@ var init_usage = __esm({
   }
 });
 
+// src/utils/puppeteer_helper.js
+import os4 from "os";
+import path8 from "path";
+import fs9 from "fs";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+function getPuppeteerConfig() {
+  const platform = os4.platform();
+  const arch = os4.arch();
+  let pptrPlatform = "";
+  let execName = "";
+  let subDir = "";
+  if (platform === "win32") {
+    pptrPlatform = arch === "x64" ? "win64" : "win32";
+    execName = "chrome.exe";
+    subDir = `chrome-${pptrPlatform}`;
+  } else if (platform === "darwin") {
+    pptrPlatform = arch === "arm64" ? "mac_arm" : "mac";
+    const archSuffix = arch === "arm64" ? "arm64" : "x64";
+    execName = "Google Chrome.app/Contents/MacOS/Google Chrome";
+    subDir = `chrome-mac-${archSuffix}`;
+  } else if (platform === "linux") {
+    pptrPlatform = "linux";
+    execName = "chrome";
+    subDir = "chrome-linux64";
+  } else {
+    return {};
+  }
+  let configPath = path8.resolve(__dirname, "..", "..", ".puppeteerrc.cjs");
+  if (!fs9.existsSync(configPath)) {
+    configPath = path8.resolve(__dirname, "..", ".puppeteerrc.cjs");
+  }
+  if (!fs9.existsSync(configPath)) {
+    return {};
+  }
+  try {
+    const config = require2(configPath);
+    const cacheDir = config.cacheDirectory;
+    const version = config.chrome?.version;
+    if (cacheDir) {
+      process.env.PUPPETEER_CACHE_DIR = cacheDir;
+      if (version) {
+        const expectedPath = path8.join(
+          cacheDir,
+          "chrome",
+          `${pptrPlatform}-${version}`,
+          subDir,
+          execName
+        );
+        if (fs9.existsSync(expectedPath)) {
+          return {
+            executablePath: expectedPath,
+            cacheDirectory: cacheDir
+          };
+        }
+      }
+      const findExecutable = (dir) => {
+        if (!fs9.existsSync(dir)) return null;
+        try {
+          const files = fs9.readdirSync(dir);
+          const dirsToSearch = [];
+          for (const file of files) {
+            const fullPath = path8.join(dir, file);
+            let stat;
+            try {
+              stat = fs9.statSync(fullPath);
+            } catch (e) {
+              continue;
+            }
+            if (stat.isDirectory()) {
+              dirsToSearch.push(fullPath);
+            } else if (file.toLowerCase() === execName.toLowerCase()) {
+              if (!version || fullPath.includes(version)) {
+                return fullPath;
+              }
+            }
+          }
+          if (version) {
+            for (const d of dirsToSearch) {
+              if (d.includes(version)) {
+                const found = findExecutable(d);
+                if (found) return found;
+              }
+            }
+          }
+          for (const d of dirsToSearch) {
+            if (!version || !d.includes(version)) {
+              const found = findExecutable(d);
+              if (found) return found;
+            }
+          }
+        } catch (e) {
+        }
+        return null;
+      };
+      const foundPath = findExecutable(cacheDir);
+      if (foundPath) {
+        return {
+          executablePath: foundPath,
+          cacheDirectory: cacheDir
+        };
+      }
+    }
+  } catch (error) {
+  }
+  return {};
+}
+var require2, __dirname;
+var init_puppeteer_helper = __esm({
+  "src/utils/puppeteer_helper.js"() {
+    require2 = createRequire(import.meta.url);
+    __dirname = path8.dirname(fileURLToPath(import.meta.url));
+  }
+});
+
 // src/tools/web_search.js
 import puppeteer from "puppeteer";
 var web_search;
@@ -7857,6 +7972,7 @@ var init_web_search = __esm({
   "src/tools/web_search.js"() {
     init_arg_parser();
     init_paths();
+    init_puppeteer_helper();
     web_search = async (argsString) => {
       const { query, limit = 10 } = parseArgs(argsString);
       if (!query) return 'ERROR: Missing "query" argument for web_search.';
@@ -7865,8 +7981,10 @@ var init_web_search = __esm({
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         let browser = null;
         try {
+          const pptrConfig = getPuppeteerConfig();
           browser = await puppeteer.launch({
             headless: true,
+            executablePath: pptrConfig.executablePath || void 0,
             args: [
               "--no-sandbox",
               "--disable-setuid-sandbox",
@@ -7929,6 +8047,7 @@ var web_scrape;
 var init_web_scrape = __esm({
   "src/tools/web_scrape.js"() {
     init_paths();
+    init_puppeteer_helper();
     web_scrape = async (args) => {
       const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
       const url = urlMatch ? urlMatch[1] : args;
@@ -7937,8 +8056,10 @@ var init_web_scrape = __esm({
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         let browser = null;
         try {
+          const pptrConfig = getPuppeteerConfig();
           browser = await puppeteer2.launch({
             headless: true,
+            executablePath: pptrConfig.executablePath || void 0,
             args: [
               "--no-sandbox",
               "--disable-setuid-sandbox",
@@ -8121,8 +8242,8 @@ var init_chat = __esm({
 });
 
 // src/tools/view_file.js
-import fs9 from "fs";
-import path8 from "path";
+import fs10 from "fs";
+import path9 from "path";
 var view_file;
 var init_view_file = __esm({
   "src/tools/view_file.js"() {
@@ -8134,16 +8255,16 @@ var init_view_file = __esm({
       const finalStart = sLine || 1;
       const finalEnd = eLine || (sLine ? sLine + 800 : 800);
       if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
-      const absolutePath = path8.resolve(process.cwd(), targetPath);
+      const absolutePath = path9.resolve(process.cwd(), targetPath);
       try {
-        if (!fs9.existsSync(absolutePath)) {
+        if (!fs10.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist.`;
         }
-        const stats = fs9.statSync(absolutePath);
+        const stats = fs10.statSync(absolutePath);
         if (stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a directory. Use list_files instead.`;
         }
-        const ext = path8.extname(targetPath).toLowerCase();
+        const ext = path9.extname(targetPath).toLowerCase();
         const videoExtensions = [".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".mpeg", ".mpg"];
         if (videoExtensions.includes(ext)) {
           const format = ext.slice(1).toUpperCase();
@@ -8163,7 +8284,7 @@ var init_view_file = __esm({
           if (!isMultiModal) {
             return `ERROR: Multimodality is not supported for the current model. Unable to load [${targetPath}].`;
           }
-          const buffer = fs9.readFileSync(absolutePath);
+          const buffer = fs10.readFileSync(absolutePath);
           const base64 = buffer.toString("base64");
           const mimeType = mimeMap[ext];
           return {
@@ -8176,7 +8297,7 @@ var init_view_file = __esm({
             }
           };
         }
-        let content = fs9.readFileSync(absolutePath, "utf8");
+        let content = fs10.readFileSync(absolutePath, "utf8");
         if (content.startsWith("\uFEFF")) {
           content = content.slice(1);
         }
@@ -8200,8 +8321,8 @@ ${code}`;
 });
 
 // src/tools/write_file.js
-import fs10 from "fs";
-import path9 from "path";
+import fs11 from "fs";
+import path10 from "path";
 var write_file;
 var init_write_file = __esm({
   "src/tools/write_file.js"() {
@@ -8212,14 +8333,14 @@ var init_write_file = __esm({
       if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';
       if (content === void 0) return 'ERROR: Missing "content" argument for write_file.';
       content = content.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-      const absolutePath = path9.resolve(process.cwd(), targetPath);
-      const parentDir = path9.dirname(absolutePath);
+      const absolutePath = path10.resolve(process.cwd(), targetPath);
+      const parentDir = path10.dirname(absolutePath);
       try {
         await RevertManager.recordFileChange(absolutePath);
         let ancestry = "";
-        if (fs10.existsSync(absolutePath)) {
+        if (fs11.existsSync(absolutePath)) {
           try {
-            const oldData = fs10.readFileSync(absolutePath, "utf8");
+            const oldData = fs11.readFileSync(absolutePath, "utf8");
             const lines = oldData.split(/\r?\n/);
             ancestry = `Old File contents:
 ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
@@ -8231,16 +8352,16 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 `;
           }
         }
-        if (!fs10.existsSync(parentDir)) {
-          fs10.mkdirSync(parentDir, { recursive: true });
+        if (!fs11.existsSync(parentDir)) {
+          fs11.mkdirSync(parentDir, { recursive: true });
         }
         const strip = (t) => t.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const processedContent = strip(content);
         const finalContent = processedContent.endsWith("\n") ? processedContent : processedContent + "\n";
         const lineCount = finalContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(finalContent, "utf8");
-        fs10.writeFileSync(absolutePath, finalContent, "utf8");
-        let verifiedContent = fs10.readFileSync(absolutePath, "utf8");
+        fs11.writeFileSync(absolutePath, finalContent, "utf8");
+        let verifiedContent = fs11.readFileSync(absolutePath, "utf8");
         const verifiedSize = Buffer.byteLength(verifiedContent, "utf8");
         const verifiedLines = verifiedContent.split(/\r?\n/);
         const verifiedLineCount = verifiedLines.length;
@@ -8275,8 +8396,8 @@ ${snippet}`;
 });
 
 // src/tools/update_file.js
-import fs11 from "fs";
-import path10 from "path";
+import fs12 from "fs";
+import path11 from "path";
 var update_file;
 var init_update_file = __esm({
   "src/tools/update_file.js"() {
@@ -8292,12 +8413,12 @@ var init_update_file = __esm({
       if (patchPairs.length === 0) {
         return "ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.";
       }
-      const absolutePath = path10.resolve(process.cwd(), targetPath);
+      const absolutePath = path11.resolve(process.cwd(), targetPath);
       try {
-        if (!fs11.existsSync(absolutePath)) {
+        if (!fs12.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
         }
-        let diskContent = context.forcedContent || fs11.readFileSync(absolutePath, "utf8");
+        let diskContent = context.forcedContent || fs12.readFileSync(absolutePath, "utf8");
         if (diskContent.startsWith("\uFEFF")) diskContent = diskContent.slice(1);
         const originalContent = diskContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const { content: finalContent, results } = applyPatches(originalContent, patchPairs);
@@ -8308,7 +8429,7 @@ var init_update_file = __esm({
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
         }
         await RevertManager.recordFileChange(absolutePath, originalContent);
-        fs11.writeFileSync(absolutePath, finalContent, "utf8");
+        fs12.writeFileSync(absolutePath, finalContent, "utf8");
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
         if (failures.length > 0) {
           return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.
@@ -8330,34 +8451,34 @@ ${diffText}`;
 });
 
 // src/tools/read_folder.js
-import fs12 from "fs";
-import path11 from "path";
+import fs13 from "fs";
+import path12 from "path";
 var read_folder;
 var init_read_folder = __esm({
   "src/tools/read_folder.js"() {
     init_arg_parser();
     read_folder = async (args) => {
       const { path: targetPath = "." } = parseArgs(args);
-      const absolutePath = path11.resolve(process.cwd(), targetPath);
+      const absolutePath = path12.resolve(process.cwd(), targetPath);
       try {
-        if (!fs12.existsSync(absolutePath)) {
+        if (!fs13.existsSync(absolutePath)) {
           return `ERROR: Path [${targetPath}] does not exist.`;
         }
-        const stats = fs12.statSync(absolutePath);
+        const stats = fs13.statSync(absolutePath);
         if (!stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
         }
-        const files = fs12.readdirSync(absolutePath);
+        const files = fs13.readdirSync(absolutePath);
         const totalItems = files.length;
         const maxDisplay = 100;
         const displayItems = files.slice(0, maxDisplay);
         const folderData = [];
         for (const file of displayItems) {
-          const fPath = path11.join(absolutePath, file);
+          const fPath = path12.join(absolutePath, file);
           let indicator = "\u{1F4C4}";
           let info = { name: file, type: "unknown", size: "N/A", mtime: "N/A" };
           try {
-            const fStats = fs12.statSync(fPath);
+            const fStats = fs13.statSync(fPath);
             info = {
               name: file,
               type: fStats.isDirectory() ? "directory" : "file",
@@ -8442,14 +8563,15 @@ var init_ask_user = __esm({
 
 // src/tools/write_pdf.js
 import puppeteer3 from "puppeteer";
-import path12 from "path";
-import fs13 from "fs-extra";
+import path13 from "path";
+import fs14 from "fs-extra";
 import { PDFDocument } from "pdf-lib";
 var write_pdf;
 var init_write_pdf = __esm({
   "src/tools/write_pdf.js"() {
     init_arg_parser();
     init_revert();
+    init_puppeteer_helper();
     write_pdf = async (args) => {
       const {
         path: targetPath,
@@ -8459,13 +8581,15 @@ var init_write_pdf = __esm({
       } = parseArgs(args);
       if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
       if (!content) return 'ERROR: Missing "content" (HTML/CSS) for write_pdf.';
-      const absolutePath = path12.resolve(process.cwd(), targetPath);
+      const absolutePath = path13.resolve(process.cwd(), targetPath);
       let browser = null;
       try {
-        await fs13.ensureDir(path12.dirname(absolutePath));
+        await fs14.ensureDir(path13.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
+        const pptrConfig = getPuppeteerConfig();
         browser = await puppeteer3.launch({
           headless: true,
+          executablePath: pptrConfig.executablePath || void 0,
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -8481,11 +8605,11 @@ var init_write_pdf = __esm({
             return null;
           }
           try {
-            const imgPath = path12.resolve(process.cwd(), originalSrc);
-            if (await fs13.pathExists(imgPath)) {
-              const ext = path12.extname(imgPath).toLowerCase().replace(".", "") || "png";
+            const imgPath = path13.resolve(process.cwd(), originalSrc);
+            if (await fs14.pathExists(imgPath)) {
+              const ext = path13.extname(imgPath).toLowerCase().replace(".", "") || "png";
               const mime = ext === "jpg" ? "jpeg" : ext === "svg" ? "svg+xml" : ext;
-              const base64 = await fs13.readFile(imgPath, "base64");
+              const base64 = await fs14.readFile(imgPath, "base64");
               return `data:image/${mime};base64,${base64}`;
             }
           } catch (e) {
@@ -8500,9 +8624,9 @@ var init_write_pdf = __esm({
           const fullTag = match[0];
           if (originalHref && fullTag.toLowerCase().includes("stylesheet") && !originalHref.startsWith("http://") && !originalHref.startsWith("https://") && !originalHref.startsWith("data:")) {
             try {
-              const cssPath = path12.resolve(process.cwd(), originalHref);
-              if (await fs13.pathExists(cssPath)) {
-                const cssContent = await fs13.readFile(cssPath, "utf-8");
+              const cssPath = path13.resolve(process.cwd(), originalHref);
+              if (await fs14.pathExists(cssPath)) {
+                const cssContent = await fs14.readFile(cssPath, "utf-8");
                 cssCache[fullTag] = `<style>${cssContent}</style>`;
               }
             } catch (e) {
@@ -8583,7 +8707,7 @@ var init_write_pdf = __esm({
           printBackground: true
         });
         const pdfDoc = await PDFDocument.load(pdfBytes);
-        const fileName = path12.basename(targetPath);
+        const fileName = path13.basename(targetPath);
         pdfDoc.setTitle(`FluxFlow_${fileName}`);
         pdfDoc.setAuthor("FluxFlow CLI");
         pdfDoc.setSubject("Generated with Agentic AI System");
@@ -8591,8 +8715,8 @@ var init_write_pdf = __esm({
         pdfDoc.setCreator("FluxFlow PDF Engine");
         pdfDoc.setProducer("FluxFlow (Generative AI)");
         const finalPdfBytes = await pdfDoc.save();
-        await fs13.writeFile(absolutePath, finalPdfBytes);
-        const stats = await fs13.stat(absolutePath);
+        await fs14.writeFile(absolutePath, finalPdfBytes);
+        const stats = await fs14.stat(absolutePath);
         return `SUCCESS: PDF generated successfully at [${targetPath}] (${(stats.size / 1024).toFixed(2)} KB).`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -8605,8 +8729,8 @@ var init_write_pdf = __esm({
 });
 
 // src/tools/write_docx.js
-import fs14 from "fs-extra";
-import path13 from "path";
+import fs15 from "fs-extra";
+import path14 from "path";
 import HTMLtoDOCX from "html-to-docx";
 var write_docx;
 var init_write_docx = __esm({
@@ -8620,11 +8744,11 @@ var init_write_docx = __esm({
       } = parseArgs(args);
       if (!targetPath) return 'ERROR: Missing "path" argument for write_docx.';
       if (!content) return 'ERROR: Missing "content" (HTML) for write_docx.';
-      const absolutePath = path13.resolve(process.cwd(), targetPath);
+      const absolutePath = path14.resolve(process.cwd(), targetPath);
       try {
-        await fs14.ensureDir(path13.dirname(absolutePath));
+        await fs15.ensureDir(path14.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
-        const fileName = path13.basename(targetPath);
+        const fileName = path14.basename(targetPath);
         const fullHtml = content.includes("<html") ? content : `
             <!DOCTYPE html>
             <html lang="en">
@@ -8645,7 +8769,7 @@ var init_write_docx = __esm({
           footer: true,
           pageNumber: true
         });
-        await fs14.writeFile(absolutePath, docxBuffer);
+        await fs15.writeFile(absolutePath, docxBuffer);
         return `SUCCESS: Word document [${targetPath}] generated successfully.
 - Size: ${(docxBuffer.length / 1024).toFixed(1)} KB`;
       } catch (err) {
@@ -8657,21 +8781,21 @@ var init_write_docx = __esm({
 });
 
 // src/tools/search_keyword.js
-import fs15 from "fs/promises";
-import path14 from "path";
+import fs16 from "fs/promises";
+import path15 from "path";
 async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
   if (depth > 12) return [];
   let results = [];
   let list;
   try {
-    list = await fs15.readdir(dir, { withFileTypes: true });
+    list = await fs16.readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   for (const file of list) {
-    const fullPath = path14.join(dir, file.name);
-    const relativePath = path14.relative(baseDir, fullPath);
-    const pathSegments = relativePath.split(path14.sep).map((s) => s.toLowerCase());
+    const fullPath = path15.join(dir, file.name);
+    const relativePath = path15.relative(baseDir, fullPath);
+    const pathSegments = relativePath.split(path15.sep).map((s) => s.toLowerCase());
     const isExcluded = excludes.some((ex) => pathSegments.includes(ex.toLowerCase()));
     if (isExcluded) continue;
     if (file.isDirectory()) {
@@ -8743,11 +8867,11 @@ var init_search_keyword = __esm({
         let filesToSearch = [];
         const rootDir = process.cwd();
         if (file) {
-          const fullPath = path14.resolve(rootDir, file);
+          const fullPath = path15.resolve(rootDir, file);
           try {
-            const stat = await fs15.stat(fullPath);
+            const stat = await fs16.stat(fullPath);
             if (stat.isFile()) {
-              filesToSearch.push({ fullPath, relativePath: path14.relative(rootDir, fullPath) });
+              filesToSearch.push({ fullPath, relativePath: path15.relative(rootDir, fullPath) });
             }
           } catch {
             return `ERROR: File not found: ${file}`;
@@ -8757,7 +8881,7 @@ var init_search_keyword = __esm({
         }
         const searchPromises = filesToSearch.map(async (fileObj) => {
           try {
-            const content = await fs15.readFile(fileObj.fullPath, "utf-8");
+            const content = await fs16.readFile(fileObj.fullPath, "utf-8");
             if (content.includes("\0")) return [];
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
@@ -8814,8 +8938,8 @@ var init_search_keyword = __esm({
 });
 
 // src/tools/generate_image.js
-import fs16 from "fs-extra";
-import path15 from "path";
+import fs17 from "fs-extra";
+import path16 from "path";
 var injectPngMetadata, generate_image;
 var init_generate_image = __esm({
   "src/tools/generate_image.js"() {
@@ -8994,12 +9118,12 @@ var init_generate_image = __esm({
           "Seed": String(seed)
         };
         finalBuffer = injectPngMetadata(finalBuffer, metadata);
-        const absolutePath = path15.resolve(process.cwd(), outputPath);
-        await fs16.ensureDir(path15.dirname(absolutePath));
+        const absolutePath = path16.resolve(process.cwd(), outputPath);
+        await fs17.ensureDir(path16.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
-        await fs16.writeFile(absolutePath, finalBuffer);
+        await fs17.writeFile(absolutePath, finalBuffer);
         await recordImageGeneration(settings);
-        const ext = path15.extname(outputPath).toLowerCase();
+        const ext = path16.extname(outputPath).toLowerCase();
         const mimeMap = {
           ".jpg": "image/jpeg",
           ".jpeg": "image/jpeg",
@@ -9114,13 +9238,13 @@ var init_addMemScore = __esm({
 });
 
 // src/utils/parsers.js
-import fs17 from "fs-extra";
-import path16 from "path";
+import fs18 from "fs-extra";
+import path17 from "path";
 import https from "https";
 async function downloadWasm(wasmFile, targetUrl = null) {
   const url = targetUrl || `https://unpkg.com/tree-sitter-wasms@0.1.13/out/${wasmFile}`;
-  const localPath = path16.join(PARSER_DIR, wasmFile);
-  await fs17.ensureDir(PARSER_DIR);
+  const localPath = path17.join(PARSER_DIR, wasmFile);
+  await fs18.ensureDir(PARSER_DIR);
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
@@ -9141,27 +9265,27 @@ async function downloadWasm(wasmFile, targetUrl = null) {
         reject(new Error(`Failed to download ${wasmFile}: HTTP ${response.statusCode}`));
         return;
       }
-      const file = fs17.createWriteStream(localPath);
+      const file = fs18.createWriteStream(localPath);
       response.pipe(file);
       file.on("finish", () => {
         file.close();
         resolve();
       });
     }).on("error", (err) => {
-      if (fs17.existsSync(localPath)) fs17.unlink(localPath, () => {
+      if (fs18.existsSync(localPath)) fs18.unlink(localPath, () => {
       });
       reject(err);
     });
   });
 }
 function isParserInstalled(wasmFile) {
-  const localPath = path16.join(PARSER_DIR, wasmFile);
-  return fs17.existsSync(localPath);
+  const localPath = path17.join(PARSER_DIR, wasmFile);
+  return fs18.existsSync(localPath);
 }
 async function deleteParser(wasmFile) {
-  const localPath = path16.join(PARSER_DIR, wasmFile);
-  if (fs17.existsSync(localPath)) {
-    await fs17.unlink(localPath);
+  const localPath = path17.join(PARSER_DIR, wasmFile);
+  if (fs18.existsSync(localPath)) {
+    await fs18.unlink(localPath);
   }
 }
 var EXTENSION_TO_WASM;
@@ -9183,9 +9307,9 @@ var init_parsers = __esm({
 });
 
 // src/tools/file_map.js
-import fs18 from "fs-extra";
-import path17 from "path";
-import { createRequire } from "module";
+import fs19 from "fs-extra";
+import path18 from "path";
+import { createRequire as createRequire2 } from "module";
 function sanitize(text, limit = 50) {
   if (!text) return "";
   const clean = text.replace(/\s+/g, " ").trim();
@@ -9309,14 +9433,14 @@ function traverse(node, depth = 0, isLast = true, prefix = "", parentName = null
   }
   return result;
 }
-var require2, TreeSitter, isParserInitialized, INTERESTING_TYPES, PASSTHROUGH_TYPES, file_map;
+var require3, TreeSitter, isParserInitialized, INTERESTING_TYPES, PASSTHROUGH_TYPES, file_map;
 var init_file_map = __esm({
   "src/tools/file_map.js"() {
     init_parsers();
     init_paths();
     init_arg_parser();
-    require2 = createRequire(import.meta.url);
-    TreeSitter = require2("web-tree-sitter");
+    require3 = createRequire2(import.meta.url);
+    TreeSitter = require3("web-tree-sitter");
     isParserInitialized = false;
     INTERESTING_TYPES = /* @__PURE__ */ new Set([
       "class_declaration",
@@ -9376,17 +9500,17 @@ var init_file_map = __esm({
       if (!filePath) {
         return 'ERROR: No file path provided. Use [tool:functions.FileMap(path="...")]';
       }
-      const absolutePath = path17.isAbsolute(filePath) ? filePath : path17.resolve(process.cwd(), filePath);
-      if (!fs18.existsSync(absolutePath)) {
+      const absolutePath = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
+      if (!fs19.existsSync(absolutePath)) {
         return `ERROR: File not found: ${filePath}`;
       }
-      const ext = path17.extname(absolutePath).slice(1).toLowerCase();
+      const ext = path18.extname(absolutePath).slice(1).toLowerCase();
       const wasmFile = EXTENSION_TO_WASM[ext];
       if (!wasmFile) {
         return `ERROR: Unsupported file extension: .${ext}`;
       }
-      const wasmPath = path17.resolve(PARSER_DIR, wasmFile);
-      if (!fs18.existsSync(wasmPath)) {
+      const wasmPath = path18.resolve(PARSER_DIR, wasmFile);
+      if (!fs19.existsSync(wasmPath)) {
         return `ERROR: Parser for .${ext} not found. Please download it in Settings > Other.`;
       }
       try {
@@ -9394,9 +9518,9 @@ var init_file_map = __esm({
         if (!isParserInitialized) {
           let tsWasmPath;
           try {
-            tsWasmPath = path17.join(path17.dirname(require2.resolve("web-tree-sitter")), "tree-sitter.wasm");
+            tsWasmPath = path18.join(path18.dirname(require3.resolve("web-tree-sitter")), "tree-sitter.wasm");
           } catch (e) {
-            tsWasmPath = path17.join(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm");
+            tsWasmPath = path18.join(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm");
           }
           await Parser.init({
             locateFile: (p) => {
@@ -9411,7 +9535,7 @@ var init_file_map = __esm({
         const parser = new Parser();
         const Lang = await TreeSitter.Language.load(wasmPath);
         parser.setLanguage(Lang);
-        const sourceCode = await fs18.readFile(absolutePath, "utf8");
+        const sourceCode = await fs19.readFile(absolutePath, "utf8");
         const lines = sourceCode.split("\n").length;
         let maxDepth = 12;
         if (lines > 1e4) maxDepth = 2;
@@ -9434,8 +9558,8 @@ Stack: ${err.stack}` : "";
 });
 
 // src/tools/todo.js
-import fs19 from "fs";
-import path18 from "path";
+import fs20 from "fs";
+import path19 from "path";
 var todo;
 var init_todo = __esm({
   "src/tools/todo.js"() {
@@ -9446,8 +9570,8 @@ var init_todo = __esm({
       const { method, tasks, markDone } = parseArgs(args);
       const chatId = context.chatId || "default";
       if (!method) return 'ERROR: Missing "method" argument for todo tool (create/append/get).';
-      const todoDir = path18.join(DATA_DIR, "plan", chatId);
-      const todoFile = path18.join(todoDir, "todo.md");
+      const todoDir = path19.join(DATA_DIR, "plan", chatId);
+      const todoFile = path19.join(todoDir, "todo.md");
       const parseMessyArray = (input) => {
         if (!input || Array.isArray(input)) return input;
         const trimmed = String(input).trim();
@@ -9507,8 +9631,8 @@ var init_todo = __esm({
         };
       };
       try {
-        if (!fs19.existsSync(todoDir)) {
-          fs19.mkdirSync(todoDir, { recursive: true });
+        if (!fs20.existsSync(todoDir)) {
+          fs20.mkdirSync(todoDir, { recursive: true });
         }
         if (method === "create") {
           if (!tasks) return 'ERROR: Missing "tasks" for create method.';
@@ -9520,7 +9644,7 @@ var init_todo = __esm({
             markedCount = result.markedCount;
           }
           await RevertManager.recordFileChange(todoFile);
-          fs19.writeFileSync(todoFile, content, "utf8");
+          fs20.writeFileSync(todoFile, content, "utf8");
           const total = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           if (markedCount > 0) {
             const completed = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -9534,8 +9658,8 @@ ${content}`;
           if (!tasks) return 'ERROR: Missing "tasks" for append method.';
           const appendContent = getTasksString(tasks);
           await RevertManager.recordFileChange(todoFile);
-          fs19.appendFileSync(todoFile, appendContent, "utf8");
-          const fullContent = fs19.readFileSync(todoFile, "utf8");
+          fs20.appendFileSync(todoFile, appendContent, "utf8");
+          const fullContent = fs20.readFileSync(todoFile, "utf8");
           const lines = fullContent.split(/\r?\n/).map((l) => l.trim());
           const total = lines.filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           const completed = lines.filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -9544,10 +9668,10 @@ ${content}`;
 ${fullContent}`;
         }
         if (method === "get") {
-          if (!fs19.existsSync(todoFile)) {
+          if (!fs20.existsSync(todoFile)) {
             return "TODO GET: No task list found for this session.";
           }
-          let content = fs19.readFileSync(todoFile, "utf8");
+          let content = fs20.readFileSync(todoFile, "utf8");
           let markedCount = 0;
           if (markDone) {
             const result = applyMarkDone(content, markDone);
@@ -9555,7 +9679,7 @@ ${fullContent}`;
               content = result.content;
               markedCount = result.markedCount;
               await RevertManager.recordFileChange(todoFile);
-              fs19.writeFileSync(todoFile, content, "utf8");
+              fs20.writeFileSync(todoFile, content, "utf8");
             }
           }
           const totalLines = content.split(/\r?\n/).map((l) => l.trim());
@@ -10153,8 +10277,8 @@ __export(ai_exports, {
   signalTermination: () => signalTermination
 });
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
-import path19 from "path";
-import fs20 from "fs";
+import path20 from "path";
+import fs21 from "fs";
 var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
@@ -10779,7 +10903,7 @@ var init_ai = __esm({
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-        return filePath ? path19.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
+        return filePath ? path20.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
       } catch (e) {
         return null;
       }
@@ -11020,9 +11144,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             }
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
-          const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-          if (!fs20.existsSync(janitorErrDir)) fs20.mkdirSync(janitorErrDir, { recursive: true });
-          fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          const janitorErrDir = path20.join(LOGS_DIR, "janitor");
+          if (!fs21.existsSync(janitorErrDir)) fs21.mkdirSync(janitorErrDir, { recursive: true });
+          fs21.appendFileSync(path20.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -11031,8 +11155,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }
       }
       if (attempts) {
-        const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-        fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        const janitorErrDir = path20.join(LOGS_DIR, "janitor");
+        fs21.appendFileSync(path20.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
         if (attempts >= MAX_JANITOR_RETRIES) {
@@ -11512,10 +11636,10 @@ ${newMemoryListStr}
           }
         })() : String(err);
         ;
-        const janitorLogDir = path19.join(LOGS_DIR, "janitor");
-        if (!fs20.existsSync(janitorLogDir)) fs20.mkdirSync(janitorLogDir, { recursive: true });
-        fs20.appendFileSync(
-          path19.join(janitorLogDir, "error.log"),
+        const janitorLogDir = path20.join(LOGS_DIR, "janitor");
+        if (!fs21.existsSync(janitorLogDir)) fs21.mkdirSync(janitorLogDir, { recursive: true });
+        fs21.appendFileSync(
+          path20.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
         );
@@ -11523,7 +11647,7 @@ ${newMemoryListStr}
     };
     compressHistory = async (settings, history, isAuto = false) => {
       const { chatId, aiProvider = "Google" } = settings;
-      const summariesFile = path19.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
       const flattenContext = (hist) => {
         return hist.filter(
           (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
@@ -11597,8 +11721,8 @@ Provide a consolidated summary of the entire session.`;
     };
     deleteChatSummary = (chatId) => {
       try {
-        const summariesFile = path19.join(SECRET_DIR, "chat-summaries.json");
-        if (fs20.existsSync(summariesFile)) {
+        const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
+        if (fs21.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -11614,7 +11738,7 @@ Provide a consolidated summary of the entire session.`;
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
       const originalText = history[history.length - 1].text;
-      const summariesFile = path19.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
       let wasCompressedInStream = false;
       const isFirstPrompt = history.filter((m) => m.role === "user").length === 1;
       const hasTitleSignal = originalText.includes("[TITLE-UPDATE]");
@@ -11850,7 +11974,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs20.readdirSync(dir, { withFileTypes: true });
+            return fs21.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -11863,16 +11987,16 @@ Provide a consolidated summary of the entire session.`;
             if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
             if (entry.isDirectory()) {
               currentCount.value++;
-              countFolders(path19.join(dir, entry.name), currentCount, depth + 1);
+              countFolders(path20.join(dir, entry.name), currentCount, depth + 1);
             }
           }
           return currentCount.value;
         };
         const getDirTree = (dir, maxDepth, prefix = "", depth = 1) => {
           const entries = safeReaddirWithTypes(dir);
-          const sep = path19.sep;
+          const sep = path20.sep;
           if (entries.length > 100) {
-            return `${prefix}\u2514\u2500\u2500 ${path19.basename(dir)}${sep} ...100+ files...
+            return `${prefix}\u2514\u2500\u2500 ${path20.basename(dir)}${sep} ...100+ files...
 `;
           }
           let result = "";
@@ -11890,7 +12014,7 @@ Provide a consolidated summary of the entire session.`;
           ];
           finalItems.forEach((item, index) => {
             const isLast = index === finalItems.length - 1;
-            const filePath = path19.join(dir, item.name);
+            const filePath = path20.join(dir, item.name);
             const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
             const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
             if (item.isCollapsed) {
@@ -11976,10 +12100,10 @@ ${currentSummary}
         if (isBridgeConnected()) {
           ideBlock = "[IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
-            const relFocused = path19.relative(process.cwd(), ideCtx.file_focused);
+            const relFocused = path20.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
-              const rel = path19.relative(process.cwd(), p);
-              return rel.startsWith("..") ? `[External] ${path19.basename(p)}` : rel;
+              const rel = path20.relative(process.cwd(), p);
+              return rel.startsWith("..") ? `[External] ${path20.basename(p)}` : rel;
             });
             ideBlock += `Focused File: ${relFocused}
 Cursor Line: ${ideCtx.cursor_line}
@@ -12021,7 +12145,7 @@ Cursor Line: ${ideCtx.cursor_line}
               }
               const getSumForLimit = (limit, activeFiles2) => {
                 return activeFiles2.reduce((sum, f) => {
-                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path19.resolve(process.cwd(), f.path) === path19.resolve(ideCtx.file_focused));
+                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path20.resolve(process.cwd(), f.path) === path20.resolve(ideCtx.file_focused));
                   const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
                   return sum + Math.min(f.edits.length, fileLimit);
                 }, 0);
@@ -12055,7 +12179,7 @@ Cursor Line: ${ideCtx.cursor_line}
                 }
               }
               for (const file of activeFiles) {
-                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path19.resolve(process.cwd(), file.path) === path19.resolve(ideCtx.file_focused));
+                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path20.resolve(process.cwd(), file.path) === path20.resolve(ideCtx.file_focused));
                 const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
                 if (file.edits.length > fileLimit) {
                   file.edits = file.edits.slice(-fileLimit);
@@ -12139,9 +12263,9 @@ ${ideCtx.warnings}
               endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
               filePath = tagClean.slice(0, matchRange.index);
             }
-            const absPath = path19.resolve(process.cwd(), filePath);
-            if (fs20.existsSync(absPath)) {
-              const stats = fs20.statSync(absPath);
+            const absPath = path20.resolve(process.cwd(), filePath);
+            if (fs21.existsSync(absPath)) {
+              const stats = fs21.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -12150,7 +12274,7 @@ ${ideCtx.warnings}
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
                 const isSupported = aiProvider === "Google" || MULTIMODAL_MODELS.includes(modelName);
                 if (isMultimodalFile && !isSupported) {
-                  const label = `\u2718 Unsupported Modality: ${path19.basename(filePath)}`;
+                  const label = `\u2718 Unsupported Modality: ${path20.basename(filePath)}`;
                   let terminalWidth = 115;
                   if (process.stdout.isTTY) {
                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -12203,7 +12327,7 @@ ${boxMid}
                   } else {
                     let totalLines = "...";
                     try {
-                      const content = fs20.readFileSync(absPath, "utf8");
+                      const content = fs21.readFileSync(absPath, "utf8");
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
@@ -12847,7 +12971,7 @@ ${ideErr} [/ERROR]`;
                       if (keyword) {
                         detail = keyword.replace(/["']/g, "");
                       } else if (filePath) {
-                        detail = path19.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
+                        detail = path20.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
                         detail = title.replace(/["']/g, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
@@ -12876,7 +13000,7 @@ ${ideErr} [/ERROR]`;
                           if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
                             detail = val.substring(0, 30);
                           } else {
-                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path19.basename(val.replace(/\\/g, "/"));
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path20.basename(val.replace(/\\/g, "/"));
                           }
                         }
                       }
@@ -13060,9 +13184,9 @@ ${ideErr} [/ERROR]`;
                       let totalLines = "...";
                       let actualEndLine = eLine;
                       try {
-                        const absPath = path19.resolve(process.cwd(), targetPath2);
-                        if (fs20.existsSync(absPath)) {
-                          const content = fs20.readFileSync(absPath, "utf8");
+                        const absPath = path20.resolve(process.cwd(), targetPath2);
+                        if (fs21.existsSync(absPath)) {
+                          const content = fs21.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           actualEndLine = Math.min(eLine, lines);
@@ -13082,8 +13206,8 @@ ${ideErr} [/ERROR]`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path21 = parseArgs(toolCall.args).path;
-                      label = `\u2714  ${action}: ${path21 === "." ? "./" : path21}`;
+                      const path22 = parseArgs(toolCall.args).path;
+                      label = `\u2714  ${action}: ${path22 === "." ? "./" : path22}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
@@ -13136,7 +13260,7 @@ ${ideErr} [/ERROR]`;
                       const { command } = parseArgs(toolCall.args);
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
-                        const currentDrive = path19.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                        const currentDrive = path20.resolve(process.cwd()).substring(0, 3).toLowerCase();
                         const splitCommands = (cmdString) => {
                           const commands = [];
                           let current = "";
@@ -13265,8 +13389,8 @@ ${ideErr} [/ERROR]`;
                     const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
                     if (targetPath) {
                       const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                      const absoluteTarget = path19.resolve(targetPath);
-                      const absoluteCwd = path19.resolve(process.cwd());
+                      const absoluteTarget = path20.resolve(targetPath);
+                      const absoluteCwd = path20.resolve(process.cwd());
                       if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                         if (normToolName === "write_file" || normToolName === "update_file") {
@@ -13455,7 +13579,7 @@ ${boxMid}`) };
                               const toolArgs = parseArgs(toolCall.args);
                               const { path: filePath } = toolArgs;
                               if (filePath) {
-                                const absPath = path19.resolve(process.cwd(), filePath);
+                                const absPath = path20.resolve(process.cwd(), filePath);
                                 const normalize = (p) => p ? p.toLowerCase().replace(/\\/g, "/").replace(/^[a-z]:/, (m) => m.toUpperCase()) : "";
                                 const normAbsPath = normalize(absPath);
                                 let originalContent = "";
@@ -13465,8 +13589,8 @@ ${boxMid}`) };
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs20.existsSync(absPath)) {
-                                  originalContent = fs20.readFileSync(absPath, "utf8");
+                                } else if (fs21.existsSync(absPath)) {
+                                  originalContent = fs21.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -13493,9 +13617,9 @@ ${boxMid}`) };
                                     const successes = patchResults.filter((r) => r.success);
                                     const failures = patchResults.filter((r) => !r.success);
                                     if (successes.length === 0) {
-                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path19.basename(absPath)}].
+                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path20.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path19.basename(absPath)}`.toUpperCase();
+                                      const errorLabel = `\u2714  Edited: ${path20.basename(absPath)}`.toUpperCase();
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -13513,19 +13637,19 @@ ${boxMid}}`) };
                                       continue;
                                     }
                                   }
-                                  yield { type: "status", content: `Opening Diff in IDE: ${path19.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening Diff in IDE: ${path20.basename(absPath)}...` };
                                   showDiffInIDE(absPath, originalContent, modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs20.existsSync(absPath)) {
+                                  if (!fs21.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs20.mkdirSync(path19.dirname(absPath), { recursive: true });
-                                    fs20.writeFileSync(absPath, "", "utf8");
+                                    fs21.mkdirSync(path20.dirname(absPath), { recursive: true });
+                                    fs21.writeFileSync(absPath, "", "utf8");
                                   }
-                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path19.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path20.basename(absPath)}...` };
                                   showDiffInIDE(absPath, "", modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -13561,11 +13685,11 @@ ${boxMid}}`) };
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const { path: filePath } = parseArgs(toolCall.args);
                             if (filePath) {
-                              const absPath = path19.resolve(process.cwd(), filePath);
+                              const absPath = path20.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs20.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs21.existsSync(absPath)) {
                                 try {
-                                  fs20.unlinkSync(absPath);
+                                  fs21.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -13577,13 +13701,13 @@ ${boxMid}}`) };
                         }
                         if (approval === "allow" && diffOpened && isBridgeConnected()) {
                           const { path: filePath } = parseArgs(toolCall.args);
-                          const absPath = path19.resolve(process.cwd(), filePath);
+                          const absPath = path20.resolve(process.cwd(), filePath);
                           const finalIDE = await getIDEContext();
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs20.existsSync(absPath)) {
-                            finalContent = fs20.readFileSync(absPath, "utf8");
+                          } else if (fs21.existsSync(absPath)) {
+                            finalContent = fs21.readFileSync(absPath, "utf8");
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -13746,7 +13870,7 @@ ${boxBottom}`}`) };
                       try {
                         const { path: filePath } = parseArgs(toolCall.args);
                         if (filePath) {
-                          const absPath = path19.resolve(process.cwd(), filePath);
+                          const absPath = path20.resolve(process.cwd(), filePath);
                           const currentIDE = await getIDEContext();
                           if (currentIDE && currentIDE.file_focused === absPath && currentIDE.full_content) {
                             execToolContext.forcedContent = currentIDE.full_content;
@@ -13760,7 +13884,7 @@ ${boxBottom}`}`) };
                     if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
-                        const absPath = path19.resolve(process.cwd(), filePath);
+                        const absPath = path20.resolve(process.cwd(), filePath);
                         openFileInEditor(absPath);
                       }
                     }
@@ -14004,9 +14128,9 @@ ${colorMainWords(output)}` };
               })() : String(err);
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
-              const agentErrDir = path19.join(LOGS_DIR, "agent");
-              if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
-              fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              const agentErrDir = path20.join(LOGS_DIR, "agent");
+              if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
+              fs21.appendFileSync(path20.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14053,7 +14177,7 @@ ${recoveryText}`
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
                   throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)
-Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               } else {
                 if (retryCount <= MAX_RETRIES) {
@@ -14071,7 +14195,7 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
                   yield { type: "status", content: `Trying to reach ${modelName}...` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
-Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               }
             }
@@ -14174,10 +14298,10 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
           }
         })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
-        const agentErrDir = path19.join(LOGS_DIR, "agent");
+        const agentErrDir = path20.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
-        if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
-        fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
+        if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
+        fs21.appendFileSync(path20.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14299,11 +14423,11 @@ ${cleanResponse}
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
             label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path21 = parseArgs(toolCall.args).path || "...";
-            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path21}`;
+            const path22 = parseArgs(toolCall.args).path || "...";
+            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path22}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path21 = parseArgs(toolCall.args).path || "...";
-            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path21}`;
+            const path22 = parseArgs(toolCall.args).path || "...";
+            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path22}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
             label = `\u2714 \x1B[95mIndexed\x1B[0m`;
           } else if (normalizedToolName === "await") {
@@ -15169,7 +15293,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs21 from "fs";
+import fs22 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -15177,7 +15301,7 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs21.existsSync(exePath);
+        const exists = exePath && fs22.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -15207,13 +15331,13 @@ var app_exports = {};
 __export(app_exports, {
   default: () => App
 });
-import os4 from "os";
+import os5 from "os";
 import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs22 from "fs-extra";
-import path20 from "path";
+import fs23 from "fs-extra";
+import path21 from "path";
 import { exec as exec2 } from "child_process";
-import { fileURLToPath } from "url";
+import { fileURLToPath as fileURLToPath2 } from "url";
 import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
@@ -15456,10 +15580,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs22.ensureDir(path20.dirname(kbPath));
+      await fs23.ensureDir(path21.dirname(kbPath));
       let bindings = [];
-      if (fs22.existsSync(kbPath)) {
-        const content = fs22.readFileSync(kbPath, "utf8").trim();
+      if (fs23.existsSync(kbPath)) {
+        const content = fs23.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -15479,7 +15603,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs22.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs23.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -15727,7 +15851,7 @@ function App({ args = [] }) {
   useEffect11(() => setEscPressCount(0), [input]);
   const [messages, rawSetMessages] = useState14(() => {
     const logoMsg = { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true };
-    const isHomeDir = process.cwd() === os4.homedir();
+    const isHomeDir = process.cwd() === os5.homedir();
     const isSystemDir = (() => {
       const cwd = process.cwd().toLowerCase();
       if (process.platform === "win32") {
@@ -15754,7 +15878,7 @@ function App({ args = [] }) {
         id: "home-warning",
         role: "system",
         text: `[SECURITY ALERT] HOME DIRECTORY DETECTED`,
-        subText: `You are currently in ${os4.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
+        subText: `You are currently in ${os5.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
         isHomeWarning: true
       });
     }
@@ -16155,7 +16279,7 @@ function App({ args = [] }) {
   useEffect11(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs22.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs23.readFileSync(path21.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -16278,7 +16402,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
+        fs23.remove(path21.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -16312,9 +16436,9 @@ function App({ args = [] }) {
         }
       }
       if (parsedArgs.playground) {
-        const playgroundDir = path20.join(DATA_DIR, "playground");
+        const playgroundDir = path21.join(DATA_DIR, "playground");
         try {
-          fs22.ensureDirSync(playgroundDir);
+          fs23.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -16355,8 +16479,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs22.existsSync(kbPath)) {
-              const content = fs22.readFileSync(kbPath, "utf8").trim();
+            if (fs23.existsSync(kbPath)) {
+              const content = fs23.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -16889,22 +17013,22 @@ ${cleanText}`, color: "magenta" }];
             });
             break;
           }
-          const src = path20.join(DATA_DIR, "playground");
-          const dest = path20.join(parsedArgs.originalCwd, "playground-export");
+          const src = path21.join(DATA_DIR, "playground");
+          const dest = path21.join(parsedArgs.originalCwd, "playground-export");
           const moveFiles = async () => {
             try {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs22.ensureDir(dest);
+              await fs23.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs22.copy(src, dest, {
+              await fs23.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
-                  const relative = path20.relative(src, srcPath);
+                  const relative = path21.relative(src, srcPath);
                   if (!relative) return true;
-                  const parts2 = relative.split(path20.sep);
+                  const parts2 = relative.split(path21.sep);
                   return !parts2.some((part) => excludeDirs.includes(part));
                 }
               });
@@ -16964,7 +17088,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs22.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
+              fs23.emptyDir(path21.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -17261,7 +17385,7 @@ ${cleanText}`, color: "magenta" }];
         }
         case "/export": {
           const exportFile = `export-fluxflow-${chatId}.txt`;
-          const exportPath = path20.join(process.cwd(), exportFile);
+          const exportPath = path21.join(process.cwd(), exportFile);
           const exportLines = [];
           let insideAgentBlock = false;
           for (let i = 0; i < messages.length; i++) {
@@ -17313,7 +17437,7 @@ ${cleanText}`, color: "magenta" }];
           }
           const fileContent = exportLines.join("\n");
           try {
-            fs22.writeFileSync(exportPath, fileContent, "utf8");
+            fs23.writeFileSync(exportPath, fileContent, "utf8");
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
               return [...prev, {
@@ -17360,12 +17484,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs22.existsSync(LOGS_DIR)) fs22.removeSync(LOGS_DIR);
-              if (fs22.existsSync(SECRET_DIR)) fs22.removeSync(SECRET_DIR);
-              if (fs22.existsSync(SETTINGS_FILE)) fs22.removeSync(SETTINGS_FILE);
+              if (fs23.existsSync(LOGS_DIR)) fs23.removeSync(LOGS_DIR);
+              if (fs23.existsSync(SECRET_DIR)) fs23.removeSync(SECRET_DIR);
+              if (fs23.existsSync(SETTINGS_FILE)) fs23.removeSync(SETTINGS_FILE);
               try {
-                const items = fs22.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs22.removeSync(FLUXFLOW_DIR);
+                const items = fs23.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs23.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -17487,15 +17611,15 @@ ${list || "No saved chats found."}`, isMeta: true }];
 # SKILLS & WORKFLOWS
 - [Define custom step-by-step recipes for this project here]
 `;
-            const filePath = path20.join(process.cwd(), "FluxFlow.md");
-            if (fs22.pathExistsSync(filePath)) {
+            const filePath = path21.join(process.cwd(), "FluxFlow.md");
+            if (fs23.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs22.writeFileSync(filePath, template);
+                fs23.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -19534,15 +19658,15 @@ var init_app = __esm({
     };
     getKeybindingsPath = (ideName) => {
       const dirName = getIDEDirName(ideName);
-      const home = os4.homedir();
+      const home = os5.homedir();
       if (process.platform === "win32") {
         const appData = process.env.APPDATA;
         if (!appData) return null;
-        return path20.join(appData, dirName, "User", "keybindings.json");
+        return path21.join(appData, dirName, "User", "keybindings.json");
       } else if (process.platform === "darwin") {
-        return path20.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
+        return path21.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
       } else {
-        return path20.join(home, ".config", dirName, "User", "keybindings.json");
+        return path21.join(home, ".config", dirName, "User", "keybindings.json");
       }
     };
     parseJsonc = (content) => {
@@ -19588,8 +19712,8 @@ var init_app = __esm({
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
     linesAdded = 0;
     linesRemoved = 0;
-    packageJsonPath = path20.join(path20.dirname(fileURLToPath(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs22.readFileSync(packageJsonPath, "utf8"));
+    packageJsonPath = path21.join(path21.dirname(fileURLToPath2(import.meta.url)), "../package.json");
+    packageJson = JSON.parse(fs23.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React15.createElement(
@@ -19685,19 +19809,19 @@ var init_app = __esm({
         const fileList = [];
         const scan = (currentDir) => {
           try {
-            const files = fs22.readdirSync(currentDir);
+            const files = fs23.readdirSync(currentDir);
             for (const file of files) {
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
-              const filePath = path20.join(currentDir, file);
-              const stat = fs22.statSync(filePath);
+              const filePath = path21.join(currentDir, file);
+              const stat = fs23.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
                 fileList.push({
                   name: file,
-                  relativePath: path20.relative(process.cwd(), filePath)
+                  relativePath: path21.relative(process.cwd(), filePath)
                 });
               }
             }
@@ -19781,9 +19905,9 @@ var init_app = __esm({
 
 // src/cli.jsx
 import { spawn as spawn3 } from "child_process";
-import { fileURLToPath as fileURLToPath2 } from "url";
-import os5 from "os";
-var totalSystemRamBytes = os5.totalmem();
+import { fileURLToPath as fileURLToPath3 } from "url";
+import os6 from "os";
+var totalSystemRamBytes = os6.totalmem();
 var totalSystemRamMB = totalSystemRamBytes / (1024 * 1024);
 var SAFETY_MARGIN = 0.5;
 var calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
@@ -19798,7 +19922,7 @@ if (!isNaN(_allocValue) && _allocValue < 64) {
 }
 var _maxAllowed = Math.floor(totalSystemRamMB * 0.75);
 var HEAP_LIMIT = !isNaN(_allocValue) && _allocValue > 0 ? Math.min(_allocValue, _maxAllowed) : Math.max(1536, Math.min(32768, calculatedLimit));
-var isBundled = fileURLToPath2(import.meta.url).endsWith(".js");
+var isBundled = fileURLToPath3(import.meta.url).endsWith(".js");
 if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-size"))) {
   if (!Number.isNaN(_allocValue)) {
     console.log(`
@@ -19809,7 +19933,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
     `--max-old-space-size=${HEAP_LIMIT}`,
     `--expose-gc`,
     `--max-semi-space-size=1`,
-    fileURLToPath2(import.meta.url),
+    fileURLToPath3(import.meta.url),
     ...process.argv.slice(2)
   ], { stdio: "inherit" });
   cp.on("exit", (code) => process.exit(code || 0));
@@ -19820,11 +19944,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isVersion = args.includes("--version") || args.includes("-v");
   const isUpdate = args[0] === "--update";
   if (isVersion || isHelp || isHelpCommands || isUpdate) {
-    const fs23 = await import("fs");
-    const path21 = await import("path");
-    const { fileURLToPath: fileURLToPath3 } = await import("url");
-    const packageJsonPath2 = path21.join(path21.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs23.readFileSync(packageJsonPath2, "utf8"));
+    const fs24 = await import("fs");
+    const path22 = await import("path");
+    const { fileURLToPath: fileURLToPath4 } = await import("url");
+    const packageJsonPath2 = path22.join(path22.dirname(fileURLToPath4(import.meta.url)), "../package.json");
+    const packageJson2 = JSON.parse(fs24.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isVersion) {
       console.log(`v${versionFluxflow2}`);

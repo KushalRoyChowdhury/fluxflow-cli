@@ -4,6 +4,7 @@ import fs from 'fs-extra';
 import { PDFDocument } from 'pdf-lib';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
+import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
 
 /**
  * Write PDF Tool (Stable Puppeteer Version)
@@ -31,8 +32,10 @@ export const write_pdf = async (args) => {
         await RevertManager.recordFileChange(absolutePath);
 
         // Launch the bundled Chromium
+        const pptrConfig = getPuppeteerConfig();
         browser = await puppeteer.launch({
             headless: true,
+            executablePath: pptrConfig.executablePath || undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',

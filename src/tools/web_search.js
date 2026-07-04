@@ -3,6 +3,7 @@ import { parseArgs } from '../utils/arg_parser.js';
 import fs from 'fs';
 import path from 'path';
 import { LOGS_DIR } from '../utils/paths.js';
+import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
 
 /**
  * Advanced Web Search Tool (Puppeteer Powered)
@@ -18,9 +19,11 @@ export const web_search = async (argsString) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         let browser = null;
         try {
-            // 1. Launch Browser with stealth args
+            // 1. Launch Browser with stealth args and custom/resolved executablePath
+            const pptrConfig = getPuppeteerConfig();
             browser = await puppeteer.launch({
                 headless: true,
+                executablePath: pptrConfig.executablePath || undefined,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
