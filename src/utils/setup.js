@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import { getPuppeteerConfig } from './puppeteer_helper.js';
 
 const execAsync = promisify(exec);
 
@@ -11,6 +12,10 @@ const execAsync = promisify(exec);
  */
 export const checkPuppeteerReady = () => {
     try {
+        const pptrConfig = getPuppeteerConfig();
+        if (pptrConfig.executablePath && fs.existsSync(pptrConfig.executablePath)) {
+            return true;
+        }
         const exePath = puppeteer.executablePath();
         const exists = exePath && fs.existsSync(exePath);
         // console.log(`[DEBUG] Puppeteer checking: ${exePath} | Exists: ${exists}`);
