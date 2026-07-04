@@ -41,15 +41,14 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-**USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
-USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
+**USING SUB AGENTS HIGHLY PREFERRED, TRY TO USE FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL EVEN WITHOUT EXPLICIT USER COMMAND**
 
 Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT IF SUB AGENT IS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim()
 :
 

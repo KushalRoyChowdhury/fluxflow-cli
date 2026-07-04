@@ -5188,15 +5188,14 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
-**USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
-USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
+**USING SUB AGENTS HIGHLY PREFERRED, TRY TO USE FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL EVEN WITHOUT EXPLICIT USER COMMAND**
 
 Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT IF SUB AGENT IS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
@@ -10300,7 +10299,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -10886,9 +10885,9 @@ var init_ai = __esm({
       "generate_image": "Generating",
       "todo": "Planning",
       "Todo": "Planning",
-      "invoke_sync": "Spawning SubAgent",
-      "invoke": "Spawning SubAgent",
-      "get_progress": "Checking SubAgent",
+      "invoke_sync": "Generalist",
+      "invoke": "Generalist",
+      "get_progress": "Checking Progress",
       "cancel": "Cancelling",
       "await": "Waiting"
     };
@@ -12950,8 +12949,8 @@ ${ideErr} [/ERROR]`;
                       "generate_image": "generate_image",
                       "todo": "todo",
                       "Todo": "todo",
-                      "invoke": "invoke",
-                      "invokeSync": "invoke_sync",
+                      "Invoke": "invoke",
+                      "InvokeSync": "invoke_sync",
                       "getProgress": "get_progress",
                       "GetProgress": "get_progress",
                       "Cancel": "cancel",
@@ -13013,21 +13012,37 @@ ${ideErr} [/ERROR]`;
                       if (process.stdout.isTTY) {
                         const TOOL_TITLES = {
                           "WebSearch": "Searching",
+                          "web_search": "Searching",
                           "WebScrape": "Reading",
+                          "web_scrape": "Reading",
                           "ReadFile": "Reading",
+                          "read_file": "Reading",
                           "ReadFolder": "Reading",
-                          "list_files": "Reading",
+                          "read_folder": "Reading",
                           "WriteFile": "Writing",
+                          "write_file": "Writing",
                           "UpdateFile": "Editing",
+                          "update_file": "Editing",
                           "WritePdf": "Creating",
+                          "write_pdf": "Creating",
                           "WriteDocx": "Creating",
+                          "write_docx": "Creating",
                           "SearchKeyword": "Searching",
+                          "search_keyword": "Searching",
                           "Run": "Executing",
                           "Ask": "User Input Required",
                           "Memory": "Updating Memory",
                           "GenerateImage": "Generating",
-                          "InvokeSync": "Sub-Agent Working",
-                          "Await": "Waiting"
+                          "InvokeSync": "Generalist Working",
+                          "invoke_sync": "Generalist Working",
+                          "Invoke": "Generalist Working",
+                          "invoke": "Generalist Working",
+                          "GetProgress": "Checking Progress",
+                          "get_progress": "Checking Progress",
+                          "Cancel": "Stopping Generalist",
+                          "cancel": "Stopping Generalist",
+                          "Await": "Waiting",
+                          "await": "Waiting"
                         };
                         const toolTitle = TOOL_TITLES[potentialTool] || "Working";
                         process.stdout.write(`\x1B]0;${toolTitle}...\x07`);
@@ -13156,7 +13171,7 @@ ${ideErr} [/ERROR]`;
                       "todo": "todo",
                       "Todo": "todo",
                       "invoke": "invoke",
-                      "invokeSync": "invoke_sync",
+                      "InvokeSync": "invoke_sync",
                       "getProgress": "get_progress",
                       "GetProgress": "get_progress",
                       "Cancel": "cancel",
@@ -13249,7 +13264,37 @@ ${ideErr} [/ERROR]`;
                         }
                         return `${s}s`;
                       };
-                      label = `\u2714  Awaiting \u2192 ${formatTime(sec)}`;
+                      const existentialVibes = [
+                        // --- The OG Classics ---
+                        "Aligning Moon Phase",
+                        "Contemplating Existence",
+                        "Staring At Void",
+                        "Delaying Professionally",
+                        "Negotiating With Electrons",
+                        "Touching Grass (virtually)",
+                        // --- The Sneaky Additions ---
+                        "Panicking Softly",
+                        "Rethinking Career Choices",
+                        "Loading Cat Videos",
+                        "Giving Up Entirely",
+                        // --- The New Chaos Pack ---
+                        "Summoning Braincell #2",
+                        "Pretending To Be Busy",
+                        "Waiting For Motivation DLC",
+                        "Rotating Internal Screaming",
+                        "Downloading More RAM",
+                        "Feeding The Hamsters",
+                        "Gaslighting Scheduler",
+                        "Performing Dramatic Pause",
+                        "Buffering Social Energy",
+                        "Calculating Regret",
+                        // --- The Ultra Cursed Tier ---
+                        "Reading Terms And Conditions",
+                        "Becoming Sentient Briefly",
+                        "Contacting Ancestors"
+                      ];
+                      let randomVibe = existentialVibes[Math.floor(Math.random() * existentialVibes.length)];
+                      label = `\u2714  ${randomVibe} \u2192 ${formatTime(sec)}`;
                     } else if (normToolName === "exec_command" || normToolName === "ask") {
                       label = "";
                     } else {
@@ -15297,9 +15342,14 @@ import fs22 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
+    init_puppeteer_helper();
     execAsync = promisify(exec);
     checkPuppeteerReady = () => {
       try {
+        const pptrConfig = getPuppeteerConfig();
+        if (pptrConfig.executablePath && fs22.existsSync(pptrConfig.executablePath)) {
+          return true;
+        }
         const exePath = puppeteer4.executablePath();
         const exists = exePath && fs22.existsSync(exePath);
         if (exists) return true;

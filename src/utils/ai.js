@@ -24,7 +24,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -691,9 +691,9 @@ const TOOL_LABELS = {
     'generate_image': 'Generating',
     'todo': 'Planning',
     'Todo': 'Planning',
-    'invoke_sync': 'Spawning SubAgent',
-    'invoke': 'Spawning SubAgent',
-    'get_progress': 'Checking SubAgent',
+    'invoke_sync': 'Generalist',
+    'invoke': 'Generalist',
+    'get_progress': 'Checking Progress',
     'cancel': 'Cancelling',
     'await': 'Waiting'
 };
@@ -2971,7 +2971,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'await': 'await', 'Await': 'await'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
@@ -3035,21 +3035,37 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (process.stdout.isTTY) {
                                         const TOOL_TITLES = {
                                             'WebSearch': 'Searching',
+                                            'web_search': 'Searching',
                                             'WebScrape': 'Reading',
+                                            'web_scrape': 'Reading',
                                             'ReadFile': 'Reading',
+                                            'read_file': 'Reading',
                                             'ReadFolder': 'Reading',
-                                            'list_files': 'Reading',
+                                            'read_folder': 'Reading',
                                             'WriteFile': 'Writing',
+                                            'write_file': 'Writing',
                                             'UpdateFile': 'Editing',
+                                            'update_file': 'Editing',
                                             'WritePdf': 'Creating',
+                                            'write_pdf': 'Creating',
                                             'WriteDocx': 'Creating',
+                                            'write_docx': 'Creating',
                                             'SearchKeyword': 'Searching',
+                                            'search_keyword': 'Searching',
                                             'Run': 'Executing',
                                             'Ask': 'User Input Required',
                                             'Memory': 'Updating Memory',
                                             'GenerateImage': 'Generating',
-                                            'InvokeSync': 'Sub-Agent Working',
-                                            'Await': 'Waiting'
+                                            'InvokeSync': 'Generalist Working',
+                                            'invoke_sync': 'Generalist Working',
+                                            'Invoke': 'Generalist Working',
+                                            'invoke': 'Generalist Working',
+                                            'GetProgress': 'Checking Progress',
+                                            'get_progress': 'Checking Progress',
+                                            'Cancel': 'Stopping Generalist',
+                                            'cancel': 'Stopping Generalist',
+                                            'Await': 'Waiting',
+                                            'await': 'Waiting'
 
 
                                         };
@@ -3192,7 +3208,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3283,7 +3299,43 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                         return `${s}s`;
                                     };
-                                    label = `✔  Awaiting → ${formatTime(sec)}`;
+
+                                    const existentialVibes = [
+                                        // --- The OG Classics ---
+                                        'Aligning Moon Phase',
+                                        'Contemplating Existence',
+                                        'Staring At Void',
+                                        'Delaying Professionally',
+                                        'Negotiating With Electrons',
+                                        'Touching Grass (virtually)',
+
+                                        // --- The Sneaky Additions ---
+                                        'Panicking Softly',
+                                        'Rethinking Career Choices',
+                                        'Loading Cat Videos',
+                                        'Giving Up Entirely',
+
+                                        // --- The New Chaos Pack ---
+                                        'Summoning Braincell #2',
+                                        'Pretending To Be Busy',
+                                        'Waiting For Motivation DLC',
+                                        'Rotating Internal Screaming',
+                                        'Downloading More RAM',
+                                        'Feeding The Hamsters',
+                                        'Gaslighting Scheduler',
+                                        'Performing Dramatic Pause',
+                                        'Buffering Social Energy',
+                                        'Calculating Regret',
+
+                                        // --- The Ultra Cursed Tier ---
+                                        'Reading Terms And Conditions',
+                                        'Becoming Sentient Briefly',
+                                        'Contacting Ancestors'
+                                    ];
+
+                                    let randomVibe = existentialVibes[Math.floor(Math.random() * existentialVibes.length)];
+
+                                    label = `✔  ${randomVibe} → ${formatTime(sec)}`;
                                 } else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                     label = '';
                                 } else {
