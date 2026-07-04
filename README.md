@@ -2,13 +2,14 @@
 ![Flux Flow Hero](./fluxflow.png)
 
 <p align="left">
-  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v2-blue?style=plastic" alt="FluxFlow Version"></a>
-  <a href="https://deepmind.google"><img src="https://img.shields.io/badge/Engine-Gemma%204-red?style=plastic" alt="Engine Gemma 4"></a>
+  <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v3-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D20-green?style=plastic" alt="Node Compatibility"></a>
 </p>
 
 **A Beautiful, Autonomous Terminal AI Agent**
+
+📖 **[Official Documentatio]n(https://fluxflow-cli.onrender.com/)**
 
 Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
 
@@ -18,7 +19,11 @@ Whether you need a conversational partner or an autonomous developer that can wr
 
 ## ✨ Features
 
-- **Multi-Provider Support**: Choose your preferred engine! Supports **Google GenAI** (Gemini/Gemma models) natively, **DeepSeek API** natively, and **OpenRouter** (Experimental) to connect to hundreds of LLMs, **NVIDIA** to get best open-weight models for free.
+- **Multi-Provider Support**: Choose your preferred engine!
+- **Google GenAI** (Gemini & Gemma models)
+- **DeepSeek** (Native DeepSeek API)
+- **OpenRouter** (Access to hundreds of models; *Experimental*)
+- **NVIDIA** (Access to selected models)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
   - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.
@@ -79,6 +84,8 @@ fluxflow
    ```
 
 ## 📖 Documentation
+
+🌐 **Official Documentation**: [HERE](https://fluxflow-cli.onrender.com/)
 
 To keep this README concise, detailed information about specific components of Flux Flow has been split into separate documents:
 

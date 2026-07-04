@@ -7875,7 +7875,7 @@ var init_web_search = __esm({
             ]
           });
           const page = await browser.newPage();
-          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.97 Safari/537.36");
+          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36");
           await page.setViewport({ width: 1366, height: 768 });
           const jitter = attempt === 1 ? Math.random() * 1e3 + 500 : Math.random() * 2e3 + 1e3;
           await new Promise((r) => setTimeout(r, jitter));
@@ -7947,7 +7947,7 @@ var init_web_scrape = __esm({
             ]
           });
           const page = await browser.newPage();
-          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.97 Safari/537.36");
+          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36");
           await page.setViewport({ width: 1366, height: 768 });
           const jitter = attempt === 1 ? Math.random() * 1e3 + 500 : Math.random() * 2e3 + 1e3;
           await new Promise((r) => setTimeout(r, jitter));
