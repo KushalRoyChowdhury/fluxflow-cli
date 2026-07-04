@@ -143,7 +143,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     // Bypass wrapText for PTY output to let the native terminal handling do its work
     const rawLines = isPty 
         ? (cleanOutput ? cleanOutput.split('\n') : [])
-        : (cleanOutput ? wrapText(cleanOutput, columns - 6) : []);
+        : (cleanOutput ? wrapText(cleanOutput, columns - 6).split('\n') : []);
 
     const [isExpanded, setIsExpanded] = useState(false);
 

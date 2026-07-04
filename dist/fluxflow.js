@@ -3702,7 +3702,7 @@ var init_TerminalBox = __esm({
         return resultLines.join("\n");
       };
       const cleanOutput = processPTY(output).replace(/\n{3,}/g, "\n\n");
-      const rawLines = isPty ? cleanOutput ? cleanOutput.split("\n") : [] : cleanOutput ? wrapText(cleanOutput, columns - 6) : [];
+      const rawLines = isPty ? cleanOutput ? cleanOutput.split("\n") : [] : cleanOutput ? wrapText(cleanOutput, columns - 6).split("\n") : [];
       const [isExpanded, setIsExpanded] = useState3(false);
       useInput2((input, key) => {
         if (isFocused && key.ctrl && (input === "o" || input === "")) {

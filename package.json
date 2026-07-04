@@ -1,6 +1,6 @@
 {
     "name": "fluxflow-cli",
-    "version": "3.0.16",
+    "version": "3.0.18",
     "date": "2026-07-04",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era.",
     "keywords": [
@@ -29,7 +29,9 @@
         "ARCHITECTURE.md",
         "TOOLS.md",
         "UI_FEATURES.md",
-        "cat.txt"
+        "cat.txt",
+        ".puppeteerrc.cjs",
+        "flux-flow.cjs"
     ],
     "type": "module",
     "bin": {
