@@ -19,6 +19,7 @@ import { todo } from '../tools/todo.js';
 import { invokeSync } from '../tools/invokeSync.js';
 import { invoke } from '../tools/invoke.js';
 import { getProgress } from '../tools/getProgress.js';
+import { cancel } from '../tools/cancel.js';
 import { awaitTool } from '../tools/await.js';
 
 
@@ -43,6 +44,7 @@ const TOOL_MAP = {
     invokeSync,
     invoke,
     getProgress,
+    cancel,
     invoke_sync: invokeSync,
     get_progress: getProgress,
     ask: ask_user,
@@ -75,6 +77,7 @@ const TOOL_MAP = {
     InvokeSync: invokeSync,
     Invoke: invoke,
     GetProgress: getProgress,
+    Cancel: cancel,
     await: awaitTool,
     Await: awaitTool
 };

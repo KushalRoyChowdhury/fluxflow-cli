@@ -32,17 +32,17 @@ export const getProgress = async (args, context = {}) => {
                     const lowerResult = result.toLowerCase();
                     const triggerIdx = lowerResult.indexOf(trigger);
                     if (triggerIdx === -1) break;
-                    
+
                     let startIdx = triggerIdx;
                     let hasOuterBracket = false;
-                    
+
                     let k = triggerIdx - 1;
                     while (k >= 0 && /\s/.test(result[k])) k--;
                     if (k >= 0 && result[k] === '[') {
                         startIdx = k;
                         hasOuterBracket = true;
                     }
-                    
+
                     let balance = 0;
                     let foundStart = false;
                     let inString = null;
@@ -99,6 +99,6 @@ export const getProgress = async (args, context = {}) => {
         output += `Failure Error: ${task.error}\n`;
     }
 
-    fs.writeFileSync("progress.txt", output.trim());
+    // fs.writeFileSync("progress.txt", output.trim());
     return output.trim();
 };

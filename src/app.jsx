@@ -3004,7 +3004,7 @@ export default function App({ args = [] }) {
                     setInput('');
                     const cleanCount = messages.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
                     const tokens = sessionStats?.tokens || 0;
-                    if (cleanCount < 100 || tokens < 32768) {
+                    if (cleanCount < 64 || tokens < 32768) {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);

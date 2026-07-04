@@ -12,6 +12,7 @@ import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
 import { loadSettings } from './settings.js';
+import { subagentProgress } from './subagent_state.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
@@ -23,7 +24,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Unsupported Modality|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -37,7 +38,7 @@ const withRetry = async (fn, maxRetries = 8, initialDelayMs = 1000, maxDelayMs =
         try {
             return await fn();
         } catch (error) {
-            if (signal?.aborted || error?.name === 'AbortError') {
+            if (signal?.aborted || error?.name === 'AbortError' || error?.message === 'Subagent task was cancelled.') {
                 throw error;
             }
             attempt++;
@@ -693,6 +694,7 @@ const TOOL_LABELS = {
     'invoke_sync': 'Spawning SubAgent',
     'invoke': 'Spawning SubAgent',
     'get_progress': 'Checking SubAgent',
+    'cancel': 'Cancelling',
     'await': 'Waiting'
 };
 
@@ -703,7 +705,7 @@ const getToolDetail = (toolName, argsStr) => {
         if (normToolName === 'invokesync' || normToolName === 'invoke') {
             return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
         }
-        if (normToolName === 'getprogress') {
+        if (normToolName === 'getprogress' || normToolName === 'cancel') {
             return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
@@ -1433,6 +1435,12 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         }
 
         for await (const chunk of stream) {
+            if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+                const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+                if (taskObj && taskObj.status === 'cancelled') {
+                    throw new Error('Subagent task was cancelled.');
+                }
+            }
             if (settings && typeof settings.onTokenChunk === 'function') {
                 settings.onTokenChunk();
             }
@@ -1463,7 +1471,7 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 });
             }
         }
-        await incrementUsage(usageKey, aiProvider);
+        await incrementUsage('agent', aiProvider);
 
         return { text: fullText, usageMetadata };
     });
@@ -1738,6 +1746,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
+        // Clean up past user turns in modifiedHistory to strip out bulky system metadata/directory structures
+        modifiedHistory = modifiedHistory.map(msg => {
+            if (msg.role === 'user' && msg.text) {
+                const match = msg.text.match(/\[USER\]([\s\S]*?)\[\/USER\]/);
+                if (match) {
+                    return { ...msg, text: match[1].trim() };
+                }
+            }
+            return { ...msg };
+        });
+
         // Truncation & Condensation Logic (Compression 0.0)
         let contextCompressionCount = 255000;
         let contextTruncationCount = 260000;
@@ -1981,13 +2000,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (hasExistingTurnsAfterCompression && currentSummary) {
             if (modifiedHistory[0] && (modifiedHistory[0].role === 'user' || modifiedHistory[0].role === 'system')) {
                 if (!modifiedHistory[0].text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
-                    modifiedHistory[0].text = `[SYSTEM METADATA (PRIORITY: HIGH)]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n\n[USER] ${modifiedHistory[0].text}`;
+                    modifiedHistory[0].text = `[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**\n${currentSummary}\n\n[USER] ${modifiedHistory[0].text}`;
                     yield { type: 'summary_injected', content: { id: modifiedHistory[0].id, text: modifiedHistory[0].text } };
                 }
             }
         }
 
-        const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA (PRIORITY: HIGH)]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**\n${currentSummary}\n` : '';
+        const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**\n${currentSummary}\n` : '';
 
         let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
@@ -2952,11 +2971,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map',
-                                    'Chat': 'chat', 'chat': 'chat',
-                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image',
-                                                                    'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress',
-                                    'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'await': 'await', 'Await': 'await'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
@@ -3019,20 +3034,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     if (process.stdout.isTTY) {
                                         const TOOL_TITLES = {
-                                            'web_search': 'Searching',
-                                            'web_scrape': 'Reading',
-                                            'view_file': 'Reading',
-                                            'read_folder': 'Reading',
+                                            'WebSearch': 'Searching',
+                                            'WebScrape': 'Reading',
+                                            'ReadFile': 'Reading',
+                                            'ReadFolder': 'Reading',
                                             'list_files': 'Reading',
-                                            'write_file': 'Writing',
-                                            'update_file': 'Editing',
-                                            'write_pdf': 'Creating',
-                                            'write_docx': 'Creating',
-                                            'search_keyword': 'Searching',
-                                            'exec_command': 'Executing',
-                                            'ask': 'User Input',
-                                            'memory': 'Updating Memory',
-                                            'generate_image': 'Generating'
+                                            'WriteFile': 'Writing',
+                                            'UpdateFile': 'Editing',
+                                            'WritePdf': 'Creating',
+                                            'WriteDocx': 'Creating',
+                                            'SearchKeyword': 'Searching',
+                                            'Run': 'Executing',
+                                            'Ask': 'User Input Required',
+                                            'Memory': 'Updating Memory',
+                                            'GenerateImage': 'Generating',
+                                            'InvokeSync': 'Sub-Agent Working',
+                                            'Await': 'Waiting'
+
+
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -3173,10 +3192,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map',
-                                    'Chat': 'chat', 'chat': 'chat',
-                                                                    'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress',
-                                    'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'invokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3242,12 +3258,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
                                     const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
                                     label = `✔  Generated: ${argPath || outputPath || output || 'generated_image.png'}`;
-                                } else if (normToolName === 'invoke_sync' || normToolName === 'invoke') {
+                                } else if (normToolName === 'invoke_sync' || normToolName === 'InvokeSync') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
-                                    label = `✔  Elevating SubAgent${detail ? `: ${detail}` : ''}`;
-                                } else if (normToolName === 'get_progress') {
+                                    label = `✔  Invoked Sub-Agent${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'Invoke' || normToolName === 'InvokeAsync' || normToolName === 'invoke') {
+                                    const detail = getToolDetail(normToolName, toolCall.args);
+                                    label = `✔  Invoked Background-Agent${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'get_progress' || normToolName === 'GetProgress') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
                                     label = `✔  Checked${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'cancel') {
+                                    const detail = getToolDetail(normToolName, toolCall.args);
+                                    label = `⊘  Cancelled${detail ? `: ${detail}` : ''}`;
                                 } else if (normToolName === 'await') {
                                     const { time } = parseArgs(toolCall.args);
                                     let sec = parseFloat(time) || 0;
@@ -4475,7 +4497,11 @@ TOOL POLICY:
 - USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
 - FileMap >>> ReadFile to understand file efficiently
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
-- HUGE FILES? SearchKeyword >> FileMap/Full Read\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}`;
+- HUGE FILES? SearchKeyword >> FileMap/Full Read\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
+- VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
+- Escape quotes: \\" for code strings
+- Literal escapes: Double-escape sequences (e.g., \\\\n)
+- File structure: Real newlines for code formatting`.trim();
 
     const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
@@ -4500,6 +4526,14 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
     let finalAnswer = '';
 
     while (turn < maxTurns) {
+        if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+            const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+            if (taskObj && taskObj.status === 'cancelled') {
+                if (logCallback) logCallback(`[SUBAGENT CANCELLED] Subagent task was cancelled.`);
+                throw new Error('Subagent task was cancelled.');
+            }
+        }
+
         const contents = subagentHistory.map(m => ({
             role: m.role === 'user' ? 'user' : 'model',
             parts: [{ text: m.text }]
@@ -4523,6 +4557,12 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
 
         let toolResultsStr = '';
         for (const toolCall of toolCalls) {
+            if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+                const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+                if (taskObj && taskObj.status === 'cancelled') {
+                    throw new Error('Subagent task was cancelled.');
+                }
+            }
             const normalizedToolName = toolCall.toolName.toLowerCase();
             const allowed = allowedTools ? allowedTools.some(t => t.toLowerCase() === normalizedToolName) : true;
             if (!allowed) {

@@ -52,6 +52,7 @@ export const invoke = async (args, context = {}) => {
     let currentTurnLogs = [];
     const subagentContext = {
         ...context,
+        taskId: taskId,
         onVisualFeedback: (feedbackLabel) => {
             taskEntry.lastChunkTime = Date.now();
             const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, '');
@@ -74,6 +75,8 @@ export const invoke = async (args, context = {}) => {
         }
     };
     runSubagent(task, subagentContext, model, allowedTools, 20, (logMessage) => {
+        if (taskEntry.status === 'cancelled') return;
+
         if (logMessage.startsWith('[Subagent Turn')) {
             if (currentTurnLogs.length > 0) {
                 taskEntry.progress.push([...currentTurnLogs]);
@@ -104,6 +107,7 @@ export const invoke = async (args, context = {}) => {
             context.onSubagentUpdate();
         }
     }).then((finalAnswer) => {
+        if (taskEntry.status === 'cancelled') return;
         currentTurnLogs.push(`[SUBAGENT SUCCESS] Final Answer:\n${finalAnswer}`);
         taskEntry.progress.push([...currentTurnLogs]);
         taskEntry.status = 'completed';
@@ -112,6 +116,7 @@ export const invoke = async (args, context = {}) => {
             context.onSubagentUpdate();
         }
     }).catch((err) => {
+        if (taskEntry.status === 'cancelled') return;
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
         taskEntry.progress.push([...currentTurnLogs]);
         taskEntry.status = 'failed';

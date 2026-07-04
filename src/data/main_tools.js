@@ -38,18 +38,19 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY`) : `BASH`} command. Destructive/Irreversible ops → Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK → BREAK DOWN TASK → CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
-9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
+9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
 **USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
 USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
 
 Invocation Types:
-- invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
-- invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
+- Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
+- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
-1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING`.trim()
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
+3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT IF SUB AGENT IS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim()
 :
 
 
@@ -68,6 +69,6 @@ Invocation Types:
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
-- Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
+- Literal escapes: Double-escape sequences (e.g., \\\\n)
 - File structure: Real newlines for code formatting`.trim();
 // [DEPRICATED] 7. [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")].. Mockups, PDF thumbnails, any visual content

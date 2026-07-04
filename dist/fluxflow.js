@@ -5185,25 +5185,26 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
-9. [tool:functions.await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
+9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 
 -- SUB AGENTS DEFINITIONS --
 **USING SUB AGENTS HIGHLY PREFERRED FOR MOST TASK**
 USE PROACTIVELY WITHOUT EXPLICIT USER COMMAND ALLOWED
 
 Invocation Types:
-- invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
-- invokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
+- Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Can take long time, If invoked DO NOT REPEAT SAME TASK AGAIN UNLESS subagent returns ERROR. Usage: Benefits parallelism & speed
+- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
 
-1. [agent:generalist.invokeSync/invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.getProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check, eg. 15s, 30s, 45s ...) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
+3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT IF SUB AGENT IS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
-- Literal escapes: Double-escape sequences (e.g., \\\\n, \\\\t)
+- Literal escapes: Double-escape sequences (e.g., \\\\n)
 - File structure: Real newlines for code formatting`.trim();
   }
 });
@@ -9672,6 +9673,7 @@ var init_invoke = __esm({
       let currentTurnLogs = [];
       const subagentContext = {
         ...context,
+        taskId,
         onVisualFeedback: (feedbackLabel) => {
           taskEntry.lastChunkTime = Date.now();
           const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, "");
@@ -9694,6 +9696,7 @@ var init_invoke = __esm({
         }
       };
       runSubagent2(task, subagentContext, model, allowedTools, 20, (logMessage) => {
+        if (taskEntry.status === "cancelled") return;
         if (logMessage.startsWith("[Subagent Turn")) {
           if (currentTurnLogs.length > 0) {
             taskEntry.progress.push([...currentTurnLogs]);
@@ -9720,6 +9723,7 @@ var init_invoke = __esm({
           context.onSubagentUpdate();
         }
       }).then((finalAnswer) => {
+        if (taskEntry.status === "cancelled") return;
         currentTurnLogs.push(`[SUBAGENT SUCCESS] Final Answer:
 ${finalAnswer}`);
         taskEntry.progress.push([...currentTurnLogs]);
@@ -9729,6 +9733,7 @@ ${finalAnswer}`);
           context.onSubagentUpdate();
         }
       }).catch((err) => {
+        if (taskEntry.status === "cancelled") return;
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
         taskEntry.progress.push([...currentTurnLogs]);
         taskEntry.status = "failed";
@@ -9743,7 +9748,6 @@ ${finalAnswer}`);
 });
 
 // src/tools/getProgress.js
-import fs20 from "fs";
 var getProgress;
 var init_getProgress = __esm({
   "src/tools/getProgress.js"() {
@@ -9846,8 +9850,38 @@ ${task.finalAnswer}
         output += `Failure Error: ${task.error}
 `;
       }
-      fs20.writeFileSync("progress.txt", output.trim());
       return output.trim();
+    };
+  }
+});
+
+// src/tools/cancel.js
+var cancel;
+var init_cancel = __esm({
+  "src/tools/cancel.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    cancel = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const id = parsed.id;
+      if (!id) {
+        return 'ERROR: Missing "id" argument for cancel.';
+      }
+      const task = subagentProgress.find((t) => t.id === id);
+      if (!task) {
+        return `ERROR: Subagent task with ID [${id}] not found.`;
+      }
+      if (task.status === "completed" || task.status === "failed") {
+        return `INFO: Subagent task with ID [${id}] has already finished with status [${task.status.toUpperCase()}].`;
+      }
+      if (task.status === "cancelled") {
+        return `INFO: Subagent task with ID [${id}] is already cancelled.`;
+      }
+      task.status = "cancelled";
+      if (context.onSubagentUpdate) {
+        context.onSubagentUpdate();
+      }
+      return `SUCCESS: Subagent task with ID [${id}] has been cancelled.`;
     };
   }
 });
@@ -9912,6 +9946,7 @@ var init_tools = __esm({
     init_invokeSync();
     init_invoke();
     init_getProgress();
+    init_cancel();
     init_await();
     TOOL_MAP = {
       web_search,
@@ -9934,6 +9969,7 @@ var init_tools = __esm({
       invokeSync,
       invoke,
       getProgress,
+      cancel,
       invoke_sync: invokeSync,
       get_progress: getProgress,
       ask: ask_user,
@@ -9965,6 +10001,7 @@ var init_tools = __esm({
       InvokeSync: invokeSync,
       Invoke: invoke,
       GetProgress: getProgress,
+      Cancel: cancel,
       await: awaitTool,
       Await: awaitTool
     };
@@ -10117,7 +10154,7 @@ __export(ai_exports, {
 });
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path19 from "path";
-import fs21 from "fs";
+import fs20 from "fs";
 var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
@@ -10131,6 +10168,7 @@ var init_ai = __esm({
     init_terminal();
     init_text();
     init_settings();
+    init_subagent_state();
     init_paths();
     init_revert();
     init_editor();
@@ -10138,7 +10176,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Unsupported Modality|Awaiting)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•⊘])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Invoked Background-Agent|Unsupported Modality|Awaiting|Cancelled)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -10151,7 +10189,7 @@ var init_ai = __esm({
         try {
           return await fn();
         } catch (error) {
-          if (signal?.aborted || error?.name === "AbortError") {
+          if (signal?.aborted || error?.name === "AbortError" || error?.message === "Subagent task was cancelled.") {
             throw error;
           }
           attempt++;
@@ -10727,6 +10765,7 @@ var init_ai = __esm({
       "invoke_sync": "Spawning SubAgent",
       "invoke": "Spawning SubAgent",
       "get_progress": "Checking SubAgent",
+      "cancel": "Cancelling",
       "await": "Waiting"
     };
     getToolDetail = (toolName, argsStr) => {
@@ -10736,7 +10775,7 @@ var init_ai = __esm({
         if (normToolName === "invokesync" || normToolName === "invoke") {
           return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
         }
-        if (normToolName === "getprogress") {
+        if (normToolName === "getprogress" || normToolName === "cancel") {
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
@@ -10982,8 +11021,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
           const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-          if (!fs21.existsSync(janitorErrDir)) fs21.mkdirSync(janitorErrDir, { recursive: true });
-          fs21.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          if (!fs20.existsSync(janitorErrDir)) fs20.mkdirSync(janitorErrDir, { recursive: true });
+          fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -10993,7 +11032,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       }
       if (attempts) {
         const janitorErrDir = path19.join(LOGS_DIR, "janitor");
-        fs21.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        fs20.appendFileSync(path19.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
         if (attempts >= MAX_JANITOR_RETRIES) {
@@ -11350,6 +11389,12 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           stream = genStream;
         }
         for await (const chunk of stream) {
+          if (settings?.taskId && typeof subagentProgress !== "undefined") {
+            const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+            if (taskObj && taskObj.status === "cancelled") {
+              throw new Error("Subagent task was cancelled.");
+            }
+          }
           if (settings && typeof settings.onTokenChunk === "function") {
             settings.onTokenChunk();
           }
@@ -11379,7 +11424,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             });
           }
         }
-        await incrementUsage(usageKey, aiProvider);
+        await incrementUsage("agent", aiProvider);
         return { text: fullText, usageMetadata };
       });
     };
@@ -11468,8 +11513,8 @@ ${newMemoryListStr}
         })() : String(err);
         ;
         const janitorLogDir = path19.join(LOGS_DIR, "janitor");
-        if (!fs21.existsSync(janitorLogDir)) fs21.mkdirSync(janitorLogDir, { recursive: true });
-        fs21.appendFileSync(
+        if (!fs20.existsSync(janitorLogDir)) fs20.mkdirSync(janitorLogDir, { recursive: true });
+        fs20.appendFileSync(
           path19.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
@@ -11553,7 +11598,7 @@ Provide a consolidated summary of the entire session.`;
     deleteChatSummary = (chatId) => {
       try {
         const summariesFile = path19.join(SECRET_DIR, "chat-summaries.json");
-        if (fs21.existsSync(summariesFile)) {
+        if (fs20.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -11610,6 +11655,15 @@ Provide a consolidated summary of the entire session.`;
             modifiedHistory = slicedHistory;
           }
         }
+        modifiedHistory = modifiedHistory.map((msg) => {
+          if (msg.role === "user" && msg.text) {
+            const match2 = msg.text.match(/\[USER\]([\s\S]*?)\[\/USER\]/);
+            if (match2) {
+              return { ...msg, text: match2[1].trim() };
+            }
+          }
+          return { ...msg };
+        });
         let contextCompressionCount = 255e3;
         let contextTruncationCount = 26e4;
         if (aiProvider === "NVIDIA" && (modelName?.includes("glm") || modelName?.includes("gpt") || modelName?.includes("qwen"))) {
@@ -11796,7 +11850,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs21.readdirSync(dir, { withFileTypes: true });
+            return fs20.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -11902,8 +11956,8 @@ Provide a consolidated summary of the entire session.`;
         if (hasExistingTurnsAfterCompression && currentSummary) {
           if (modifiedHistory[0] && (modifiedHistory[0].role === "user" || modifiedHistory[0].role === "system")) {
             if (!modifiedHistory[0].text.includes("**CONTEXT SUMMARY OF PREVIOUS TURNS")) {
-              modifiedHistory[0].text = `[SYSTEM METADATA (PRIORITY: HIGH)]
-**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**
+              modifiedHistory[0].text = `[SYSTEM METADATA]
+**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**
 ${currentSummary}
 
 [USER] ${modifiedHistory[0].text}`;
@@ -11912,8 +11966,8 @@ ${currentSummary}
           }
         }
         const activeSummaryBlock = currentSummary && !hasExistingTurnsAfterCompression ? `
-[SYSTEM METADATA (PRIORITY: HIGH)]
-**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: HIGH)**
+[SYSTEM METADATA]
+**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**
 ${currentSummary}
 ` : "";
         let dirStructure = process.cwd() + "\n" + getDirTree(process.cwd(), dynamicMaxDepth);
@@ -12086,8 +12140,8 @@ ${ideCtx.warnings}
               filePath = tagClean.slice(0, matchRange.index);
             }
             const absPath = path19.resolve(process.cwd(), filePath);
-            if (fs21.existsSync(absPath)) {
-              const stats = fs21.statSync(absPath);
+            if (fs20.existsSync(absPath)) {
+              const stats = fs20.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -12149,7 +12203,7 @@ ${boxMid}
                   } else {
                     let totalLines = "...";
                     try {
-                      const content = fs21.readFileSync(absPath, "utf8");
+                      const content = fs20.readFileSync(absPath, "utf8");
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
@@ -12775,6 +12829,8 @@ ${ideErr} [/ERROR]`;
                       "invoke": "invoke",
                       "invokeSync": "invoke_sync",
                       "getProgress": "get_progress",
+                      "GetProgress": "get_progress",
+                      "Cancel": "cancel",
                       "await": "await",
                       "Await": "await"
                     };
@@ -12832,20 +12888,22 @@ ${ideErr} [/ERROR]`;
                       yield { type: "status", content: `${currentLabel}...` };
                       if (process.stdout.isTTY) {
                         const TOOL_TITLES = {
-                          "web_search": "Searching",
-                          "web_scrape": "Reading",
-                          "view_file": "Reading",
-                          "read_folder": "Reading",
+                          "WebSearch": "Searching",
+                          "WebScrape": "Reading",
+                          "ReadFile": "Reading",
+                          "ReadFolder": "Reading",
                           "list_files": "Reading",
-                          "write_file": "Writing",
-                          "update_file": "Editing",
-                          "write_pdf": "Creating",
-                          "write_docx": "Creating",
-                          "search_keyword": "Searching",
-                          "exec_command": "Executing",
-                          "ask": "User Input",
-                          "memory": "Updating Memory",
-                          "generate_image": "Generating"
+                          "WriteFile": "Writing",
+                          "UpdateFile": "Editing",
+                          "WritePdf": "Creating",
+                          "WriteDocx": "Creating",
+                          "SearchKeyword": "Searching",
+                          "Run": "Executing",
+                          "Ask": "User Input Required",
+                          "Memory": "Updating Memory",
+                          "GenerateImage": "Generating",
+                          "InvokeSync": "Sub-Agent Working",
+                          "Await": "Waiting"
                         };
                         const toolTitle = TOOL_TITLES[potentialTool] || "Working";
                         process.stdout.write(`\x1B]0;${toolTitle}...\x07`);
@@ -12976,6 +13034,9 @@ ${ideErr} [/ERROR]`;
                       "invoke": "invoke",
                       "invokeSync": "invoke_sync",
                       "getProgress": "get_progress",
+                      "GetProgress": "get_progress",
+                      "Cancel": "cancel",
+                      "cancel": "cancel",
                       "await": "await",
                       "Await": "await"
                     };
@@ -13000,8 +13061,8 @@ ${ideErr} [/ERROR]`;
                       let actualEndLine = eLine;
                       try {
                         const absPath = path19.resolve(process.cwd(), targetPath2);
-                        if (fs21.existsSync(absPath)) {
-                          const content = fs21.readFileSync(absPath, "utf8");
+                        if (fs20.existsSync(absPath)) {
+                          const content = fs20.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           actualEndLine = Math.min(eLine, lines);
@@ -13039,12 +13100,18 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName.toLowerCase() === "generate_image") {
                       const { path: argPath, outputPath, output } = parseArgs(toolCall.args);
                       label = `\u2714  Generated: ${argPath || outputPath || output || "generated_image.png"}`;
-                    } else if (normToolName === "invoke_sync" || normToolName === "invoke") {
+                    } else if (normToolName === "invoke_sync" || normToolName === "InvokeSync") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
-                      label = `\u2714  Elevating SubAgent${detail2 ? `: ${detail2}` : ""}`;
-                    } else if (normToolName === "get_progress") {
+                      label = `\u2714  Invoked Sub-Agent${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "Invoke" || normToolName === "InvokeAsync" || normToolName === "invoke") {
+                      const detail2 = getToolDetail(normToolName, toolCall.args);
+                      label = `\u2714  Invoked Background-Agent${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "get_progress" || normToolName === "GetProgress") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
                       label = `\u2714  Checked${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "cancel") {
+                      const detail2 = getToolDetail(normToolName, toolCall.args);
+                      label = `\u2298  Cancelled${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
@@ -13398,8 +13465,8 @@ ${boxMid}`) };
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs21.existsSync(absPath)) {
-                                  originalContent = fs21.readFileSync(absPath, "utf8");
+                                } else if (fs20.existsSync(absPath)) {
+                                  originalContent = fs20.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -13453,10 +13520,10 @@ ${boxMid}}`) };
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs21.existsSync(absPath)) {
+                                  if (!fs20.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs21.mkdirSync(path19.dirname(absPath), { recursive: true });
-                                    fs21.writeFileSync(absPath, "", "utf8");
+                                    fs20.mkdirSync(path19.dirname(absPath), { recursive: true });
+                                    fs20.writeFileSync(absPath, "", "utf8");
                                   }
                                   yield { type: "status", content: `Opening New File Diff in IDE: ${path19.basename(absPath)}...` };
                                   showDiffInIDE(absPath, "", modifiedContent);
@@ -13496,9 +13563,9 @@ ${boxMid}}`) };
                             if (filePath) {
                               const absPath = path19.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs21.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs20.existsSync(absPath)) {
                                 try {
-                                  fs21.unlinkSync(absPath);
+                                  fs20.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -13515,8 +13582,8 @@ ${boxMid}}`) };
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs21.existsSync(absPath)) {
-                            finalContent = fs21.readFileSync(absPath, "utf8");
+                          } else if (fs20.existsSync(absPath)) {
+                            finalContent = fs20.readFileSync(absPath, "utf8");
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -13938,8 +14005,8 @@ ${colorMainWords(output)}` };
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
               const agentErrDir = path19.join(LOGS_DIR, "agent");
-              if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
-              fs21.appendFileSync(path19.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
+              fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14109,8 +14176,8 @@ Error Log can be found in ${path19.join(LOGS_DIR, "agent", "error.log")}`);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path19.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
-        if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
-        fs21.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
+        if (!fs20.existsSync(agentErrDir)) fs20.mkdirSync(agentErrDir, { recursive: true });
+        fs20.appendFileSync(path19.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14152,7 +14219,12 @@ TOOL POLICY:
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
 - HUGE FILES? SearchKeyword >> FileMap/Full Read
 -- PROVIDED TOOLS --
-${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}`;
+${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}
+
+- VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
+- Escape quotes: \\" for code strings
+- Literal escapes: Double-escape sequences (e.g., \\\\n)
+- File structure: Real newlines for code formatting`.trim();
       const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
@@ -14174,6 +14246,13 @@ Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "nu
       let turn = 0;
       let finalAnswer = "";
       while (turn < maxTurns) {
+        if (settings?.taskId && typeof subagentProgress !== "undefined") {
+          const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+          if (taskObj && taskObj.status === "cancelled") {
+            if (logCallback) logCallback(`[SUBAGENT CANCELLED] Subagent task was cancelled.`);
+            throw new Error("Subagent task was cancelled.");
+          }
+        }
         const contents = subagentHistory.map((m) => ({
           role: m.role === "user" ? "user" : "model",
           parts: [{ text: m.text }]
@@ -14193,6 +14272,12 @@ ${cleanResponse}
         }
         let toolResultsStr = "";
         for (const toolCall of toolCalls) {
+          if (settings?.taskId && typeof subagentProgress !== "undefined") {
+            const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+            if (taskObj && taskObj.status === "cancelled") {
+              throw new Error("Subagent task was cancelled.");
+            }
+          }
           const normalizedToolName = toolCall.toolName.toLowerCase();
           const allowed = allowedTools ? allowedTools.some((t) => t.toLowerCase() === normalizedToolName) : true;
           if (!allowed) {
@@ -15084,7 +15169,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs22 from "fs";
+import fs21 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -15092,7 +15177,7 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs22.existsSync(exePath);
+        const exists = exePath && fs21.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -15125,7 +15210,7 @@ __export(app_exports, {
 import os4 from "os";
 import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs23 from "fs-extra";
+import fs22 from "fs-extra";
 import path20 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath } from "url";
@@ -15371,10 +15456,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs23.ensureDir(path20.dirname(kbPath));
+      await fs22.ensureDir(path20.dirname(kbPath));
       let bindings = [];
-      if (fs23.existsSync(kbPath)) {
-        const content = fs23.readFileSync(kbPath, "utf8").trim();
+      if (fs22.existsSync(kbPath)) {
+        const content = fs22.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -15394,7 +15479,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs23.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs22.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -16070,7 +16155,7 @@ function App({ args = [] }) {
   useEffect11(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs23.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs22.readFileSync(path20.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -16193,7 +16278,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs23.remove(path20.join(DATA_DIR, "playground")).catch(() => {
+        fs22.remove(path20.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -16229,7 +16314,7 @@ function App({ args = [] }) {
       if (parsedArgs.playground) {
         const playgroundDir = path20.join(DATA_DIR, "playground");
         try {
-          fs23.ensureDirSync(playgroundDir);
+          fs22.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -16270,8 +16355,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs23.existsSync(kbPath)) {
-              const content = fs23.readFileSync(kbPath, "utf8").trim();
+            if (fs22.existsSync(kbPath)) {
+              const content = fs22.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -16812,9 +16897,9 @@ ${cleanText}`, color: "magenta" }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs23.ensureDir(dest);
+              await fs22.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs23.copy(src, dest, {
+              await fs22.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
                   const relative = path20.relative(src, srcPath);
@@ -16879,7 +16964,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs23.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
+              fs22.emptyDir(path20.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -17228,7 +17313,7 @@ ${cleanText}`, color: "magenta" }];
           }
           const fileContent = exportLines.join("\n");
           try {
-            fs23.writeFileSync(exportPath, fileContent, "utf8");
+            fs22.writeFileSync(exportPath, fileContent, "utf8");
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
               return [...prev, {
@@ -17275,12 +17360,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs23.existsSync(LOGS_DIR)) fs23.removeSync(LOGS_DIR);
-              if (fs23.existsSync(SECRET_DIR)) fs23.removeSync(SECRET_DIR);
-              if (fs23.existsSync(SETTINGS_FILE)) fs23.removeSync(SETTINGS_FILE);
+              if (fs22.existsSync(LOGS_DIR)) fs22.removeSync(LOGS_DIR);
+              if (fs22.existsSync(SECRET_DIR)) fs22.removeSync(SECRET_DIR);
+              if (fs22.existsSync(SETTINGS_FILE)) fs22.removeSync(SETTINGS_FILE);
               try {
-                const items = fs23.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs23.removeSync(FLUXFLOW_DIR);
+                const items = fs22.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs22.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -17403,14 +17488,14 @@ ${list || "No saved chats found."}`, isMeta: true }];
 - [Define custom step-by-step recipes for this project here]
 `;
             const filePath = path20.join(process.cwd(), "FluxFlow.md");
-            if (fs23.pathExistsSync(filePath)) {
+            if (fs22.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs23.writeFileSync(filePath, template);
+                fs22.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -17453,7 +17538,7 @@ ${list || "No saved chats found."}`, isMeta: true }];
           setInput("");
           const cleanCount = messages.filter((m) => (m.role === "user" || m.role === "agent" || m.role === "system") && !String(m.id).startsWith("welcome") && !m.isMeta).length;
           const tokens = sessionStats?.tokens || 0;
-          if (cleanCount < 100 || tokens < 32768) {
+          if (cleanCount < 64 || tokens < 32768) {
             const s2 = emojiSpace(2);
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
@@ -19503,7 +19588,7 @@ var init_app = __esm({
     linesAdded = 0;
     linesRemoved = 0;
     packageJsonPath = path20.join(path20.dirname(fileURLToPath(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs23.readFileSync(packageJsonPath, "utf8"));
+    packageJson = JSON.parse(fs22.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React15.createElement(
@@ -19599,13 +19684,13 @@ var init_app = __esm({
         const fileList = [];
         const scan = (currentDir) => {
           try {
-            const files = fs23.readdirSync(currentDir);
+            const files = fs22.readdirSync(currentDir);
             for (const file of files) {
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
               const filePath = path20.join(currentDir, file);
-              const stat = fs23.statSync(filePath);
+              const stat = fs22.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
@@ -19734,11 +19819,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isVersion = args.includes("--version") || args.includes("-v");
   const isUpdate = args[0] === "--update";
   if (isVersion || isHelp || isHelpCommands || isUpdate) {
-    const fs24 = await import("fs");
+    const fs23 = await import("fs");
     const path21 = await import("path");
     const { fileURLToPath: fileURLToPath3 } = await import("url");
     const packageJsonPath2 = path21.join(path21.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs24.readFileSync(packageJsonPath2, "utf8"));
+    const packageJson2 = JSON.parse(fs23.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isVersion) {
       console.log(`v${versionFluxflow2}`);
