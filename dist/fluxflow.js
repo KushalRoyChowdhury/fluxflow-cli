@@ -3989,14 +3989,14 @@ var init_terminal = __esm({
     getFluxLogo = (version = "2.0.0", provider = "Google") => {
       const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
       const art = [
-        "    \u2588\u2588\u2588       ",
-        "   \u2591\u2591\u2591\u2588\u2588\u2588     ",
-        "     \u2591\u2591\u2591\u2588\u2588\u2588   ",
-        "       \u2591\u2591\u2591\u2588\u2588\u2588 ",
-        "        \u2588\u2588\u2588\u2591  ",
-        "      \u2588\u2588\u2588\u2591    ",
-        "    \u2588\u2588\u2588\u2591      ",
-        "   \u2591\u2591\u2591        "
+        "  \u2588\u2588\u2588       ",
+        " \u2591\u2591\u2591\u2588\u2588\u2588     ",
+        "   \u2591\u2591\u2591\u2588\u2588\u2588   ",
+        "     \u2591\u2591\u2591\u2588\u2588\u2588 ",
+        "      \u2588\u2588\u2588\u2591  ",
+        "    \u2588\u2588\u2588\u2591    ",
+        "  \u2588\u2588\u2588\u2591      ",
+        " \u2591\u2591\u2591        "
       ];
       const coloredArt = gradient(["#0077ff", "#ff00ff"]).multiline(art.join("\n")).split("\n");
       const grey = (t) => `\x1B[90m${t}\x1B[0m`;
@@ -20244,7 +20244,7 @@ var init_app = __esm({
         return fileList;
       };
     })();
-    cachedShortcut = "\\ + Enter";
+    cachedShortcut = "Ctrl + Enter";
     getLatencyColor2 = (delay) => {
       if (delay <= 400) return "#00a564";
       if (delay >= 5e3) return "#ff0000";

@@ -373,7 +373,7 @@ const getProjectFiles = (() => {
     };
 })();
 
-let cachedShortcut = '\\ + Enter';
+let cachedShortcut = "Ctrl + Enter";
 
 const getLatencyColor = (delay) => {
     if (delay <= 400) return '#00a564'; // Deep green
