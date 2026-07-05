@@ -1,5 +1,5 @@
 # 🌊 Flux Flow
-![Flux Flow Hero](./fluxflow.png)
+![Flux Flow Hero](https://github.com/KushalRoyChowdhury/fluxflow-cli/blob/main/fluxflow.png)
 
 <p align="left">
   <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v3-blue?style=plastic" alt="FluxFlow Version"></a>
