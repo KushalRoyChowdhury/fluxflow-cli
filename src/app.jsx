@@ -3487,8 +3487,8 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
-                            // Do a small 300ms delay before pushing
-                            setTimeout(async () => {
+                            // Do a small 75ms delay before pushing
+                            setTimeout(() => {
                                 setMessages(prev => {
                                     const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
                                     const newMsgs = [...updatedPrev, {
@@ -3500,7 +3500,7 @@ export default function App({ args = [] }) {
                                     setCompletedIndex(newMsgs.length);
                                     return newMsgs;
                                 });
-                            }, 300);
+                            }, 75);
                             continue;
                         }
                         if (packet.type === 'exec_start') {

@@ -10624,7 +10624,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback!|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -13372,7 +13372,8 @@ ${ideErr} [/ERROR]`;
                           "Cancel": "Stopping Generalist",
                           "cancel": "Stopping Generalist",
                           "Await": "Waiting",
-                          "await": "Waiting"
+                          "await": "Waiting",
+                          "EmergencyRollback": "Rolling the Ball"
                         };
                         const toolTitle = TOOL_TITLES[potentialTool] || "Working";
                         process.stdout.write(`\x1B]0;${toolTitle}...\x07`);
@@ -13507,7 +13508,8 @@ ${ideErr} [/ERROR]`;
                       "Cancel": "cancel",
                       "cancel": "cancel",
                       "await": "await",
-                      "Await": "await"
+                      "Await": "await",
+                      "EmergencyRollback": "Don't panic. Lookin' into it."
                     };
                     const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
                     const displayLabel = TOOL_LABELS2[normToolName] || toolCall.toolName;
@@ -13583,7 +13585,7 @@ ${ideErr} [/ERROR]`;
                       label = `\u{1F6C7}  Cancelled${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "EmergencyRollback") {
                       const { method } = parseArgs(toolCall.args);
-                      label = `\u2714  ${method === "forceRevert" ? "Emergency Rollback!" : "Rollback Checked"}`;
+                      label = `\u2714  ${method === "forceRevert" ? "Emergency Rollback" : "Rollback Checked"}`;
                     } else if (normToolName === "await" || normToolName === "Await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
@@ -18504,7 +18506,7 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
-              setTimeout(async () => {
+              setTimeout(() => {
                 setMessages((prev) => {
                   const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
                   const newMsgs = [...updatedPrev, {
@@ -18516,7 +18518,7 @@ Selection: ${val}`,
                   setCompletedIndex(newMsgs.length);
                   return newMsgs;
                 });
-              }, 300);
+              }, 75);
               continue;
             }
             if (packet.type === "exec_start") {

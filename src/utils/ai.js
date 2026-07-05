@@ -25,7 +25,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback!|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -3070,9 +3070,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'Cancel': 'Stopping Generalist',
                                             'cancel': 'Stopping Generalist',
                                             'Await': 'Waiting',
-                                            'await': 'Waiting'
-
-
+                                            'await': 'Waiting',
+                                            'EmergencyRollback': 'Rolling the Ball'
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -3213,7 +3212,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await', 'EmergencyRollback': 'Don\'t panic. Lookin\' into it.'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3293,7 +3292,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     label = `🛇  Cancelled${detail ? `: ${detail}` : ''}`;
                                 } else if (normToolName === 'EmergencyRollback') {
                                     const { method } = parseArgs(toolCall.args);
-                                    label = `✔  ${method === 'forceRevert' ? 'Emergency Rollback!' : 'Rollback Checked'}`;
+                                    label = `✔  ${method === 'forceRevert' ? 'Emergency Rollback' : 'Rollback Checked'}`;
                                 } else if (normToolName === 'await' || normToolName === 'Await') {
                                     const { time } = parseArgs(toolCall.args);
                                     let sec = parseFloat(time) || 0;
