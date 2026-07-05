@@ -3488,19 +3488,18 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'visual_feedback') {
                             // Do a small 75ms delay before pushing
-                            setTimeout(() => {
-                                setMessages(prev => {
-                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                    const newMsgs = [...updatedPrev, {
-                                        id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-                                        role: 'system',
-                                        text: packet.content,
-                                        isVisualFeedback: true
-                                    }];
-                                    setCompletedIndex(newMsgs.length);
-                                    return newMsgs;
-                                });
-                            }, 75);
+                            await new Promise(r => setTimeout(r, 75));
+                            setMessages(prev => {
+                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                const newMsgs = [...updatedPrev, {
+                                    id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+                                    role: 'system',
+                                    text: packet.content,
+                                    isVisualFeedback: true
+                                }];
+                                setCompletedIndex(newMsgs.length);
+                                return newMsgs;
+                            });
                             continue;
                         }
                         if (packet.type === 'exec_start') {
@@ -5366,7 +5365,7 @@ export default function App({ args = [] }) {
                                 )}
                             </Box>
                             <Box>
-                                {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running') ? (
+                                {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running' && !statusText.toLowerCase().includes('waiting')) ? (
                                     <Box><Text color="white" bold>Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : wittyPhrase ? (
                                     <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>

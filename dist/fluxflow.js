@@ -5193,7 +5193,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
 Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
-1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace during execution to a specific turn checkpoint. Usage: ONLY in catastrophic codebase error/deletions. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop. Usage: ONLY in catastrophic situations. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
 ` : ""}
 -- SUB AGENTS DEFINITIONS --
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
@@ -12702,7 +12702,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
         }
         let lastUsage = null;
-        const MAX_LOOPS = mode === "Flux" ? 70 : 7;
+        const MAX_LOOPS = mode === "Flux" ? 100 : 10;
         const MAX_RETRIES = 16;
         yield { type: "status", content: "Connecting..." };
         TERMINATION_SIGNAL = false;
@@ -12895,7 +12895,7 @@ ${ideErr} [/ERROR]`;
                 }
               }
               if (isGemma) {
-                const stepThreshold = Math.floor(MAX_LOOPS * (mode === "Flux" ? 0.98 : 0.7));
+                const stepThreshold = Math.floor(MAX_LOOPS * (mode === "Flux" ? 0.98 : 0.8));
                 const currentStep = loop + 1;
                 if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                   lastUserMsg.parts[0].text += `
@@ -18506,19 +18506,18 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
-              setTimeout(() => {
-                setMessages((prev) => {
-                  const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-                  const newMsgs = [...updatedPrev, {
-                    id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
-                    role: "system",
-                    text: packet.content,
-                    isVisualFeedback: true
-                  }];
-                  setCompletedIndex(newMsgs.length);
-                  return newMsgs;
-                });
-              }, 75);
+              await new Promise((r) => setTimeout(r, 75));
+              setMessages((prev) => {
+                const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+                const newMsgs = [...updatedPrev, {
+                  id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
+                  role: "system",
+                  text: packet.content,
+                  isVisualFeedback: true
+                }];
+                setCompletedIndex(newMsgs.length);
+                return newMsgs;
+              });
               continue;
             }
             if (packet.type === "exec_start") {
@@ -19822,7 +19821,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React15.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running") ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "Waiting for API"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React15.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "Waiting for API"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
           Box14,
           {
             backgroundColor: "#555555",

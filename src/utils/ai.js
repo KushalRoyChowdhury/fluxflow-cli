@@ -2323,7 +2323,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         let lastUsage = null;
-        const MAX_LOOPS = mode === 'Flux' ? 70 : 7;
+        const MAX_LOOPS = mode === 'Flux' ? 100 : 10;
         const MAX_RETRIES = 16;
         yield { type: 'status', content: 'Connecting...' };
 
@@ -2555,7 +2555,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // [JIT STEP SENTRY] - Only inject step warning if loop is at >= 80% of MAX_LOOPS for Flow and 98% for Flux
                     // Keeps prompts fully cached and static for the vast majority of runs!
                     if (isGemma) {
-                        const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.7));
+                        const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.8));
                         const currentStep = loop + 1;
                         if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                             lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
