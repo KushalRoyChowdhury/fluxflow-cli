@@ -4806,6 +4806,31 @@ export default function App({ args = [] }) {
                         </Box>
                     </Box>
                 );
+            case 'advanceRollbackDanger':
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} paddingTop={0} width="100%">
+                        <Text color="white" bold>⚠ Emergency Rollback Notice</Text>
+                        <Text marginTop={1}>When enabled, full repo snapshots exist only during active AI turns.</Text>
+                        <Text marginTop={1}>If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase).</Text>
+                        <Text>The agent may be able to automatically restore the repo to a safe state.</Text>
+                        <Text marginTop={1}>Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content.</Text>
+                        <Box marginTop={1}>
+                            <CommandMenu
+                                title="Confirm"
+                                items={[
+                                    { label: 'I understand and wish to enable', value: 'on' },
+                                    { label: 'Keep Off', value: 'off' }
+                                ]}
+                                onSelect={(item) => {
+                                    if (item.value === 'on') {
+                                        setSystemSettings(s => ({ ...s, advanceRollback: true }));
+                                    }
+                                    setActiveView('settings');
+                                }}
+                            />
+                        </Box>
+                    </Box>
+                );
             case 'externalDanger':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">

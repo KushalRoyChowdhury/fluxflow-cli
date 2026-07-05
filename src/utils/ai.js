@@ -6,7 +6,7 @@ import { dispatchTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
 import { fileURLToPath } from 'url';
-import path from 'path';
+import path, { normalize } from 'path';
 import fs from 'fs';
 import { view_file } from '../tools/view_file.js';
 import { emojiSpace } from './terminal.js';
@@ -16,6 +16,7 @@ import { subagentProgress } from './subagent_state.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
+import { AdvanceRevertManager } from './advanceRevert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 import { type } from 'os';
 
@@ -24,7 +25,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -1706,6 +1707,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     agentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
 
     await RevertManager.startTransaction(chatId, agentText);
+    if (systemSettings?.advanceRollback) {
+        await AdvanceRevertManager.takeInitialSnapshot(chatId);
+    }
 
     TERMINATION_SIGNAL = false;
 
@@ -1866,7 +1870,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             'EFI', 'boot', 'grub',
 
             // --- Linters, Formatters, Logs & QA ---
-            'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache'
+            'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter'
         ];
 
         // Helper to safely read a directory with its file types directly (saves disk hits!)
@@ -2341,6 +2345,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+            const currentTurnTools = [];
             wasToolCalledInLastLoop = false
             if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
@@ -3286,7 +3291,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'cancel') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
                                     label = `🛇  Cancelled${detail ? `: ${detail}` : ''}`;
-                                } else if (normToolName === 'await') {
+                                } else if (normToolName === 'EmergencyRollback') {
+                                    label = `✔  Rollback`;
+                                } else if (normToolName === 'await' || normToolName === 'Await') {
                                     const { time } = parseArgs(toolCall.args);
                                     let sec = parseFloat(time) || 0;
                                     if (sec < 10) sec = 10;
@@ -3996,6 +4003,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     } catch (e) { }
                                 }
 
+                                currentTurnTools.push(normToolName);
                                 let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                                 yield { type: 'spinner', content: true };
 
@@ -4478,6 +4486,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 isStutteringLoop = false;
                 isGeneralLoop = false;
             }
+            if (systemSettings?.advanceRollback) {
+                await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
+            }
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
 
@@ -4519,6 +4530,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             connectionPollInterval = null;
         }
         await RevertManager.commitTransaction();
+        if (systemSettings?.advanceRollback) {
+            await AdvanceRevertManager.cleanup(chatId);
+        }
     }
     yield { type: 'status', content: null };
 };
@@ -4549,7 +4563,8 @@ TOOL POLICY:
 - USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
 - FileMap >>> ReadFile to understand file efficiently
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
-- HUGE FILES? SearchKeyword >> FileMap/Full Read\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
+- HUGE FILES? SearchKeyword >> FileMap/Full Read
+- NO Terminal Access\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n)

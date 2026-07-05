@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS = {
         compression: 0.0,
         autoExec: false,
         allowExternalAccess: false,
+        advanceRollback: false,
         autoDeleteHistory: '7d',
         useExternalData: false,
         externalDataPath: ''

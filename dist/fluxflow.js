@@ -42,6 +42,7 @@ __export(paths_exports, {
   FLUXFLOW_DIR: () => FLUXFLOW_DIR,
   HISTORY_DIR: () => HISTORY_DIR,
   HISTORY_FILE: () => HISTORY_FILE,
+  LEDGER_ADVANCE_FILE: () => LEDGER_ADVANCE_FILE,
   LEDGER_FILE: () => LEDGER_FILE,
   LOGS_DIR: () => LOGS_DIR,
   MEMORIES_FILE: () => MEMORIES_FILE,
@@ -57,7 +58,7 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, HISTORY_DIR, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
+var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, HISTORY_DIR, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, LEDGER_ADVANCE_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
 var init_paths = __esm({
   "src/utils/paths.js"() {
     FLUXFLOW_DIR = path.join(os.homedir(), ".fluxflow");
@@ -101,6 +102,7 @@ var init_paths = __esm({
     TEMP_MEM_CHAT_FILE = path.join(SECRET_DIR, "temp-memory-chat.json");
     BACKUPS_DIR = path.join(DATA_DIR, "backups");
     LEDGER_FILE = path.join(SECRET_DIR, "ledger.json");
+    LEDGER_ADVANCE_FILE = path.join(SECRET_DIR, "ledgerAdvance.json");
     ACTIVE_TX_FILE = path.join(SECRET_DIR, "active_tx.json");
     PATHS_FILE = path.join(SECRET_DIR, "path.json");
     CONTEXT_FILE = path.join(SECRET_DIR, "context.json");
@@ -136,6 +138,7 @@ var init_crypto = __esm({
       return iv.toString("hex") + ":" + encrypted;
     };
     decryptAes = (encryptedText) => {
+      if (bypass) return encryptedText;
       const parts = encryptedText.split(":");
       if (parts.length !== 2) {
         throw new Error("Invalid AES format");
@@ -318,6 +321,7 @@ var init_settings = __esm({
         compression: 0,
         autoExec: false,
         allowExternalAccess: false,
+        advanceRollback: false,
         autoDeleteHistory: "7d",
         useExternalData: false,
         externalDataPath: ""
@@ -5162,7 +5166,7 @@ var init_main_tools = __esm({
       }
       return _isPsAvailable;
     };
-    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
+    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
 -- TOOL DEFINITIONS --
 Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
@@ -5186,7 +5190,10 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
-
+${advanceRollback ? `
+- EMERGENCY SAFETY TOOLS -
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace during execution to a specific turn checkpoint. Usage: ONLY in catastrophic codebase error/deletions. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
+` : ""}
 -- SUB AGENTS DEFINITIONS --
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
 
@@ -5944,6 +5951,7 @@ function SettingsMenu({
           { label: "Auto Approve Commands", value: "autoApprove", status: truncateCSV(systemSettings.autoApproveCommands), section: "Sandbox" },
           { label: "Auto Disapprove Commands", value: "autoDisallow", status: truncateCSV(systemSettings.autoDisallowCommands), section: "Sandbox" },
           { label: "Auto Approve Git Commits", value: "autoApproveGit", status: systemSettings.autoApproveGit ? "ON" : "OFF", section: "Sandbox" },
+          { label: "Advanced Rollback [EXPERIMENTAL]", value: "advanceRollback", status: systemSettings.advanceRollback ? "ON" : "OFF", section: "Other" },
           { label: "Auto-Delete History", value: "autoDelete", status: systemSettings.autoDeleteHistory || "30d", section: "Other" },
           { label: "Save AppData Externally", value: "externalData", status: systemSettings.useExternalData ? "ON" : "OFF", section: "Other" }
         ];
@@ -6075,6 +6083,16 @@ function SettingsMenu({
       setActiveView("apiTier");
     } else if (item.value === "aiProvider") {
       setActiveView("selectProvider");
+    } else if (item.value === "advanceRollback") {
+      if (!systemSettings.advanceRollback) {
+        setActiveView("advanceRollbackDanger");
+      } else {
+        setSystemSettings((s) => {
+          const newSysSettings = { ...s, advanceRollback: false };
+          saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+          return newSysSettings;
+        });
+      }
     } else if (item.value === "autoDelete") {
       const options = ["1d", "7d", "30d"];
       const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || "30d");
@@ -6544,7 +6562,7 @@ ${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && !isGemini ? `
 CRITICAL THINKING POLICY
 - ALWAYS use <think> ... </think> before responding, even with simple queries/greetings
 ` : ""}` : `${thinkingConfig}`}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider)}
+${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
 -- MEMORY RULES --
 - Memory: ${isMemoryEnabled ? "Subtly Personalize. Auto Saves" : "OFF. Decline Remembering Memories"}
@@ -10044,6 +10062,281 @@ var init_await = __esm({
   }
 });
 
+// src/utils/advanceRevert.js
+import fs21 from "fs-extra";
+import path20 from "path";
+async function scanWorkspace(dir, baseDir = dir) {
+  const manifest = {};
+  const entries = await fs21.readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (JUNK_DIRECTORIES.includes(entry.name)) continue;
+    const fullPath = path20.join(dir, entry.name);
+    const relPath = path20.relative(baseDir, fullPath).replace(/\\/g, "/");
+    if (entry.isDirectory()) {
+      const sub = await scanWorkspace(fullPath, baseDir);
+      Object.assign(manifest, sub);
+    } else {
+      const stats = await fs21.stat(fullPath).catch(() => null);
+      if (stats) {
+        manifest[relPath] = {
+          size: stats.size,
+          mtime: stats.mtimeMs
+        };
+      }
+    }
+  }
+  return manifest;
+}
+async function copyWorkspaceFiles(destDir, manifest) {
+  await fs21.ensureDir(destDir);
+  for (const relPath of Object.keys(manifest)) {
+    const srcPath = path20.join(process.cwd(), relPath);
+    const destPath = path20.join(destDir, relPath);
+    await fs21.ensureDir(path20.dirname(destPath));
+    await fs21.copyFile(srcPath, destPath).catch(() => {
+    });
+  }
+}
+async function restoreSnapshotDir(srcDir, destDir) {
+  if (!await fs21.pathExists(srcDir)) return;
+  const entries = await fs21.readdir(srcDir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const srcPath = path20.join(srcDir, entry.name);
+    const destPath = path20.join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      await restoreSnapshotDir(srcPath, destPath);
+    } else {
+      if (await fs21.pathExists(destPath)) {
+        await fs21.chmod(destPath, 438).catch(() => {
+        });
+      }
+      await fs21.ensureDir(path20.dirname(destPath));
+      await fs21.copyFile(srcPath, destPath).catch(() => {
+      });
+      await fs21.chmod(destPath, 438).catch(() => {
+      });
+    }
+  }
+}
+var JUNK_DIRECTORIES, AdvanceRevertManager;
+var init_advanceRevert = __esm({
+  "src/utils/advanceRevert.js"() {
+    init_paths();
+    init_crypto();
+    JUNK_DIRECTORIES = [
+      "node_modules",
+      "dist",
+      "bin",
+      "logs",
+      ".git",
+      ".fluxflow",
+      "secret",
+      ".gemini",
+      ".agents",
+      "tmp",
+      "temp",
+      "build",
+      "out",
+      "snapshots"
+    ];
+    AdvanceRevertManager = {
+      async takeInitialSnapshot(chatId) {
+        try {
+          const snapshotsDir = path20.join(DATA_DIR, "snapshots", chatId);
+          await fs21.remove(snapshotsDir).catch(() => {
+          });
+          await fs21.ensureDir(snapshotsDir);
+          const manifest = await scanWorkspace(process.cwd());
+          await copyWorkspaceFiles(path20.join(snapshotsDir, "initial"), manifest);
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          ledger[chatId] = {
+            initialManifest: manifest,
+            currentManifest: manifest,
+            checkpoints: [
+              {
+                id: "initial",
+                timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+                newFiles: [],
+                modifiedFiles: [],
+                deletedFiles: [],
+                toolsUsed: []
+              }
+            ]
+          };
+          writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
+        } catch (err) {
+        }
+      },
+      async recordTurnDelta(chatId, turnNumber, toolsUsed = []) {
+        try {
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          const session = ledger[chatId];
+          if (!session) return;
+          const previousManifest = session.currentManifest || session.initialManifest;
+          const currentManifest = await scanWorkspace(process.cwd());
+          const newFiles = [];
+          const modifiedFiles = [];
+          const deletedFiles = [];
+          for (const [relPath, info] of Object.entries(currentManifest)) {
+            const prev = previousManifest[relPath];
+            if (!prev) {
+              newFiles.push(relPath);
+            } else if (prev.size !== info.size || prev.mtime !== info.mtime) {
+              modifiedFiles.push(relPath);
+            }
+          }
+          for (const relPath of Object.keys(previousManifest)) {
+            if (!currentManifest[relPath]) {
+              deletedFiles.push(relPath);
+            }
+          }
+          const changedFiles = [...newFiles, ...modifiedFiles];
+          if (changedFiles.length > 0 || deletedFiles.length > 0) {
+            const deltaManifest = {};
+            for (const file of changedFiles) {
+              deltaManifest[file] = currentManifest[file];
+            }
+            const turnDir = path20.join(DATA_DIR, "snapshots", chatId, `turn_${turnNumber}`);
+            await copyWorkspaceFiles(turnDir, deltaManifest);
+          }
+          session.checkpoints.push({
+            id: `turn_${turnNumber}`,
+            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+            newFiles,
+            modifiedFiles,
+            deletedFiles,
+            toolsUsed
+          });
+          session.currentManifest = currentManifest;
+          writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
+        } catch (err) {
+        }
+      },
+      async getCheckpoints(chatId) {
+        try {
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          const session = ledger[chatId];
+          if (!session) return [];
+          return session.checkpoints || [];
+        } catch (err) {
+          return [];
+        }
+      },
+      async rollbackToCheckpoint(chatId, checkpointId) {
+        try {
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          const session = ledger[chatId];
+          if (!session) throw new Error("No session active for Advance Rollback.");
+          const checkpoints = session.checkpoints || [];
+          const targetIdx = checkpoints.findIndex((c) => c.id === checkpointId);
+          if (targetIdx === -1) throw new Error(`Checkpoint [${checkpointId}] not found.`);
+          const snapshotsDir = path20.join(DATA_DIR, "snapshots", chatId);
+          const currentFiles = await scanWorkspace(process.cwd());
+          for (const relPath of Object.keys(currentFiles)) {
+            const fullPath = path20.join(process.cwd(), relPath);
+            await fs21.chmod(fullPath, 438).catch(() => {
+            });
+            await fs21.remove(fullPath).catch(() => {
+            });
+          }
+          const initialDir = path20.join(snapshotsDir, "initial");
+          await restoreSnapshotDir(initialDir, process.cwd());
+          for (let i = 1; i <= targetIdx; i++) {
+            const cp = checkpoints[i];
+            const turnDir = path20.join(snapshotsDir, cp.id);
+            await restoreSnapshotDir(turnDir, process.cwd());
+            if (cp.deletedFiles && cp.deletedFiles.length > 0) {
+              for (const delFile of cp.deletedFiles) {
+                const fullPath = path20.join(process.cwd(), delFile);
+                await fs21.chmod(fullPath, 438).catch(() => {
+                });
+                await fs21.remove(fullPath).catch(() => {
+                });
+              }
+            }
+          }
+          session.checkpoints = checkpoints.slice(0, targetIdx + 1);
+          session.currentManifest = await scanWorkspace(process.cwd());
+          writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
+          return true;
+        } catch (err) {
+          throw new Error(`Rollback failed: ${err.message}`);
+        }
+      },
+      async cleanup(chatId) {
+        try {
+          const snapshotsDir = path20.join(DATA_DIR, "snapshots", chatId);
+          await fs21.remove(snapshotsDir).catch(() => {
+          });
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          if (ledger[chatId]) {
+            delete ledger[chatId];
+            writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
+          }
+        } catch (err) {
+        }
+      }
+    };
+  }
+});
+
+// src/tools/emergency_rollback.js
+var emergency_rollback;
+var init_emergency_rollback = __esm({
+  "src/tools/emergency_rollback.js"() {
+    init_arg_parser();
+    init_advanceRevert();
+    emergency_rollback = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const method = parsed.method;
+      const id = parsed.id;
+      const chatId = context.chatId;
+      const systemSettings = context.systemSettings;
+      if (!systemSettings?.advanceRollback) {
+        return "ERROR: Advance Rollback feature is currently disabled in settings under Security. Tell user to enable it.";
+      }
+      if (!chatId) {
+        return "ERROR: No active chat transaction found for rollback.";
+      }
+      if (method === "getCheckpoint") {
+        const checkpoints = await AdvanceRevertManager.getCheckpoints(chatId);
+        if (checkpoints.length === 0) {
+          return "No checkpoints available.";
+        }
+        let output = "Available checkpoints for rollback:\n\n";
+        for (const cp of checkpoints) {
+          if (cp.id === "initial") {
+            output += `--- Initial State (id: initial) ---
+Tools Used: None
+
+`;
+          } else {
+            const turnNum = cp.id.replace("turn_", "");
+            const toolsStr = cp.toolsUsed && cp.toolsUsed.length > 0 ? cp.toolsUsed.join(", ") : "None";
+            output += `--- Turn ${turnNum} (id: ${cp.id}) ---
+Tools Used: ${toolsStr}
+
+`;
+          }
+        }
+        return output.trim();
+      } else if (method === "forceRevert") {
+        if (!id) {
+          return "ERROR: Missing required parameter 'id' for forceRevert.";
+        }
+        try {
+          await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
+          return `SUCCESS: Repository rolled back to checkpoint [${id}].`;
+        } catch (err) {
+          return `ERROR: ${err.message}`;
+        }
+      } else {
+        return `ERROR: Invalid method "${method}". Use "getCheckpoint" or "forceRevert".`;
+      }
+    };
+  }
+});
+
 // src/utils/tools.js
 var TOOL_MAP, dispatchTool;
 var init_tools = __esm({
@@ -10071,6 +10364,7 @@ var init_tools = __esm({
     init_getProgress();
     init_cancel();
     init_await();
+    init_emergency_rollback();
     TOOL_MAP = {
       web_search,
       web_scrape,
@@ -10126,7 +10420,9 @@ var init_tools = __esm({
       GetProgress: getProgress,
       Cancel: cancel,
       await: awaitTool,
-      Await: awaitTool
+      Await: awaitTool,
+      EmergencyRollback: emergency_rollback,
+      emergency_rollback
     };
     dispatchTool = async (toolName, args, context = {}) => {
       const mode = context.mode ? context.mode.toLowerCase() : "flux";
@@ -10276,8 +10572,8 @@ __export(ai_exports, {
   signalTermination: () => signalTermination
 });
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
-import path20 from "path";
-import fs21 from "fs";
+import path21, { normalize } from "path";
+import fs22 from "fs";
 var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
@@ -10294,12 +10590,13 @@ var init_ai = __esm({
     init_subagent_state();
     init_paths();
     init_revert();
+    init_advanceRevert();
     init_editor();
     client = null;
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -10902,7 +11199,7 @@ var init_ai = __esm({
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-        return filePath ? path20.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
+        return filePath ? path21.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
       } catch (e) {
         return null;
       }
@@ -11143,9 +11440,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             }
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
-          const janitorErrDir = path20.join(LOGS_DIR, "janitor");
-          if (!fs21.existsSync(janitorErrDir)) fs21.mkdirSync(janitorErrDir, { recursive: true });
-          fs21.appendFileSync(path20.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          const janitorErrDir = path21.join(LOGS_DIR, "janitor");
+          if (!fs22.existsSync(janitorErrDir)) fs22.mkdirSync(janitorErrDir, { recursive: true });
+          fs22.appendFileSync(path21.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -11154,8 +11451,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }
       }
       if (attempts) {
-        const janitorErrDir = path20.join(LOGS_DIR, "janitor");
-        fs21.appendFileSync(path20.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        const janitorErrDir = path21.join(LOGS_DIR, "janitor");
+        fs22.appendFileSync(path21.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
         if (attempts >= MAX_JANITOR_RETRIES) {
@@ -11635,10 +11932,10 @@ ${newMemoryListStr}
           }
         })() : String(err);
         ;
-        const janitorLogDir = path20.join(LOGS_DIR, "janitor");
-        if (!fs21.existsSync(janitorLogDir)) fs21.mkdirSync(janitorLogDir, { recursive: true });
-        fs21.appendFileSync(
-          path20.join(janitorLogDir, "error.log"),
+        const janitorLogDir = path21.join(LOGS_DIR, "janitor");
+        if (!fs22.existsSync(janitorLogDir)) fs22.mkdirSync(janitorLogDir, { recursive: true });
+        fs22.appendFileSync(
+          path21.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
         );
@@ -11646,7 +11943,7 @@ ${newMemoryListStr}
     };
     compressHistory = async (settings, history, isAuto = false) => {
       const { chatId, aiProvider = "Google" } = settings;
-      const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path21.join(SECRET_DIR, "chat-summaries.json");
       const flattenContext = (hist) => {
         return hist.filter(
           (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
@@ -11720,8 +12017,8 @@ Provide a consolidated summary of the entire session.`;
     };
     deleteChatSummary = (chatId) => {
       try {
-        const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
-        if (fs21.existsSync(summariesFile)) {
+        const summariesFile = path21.join(SECRET_DIR, "chat-summaries.json");
+        if (fs22.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -11737,7 +12034,7 @@ Provide a consolidated summary of the entire session.`;
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
       const originalText = history[history.length - 1].text;
-      const summariesFile = path20.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path21.join(SECRET_DIR, "chat-summaries.json");
       let wasCompressedInStream = false;
       const isFirstPrompt = history.filter((m) => m.role === "user").length === 1;
       const hasTitleSignal = originalText.includes("[TITLE-UPDATE]");
@@ -11745,6 +12042,9 @@ Provide a consolidated summary of the entire session.`;
       let agentText = originalText.replace(/\[TITLE-UPDATE\]/g, "").trim();
       agentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
       await RevertManager.startTransaction(chatId, agentText);
+      if (systemSettings?.advanceRollback) {
+        await AdvanceRevertManager.takeInitialSnapshot(chatId);
+      }
       TERMINATION_SIGNAL = false;
       let connectionPollInterval = null;
       try {
@@ -11969,11 +12269,12 @@ Provide a consolidated summary of the entire session.`;
           "log",
           ".nyc_output",
           ".sonar",
-          ".ruff_cache"
+          ".ruff_cache",
+          ".VSCodeCounter"
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs21.readdirSync(dir, { withFileTypes: true });
+            return fs22.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -11986,16 +12287,16 @@ Provide a consolidated summary of the entire session.`;
             if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
             if (entry.isDirectory()) {
               currentCount.value++;
-              countFolders(path20.join(dir, entry.name), currentCount, depth + 1);
+              countFolders(path21.join(dir, entry.name), currentCount, depth + 1);
             }
           }
           return currentCount.value;
         };
         const getDirTree = (dir, maxDepth, prefix = "", depth = 1) => {
           const entries = safeReaddirWithTypes(dir);
-          const sep = path20.sep;
+          const sep = path21.sep;
           if (entries.length > 100) {
-            return `${prefix}\u2514\u2500\u2500 ${path20.basename(dir)}${sep} ...100+ files...
+            return `${prefix}\u2514\u2500\u2500 ${path21.basename(dir)}${sep} ...100+ files...
 `;
           }
           let result = "";
@@ -12013,7 +12314,7 @@ Provide a consolidated summary of the entire session.`;
           ];
           finalItems.forEach((item, index) => {
             const isLast = index === finalItems.length - 1;
-            const filePath = path20.join(dir, item.name);
+            const filePath = path21.join(dir, item.name);
             const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
             const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
             if (item.isCollapsed) {
@@ -12099,10 +12400,10 @@ ${currentSummary}
         if (isBridgeConnected()) {
           ideBlock = "[IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
-            const relFocused = path20.relative(process.cwd(), ideCtx.file_focused);
+            const relFocused = path21.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
-              const rel = path20.relative(process.cwd(), p);
-              return rel.startsWith("..") ? `[External] ${path20.basename(p)}` : rel;
+              const rel = path21.relative(process.cwd(), p);
+              return rel.startsWith("..") ? `[External] ${path21.basename(p)}` : rel;
             });
             ideBlock += `Focused File: ${relFocused}
 Cursor Line: ${ideCtx.cursor_line}
@@ -12144,7 +12445,7 @@ Cursor Line: ${ideCtx.cursor_line}
               }
               const getSumForLimit = (limit, activeFiles2) => {
                 return activeFiles2.reduce((sum, f) => {
-                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path20.resolve(process.cwd(), f.path) === path20.resolve(ideCtx.file_focused));
+                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path21.resolve(process.cwd(), f.path) === path21.resolve(ideCtx.file_focused));
                   const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
                   return sum + Math.min(f.edits.length, fileLimit);
                 }, 0);
@@ -12178,7 +12479,7 @@ Cursor Line: ${ideCtx.cursor_line}
                 }
               }
               for (const file of activeFiles) {
-                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path20.resolve(process.cwd(), file.path) === path20.resolve(ideCtx.file_focused));
+                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path21.resolve(process.cwd(), file.path) === path21.resolve(ideCtx.file_focused));
                 const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
                 if (file.edits.length > fileLimit) {
                   file.edits = file.edits.slice(-fileLimit);
@@ -12262,9 +12563,9 @@ ${ideCtx.warnings}
               endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
               filePath = tagClean.slice(0, matchRange.index);
             }
-            const absPath = path20.resolve(process.cwd(), filePath);
-            if (fs21.existsSync(absPath)) {
-              const stats = fs21.statSync(absPath);
+            const absPath = path21.resolve(process.cwd(), filePath);
+            if (fs22.existsSync(absPath)) {
+              const stats = fs22.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -12273,7 +12574,7 @@ ${ideCtx.warnings}
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
                 const isSupported = aiProvider === "Google" || MULTIMODAL_MODELS.includes(modelName);
                 if (isMultimodalFile && !isSupported) {
-                  const label = `\u2718 Unsupported Modality: ${path20.basename(filePath)}`;
+                  const label = `\u2718 Unsupported Modality: ${path21.basename(filePath)}`;
                   let terminalWidth = 115;
                   if (process.stdout.isTTY) {
                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -12326,7 +12627,7 @@ ${boxMid}
                   } else {
                     let totalLines = "...";
                     try {
-                      const content = fs21.readFileSync(absPath, "utf8");
+                      const content = fs22.readFileSync(absPath, "utf8");
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
@@ -12386,6 +12687,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           }
         });
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+          const currentTurnTools = [];
           wasToolCalledInLastLoop = false;
           if (systemSettings?.compression === 0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
@@ -12970,7 +13272,7 @@ ${ideErr} [/ERROR]`;
                       if (keyword) {
                         detail = keyword.replace(/["']/g, "");
                       } else if (filePath) {
-                        detail = path20.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
+                        detail = path21.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
                         detail = title.replace(/["']/g, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
@@ -12999,7 +13301,7 @@ ${ideErr} [/ERROR]`;
                           if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
                             detail = val.substring(0, 30);
                           } else {
-                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path20.basename(val.replace(/\\/g, "/"));
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path21.basename(val.replace(/\\/g, "/"));
                           }
                         }
                       }
@@ -13199,9 +13501,9 @@ ${ideErr} [/ERROR]`;
                       let totalLines = "...";
                       let actualEndLine = eLine;
                       try {
-                        const absPath = path20.resolve(process.cwd(), targetPath2);
-                        if (fs21.existsSync(absPath)) {
-                          const content = fs21.readFileSync(absPath, "utf8");
+                        const absPath = path21.resolve(process.cwd(), targetPath2);
+                        if (fs22.existsSync(absPath)) {
+                          const content = fs22.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           actualEndLine = Math.min(eLine, lines);
@@ -13221,8 +13523,8 @@ ${ideErr} [/ERROR]`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path22 = parseArgs(toolCall.args).path;
-                      label = `\u2714  ${action}: ${path22 === "." ? "./" : path22}`;
+                      const path23 = parseArgs(toolCall.args).path;
+                      label = `\u2714  ${action}: ${path23 === "." ? "./" : path23}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
@@ -13251,7 +13553,9 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName === "cancel") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
                       label = `\u{1F6C7}  Cancelled${detail2 ? `: ${detail2}` : ""}`;
-                    } else if (normToolName === "await") {
+                    } else if (normToolName === "EmergencyRollback") {
+                      label = `\u2714  Rollback`;
+                    } else if (normToolName === "await" || normToolName === "Await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
                       if (sec < 10) sec = 10;
@@ -13305,7 +13609,7 @@ ${ideErr} [/ERROR]`;
                       const { command } = parseArgs(toolCall.args);
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
-                        const currentDrive = path20.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                        const currentDrive = path21.resolve(process.cwd()).substring(0, 3).toLowerCase();
                         const splitCommands = (cmdString) => {
                           const commands = [];
                           let current = "";
@@ -13434,8 +13738,8 @@ ${ideErr} [/ERROR]`;
                     const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
                     if (targetPath) {
                       const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                      const absoluteTarget = path20.resolve(targetPath);
-                      const absoluteCwd = path20.resolve(process.cwd());
+                      const absoluteTarget = path21.resolve(targetPath);
+                      const absoluteCwd = path21.resolve(process.cwd());
                       if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                         if (normToolName === "write_file" || normToolName === "update_file") {
@@ -13624,18 +13928,18 @@ ${boxMid}`) };
                               const toolArgs = parseArgs(toolCall.args);
                               const { path: filePath } = toolArgs;
                               if (filePath) {
-                                const absPath = path20.resolve(process.cwd(), filePath);
-                                const normalize = (p) => p ? p.toLowerCase().replace(/\\/g, "/").replace(/^[a-z]:/, (m) => m.toUpperCase()) : "";
-                                const normAbsPath = normalize(absPath);
+                                const absPath = path21.resolve(process.cwd(), filePath);
+                                const normalize2 = (p) => p ? p.toLowerCase().replace(/\\/g, "/").replace(/^[a-z]:/, (m) => m.toUpperCase()) : "";
+                                const normAbsPath = normalize2(absPath);
                                 let originalContent = "";
                                 let hasOriginal = false;
                                 const currentIDE = await getIDEContext();
-                                const normFocused = normalize(currentIDE?.file_focused);
+                                const normFocused = normalize2(currentIDE?.file_focused);
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs21.existsSync(absPath)) {
-                                  originalContent = fs21.readFileSync(absPath, "utf8");
+                                } else if (fs22.existsSync(absPath)) {
+                                  originalContent = fs22.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -13662,9 +13966,9 @@ ${boxMid}`) };
                                     const successes = patchResults.filter((r) => r.success);
                                     const failures = patchResults.filter((r) => !r.success);
                                     if (successes.length === 0) {
-                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path20.basename(absPath)}].
+                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path21.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path20.basename(absPath)}`.toUpperCase();
+                                      const errorLabel = `\u2714  Edited: ${path21.basename(absPath)}`.toUpperCase();
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -13682,19 +13986,19 @@ ${boxMid}}`) };
                                       continue;
                                     }
                                   }
-                                  yield { type: "status", content: `Opening Diff in IDE: ${path20.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening Diff in IDE: ${path21.basename(absPath)}...` };
                                   showDiffInIDE(absPath, originalContent, modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs21.existsSync(absPath)) {
+                                  if (!fs22.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs21.mkdirSync(path20.dirname(absPath), { recursive: true });
-                                    fs21.writeFileSync(absPath, "", "utf8");
+                                    fs22.mkdirSync(path21.dirname(absPath), { recursive: true });
+                                    fs22.writeFileSync(absPath, "", "utf8");
                                   }
-                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path20.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path21.basename(absPath)}...` };
                                   showDiffInIDE(absPath, "", modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -13730,11 +14034,11 @@ ${boxMid}}`) };
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const { path: filePath } = parseArgs(toolCall.args);
                             if (filePath) {
-                              const absPath = path20.resolve(process.cwd(), filePath);
+                              const absPath = path21.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs21.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs22.existsSync(absPath)) {
                                 try {
-                                  fs21.unlinkSync(absPath);
+                                  fs22.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -13746,13 +14050,13 @@ ${boxMid}}`) };
                         }
                         if (approval === "allow" && diffOpened && isBridgeConnected()) {
                           const { path: filePath } = parseArgs(toolCall.args);
-                          const absPath = path20.resolve(process.cwd(), filePath);
+                          const absPath = path21.resolve(process.cwd(), filePath);
                           const finalIDE = await getIDEContext();
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs21.existsSync(absPath)) {
-                            finalContent = fs21.readFileSync(absPath, "utf8");
+                          } else if (fs22.existsSync(absPath)) {
+                            finalContent = fs22.readFileSync(absPath, "utf8");
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -13915,7 +14219,7 @@ ${boxBottom}`}`) };
                       try {
                         const { path: filePath } = parseArgs(toolCall.args);
                         if (filePath) {
-                          const absPath = path20.resolve(process.cwd(), filePath);
+                          const absPath = path21.resolve(process.cwd(), filePath);
                           const currentIDE = await getIDEContext();
                           if (currentIDE && currentIDE.file_focused === absPath && currentIDE.full_content) {
                             execToolContext.forcedContent = currentIDE.full_content;
@@ -13924,12 +14228,13 @@ ${boxBottom}`}`) };
                       } catch (e) {
                       }
                     }
+                    currentTurnTools.push(normToolName);
                     let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
                     yield { type: "spinner", content: true };
                     if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
-                        const absPath = path20.resolve(process.cwd(), filePath);
+                        const absPath = path21.resolve(process.cwd(), filePath);
                         openFileInEditor(absPath);
                       }
                     }
@@ -14173,9 +14478,9 @@ ${colorMainWords(output)}` };
               })() : String(err);
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
-              const agentErrDir = path20.join(LOGS_DIR, "agent");
-              if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
-              fs21.appendFileSync(path20.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              const agentErrDir = path21.join(LOGS_DIR, "agent");
+              if (!fs22.existsSync(agentErrDir)) fs22.mkdirSync(agentErrDir, { recursive: true });
+              fs22.appendFileSync(path21.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14222,7 +14527,7 @@ ${recoveryText}`
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
                   throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)
-Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               } else {
                 if (retryCount <= MAX_RETRIES) {
@@ -14240,7 +14545,7 @@ Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
                   yield { type: "status", content: `Trying to reach ${modelName}...` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
-Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               }
             }
@@ -14313,6 +14618,9 @@ Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
             isStutteringLoop = false;
             isGeneralLoop = false;
           }
+          if (systemSettings?.advanceRollback) {
+            await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
+          }
           wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
         modifiedHistory.forEach((msg) => {
@@ -14343,10 +14651,10 @@ Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
           }
         })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
-        const agentErrDir = path20.join(LOGS_DIR, "agent");
+        const agentErrDir = path21.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
-        if (!fs21.existsSync(agentErrDir)) fs21.mkdirSync(agentErrDir, { recursive: true });
-        fs21.appendFileSync(path20.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
+        if (!fs22.existsSync(agentErrDir)) fs22.mkdirSync(agentErrDir, { recursive: true });
+        fs22.appendFileSync(path21.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -14361,6 +14669,9 @@ Error Log can be found in ${path20.join(LOGS_DIR, "agent", "error.log")}`);
           connectionPollInterval = null;
         }
         await RevertManager.commitTransaction();
+        if (systemSettings?.advanceRollback) {
+          await AdvanceRevertManager.cleanup(chatId);
+        }
       }
       yield { type: "status", content: null };
     };
@@ -14387,6 +14698,7 @@ TOOL POLICY:
 - FileMap >>> ReadFile to understand file efficiently
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
 - HUGE FILES? SearchKeyword >> FileMap/Full Read
+- NO Terminal Access
 -- PROVIDED TOOLS --
 ${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}
 
@@ -14468,11 +14780,11 @@ ${cleanResponse}
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
             label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path22 = parseArgs(toolCall.args).path || "...";
-            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path22}`;
+            const path23 = parseArgs(toolCall.args).path || "...";
+            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path22 = parseArgs(toolCall.args).path || "...";
-            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path22}`;
+            const path23 = parseArgs(toolCall.args).path || "...";
+            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
             label = `\u2714 \x1B[95mIndexed\x1B[0m`;
           } else if (normalizedToolName === "await") {
@@ -15338,7 +15650,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs22 from "fs";
+import fs23 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -15347,11 +15659,11 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const pptrConfig = getPuppeteerConfig();
-        if (pptrConfig.executablePath && fs22.existsSync(pptrConfig.executablePath)) {
+        if (pptrConfig.executablePath && fs23.existsSync(pptrConfig.executablePath)) {
           return true;
         }
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs22.existsSync(exePath);
+        const exists = exePath && fs23.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -15384,8 +15696,8 @@ __export(app_exports, {
 import os5 from "os";
 import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs23 from "fs-extra";
-import path21 from "path";
+import fs24 from "fs-extra";
+import path22 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import TextInput4 from "ink-text-input";
@@ -15630,10 +15942,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs23.ensureDir(path21.dirname(kbPath));
+      await fs24.ensureDir(path22.dirname(kbPath));
       let bindings = [];
-      if (fs23.existsSync(kbPath)) {
-        const content = fs23.readFileSync(kbPath, "utf8").trim();
+      if (fs24.existsSync(kbPath)) {
+        const content = fs24.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -15653,7 +15965,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs23.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs24.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -16329,7 +16641,7 @@ function App({ args = [] }) {
   useEffect11(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs23.readFileSync(path21.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs24.readFileSync(path22.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -16452,7 +16764,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs23.remove(path21.join(DATA_DIR, "playground")).catch(() => {
+        fs24.remove(path22.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -16486,9 +16798,9 @@ function App({ args = [] }) {
         }
       }
       if (parsedArgs.playground) {
-        const playgroundDir = path21.join(DATA_DIR, "playground");
+        const playgroundDir = path22.join(DATA_DIR, "playground");
         try {
-          fs23.ensureDirSync(playgroundDir);
+          fs24.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -16529,8 +16841,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs23.existsSync(kbPath)) {
-              const content = fs23.readFileSync(kbPath, "utf8").trim();
+            if (fs24.existsSync(kbPath)) {
+              const content = fs24.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -17063,22 +17375,22 @@ ${cleanText}`, color: "magenta" }];
             });
             break;
           }
-          const src = path21.join(DATA_DIR, "playground");
-          const dest = path21.join(parsedArgs.originalCwd, "playground-export");
+          const src = path22.join(DATA_DIR, "playground");
+          const dest = path22.join(parsedArgs.originalCwd, "playground-export");
           const moveFiles = async () => {
             try {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs23.ensureDir(dest);
+              await fs24.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs23.copy(src, dest, {
+              await fs24.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
-                  const relative = path21.relative(src, srcPath);
+                  const relative = path22.relative(src, srcPath);
                   if (!relative) return true;
-                  const parts2 = relative.split(path21.sep);
+                  const parts2 = relative.split(path22.sep);
                   return !parts2.some((part) => excludeDirs.includes(part));
                 }
               });
@@ -17138,7 +17450,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs23.emptyDir(path21.join(DATA_DIR, "playground")).catch((err) => {
+              fs24.emptyDir(path22.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -17435,7 +17747,7 @@ ${cleanText}`, color: "magenta" }];
         }
         case "/export": {
           const exportFile = `export-fluxflow-${chatId}.txt`;
-          const exportPath = path21.join(process.cwd(), exportFile);
+          const exportPath = path22.join(process.cwd(), exportFile);
           const exportLines = [];
           let insideAgentBlock = false;
           for (let i = 0; i < messages.length; i++) {
@@ -17487,7 +17799,7 @@ ${cleanText}`, color: "magenta" }];
           }
           const fileContent = exportLines.join("\n");
           try {
-            fs23.writeFileSync(exportPath, fileContent, "utf8");
+            fs24.writeFileSync(exportPath, fileContent, "utf8");
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
               return [...prev, {
@@ -17534,12 +17846,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs23.existsSync(LOGS_DIR)) fs23.removeSync(LOGS_DIR);
-              if (fs23.existsSync(SECRET_DIR)) fs23.removeSync(SECRET_DIR);
-              if (fs23.existsSync(SETTINGS_FILE)) fs23.removeSync(SETTINGS_FILE);
+              if (fs24.existsSync(LOGS_DIR)) fs24.removeSync(LOGS_DIR);
+              if (fs24.existsSync(SECRET_DIR)) fs24.removeSync(SECRET_DIR);
+              if (fs24.existsSync(SETTINGS_FILE)) fs24.removeSync(SETTINGS_FILE);
               try {
-                const items = fs23.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs23.removeSync(FLUXFLOW_DIR);
+                const items = fs24.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs24.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -17661,15 +17973,15 @@ ${list || "No saved chats found."}`, isMeta: true }];
 # SKILLS & WORKFLOWS
 - [Define custom step-by-step recipes for this project here]
 `;
-            const filePath = path21.join(process.cwd(), "FluxFlow.md");
-            if (fs23.pathExistsSync(filePath)) {
+            const filePath = path22.join(process.cwd(), "FluxFlow.md");
+            if (fs24.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs23.writeFileSync(filePath, template);
+                fs24.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -19065,6 +19377,23 @@ Selection: ${val}`,
             }
           }
         )));
+      case "advanceRollbackDanger":
+        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React15.createElement(Text15, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+          CommandMenu,
+          {
+            title: "Confirm",
+            items: [
+              { label: "I understand and wish to enable", value: "on" },
+              { label: "Keep Off", value: "off" }
+            ],
+            onSelect: (item) => {
+              if (item.value === "on") {
+                setSystemSettings((s) => ({ ...s, advanceRollback: true }));
+              }
+              setActiveView("settings");
+            }
+          }
+        )));
       case "externalDanger":
         return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SECURITY WARNING: EXTERNAL WORKSPACE ACCESS"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Access to sensitive system files (SSH keys, Browser data, etc.)"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Potential for accidental or malicious deletion of OS-critical files."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Unauthorized script execution across your entire file system."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
           CommandMenu,
@@ -19712,11 +20041,11 @@ var init_app = __esm({
       if (process.platform === "win32") {
         const appData = process.env.APPDATA;
         if (!appData) return null;
-        return path21.join(appData, dirName, "User", "keybindings.json");
+        return path22.join(appData, dirName, "User", "keybindings.json");
       } else if (process.platform === "darwin") {
-        return path21.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
+        return path22.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
       } else {
-        return path21.join(home, ".config", dirName, "User", "keybindings.json");
+        return path22.join(home, ".config", dirName, "User", "keybindings.json");
       }
     };
     parseJsonc = (content) => {
@@ -19762,8 +20091,8 @@ var init_app = __esm({
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
     linesAdded = 0;
     linesRemoved = 0;
-    packageJsonPath = path21.join(path21.dirname(fileURLToPath2(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs23.readFileSync(packageJsonPath, "utf8"));
+    packageJsonPath = path22.join(path22.dirname(fileURLToPath2(import.meta.url)), "../package.json");
+    packageJson = JSON.parse(fs24.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React15.createElement(
@@ -19859,19 +20188,19 @@ var init_app = __esm({
         const fileList = [];
         const scan = (currentDir) => {
           try {
-            const files = fs23.readdirSync(currentDir);
+            const files = fs24.readdirSync(currentDir);
             for (const file of files) {
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
-              const filePath = path21.join(currentDir, file);
-              const stat = fs23.statSync(filePath);
+              const filePath = path22.join(currentDir, file);
+              const stat = fs24.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
                 fileList.push({
                   name: file,
-                  relativePath: path21.relative(process.cwd(), filePath)
+                  relativePath: path22.relative(process.cwd(), filePath)
                 });
               }
             }
@@ -19994,11 +20323,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isVersion = args.includes("--version") || args.includes("-v");
   const isUpdate = args[0] === "--update";
   if (isVersion || isHelp || isHelpCommands || isUpdate) {
-    const fs24 = await import("fs");
-    const path22 = await import("path");
+    const fs25 = await import("fs");
+    const path23 = await import("path");
     const { fileURLToPath: fileURLToPath4 } = await import("url");
-    const packageJsonPath2 = path22.join(path22.dirname(fileURLToPath4(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs24.readFileSync(packageJsonPath2, "utf8"));
+    const packageJsonPath2 = path23.join(path23.dirname(fileURLToPath4(import.meta.url)), "../package.json");
+    const packageJson2 = JSON.parse(fs25.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isVersion) {
       console.log(`v${versionFluxflow2}`);

@@ -21,6 +21,7 @@ import { invoke } from '../tools/invoke.js';
 import { getProgress } from '../tools/getProgress.js';
 import { cancel } from '../tools/cancel.js';
 import { awaitTool } from '../tools/await.js';
+import { emergency_rollback } from '../tools/emergency_rollback.js';
 
 
 const TOOL_MAP = {
@@ -79,7 +80,9 @@ const TOOL_MAP = {
     GetProgress: getProgress,
     Cancel: cancel,
     await: awaitTool,
-    Await: awaitTool
+    Await: awaitTool,
+    EmergencyRollback: emergency_rollback,
+    emergency_rollback: emergency_rollback
 };
 
 /**

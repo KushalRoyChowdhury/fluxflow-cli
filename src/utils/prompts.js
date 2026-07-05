@@ -98,7 +98,7 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux"
 ${aiProvider === 'Google' && !isGemini ? `${thinkingConfig}
 ${thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh' && !isGemini ? `\nCRITICAL THINKING POLICY
 - ALWAYS use <think> ... </think> before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}`}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider)}
+${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
 -- MEMORY RULES --
 - Memory: ${isMemoryEnabled ? 'Subtly Personalize. Auto Saves' : 'OFF. Decline Remembering Memories'}

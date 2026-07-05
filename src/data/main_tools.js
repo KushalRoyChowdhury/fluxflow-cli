@@ -15,7 +15,7 @@ export const isPsAvailable = () => {
     return _isPsAvailable;
 };
 
-export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider) => `
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
 -- TOOL DEFINITIONS --
 Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
@@ -39,7 +39,9 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY`) : `BASH`} command. Destructive/Irreversible ops → Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK → BREAK DOWN TASK → CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
-
+${advanceRollback ? `
+- EMERGENCY SAFETY TOOLS -
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace during execution to a specific turn checkpoint. Usage: ONLY in catastrophic codebase error/deletions. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint\n` : ''}
 -- SUB AGENTS DEFINITIONS --
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
 

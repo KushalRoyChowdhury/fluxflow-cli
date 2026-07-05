@@ -134,6 +134,7 @@ export default function SettingsMenu({
                     { label: 'Auto Approve Commands', value: 'autoApprove', status: truncateCSV(systemSettings.autoApproveCommands), section: 'Sandbox' },
                     { label: 'Auto Disapprove Commands', value: 'autoDisallow', status: truncateCSV(systemSettings.autoDisallowCommands), section: 'Sandbox' },
                     { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
+                    { label: 'Advanced Rollback [EXPERIMENTAL]', value: 'advanceRollback', status: systemSettings.advanceRollback ? 'ON' : 'OFF', section: 'Other' },
                     { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
                     { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' }
                 ];
@@ -269,6 +270,16 @@ export default function SettingsMenu({
             setActiveView('apiTier');
         } else if (item.value === 'aiProvider') {
             setActiveView('selectProvider');
+        } else if (item.value === 'advanceRollback') {
+            if (!systemSettings.advanceRollback) {
+                setActiveView('advanceRollbackDanger');
+            } else {
+                setSystemSettings(s => {
+                    const newSysSettings = { ...s, advanceRollback: false };
+                    saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                    return newSysSettings;
+                });
+            }
         } else if (item.value === 'autoDelete') {
             const options = ['1d', '7d', '30d'];
             const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || '30d');

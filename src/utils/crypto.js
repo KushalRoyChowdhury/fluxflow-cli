@@ -28,6 +28,7 @@ export const encryptAes = (text) => {
 };
 
 export const decryptAes = (encryptedText) => {
+    if (bypass) return encryptedText;
     const parts = encryptedText.split(':');
     if (parts.length !== 2) {
         throw new Error('Invalid AES format');
