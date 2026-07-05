@@ -501,7 +501,15 @@ export default function App({ args = [] }) {
                 const diff = Date.now() - lastGCTime || 0;
                 if (diff > 30000) {
                     if (global.gc) {
-                        try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                        const gCAsync = async () => {
+                            for (let i = 0; i < 1; i++) {
+                                global.gc();
+                                // Wait for the next tick of the event loop
+                                await new Promise(resolve => setImmediate(resolve));
+                            }
+                            lastGCTime = Date.now();
+                        }
+                        gCAsync();
                     }
                 }
                 // else console.log(lastGCTime, diff);
@@ -2465,7 +2473,14 @@ export default function App({ args = [] }) {
                     chatTokenStartRef.current = sessionTotalTokens;
                     setTimeout(() => {
                         if (global.gc) {
-                            try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                            const gCAsync = async () => {
+                                for (let i = 0; i < 5; i++) {
+                                    global.gc();
+                                    await new Promise(resolve => setImmediate(resolve));
+                                }
+                                lastGCTime = Date.now();
+                            }
+                            gCAsync();
                         }
                     }, 500);
                     break;
@@ -2485,7 +2500,14 @@ export default function App({ args = [] }) {
                     });
                     setTimeout(() => {
                         if (global.gc) {
-                            try { global.gc(); lastGCTime = Date.now(); } catch (e) { }
+                            const gCAsync = async () => {
+                                for (let i = 0; i < 5; i++) {
+                                    global.gc();
+                                    await new Promise(resolve => setImmediate(resolve));
+                                }
+                                lastGCTime = Date.now();
+                            }
+                            gCAsync();
                         }
                     }, 500);
                     break;
@@ -3355,7 +3377,7 @@ export default function App({ args = [] }) {
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
                     for await (const packet of stream) {
-                        // fs.appendFileSync('DEBUG.txt', JSON.stringify(packet, null, 2));
+                        await new Promise(resolve => setTimeout(resolve, 3));
 
                         if (packet.type === 'text') {
                             setLastChunkTime(Date.now());
@@ -3437,13 +3459,12 @@ export default function App({ args = [] }) {
                             clearBlocksCache();
 
                             if (global.gc) {
-                                try {
-                                    global.gc(); // Pass 1: Mark & sweep flattened strings and dropped caches
-                                    setTimeout(() => {
-                                        if (global.gc) global.gc(); // Pass 2: Compaction of surviving old-gen
-                                        lastGCTime = Date.now();
-                                    }, 100);
-                                } catch (e) { }
+                                for (let i = 0; i < 2; i++) {
+                                    global.gc();
+                                    // Wait for the next tick of the event loop
+                                    await new Promise(resolve => setImmediate(resolve));
+                                }
+                                lastGCTime = Date.now();
                             }
 
                             continue;
@@ -3474,21 +3495,20 @@ export default function App({ args = [] }) {
                                 }
                             );
 
-                            if (global.gc) {
-                                try {
-                                    global.gc();
-                                    setTimeout(() => {
-                                        if (global.gc) global.gc();
-                                        lastGCTime = Date.now();
-                                    }, 150);
-                                } catch (e) { }
-                            }
+                            // if (global.gc) {
+                            //     try {
+                            //         for (let i = 0; i < 5; i++) {
+                            //             global.gc();
+                            //             // Wait for the next tick of the event loop
+                            //             await new Promise(resolve => setImmediate(resolve));
+                            //         }
+                            //         lastGCTime = Date.now();
+                            //     } catch (e) { }
+                            // }
 
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
-                            // Do a small 75ms delay before pushing
-                            await new Promise(r => setTimeout(r, 75));
                             setMessages(prev => {
                                 const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
                                 const newMsgs = [...updatedPrev, {
@@ -3604,7 +3624,11 @@ export default function App({ args = [] }) {
                         let chunkText = packet.content;
                         if (packet.type === 'text' && chunkText.includes('Request Cancelled')) {
                             if (global.gc) {
-                                global.gc();
+                                for (let i = 0; i < 5; i++) {
+                                    global.gc();
+                                    // Wait for the next tick of the event loop
+                                    await new Promise(resolve => setImmediate(resolve));
+                                }
                                 lastGCTime = Date.now();
                             }
                             continue;
@@ -3774,11 +3798,12 @@ export default function App({ args = [] }) {
                     // Add this aggressive double-GC cleanup specifically for end-of-stream
                     if (global.gc) {
                         try {
-                            global.gc();
-                            setTimeout(() => {
-                                if (global.gc) global.gc();
-                                lastGCTime = Date.now();
-                            }, 500);
+                            for (let i = 0; i < 5; i++) {
+                                global.gc();
+                                // Wait for the next tick of the event loop
+                                await new Promise(resolve => setImmediate(resolve));
+                            }
+                            lastGCTime = Date.now();
                         } catch (e) { }
                     }
 

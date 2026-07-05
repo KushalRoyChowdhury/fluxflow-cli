@@ -15771,11 +15771,14 @@ function App({ args = [] }) {
         const diff = Date.now() - lastGCTime || 0;
         if (diff > 3e4) {
           if (global.gc) {
-            try {
-              global.gc();
+            const gCAsync = async () => {
+              for (let i = 0; i < 1; i++) {
+                global.gc();
+                await new Promise((resolve) => setImmediate(resolve));
+              }
               lastGCTime = Date.now();
-            } catch (e) {
-            }
+            };
+            gCAsync();
           }
         }
       }
@@ -17506,11 +17509,14 @@ ${cleanText}`, color: "magenta" }];
           chatTokenStartRef.current = sessionTotalTokens;
           setTimeout(() => {
             if (global.gc) {
-              try {
-                global.gc();
+              const gCAsync = async () => {
+                for (let i = 0; i < 5; i++) {
+                  global.gc();
+                  await new Promise((resolve) => setImmediate(resolve));
+                }
                 lastGCTime = Date.now();
-              } catch (e) {
-              }
+              };
+              gCAsync();
             }
           }, 500);
           break;
@@ -17530,11 +17536,14 @@ ${cleanText}`, color: "magenta" }];
           });
           setTimeout(() => {
             if (global.gc) {
-              try {
-                global.gc();
+              const gCAsync = async () => {
+                for (let i = 0; i < 5; i++) {
+                  global.gc();
+                  await new Promise((resolve) => setImmediate(resolve));
+                }
                 lastGCTime = Date.now();
-              } catch (e) {
-              }
+              };
+              gCAsync();
             }
           }, 500);
           break;
@@ -18387,6 +18396,7 @@ Selection: ${val}`,
           let inToolCallString = null;
           const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
           for await (const packet of stream) {
+            await new Promise((resolve) => setTimeout(resolve, 3));
             if (packet.type === "text") {
               setLastChunkTime(Date.now());
             }
@@ -18458,14 +18468,11 @@ Selection: ${val}`,
               });
               clearBlocksCache();
               if (global.gc) {
-                try {
+                for (let i = 0; i < 2; i++) {
                   global.gc();
-                  setTimeout(() => {
-                    if (global.gc) global.gc();
-                    lastGCTime = Date.now();
-                  }, 100);
-                } catch (e) {
+                  await new Promise((resolve) => setImmediate(resolve));
                 }
+                lastGCTime = Date.now();
               }
               continue;
             }
@@ -18492,20 +18499,9 @@ Selection: ${val}`,
                   onBackgroundIncrement: () => setSessionBackgroundCalls((prev) => prev + 1)
                 }
               );
-              if (global.gc) {
-                try {
-                  global.gc();
-                  setTimeout(() => {
-                    if (global.gc) global.gc();
-                    lastGCTime = Date.now();
-                  }, 150);
-                } catch (e) {
-                }
-              }
               continue;
             }
             if (packet.type === "visual_feedback") {
-              await new Promise((r) => setTimeout(r, 75));
               setMessages((prev) => {
                 const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
                 const newMsgs = [...updatedPrev, {
@@ -18618,7 +18614,10 @@ Selection: ${val}`,
             let chunkText = packet.content;
             if (packet.type === "text" && chunkText.includes("Request Cancelled")) {
               if (global.gc) {
-                global.gc();
+                for (let i = 0; i < 5; i++) {
+                  global.gc();
+                  await new Promise((resolve) => setImmediate(resolve));
+                }
                 lastGCTime = Date.now();
               }
               continue;
@@ -18759,11 +18758,11 @@ Selection: ${val}`,
           clearBlocksCache();
           if (global.gc) {
             try {
-              global.gc();
-              setTimeout(() => {
-                if (global.gc) global.gc();
-                lastGCTime = Date.now();
-              }, 500);
+              for (let i = 0; i < 5; i++) {
+                global.gc();
+                await new Promise((resolve) => setImmediate(resolve));
+              }
+              lastGCTime = Date.now();
             } catch (e) {
             }
           }
