@@ -43,13 +43,11 @@ ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
 Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop. Usage: ONLY in catastrophic situations. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint\n` : ''}
--- SUB AGENTS DEFINITIONS --
+- SUB AGENT TOOLS -
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
-
 Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
-
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT ONLY IF ITS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim()

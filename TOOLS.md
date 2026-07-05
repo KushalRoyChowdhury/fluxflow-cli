@@ -8,13 +8,16 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | :--- | :---: | :---: |
 | **Communication (Ask)** | ✅ | ✅ |
 | **Web Search & Scrape** | ✅ | ✅ |
-| **Creative (PDF/DOCX/Image)** | ❌ | ✅ |
+| **Creative (PDF/DOCX)** | ❌ | ✅ |
 | **File System (Read/Write)** | ✅ | ❌ |
 | **Terminal Execution** | ✅ | ❌ |
 | **Search Keyword** | ✅ | ❌ |
 | **File Map** | ✅ | ❌ |
 | **Todo (Planning)** | ✅ | ❌ |
 | **Multi Agent (sync/async)** | ✅ | ❌ |
+| **EmergencyRollback\*** | ✅ | ❌ |
+
+\* Emergency Rollback Tool is *EXPERIMENTAL* and may not be 100% reliable. It is still recomended to keep backups when working with Autonomous Systems.
 
 ---
 
@@ -22,6 +25,7 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 
 FluxFlow uses a transparent, string-based protocol for tool dispatching:
 `[tool:functions.ToolName(arg1="value", arg2=123)]`
+`[agent:generalist.Method(args)]`
 
 ---
 

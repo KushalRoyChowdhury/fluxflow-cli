@@ -696,7 +696,8 @@ const TOOL_LABELS = {
     'invoke': 'Generalist',
     'get_progress': 'Checking Progress',
     'cancel': 'Cancelling',
-    'await': 'Waiting'
+    'await': 'Waiting',
+    'EmergencyRollback': 'Don\'t Panic. Lookin\' into it',
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -3208,11 +3209,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
-                                    'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
-                                    'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
-                                    'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await', 'EmergencyRollback': 'Don\'t panic. Lookin\' into it.'
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await', 'EmergencyRollback': 'EmergencyRollback'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
