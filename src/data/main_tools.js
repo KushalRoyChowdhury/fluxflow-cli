@@ -41,6 +41,7 @@ ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
+Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace during execution to a specific turn checkpoint. Usage: ONLY in catastrophic codebase error/deletions. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint\n` : ''}
 -- SUB AGENTS DEFINITIONS --
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**

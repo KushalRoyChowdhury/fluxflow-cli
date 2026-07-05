@@ -39,6 +39,7 @@ import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, clean
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
+
 const shouldClearValue = (val) => {
     const s = String(val);
     return s.startsWith('999') && s.endsWith('9');
@@ -388,7 +389,7 @@ const getLatencyColor = (delay) => {
 
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
-        const p2 = points[i+1];
+        const p2 = points[i + 1];
         if (delay >= p1.t && delay <= p2.t) {
             const ratio = (delay - p1.t) / (p2.t - p1.t);
             const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
@@ -3486,19 +3487,20 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
-                            // Do a small 150ms delay here
-                            await new Promise(resolve => setTimeout(resolve, 150));
-                            setMessages(prev => {
-                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                const newMsgs = [...updatedPrev, {
-                                    id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
-                                    role: 'system',
-                                    text: packet.content,
-                                    isVisualFeedback: true
-                                }];
-                                setCompletedIndex(newMsgs.length);
-                                return newMsgs;
-                            });
+                            // Do a small 300ms delay before pushing
+                            setTimeout(async () => {
+                                setMessages(prev => {
+                                    const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                                    const newMsgs = [...updatedPrev, {
+                                        id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
+                                        role: 'system',
+                                        text: packet.content,
+                                        isVisualFeedback: true
+                                    }];
+                                    setCompletedIndex(newMsgs.length);
+                                    return newMsgs;
+                                });
+                            }, 300);
                             continue;
                         }
                         if (packet.type === 'exec_start') {

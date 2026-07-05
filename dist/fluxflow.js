@@ -5192,6 +5192,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
+Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace during execution to a specific turn checkpoint. Usage: ONLY in catastrophic codebase error/deletions. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
 ` : ""}
 -- SUB AGENTS DEFINITIONS --
@@ -10303,16 +10304,43 @@ var init_emergency_rollback = __esm({
         if (checkpoints.length === 0) {
           return "No checkpoints available.";
         }
+        const FRIENDLY_TOOL_NAMES = {
+          "write_file": "WriteFile",
+          "update_file": "PatchFile",
+          "view_file": "ReadFile",
+          "read_folder": "ReadFolder",
+          "exec_command": "Run",
+          "web_search": "WebSearch",
+          "web_scrape": "WebScrape",
+          "search_keyword": "SearchKeyword",
+          "write_pdf": "WritePDF",
+          "write_docx": "WriteDoc",
+          "generate_image": "GenerateImage",
+          "file_map": "FileMap",
+          "todo": "Todo",
+          "await": "Await",
+          "ask": "Ask",
+          "ask_user": "Ask",
+          "invoke": "Invoke",
+          "invokesync": "InvokeSync",
+          "getprogress": "GetProgress",
+          "cancel": "Cancel",
+          "emergency_rollback": "EmergencyRollback",
+          "emergencyrollback": "EmergencyRollback"
+        };
+        const getFriendlyName = (name) => {
+          return FRIENDLY_TOOL_NAMES[name] || FRIENDLY_TOOL_NAMES[name.toLowerCase()] || name;
+        };
         let output = "Available checkpoints for rollback:\n\n";
         for (const cp of checkpoints) {
           if (cp.id === "initial") {
             output += `--- Initial State (id: initial) ---
-Tools Used: None
+Tools Used: User Prompted for task
 
 `;
           } else {
             const turnNum = cp.id.replace("turn_", "");
-            const toolsStr = cp.toolsUsed && cp.toolsUsed.length > 0 ? cp.toolsUsed.join(", ") : "None";
+            const toolsStr = cp.toolsUsed && cp.toolsUsed.length > 0 ? cp.toolsUsed.map(getFriendlyName).join(", ") : "None";
             output += `--- Turn ${turnNum} (id: ${cp.id}) ---
 Tools Used: ${toolsStr}
 
@@ -10596,7 +10624,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback!|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -13554,7 +13582,8 @@ ${ideErr} [/ERROR]`;
                       const detail2 = getToolDetail(normToolName, toolCall.args);
                       label = `\u{1F6C7}  Cancelled${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "EmergencyRollback") {
-                      label = `\u2714  Rollback`;
+                      const { method } = parseArgs(toolCall.args);
+                      label = `\u2714  ${method === "forceRevert" ? "Emergency Rollback!" : "Rollback Checked"}`;
                     } else if (normToolName === "await" || normToolName === "Await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
@@ -18475,18 +18504,19 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
-              await new Promise((resolve) => setTimeout(resolve, 150));
-              setMessages((prev) => {
-                const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-                const newMsgs = [...updatedPrev, {
-                  id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
-                  role: "system",
-                  text: packet.content,
-                  isVisualFeedback: true
-                }];
-                setCompletedIndex(newMsgs.length);
-                return newMsgs;
-              });
+              setTimeout(async () => {
+                setMessages((prev) => {
+                  const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+                  const newMsgs = [...updatedPrev, {
+                    id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
+                    role: "system",
+                    text: packet.content,
+                    isVisualFeedback: true
+                  }];
+                  setCompletedIndex(newMsgs.length);
+                  return newMsgs;
+                });
+              }, 300);
               continue;
             }
             if (packet.type === "exec_start") {

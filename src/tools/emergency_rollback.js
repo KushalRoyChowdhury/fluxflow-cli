@@ -25,13 +25,45 @@ export const emergency_rollback = async (args, context = {}) => {
         if (checkpoints.length === 0) {
             return "No checkpoints available.";
         }
+
+        const FRIENDLY_TOOL_NAMES = {
+            'write_file': 'WriteFile',
+            'update_file': 'PatchFile',
+            'view_file': 'ReadFile',
+            'read_folder': 'ReadFolder',
+            'exec_command': 'Run',
+            'web_search': 'WebSearch',
+            'web_scrape': 'WebScrape',
+            'search_keyword': 'SearchKeyword',
+            'write_pdf': 'WritePDF',
+            'write_docx': 'WriteDoc',
+            'generate_image': 'GenerateImage',
+            'file_map': 'FileMap',
+            'todo': 'Todo',
+            'await': 'Await',
+            'ask': 'Ask',
+            'ask_user': 'Ask',
+            'invoke': 'Invoke',
+            'invokesync': 'InvokeSync',
+            'getprogress': 'GetProgress',
+            'cancel': 'Cancel',
+            'emergency_rollback': 'EmergencyRollback',
+            'emergencyrollback': 'EmergencyRollback'
+        };
+
+        const getFriendlyName = (name) => {
+            return FRIENDLY_TOOL_NAMES[name] || FRIENDLY_TOOL_NAMES[name.toLowerCase()] || name;
+        };
+
         let output = "Available checkpoints for rollback:\n\n";
         for (const cp of checkpoints) {
             if (cp.id === 'initial') {
-                output += `--- Initial State (id: initial) ---\nTools Used: None\n\n`;
+                output += `--- Initial State (id: initial) ---\nTools Used: User Prompted for task\n\n`;
             } else {
                 const turnNum = cp.id.replace('turn_', '');
-                const toolsStr = cp.toolsUsed && cp.toolsUsed.length > 0 ? cp.toolsUsed.join(', ') : 'None';
+                const toolsStr = cp.toolsUsed && cp.toolsUsed.length > 0
+                    ? cp.toolsUsed.map(getFriendlyName).join(', ')
+                    : 'None';
                 output += `--- Turn ${turnNum} (id: ${cp.id}) ---\nTools Used: ${toolsStr}\n\n`;
             }
         }
