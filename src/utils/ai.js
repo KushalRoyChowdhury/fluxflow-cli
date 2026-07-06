@@ -4439,11 +4439,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // RETRY ONLY ON 500-LEVEL (500, 503, ETC.) AND 408 TIMEOUT ERRORS
                     const status = err.status || err.statusCode || err.code;
                     const isRetryable = (
-                        (status && ((status >= 500 && status < 600) || status === 408)) ||
+                        (status && ((status >= 500 && status < 600) || status === 408 || status === 429)) ||
                         (!status && (
-                            /status[ :]+(5\d\d|408)/i.test(String(err)) ||
-                            /code[ :]+(5\d\d|408)/i.test(String(err)) ||
-                            /(500|503|408)/.test(String(err))
+                            /status[ :]+(5\d\d|408|429)/i.test(String(err)) ||
+                            /code[ :]+(5\d\d|408|429)/i.test(String(err)) ||
+                            /(500|503|408|429)/.test(String(err))
                         ))
                     );
 
@@ -4669,7 +4669,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
 
-export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 20, logCallback = null) => {
+export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null) => {
     const savedSettings = await loadSettings();
     const mergedSettings = { ...savedSettings, ...settings };
     const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
@@ -4694,7 +4694,7 @@ TOOL POLICY:
 - FileMap >>> ReadFile to understand file efficiently
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
 - HUGE FILES? SearchKeyword >> FileMap/Full Read
-- NO Terminal Access\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
+- NO Terminal Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - Escape quotes: \\" for code strings
 - Literal escapes: Double-escape sequences (e.g., \\\\n)
@@ -4831,10 +4831,52 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
                 const result = await dispatchTool(toolCall.toolName, toolCall.args, { ...settings, mode: 'Flux' });
                 if (logCallback) logCallback(`[Tool Result]\n${result}\n`);
                 toolResultsStr += `[TOOL RESULT for ${toolCall.toolName}]: ${result}\n\n`;
+                await incrementUsage('toolSuccess');
+
+                // Track code changes made by the subagent (mirrors the main agent's tracking in app.jsx)
+                if (normalizedToolName === 'patchfile' || normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patch_file') {
+                    if (result) {
+                        const diffLines = result.split('\n');
+                        let added = 0, removed = 0, insideDiff = false;
+                        for (const line of diffLines) {
+                            if (line.includes('[DIFF_START]')) { insideDiff = true; continue; }
+                            if (line.includes('[DIFF_END]')) { insideDiff = false; continue; }
+                            if (insideDiff) {
+                                if (/^\+\d+/.test(line)) added++;
+                                else if (/^\-\d+/.test(line)) removed++;
+                            }
+                        }
+                        if (added > 0 || removed > 0) {
+                            await addToUsage('linesAdded', added);
+                            await addToUsage('linesRemoved', removed);
+                        }
+                    }
+                } else if (normalizedToolName === 'writefile' || normalizedToolName === 'write_file') {
+                    if (result) {
+                        const statsMatch = result.match(/- Stats: \[(\d+) lines/);
+                        const verifiedLinesCount = statsMatch ? parseInt(statsMatch[1]) : 0;
+                        let oldLinesCount = 0;
+                        if (result.includes('Old File contents:')) {
+                            let insideOldFile = false;
+                            for (const line of result.split('\n')) {
+                                if (line.includes('Old File contents:')) { insideOldFile = true; continue; }
+                                if (insideOldFile) {
+                                    if (line.trim() === '') { insideOldFile = false; }
+                                    else if (/^\d+ \|/.test(line)) oldLinesCount++;
+                                }
+                            }
+                        }
+                        if (verifiedLinesCount > 0 || oldLinesCount > 0) {
+                            await addToUsage('linesAdded', verifiedLinesCount);
+                            await addToUsage('linesRemoved', oldLinesCount);
+                        }
+                    }
+                }
             } catch (e) {
                 const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
                 if (logCallback) logCallback(`[Tool Error] ${errorMsg}\n`);
                 toolResultsStr += `${errorMsg}\n\n`;
+                await incrementUsage('toolFailure');
             }
         }
 

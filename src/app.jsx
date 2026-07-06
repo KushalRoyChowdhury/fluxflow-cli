@@ -30,7 +30,7 @@ import { GEMINI_QUOTES } from './data/gemini_quotes.js';
 import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
-import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats } from './utils/usage.js';
+import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -197,8 +197,6 @@ const BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
 const SESSION_START_TIME = Date.now();
 const CHANGELOG_URL = 'https://fluxflow-cli.onrender.com/changelog';
 const DOCS_URL = 'https://fluxflow-cli.onrender.com/';
-let linesAdded = 0;
-let linesRemoved = 0;
 
 // Centralized Version Control: dynamically fetch version and date from package.json
 const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
@@ -376,11 +374,11 @@ const getProjectFiles = (() => {
 let cachedShortcut = "Ctrl + Enter";
 
 const getLatencyColor = (delay) => {
-    if (delay <= 400) return '#00a564'; // Deep green
+    if (delay <= 500) return '#00a564'; // Deep green
     if (delay >= 5000) return '#ff0000'; // Pure red
 
     const points = [
-        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 500, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3000, r: 255, g: 120, b: 0 },
@@ -3586,8 +3584,6 @@ export default function App({ args = [] }) {
                                         }
                                     }
                                 }
-                                linesAdded += added;
-                                linesRemoved += removed;
                                 addToUsage('linesAdded', added);
                                 addToUsage('linesRemoved', removed);
                             } else if (packet.toolName === 'write_file' && packet.aiContent) {
@@ -3612,8 +3608,6 @@ export default function App({ args = [] }) {
                                         }
                                     }
                                 }
-                                linesAdded += verifiedLinesCount;
-                                linesRemoved += oldLinesCount;
                                 addToUsage('linesAdded', verifiedLinesCount);
                                 addToUsage('linesRemoved', oldLinesCount);
                             }
@@ -4720,16 +4714,16 @@ export default function App({ args = [] }) {
                                     )}
                                     <Box>
                                         <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
-                                        <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
+                                        <Text color="white"><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
                                     </Box>
                                     <Box>
                                         <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
-                                        <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( </Text>
-                                        <Text color="green">✔ {sessionToolSuccess}</Text>
+                                        <Text color="white">{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( </Text>
+                                        <Text color="green">✔ {runtimeSession.toolSuccess}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="yellow">🛇 {sessionToolDenied}</Text>
+                                        <Text color="yellow">🛇 {runtimeSession.toolDenied}</Text>
                                         <Text color="white"> </Text>
-                                        <Text color="red">✘ {sessionToolFailure}</Text>
+                                        <Text color="red">✘ {runtimeSession.toolFailure}</Text>
                                         <Text color="white"> )</Text>
                                     </Box>
                                 </Box>
@@ -5700,8 +5694,8 @@ export default function App({ args = [] }) {
                         {activeView === 'exit' && (() => {
                             const wallTimeMs = Date.now() - SESSION_START_TIME;
 
-                            const totalTools = sessionToolSuccess + sessionToolFailure;
-                            const successRate = totalTools > 0 ? ((sessionToolSuccess / totalTools) * 100).toFixed(1) : '0.0';
+                            const totalTools = runtimeSession.toolSuccess + runtimeSession.toolFailure;
+                            const successRate = totalTools > 0 ? ((runtimeSession.toolSuccess / totalTools) * 100).toFixed(1) : '0.0';
 
                             const agentActiveMs = sessionApiTime + sessionToolTime;
                             const apiPercent = agentActiveMs > 0 ? ((sessionApiTime / agentActiveMs) * 100).toFixed(1) : '0.0';
@@ -5720,7 +5714,7 @@ export default function App({ args = [] }) {
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                            <Text color="white">{sessionToolSuccess + sessionToolFailure + sessionToolDenied} ( <Text color="green">✔ {sessionToolSuccess}</Text> <Text color="yellow">🛇 {sessionToolDenied}</Text> <Text color="red">✘ {sessionToolFailure}</Text> )</Text>
+                                            <Text color="white">{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( <Text color="green">✔ {runtimeSession.toolSuccess}</Text> <Text color="yellow">🛇 {runtimeSession.toolDenied}</Text> <Text color="red">✘ {runtimeSession.toolFailure}</Text> )</Text>
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Success Rate:</Text></Box>
@@ -5728,7 +5722,7 @@ export default function App({ args = [] }) {
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Code Changes:</Text></Box>
-                                            <Text color="white"><Text color="green">+{linesAdded}</Text> <Text color="red">-{linesRemoved}</Text></Text>
+                                            <Text color="white"><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
                                         </Box>
                                         <Box>
                                             <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>

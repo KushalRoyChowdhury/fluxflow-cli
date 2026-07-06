@@ -445,6 +445,10 @@ export const getMonthlyUsage = async () => {
  * Increments a specific usage key in memory
  */
 export const incrementUsage = async (key, provider) => {
+    if (key === 'toolSuccess') runtimeSession.toolSuccess++;
+    else if (key === 'toolFailure') runtimeSession.toolFailure++;
+    else if (key === 'toolDenied') runtimeSession.toolDenied++;
+
     const stats = await getDailyUsage();
     if (stats[key] !== undefined) {
         stats[key]++;
@@ -458,10 +462,24 @@ export const incrementUsage = async (key, provider) => {
     queueFlush();
 };
 
+export const runtimeSession = {
+    linesAdded: 0,
+    linesRemoved: 0,
+    toolSuccess: 0,
+    toolFailure: 0,
+    toolDenied: 0
+};
+
 /**
  * Adds a specific amount to a usage key in memory
  */
 export const addToUsage = async (key, amount, provider, model) => {
+    if (key === 'linesAdded') {
+        runtimeSession.linesAdded += amount;
+    } else if (key === 'linesRemoved') {
+        runtimeSession.linesRemoved += amount;
+    }
+
     const stats = await getDailyUsage();
     if (stats[key] !== undefined) {
         stats[key] += Math.floor(amount);

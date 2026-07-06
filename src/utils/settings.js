@@ -31,7 +31,8 @@ const DEFAULT_SETTINGS = {
         advanceRollback: false,
         autoDeleteHistory: '7d',
         useExternalData: false,
-        externalDataPath: ''
+        externalDataPath: '',
+        preserveThinking: true
     },
     profileData: {
         name: null,

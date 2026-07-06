@@ -324,7 +324,8 @@ var init_settings = __esm({
         advanceRollback: false,
         autoDeleteHistory: "7d",
         useExternalData: false,
-        externalDataPath: ""
+        externalDataPath: "",
+        preserveThinking: true
       },
       profileData: {
         name: null,
@@ -4844,10 +4845,10 @@ var init_StatusBar = __esm({
     init_text();
     activeGetMemoryInfo = null;
     getLatencyColor = (delay) => {
-      if (delay <= 400) return "#00a564";
+      if (delay <= 500) return "#00a564";
       if (delay >= 5e3) return "#ff0000";
       const points = [
-        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 500, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3e3, r: 255, g: 120, b: 0 },
@@ -5963,6 +5964,7 @@ function SettingsMenu({
         return [
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
           { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
+          { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -6119,6 +6121,12 @@ function SettingsMenu({
       setActiveView("updateManager");
     } else if (item.value === "parserDownload") {
       setActiveView("parserDownload");
+    } else if (item.value === "preserveThinking") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     }
   };
   return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: "gray", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", borderStyle: "round", borderColor: activeColumn === "categories" ? "white" : "grey", padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? "white" : "grey", bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
@@ -6203,7 +6211,7 @@ function SettingsMenu({
     });
     if (currentCatId === "other") {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 17, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 16, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
       );
       elements.push(
         /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
@@ -6829,6 +6837,7 @@ var init_history = __esm({
     init_crypto();
     init_paths();
     init_revert();
+    init_settings();
     WRITE_LOCK = Promise.resolve();
     withLock = (op) => {
       const nextLock = WRITE_LOCK.then(async () => {
@@ -6883,9 +6892,16 @@ var init_history = __esm({
         await fs7.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
-        const persistentMessages = (messages || []).filter(
+        let persistentMessages = (messages || []).filter(
           (m) => !m.isUpdateNotification && (!m.isMeta || m.text && m.text.includes("Request Cancelled"))
         );
+        try {
+          const settings = await loadSettings();
+          if (settings.systemSettings?.preserveThinking === false) {
+            persistentMessages = persistentMessages.filter((m) => m.role !== "think");
+          }
+        } catch (e) {
+        }
         const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
         const chatFile = path6.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
@@ -7142,7 +7158,7 @@ var init_history = __esm({
 import fs8 from "fs-extra";
 import path7 from "path";
 import os3 from "os";
-var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
+var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
   "src/utils/usage.js"() {
     init_paths();
@@ -7504,6 +7520,9 @@ var init_usage = __esm({
       return summed;
     };
     incrementUsage = async (key, provider) => {
+      if (key === "toolSuccess") runtimeSession.toolSuccess++;
+      else if (key === "toolFailure") runtimeSession.toolFailure++;
+      else if (key === "toolDenied") runtimeSession.toolDenied++;
       const stats = await getDailyUsage();
       if (stats[key] !== void 0) {
         stats[key]++;
@@ -7516,7 +7535,19 @@ var init_usage = __esm({
       }
       queueFlush();
     };
+    runtimeSession = {
+      linesAdded: 0,
+      linesRemoved: 0,
+      toolSuccess: 0,
+      toolFailure: 0,
+      toolDenied: 0
+    };
     addToUsage = async (key, amount, provider, model) => {
+      if (key === "linesAdded") {
+        runtimeSession.linesAdded += amount;
+      } else if (key === "linesRemoved") {
+        runtimeSession.linesRemoved += amount;
+      }
       const stats = await getDailyUsage();
       if (stats[key] !== void 0) {
         stats[key] += Math.floor(amount);
@@ -9744,7 +9775,7 @@ var init_invokeSync = __esm({
         if (context.onVisualFeedback) {
           context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title}`);
         }
-        const result = await runSubagent2(task, context, model, allowedTools, 20);
+        const result = await runSubagent2(task, context, model, allowedTools, 50);
         if (context.onVisualFeedback) {
           context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title} [COMPLETED]
 `);
@@ -9835,7 +9866,7 @@ var init_invoke = __esm({
           }
         }
       };
-      runSubagent2(task, subagentContext, model, allowedTools, 20, (logMessage) => {
+      runSubagent2(task, subagentContext, model, allowedTools, 50, (logMessage) => {
         if (taskEntry.status === "cancelled") return;
         if (logMessage.startsWith("[Subagent Turn")) {
           if (currentTurnLogs.length > 0) {
@@ -9990,7 +10021,8 @@ ${task.finalAnswer}
         output += `Failure Error: ${task.error}
 `;
       }
-      return output.trim();
+      const sanitized = output.trim().replace(/\[TOOL RESULT\]/gi, "TOOL RESULT:");
+      return sanitized;
     };
   }
 });
@@ -14666,7 +14698,7 @@ ${colorMainWords(output)}` };
 
 `);
               const status = err.status || err.statusCode || err.code;
-              const isRetryable = status && (status >= 500 && status < 600 || status === 408) || !status && (/status[ :]+(5\d\d|408)/i.test(String(err)) || /code[ :]+(5\d\d|408)/i.test(String(err)) || /(500|503|408)/.test(String(err)));
+              const isRetryable = status && (status >= 500 && status < 600 || status === 408 || status === 429) || !status && (/status[ :]+(5\d\d|408|429)/i.test(String(err)) || /code[ :]+(5\d\d|408|429)/i.test(String(err)) || /(500|503|408|429)/.test(String(err)));
               if (!isRetryable) {
                 if (retryCount < MAX_RETRIES - 3) {
                   throw err;
@@ -14855,7 +14887,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
       }
       yield { type: "status", content: null };
     };
-    runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 20, logCallback = null) => {
+    runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null) => {
       const savedSettings = await loadSettings();
       const mergedSettings = { ...savedSettings, ...settings };
       const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
@@ -14879,6 +14911,7 @@ TOOL POLICY:
 - Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
 - HUGE FILES? SearchKeyword >> FileMap/Full Read
 - NO Terminal Access
+
 -- PROVIDED TOOLS --
 ${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}
 
@@ -14998,6 +15031,55 @@ ${result}
             toolResultsStr += `[TOOL RESULT for ${toolCall.toolName}]: ${result}
 
 `;
+            await incrementUsage("toolSuccess");
+            if (normalizedToolName === "patchfile" || normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patch_file") {
+              if (result) {
+                const diffLines = result.split("\n");
+                let added = 0, removed = 0, insideDiff = false;
+                for (const line of diffLines) {
+                  if (line.includes("[DIFF_START]")) {
+                    insideDiff = true;
+                    continue;
+                  }
+                  if (line.includes("[DIFF_END]")) {
+                    insideDiff = false;
+                    continue;
+                  }
+                  if (insideDiff) {
+                    if (/^\+\d+/.test(line)) added++;
+                    else if (/^\-\d+/.test(line)) removed++;
+                  }
+                }
+                if (added > 0 || removed > 0) {
+                  await addToUsage("linesAdded", added);
+                  await addToUsage("linesRemoved", removed);
+                }
+              }
+            } else if (normalizedToolName === "writefile" || normalizedToolName === "write_file") {
+              if (result) {
+                const statsMatch = result.match(/- Stats: \[(\d+) lines/);
+                const verifiedLinesCount = statsMatch ? parseInt(statsMatch[1]) : 0;
+                let oldLinesCount = 0;
+                if (result.includes("Old File contents:")) {
+                  let insideOldFile = false;
+                  for (const line of result.split("\n")) {
+                    if (line.includes("Old File contents:")) {
+                      insideOldFile = true;
+                      continue;
+                    }
+                    if (insideOldFile) {
+                      if (line.trim() === "") {
+                        insideOldFile = false;
+                      } else if (/^\d+ \|/.test(line)) oldLinesCount++;
+                    }
+                  }
+                }
+                if (verifiedLinesCount > 0 || oldLinesCount > 0) {
+                  await addToUsage("linesAdded", verifiedLinesCount);
+                  await addToUsage("linesRemoved", oldLinesCount);
+                }
+              }
+            }
           } catch (e) {
             const errorMsg = `ERROR: Execution failed for [${toolCall.toolName}]: ${e.message}`;
             if (logCallback) logCallback(`[Tool Error] ${errorMsg}
@@ -15005,6 +15087,7 @@ ${result}
             toolResultsStr += `${errorMsg}
 
 `;
+            await incrementUsage("toolFailure");
           }
         }
         subagentHistory.push({ role: "user", text: toolResultsStr.trim() });
@@ -18729,8 +18812,6 @@ Selection: ${val}`,
                     }
                   }
                 }
-                linesAdded += added;
-                linesRemoved += removed;
                 addToUsage("linesAdded", added);
                 addToUsage("linesRemoved", removed);
               } else if (packet.toolName === "write_file" && packet.aiContent) {
@@ -18754,8 +18835,6 @@ Selection: ${val}`,
                     }
                   }
                 }
-                linesAdded += verifiedLinesCount;
-                linesRemoved += oldLinesCount;
                 addToUsage("linesAdded", verifiedLinesCount);
                 addToUsage("linesRemoved", oldLinesCount);
               }
@@ -19537,7 +19616,7 @@ Selection: ${val}`,
         return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
           const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
           return /* @__PURE__ */ React15.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 40 }, /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React15.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 36 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React15.createElement(Box14, { width: 31 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", sessionToolSuccess), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", sessionToolDenied), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", sessionToolFailure), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, timeLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )")))), /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+        })) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, timeLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )")))), /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "autoExecDanger":
         return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
@@ -20129,15 +20208,15 @@ Selection: ${val}`,
     }
   )), activeView === "exit" && (() => {
     const wallTimeMs = Date.now() - SESSION_START_TIME;
-    const totalTools = sessionToolSuccess + sessionToolFailure;
-    const successRate = totalTools > 0 ? (sessionToolSuccess / totalTools * 100).toFixed(1) : "0.0";
+    const totalTools = runtimeSession.toolSuccess + runtimeSession.toolFailure;
+    const successRate = totalTools > 0 ? (runtimeSession.toolSuccess / totalTools * 100).toFixed(1) : "0.0";
     const agentActiveMs = sessionApiTime + sessionToolTime;
     const apiPercent = agentActiveMs > 0 ? (sessionApiTime / agentActiveMs * 100).toFixed(1) : "0.0";
     const toolPercent = agentActiveMs > 0 ? (sessionToolTime / agentActiveMs * 100).toFixed(1) : "0.0";
-    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionToolSuccess + sessionToolFailure + sessionToolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", sessionToolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", sessionToolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", sessionToolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
+    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, linesAdded, linesRemoved, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
+var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_build();
@@ -20268,8 +20347,6 @@ var init_app = __esm({
     SESSION_START_TIME = Date.now();
     CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog";
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
-    linesAdded = 0;
-    linesRemoved = 0;
     packageJsonPath = path22.join(path22.dirname(fileURLToPath2(import.meta.url)), "../package.json");
     packageJson = JSON.parse(fs24.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
@@ -20394,10 +20471,10 @@ var init_app = __esm({
     })();
     cachedShortcut = "Ctrl + Enter";
     getLatencyColor2 = (delay) => {
-      if (delay <= 400) return "#00a564";
+      if (delay <= 500) return "#00a564";
       if (delay >= 5e3) return "#ff0000";
       const points = [
-        { t: 400, r: 0, g: 165, b: 100 },
+        { t: 500, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3e3, r: 255, g: 120, b: 0 },

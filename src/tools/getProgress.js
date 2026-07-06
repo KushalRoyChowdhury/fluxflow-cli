@@ -100,5 +100,6 @@ export const getProgress = async (args, context = {}) => {
     }
 
     // fs.writeFileSync("progress.txt", output.trim());
-    return output.trim();
+    const sanitized = output.trim().replace(/\[TOOL RESULT\]/gi, 'TOOL RESULT:');
+    return sanitized;
 };

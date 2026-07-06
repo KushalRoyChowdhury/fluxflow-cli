@@ -32,7 +32,7 @@ export const invokeSync = async (args, context = {}) => {
             context.onVisualFeedback(`\x1b[95mSubAgent\x1b[0m: \x1b[32mGeneralist\x1b[0m → ${title}`);
         }
         // Support multi-turn operations for sync agents
-        const result = await runSubagent(task, context, model, allowedTools, 20);
+        const result = await runSubagent(task, context, model, allowedTools, 50);
         if (context.onVisualFeedback) {
             context.onVisualFeedback(`\x1b[95mSubAgent\x1b[0m: \x1b[32mGeneralist\x1b[0m → ${title} [COMPLETED]\n`);
         }

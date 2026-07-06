@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { HISTORY_FILE, HISTORY_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
+import { loadSettings } from './settings.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
 let WRITE_LOCK = Promise.resolve();
@@ -75,10 +76,18 @@ export const saveChat = async (id, name, messages) => {
 
         // [CLEANUP] Filter out ephemeral messages (like update notices or transient meta alerts)
         // These should only exist in the live UI session.
-        const persistentMessages = (messages || []).filter(m => 
-            !m.isUpdateNotification && 
+        let persistentMessages = (messages || []).filter(m =>
+            !m.isUpdateNotification &&
             (!m.isMeta || (m.text && m.text.includes('Request Cancelled')))
         );
+
+        // [PRESERVE THINKING] Strip think-role entries when the setting is disabled.
+        try {
+            const settings = await loadSettings();
+            if (settings.systemSettings?.preserveThinking === false) {
+                persistentMessages = persistentMessages.filter(m => m.role !== 'think');
+            }
+        } catch (e) { }
 
         // Defensive name selection:
         // 1. Provided name

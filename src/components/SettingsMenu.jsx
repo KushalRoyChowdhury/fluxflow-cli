@@ -147,6 +147,7 @@ export default function SettingsMenu({
                 return [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
                     { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') },
+                    { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ]; default:
                 return [];
@@ -307,6 +308,12 @@ export default function SettingsMenu({
             setActiveView('updateManager');
         } else if (item.value === 'parserDownload') {
             setActiveView('parserDownload');
+        } else if (item.value === 'preserveThinking') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
         }
     };
 
@@ -451,7 +458,7 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={17} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={16} paddingX={1}>
                                         <Text color="white">
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>
