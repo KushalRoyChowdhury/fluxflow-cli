@@ -232,12 +232,22 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["3.1.0"]
+        const stableVersions = ["3.1.7"]
         const changelogData = {
+            "3.1.7": {
+                "note": "JULY 6.",
+                "added": [
+                    "Added more info about API state/queue for NVIDIA API [EXPERIMENTAL]."
+                ],
+                "changed": [],
+                "fixes": [
+                    "UI Bug Fixes."
+                ]
+            },
             "3.1.0": {
                 "note": "JULY 5.",
                 "added": [
-                    "Added Emergency Rollback System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.**"
+                    "Added Emergency Rollback System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.** This feature is currectly *EXPERIMENTAL*, can be turned on in /settings → Security. Will use more disk space."
                 ],
                 "changed": [],
                 "fixes": []

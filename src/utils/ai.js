@@ -511,6 +511,108 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 }
 
+const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
+    const queue = [];
+    let resolveNext = null;
+    let done = false;
+    let error = null;
+
+    const push = (item) => {
+        queue.push(item);
+        if (resolveNext) {
+            const resolve = resolveNext;
+            resolveNext = null;
+            resolve();
+        }
+    };
+
+    const cleanModelId = modelName.split('/').pop();
+    const pollUrl = `https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
+
+    let isStreamingStarted = false;
+    let pollInterval = null;
+
+    const poll = async () => {
+        try {
+            const res = await fetch(pollUrl);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === 'number') {
+                    const depth = data.queues[0].queueDepth;
+                    if (!isStreamingStarted) {
+                        push({ value: { type: 'status', content: `Queue Depth ${depth}...` }, done: false });
+                    }
+                }
+            }
+        } catch (e) {
+            // Silently ignore errors
+        }
+    };
+
+    // Run first poll immediately
+    poll();
+    pollInterval = setInterval(poll, 5000);
+
+    // Consume the raw stream in the background
+    (async () => {
+        try {
+            const iterator = stream[Symbol.asyncIterator]();
+            while (true) {
+                const { value, done: streamDone } = await iterator.next();
+                if (streamDone) {
+                    break;
+                }
+                isStreamingStarted = true;
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                push({ value, done: false });
+            }
+            done = true;
+            push(null);
+        } catch (e) {
+            error = e;
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            if (resolveNext) {
+                const resolve = resolveNext;
+                resolveNext = null;
+                resolve();
+            }
+        }
+    })();
+
+    try {
+        while (true) {
+            if (error) {
+                throw error;
+            }
+            if (queue.length > 0) {
+                const item = queue.shift();
+                if (item === null && done) {
+                    break;
+                }
+                yield item.value;
+            } else {
+                if (done) {
+                    break;
+                }
+                await new Promise((resolve) => {
+                    resolveNext = resolve;
+                });
+            }
+        }
+    } finally {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+    }
+};
+
 const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.95) {
     const messages = [];
     if (systemInstruction) {
@@ -1541,8 +1643,10 @@ Chats to process:
         let targetModel = 'gemma-4-26b-a4b-it';
         if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
         if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
+        if (aiProvider === 'NVIDIA') targetModel = 'moonshotai/kimi-k2.6';
 
         while (attempts <= maxAttempts && !success) {
+            // console.log(targetModel, settings);
             attempts++;
             try {
                 const response = await generateSimpleContent(settings, targetModel, prompt, null, 'Fast', 0.75, 'background');
@@ -1614,7 +1718,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         let targetModel = 'gemma-4-26b-a4b-it';
         if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
         if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-        if (aiProvider === 'NVIDIA') targetModel = 'stepfun-ai/step-3.7-flash';
+        if (aiProvider === 'NVIDIA') targetModel = 'moonshotai/kimi-k2.6';
 
         let attempts = 0;
         let success = false;
@@ -1965,8 +2069,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         yield { type: 'status', content: '[start]' };
         yield { type: 'status', content: 'Gathering Context...' };
-        // Add a 500ms sleep for something
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Add a 300ms sleep for something
+        // await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
         if (totalFolders > 4096) dynamicMaxDepth = 1;
@@ -2602,7 +2706,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             0.99
                         );
                     } else if (aiProvider === 'NVIDIA') {
-                        stream = getNVIDIAStream(
+                        const rawStream = getNVIDIAStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -2613,6 +2717,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortController.signal,
                             0.99
                         );
+                        stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
                     } else {
                         const apiCallPromise = client.models.generateContentStream({
                             model: targetModel || "gemini-3-flash-preview",
@@ -2871,6 +2976,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             abortPromise
                         ]);
                         if (done) break;
+
+                        if (chunk && chunk.type === 'status') {
+                            yield chunk;
+                            continue;
+                        }
 
                         if (settings && typeof settings.onTokenChunk === 'function') {
                             settings.onTokenChunk();

@@ -34,10 +34,10 @@ export const emojiSpace = (baseSpaces = 2) => {
     return ' '.repeat(baseSpaces);
 };
 
-export const getFluxLogo = (version = '2.0.0', provider = 'Google') => {
+export const getFluxLogo = (version = '...', provider = 'Loading...') => {
     // Pick a random quote
     const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
-
+    // DONT remove this comment
     // const art = [
     //     " ███           ██████████   ███        ███      ███ ███      ███ ██████████ ███        █████████  ███      ███ ███",
     //     "░░░███        ░░███░░░░░█  ░███      ░░███    ░░███░░███    ███░░███░░░░░█ ░░███      ███░░░░░███ ░░███    ░░███░░███",

@@ -3986,7 +3986,7 @@ var init_terminal = __esm({
       }
       return " ".repeat(baseSpaces);
     };
-    getFluxLogo = (version = "2.0.0", provider = "Google") => {
+    getFluxLogo = (version = "...", provider = "Loading...") => {
       const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
       const art = [
         "  \u2588\u2588\u2588       ",
@@ -6549,7 +6549,7 @@ Check these first; These Files > Training Data. Safety rules apply
       const projectContextBlock = cachedProjectContextBlock;
       return `${nameStr}${nicknameStr}${userInstrStr}=== SYSTEM PROMPT ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
-Mode: ${mode}${thinkingLevel !== "Fast" ? " (Thinking)" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
+Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
 
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT]
@@ -10600,7 +10600,7 @@ __export(ai_exports, {
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path21, { normalize } from "path";
 import fs22 from "fs";
-var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -11046,6 +11046,97 @@ var init_ai = __esm({
           pendingParts = [];
           lastFlushTime = Date.now();
           hasNewData = false;
+        }
+      }
+    };
+    wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
+      const queue = [];
+      let resolveNext = null;
+      let done = false;
+      let error = null;
+      const push = (item) => {
+        queue.push(item);
+        if (resolveNext) {
+          const resolve = resolveNext;
+          resolveNext = null;
+          resolve();
+        }
+      };
+      const cleanModelId = modelName.split("/").pop();
+      const pollUrl = `https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
+      let isStreamingStarted = false;
+      let pollInterval = null;
+      const poll = async () => {
+        try {
+          const res = await fetch(pollUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === "number") {
+              const depth = data.queues[0].queueDepth;
+              if (!isStreamingStarted) {
+                push({ value: { type: "status", content: `Queue Depth ${depth}...` }, done: false });
+              }
+            }
+          }
+        } catch (e) {
+        }
+      };
+      poll();
+      pollInterval = setInterval(poll, 5e3);
+      (async () => {
+        try {
+          const iterator = stream[Symbol.asyncIterator]();
+          while (true) {
+            const { value, done: streamDone } = await iterator.next();
+            if (streamDone) {
+              break;
+            }
+            isStreamingStarted = true;
+            if (pollInterval) {
+              clearInterval(pollInterval);
+              pollInterval = null;
+            }
+            push({ value, done: false });
+          }
+          done = true;
+          push(null);
+        } catch (e) {
+          error = e;
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+          if (resolveNext) {
+            const resolve = resolveNext;
+            resolveNext = null;
+            resolve();
+          }
+        }
+      })();
+      try {
+        while (true) {
+          if (error) {
+            throw error;
+          }
+          if (queue.length > 0) {
+            const item = queue.shift();
+            if (item === null && done) {
+              break;
+            }
+            yield item.value;
+          } else {
+            if (done) {
+              break;
+            }
+            await new Promise((resolve) => {
+              resolveNext = resolve;
+            });
+          }
+        }
+      } finally {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
         }
       }
     };
@@ -11928,6 +12019,7 @@ ${newMemoryListStr}
         let targetModel = "gemma-4-26b-a4b-it";
         if (aiProvider === "OpenRouter") targetModel = "google/gemma-4-26b-a4b-it:free";
         if (aiProvider === "DeepSeek") targetModel = "deepseek-v4-flash";
+        if (aiProvider === "NVIDIA") targetModel = "moonshotai/kimi-k2.6";
         while (attempts <= maxAttempts && !success) {
           attempts++;
           try {
@@ -11994,7 +12086,7 @@ Provide a consolidated summary of the entire session.`;
         let targetModel = "gemma-4-26b-a4b-it";
         if (aiProvider === "OpenRouter") targetModel = "google/gemma-4-26b-a4b-it:free";
         if (aiProvider === "DeepSeek") targetModel = "deepseek-v4-flash";
-        if (aiProvider === "NVIDIA") targetModel = "stepfun-ai/step-3.7-flash";
+        if (aiProvider === "NVIDIA") targetModel = "moonshotai/kimi-k2.6";
         let attempts = 0;
         let success = false;
         let response = null;
@@ -12373,7 +12465,6 @@ Provide a consolidated summary of the entire session.`;
         };
         yield { type: "status", content: "[start]" };
         yield { type: "status", content: "Gathering Context..." };
-        await new Promise((resolve) => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
         if (totalFolders > 4096) dynamicMaxDepth = 1;
@@ -12935,7 +13026,7 @@ ${ideErr} [/ERROR]`;
                   0.99
                 );
               } else if (aiProvider === "NVIDIA") {
-                stream = getNVIDIAStream(
+                const rawStream = getNVIDIAStream(
                   settings.apiKey,
                   targetModel,
                   activeContents,
@@ -12946,6 +13037,7 @@ ${ideErr} [/ERROR]`;
                   abortController.signal,
                   0.99
                 );
+                stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
               } else {
                 const apiCallPromise = client.models.generateContentStream({
                   model: targetModel || "gemini-3-flash-preview",
@@ -13173,6 +13265,10 @@ ${ideErr} [/ERROR]`;
                   abortPromise
                 ]);
                 if (done) break;
+                if (chunk && chunk.type === "status") {
+                  yield chunk;
+                  continue;
+                }
                 if (settings && typeof settings.onTokenChunk === "function") {
                   settings.onTokenChunk();
                 }
@@ -19856,7 +19952,7 @@ Selection: ${val}`,
         ), /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
     }
   };
-  return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, showBridgePromo ? /* @__PURE__ */ React15.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex }) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React15.createElement(
+  return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React15.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider }) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React15.createElement(
     BlockItem,
     {
       key: block.key,
@@ -20099,7 +20195,7 @@ var init_app = __esm({
       options.push({ label: "Continue to CLI only", action: "dismiss" });
       return options;
     };
-    BridgePromo = ({ width, height, selectedIndex }) => {
+    BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
       const ideName = getIDEName();
       const options = getPromoOptions(ideName);
       return /* @__PURE__ */ React15.createElement(
@@ -20111,7 +20207,7 @@ var init_app = __esm({
           width,
           height
         },
-        /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React15.createElement(Text15, null, getFluxLogo(versionFluxflow))),
+        /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React15.createElement(Text15, null, getFluxLogo(versionFluxflow, aiProvider))),
         /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React15.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React15.createElement(Text15, null, "You're in ", /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Real-time IDE context & Error Resolution"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Native DIFFing for AI edits"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React15.createElement(Box14, { key: i }, /* @__PURE__ */ React15.createElement(Text15, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
       );
     };

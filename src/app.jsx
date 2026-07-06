@@ -143,7 +143,7 @@ const getPromoOptions = (ideName) => {
     return options;
 };
 
-const BridgePromo = ({ width, height, selectedIndex }) => {
+const BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
     const ideName = getIDEName();
     const options = getPromoOptions(ideName);
 
@@ -156,7 +156,7 @@ const BridgePromo = ({ width, height, selectedIndex }) => {
             height={height}
         >
             <Box marginBottom={1} width={Math.min(80, width - 4)} justifyContent="flex-start">
-                <Text>{getFluxLogo(versionFluxflow)}</Text>
+                <Text>{getFluxLogo(versionFluxflow, aiProvider)}</Text>
             </Box>
             <Box flexDirection="column" borderStyle="double" borderColor="grey" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
                 <Text bold color="white" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
@@ -5471,8 +5471,8 @@ export default function App({ args = [] }) {
 
     return (
         <Box flexDirection="column" width="100%">
-            {showBridgePromo ? (
-                <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} />
+            {isInitializing ? null : showBridgePromo ? (
+                <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} aiProvider={aiProvider} />
             ) : (
                 <>
                     <Box paddingX={1} flexDirection="column" width="100%">
