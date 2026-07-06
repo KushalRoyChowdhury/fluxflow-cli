@@ -10096,24 +10096,35 @@ async function copyWorkspaceFiles(destDir, manifest) {
     });
   }
 }
-async function restoreSnapshotDir(srcDir, destDir) {
+async function restoreSnapshotDir(srcDir, destDir, stats = null, baseDir = null) {
   if (!await fs21.pathExists(srcDir)) return;
+  if (!baseDir) baseDir = srcDir;
   const entries = await fs21.readdir(srcDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     const srcPath = path20.join(srcDir, entry.name);
     const destPath = path20.join(destDir, entry.name);
     if (entry.isDirectory()) {
-      await restoreSnapshotDir(srcPath, destPath);
+      await restoreSnapshotDir(srcPath, destPath, stats, baseDir);
     } else {
-      if (await fs21.pathExists(destPath)) {
+      const relPath = path20.relative(baseDir, srcPath).replace(/\\/g, "/");
+      const existed = await fs21.pathExists(destPath);
+      if (existed) {
         await fs21.chmod(destPath, 438).catch(() => {
         });
       }
       await fs21.ensureDir(path20.dirname(destPath));
-      await fs21.copyFile(srcPath, destPath).catch(() => {
-      });
+      const ok = await fs21.copyFile(srcPath, destPath).then(() => true).catch(() => false);
       await fs21.chmod(destPath, 438).catch(() => {
       });
+      if (stats) {
+        if (!ok) {
+          stats.failed.push(relPath);
+        } else if (existed) {
+          stats.replaced++;
+        } else {
+          stats.restored++;
+        }
+      }
     }
   }
 }
@@ -10230,6 +10241,7 @@ var init_advanceRevert = __esm({
           const targetIdx = checkpoints.findIndex((c) => c.id === checkpointId);
           if (targetIdx === -1) throw new Error(`Checkpoint [${checkpointId}] not found.`);
           const snapshotsDir = path20.join(DATA_DIR, "snapshots", chatId);
+          const stats = { restored: 0, replaced: 0, failed: [] };
           const currentFiles = await scanWorkspace(process.cwd());
           for (const relPath of Object.keys(currentFiles)) {
             const fullPath = path20.join(process.cwd(), relPath);
@@ -10239,11 +10251,11 @@ var init_advanceRevert = __esm({
             });
           }
           const initialDir = path20.join(snapshotsDir, "initial");
-          await restoreSnapshotDir(initialDir, process.cwd());
+          await restoreSnapshotDir(initialDir, process.cwd(), stats, initialDir);
           for (let i = 1; i <= targetIdx; i++) {
             const cp = checkpoints[i];
             const turnDir = path20.join(snapshotsDir, cp.id);
-            await restoreSnapshotDir(turnDir, process.cwd());
+            await restoreSnapshotDir(turnDir, process.cwd(), stats, turnDir);
             if (cp.deletedFiles && cp.deletedFiles.length > 0) {
               for (const delFile of cp.deletedFiles) {
                 const fullPath = path20.join(process.cwd(), delFile);
@@ -10257,7 +10269,7 @@ var init_advanceRevert = __esm({
           session.checkpoints = checkpoints.slice(0, targetIdx + 1);
           session.currentManifest = await scanWorkspace(process.cwd());
           writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
-          return true;
+          return { checkpointId, stats };
         } catch (err) {
           throw new Error(`Rollback failed: ${err.message}`);
         }
@@ -10351,8 +10363,28 @@ Tools Used: ${toolsStr}
           return "ERROR: Missing required parameter 'id' for forceRevert.";
         }
         try {
-          await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
-          return `SUCCESS: Repository rolled back to checkpoint [${id}].`;
+          const result = await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
+          const { checkpointId, stats } = result;
+          const totalFiles = stats.restored + stats.replaced + stats.failed.length;
+          let output = `SUCCESS: Repository rolled back to checkpoint [${checkpointId}].
+
+`;
+          output += `Stats:
+`;
+          output += `  Restored : ${stats.restored} file${stats.restored !== 1 ? "s" : ""} (new to workspace)
+`;
+          output += `  Replaced : ${stats.replaced} file${stats.replaced !== 1 ? "s" : ""} (overwritten)
+`;
+          output += `  Failed   : ${stats.failed.length} file${stats.failed.length !== 1 ? "s" : ""}`;
+          if (stats.failed.length > 0) {
+            output += `
+    ${stats.failed.join("\n    ")}`;
+          }
+          output += `
+  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500-
+`;
+          output += `  Total    : ${totalFiles} file${totalFiles !== 1 ? "s" : ""} processed`;
+          return output;
         } catch (err) {
           return `ERROR: ${err.message}`;
         }
@@ -10622,7 +10654,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -13680,7 +13712,7 @@ ${ideErr} [/ERROR]`;
                       label = `\u{1F6C7}  Cancelled${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "EmergencyRollback") {
                       const { method } = parseArgs(toolCall.args);
-                      label = `\u2714  ${method === "forceRevert" ? "Emergency Rollback" : "Rollback Checked"}`;
+                      label = method === "forceRevert" ? "" : "\u2714  Rollback Point Checked";
                     } else if (normToolName === "await" || normToolName === "Await") {
                       const { time } = parseArgs(toolCall.args);
                       let sec = parseFloat(time) || 0;
@@ -14396,6 +14428,28 @@ ${boxBottom}`}`) };
                       yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
 ${boxMid}
 `) };
+                    }
+                    if (normToolName === "EmergencyRollback") {
+                      const { method } = parseArgs(toolCall.args);
+                      if (method === "forceRevert") {
+                        let totalFiles = 0;
+                        if (result) {
+                          const m = result.match(/Total\s*:\s*(\d+)/i);
+                          if (m) totalFiles = parseInt(m[1]);
+                        }
+                        const isErr = result && result.startsWith("ERROR:");
+                        const postLabel = isErr ? `\u2718  Emergency Rollback Failed` : `\u2714  Emergency Rollback \u2192 ${totalFiles} file${totalFiles === 1 ? "" : "s"} processed`;
+                        let terminalWidth = 115;
+                        if (process.stdout.isTTY) {
+                          terminalWidth = process.stdout.columns - 5 || 120;
+                        }
+                        const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
+                        const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                        const boxBottom = ` ${" ".repeat(boxWidth)} `;
+                        yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
+${boxMid}
+`) };
+                      }
                     }
                     if (normToolName === "todo") {
                       const { method, tasks, markDone } = parseArgs(toolCall.args);

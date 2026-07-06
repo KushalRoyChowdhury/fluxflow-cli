@@ -73,8 +73,24 @@ export const emergency_rollback = async (args, context = {}) => {
             return "ERROR: Missing required parameter 'id' for forceRevert.";
         }
         try {
-            await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
-            return `SUCCESS: Repository rolled back to checkpoint [${id}].`;
+            const result = await AdvanceRevertManager.rollbackToCheckpoint(chatId, id);
+            const { checkpointId, stats } = result;
+            const totalFiles = stats.restored + stats.replaced + stats.failed.length;
+
+            let output = `SUCCESS: Repository rolled back to checkpoint [${checkpointId}].\n\n`;
+            output += `Stats:\n`;
+            output += `  Restored : ${stats.restored} file${stats.restored !== 1 ? 's' : ''} (new to workspace)\n`;
+            output += `  Replaced : ${stats.replaced} file${stats.replaced !== 1 ? 's' : ''} (overwritten)\n`;
+            output += `  Failed   : ${stats.failed.length} file${stats.failed.length !== 1 ? 's' : ''}`;
+
+            if (stats.failed.length > 0) {
+                output += `\n    ${stats.failed.join('\n    ')}`;
+            }
+
+            output += `\n  ────────────────────────────-\n`;
+            output += `  Total    : ${totalFiles} file${totalFiles !== 1 ? 's' : ''} processed`;
+
+            return output;
         } catch (err) {
             return `ERROR: ${err.message}`;
         }

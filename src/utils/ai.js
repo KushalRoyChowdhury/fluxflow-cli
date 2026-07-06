@@ -18,14 +18,13 @@ import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE,
 import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
-import { type } from 'os';
 
 let client = null;
 let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Checked|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -3399,7 +3398,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     label = `🛇  Cancelled${detail ? `: ${detail}` : ''}`;
                                 } else if (normToolName === 'EmergencyRollback') {
                                     const { method } = parseArgs(toolCall.args);
-                                    label = `✔  ${method === 'forceRevert' ? 'Emergency Rollback' : 'Rollback Checked'}`;
+                                    // forceRevert feedback is shown post-execution (see below), getCheckpoint is immediate
+                                    label = method === 'forceRevert' ? '' : '✔  Rollback Point Checked';
                                 } else if (normToolName === 'await' || normToolName === 'Await') {
                                     const { time } = parseArgs(toolCall.args);
                                     let sec = parseFloat(time) || 0;
@@ -4157,6 +4157,29 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                     const boxBottom = ` ${' '.repeat(boxWidth)} `;
                                     yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                                }
+
+                                if (normToolName === 'EmergencyRollback') {
+                                    const { method } = parseArgs(toolCall.args);
+                                    if (method === 'forceRevert') {
+                                        let totalFiles = 0;
+                                        if (result) {
+                                            const m = result.match(/Total\s*:\s*(\d+)/i);
+                                            if (m) totalFiles = parseInt(m[1]);
+                                        }
+                                        const isErr = result && result.startsWith('ERROR:');
+                                        const postLabel = isErr
+                                            ? `✘  Emergency Rollback Failed`
+                                            : `✔  Emergency Rollback → ${totalFiles} file${totalFiles === 1 ? '' : 's'} processed`;
+                                        let terminalWidth = 115;
+                                        if (process.stdout.isTTY) {
+                                            terminalWidth = process.stdout.columns - 5 || 120;
+                                        }
+                                        const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
+                                        const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
+                                        const boxBottom = ` ${' '.repeat(boxWidth)} `;
+                                        yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                                    }
                                 }
 
                                 if (normToolName === 'todo') {

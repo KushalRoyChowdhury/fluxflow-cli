@@ -41,21 +41,33 @@ async function copyWorkspaceFiles(destDir, manifest) {
     }
 }
 
-async function restoreSnapshotDir(srcDir, destDir) {
+async function restoreSnapshotDir(srcDir, destDir, stats = null, baseDir = null) {
     if (!await fs.pathExists(srcDir)) return;
+    if (!baseDir) baseDir = srcDir;
     const entries = await fs.readdir(srcDir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
         const srcPath = path.join(srcDir, entry.name);
         const destPath = path.join(destDir, entry.name);
         if (entry.isDirectory()) {
-            await restoreSnapshotDir(srcPath, destPath);
+            await restoreSnapshotDir(srcPath, destPath, stats, baseDir);
         } else {
-            if (await fs.pathExists(destPath)) {
+            const relPath = path.relative(baseDir, srcPath).replace(/\\/g, '/');
+            const existed = await fs.pathExists(destPath);
+            if (existed) {
                 await fs.chmod(destPath, 0o666).catch(() => {});
             }
             await fs.ensureDir(path.dirname(destPath));
-            await fs.copyFile(srcPath, destPath).catch(() => {});
+            const ok = await fs.copyFile(srcPath, destPath).then(() => true).catch(() => false);
             await fs.chmod(destPath, 0o666).catch(() => {});
+            if (stats) {
+                if (!ok) {
+                    stats.failed.push(relPath);
+                } else if (existed) {
+                    stats.replaced++;
+                } else {
+                    stats.restored++;
+                }
+            }
         }
     }
 }
@@ -171,6 +183,9 @@ export const AdvanceRevertManager = {
 
             const snapshotsDir = path.join(DATA_DIR, 'snapshots', chatId);
 
+            // Shared stats object accumulated across all restore passes
+            const stats = { restored: 0, replaced: 0, failed: [] };
+
             // 1. Clear workspace of non-junk files
             const currentFiles = await scanWorkspace(process.cwd());
             for (const relPath of Object.keys(currentFiles)) {
@@ -181,13 +196,13 @@ export const AdvanceRevertManager = {
 
             // 2. Restore initial snapshot
             const initialDir = path.join(snapshotsDir, 'initial');
-            await restoreSnapshotDir(initialDir, process.cwd());
+            await restoreSnapshotDir(initialDir, process.cwd(), stats, initialDir);
 
             // 3. Sequentially apply deltas up to target checkpoint
             for (let i = 1; i <= targetIdx; i++) {
                 const cp = checkpoints[i];
                 const turnDir = path.join(snapshotsDir, cp.id);
-                await restoreSnapshotDir(turnDir, process.cwd());
+                await restoreSnapshotDir(turnDir, process.cwd(), stats, turnDir);
                 // Handle deletions recorded in that turn
                 if (cp.deletedFiles && cp.deletedFiles.length > 0) {
                     for (const delFile of cp.deletedFiles) {
@@ -200,12 +215,12 @@ export const AdvanceRevertManager = {
 
             // 4. Update ledger: keep only checkpoints up to the restored checkpoint
             session.checkpoints = checkpoints.slice(0, targetIdx + 1);
-            
+
             // Re-scan workspace after restore to reset currentManifest
             session.currentManifest = await scanWorkspace(process.cwd());
 
             writeEncryptedJson(LEDGER_ADVANCE_FILE, ledger);
-            return true;
+            return { checkpointId, stats };
         } catch (err) {
             throw new Error(`Rollback failed: ${err.message}`);
         }
