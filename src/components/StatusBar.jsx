@@ -12,11 +12,11 @@ export function getMemoryInfo() {
 }
 
 const getLatencyColor = (delay) => {
-    if (delay <= 500) return '#00a564'; // Deep green
+    if (delay <= 370) return '#00a564'; // Deep green
     if (delay >= 5000) return '#ff0000'; // Pure red
 
     const points = [
-        { t: 500, r: 0, g: 165, b: 100 },
+        { t: 370, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3000, r: 255, g: 120, b: 0 },
@@ -128,7 +128,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     let maxLimit = 262144;
     if (aiProvider === 'NVIDIA' && (activeModel?.includes('glm') || activeModel?.includes('gpt') || activeModel?.includes('qwen'))) {
         maxLimit = 128000;
-    } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
+    } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && activeModel.includes('deepseek'))) {
         maxLimit = 409600;
     }
 

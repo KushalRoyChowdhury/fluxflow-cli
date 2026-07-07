@@ -443,6 +443,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
 
             if (!response.ok) {
                 const err = await response.json();
+                // console.log(err);
                 const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
                 error.status = response.status;
                 throw error;
@@ -1617,14 +1618,14 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
 
  * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
  */
-const consolidatePastMemories = async (currentChatId, settings) => {
+const consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
     try {
         const { aiProvider = 'Google' } = settings;
-        const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
+        const tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
 
         // 1. Calculate total memories across all chats in L1
         const totalMemoriesCount = Object.values(tempStorage).flat().length;
-        if (totalMemoriesCount <= 2) return;
+        if (totalMemoriesCount <= 5) return;
 
         // 2. Identify past chats that have more than 2 individual memories in L1
         const chatsToSummarize = Object.keys(tempStorage).filter(id => {
@@ -1922,8 +1923,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // --- PAST CHATS SUMMARIZATION ON NEW CHAT START ---
         if (isFirstPrompt && isMemoryEnabled) {
-            yield { type: 'status', content: 'Condensing past chat memories...' };
-            await consolidatePastMemories(chatId, settings);
+            const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
+
+            // 1. Calculate total memories across all chats in L1
+            const totalMemoriesCount = Object.values(tempStorage).flat().length;
+            if (totalMemoriesCount > 5) {
+                yield { type: 'status', content: 'Condensing past chat memories' };
+                await consolidatePastMemories(chatId, settings, tempStorage);
+            }
         }
         // --------------------------------------------------
 

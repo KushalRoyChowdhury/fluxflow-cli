@@ -3,9 +3,9 @@ import { Text } from 'ink';
 
 const GlintText = ({
     text,
-    baseColor = 'white',
+    baseColor = 'grey',
     glintColor = 'gray',
-    speed = 150,
+    speed = 200,
     glintWidth = 6,
     typeSpeed = 30, // 👈 New prop! How fast it backspaces and types! ⌨️
     ...props
@@ -24,7 +24,7 @@ const GlintText = ({
 
     // 2. The Smart Typewriter Effect 🪄
     useEffect(() => {
-        if (text && text.includes('Trying to reach')) {
+        if (text && text.includes('Trying to reach') && displayedText && displayedText.includes('Trying to reach')) {
             setDisplayedText(text);
             return;
         }

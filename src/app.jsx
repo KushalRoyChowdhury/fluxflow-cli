@@ -375,11 +375,11 @@ const getProjectFiles = (() => {
 let cachedShortcut = "Ctrl + Enter";
 
 const getLatencyColor = (delay) => {
-    if (delay <= 500) return '#00a564'; // Deep green
+    if (delay <= 370) return '#00a564'; // Deep green
     if (delay >= 5000) return '#ff0000'; // Pure red
 
     const points = [
-        { t: 500, r: 0, g: 165, b: 100 },
+        { t: 370, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3000, r: 255, g: 120, b: 0 },
@@ -3927,6 +3927,38 @@ export default function App({ args = [] }) {
         setSelectedIndex(0);
     }, [suggestions]);
 
+    // Slide-down animation for suggestion box 🎞️
+    const [suggestionVisibleCount, setSuggestionVisibleCount] = useState(0);
+    const prevSuggestionsLenRef = useRef(0);
+    useEffect(() => {
+        const wasOpen = prevSuggestionsLenRef.current > 0;
+        const isOpen = suggestions.length > 0;
+        prevSuggestionsLenRef.current = suggestions.length;
+
+        if (!isOpen) {
+            setSuggestionVisibleCount(0);
+            return;
+        }
+
+        // On fresh open (was closed), animate from 1 row down
+        if (!wasOpen) {
+            setSuggestionVisibleCount(1);
+            return;
+        }
+
+        // Already open — jump straight to full count
+        setSuggestionVisibleCount(suggestions.length);
+    }, [suggestions]);
+
+    useEffect(() => {
+        if (suggestionVisibleCount > 0 && suggestionVisibleCount < suggestions.length) {
+            const t = setTimeout(() => {
+                setSuggestionVisibleCount(prev => Math.min(prev + 1, suggestions.length));
+            }, 5);
+            return () => clearTimeout(t);
+        }
+    }, [suggestionVisibleCount, suggestions.length]);
+
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
@@ -5385,8 +5417,9 @@ export default function App({ args = [] }) {
                                         {/* Look at the shine! (≧∇≦)/ */}
                                         <GlintText
                                             text={statusText.trimEnd()}
-                                            baseColor="#BFD2CA"
-                                            glintColor="#D8D2C8"
+                                            baseColor="#B5B8D9"
+                                            glintColor="#BFD4DB"
+                                            // glintColor="#D7D1E6"
                                             speed={60}
                                             italic={true}
                                             glintWidth={2}
@@ -5403,12 +5436,12 @@ export default function App({ args = [] }) {
                             </Box>
                             <Box>
                                 {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running' && !statusText.toLowerCase().includes('waiting')) ? (
-                                    <Box><Text color="white">Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
+                                    <Box><GlintText text="Waiting for API" baseColor="white" glintColor="gray" glintWidth={4} speed={80} /><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : wittyPhrase ? (
-                                    <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>
+                                    <Box><GlintText text={wittyPhrase} italic={true} speed={80} typeSpeed={15} /><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : null}
                                 {/* <Text color="gray" bold>[ </Text> */}
-                                <GlintText text={tempModelOverride || activeModel} baseColor="white" glintColor="gray" glintWidth={1} />
+                                <GlintText text={tempModelOverride || activeModel.split('/')[1] || activeModel} baseColor="white" glintColor="gray" glintWidth={3} />
                                 {/* <Text color="gray" bold> ]</Text> */}
                             </Box>
                         </Box>
@@ -5644,7 +5677,7 @@ export default function App({ args = [] }) {
                                         })() : null}
                                     </Box>
 
-                                    {visible.map((s, i) => {
+                                    {visible.slice(0, suggestionVisibleCount).map((s, i) => {
                                         const actualIdx = startIdx + i;
                                         const isActive = actualIdx === selectedIndex;
                                         const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';

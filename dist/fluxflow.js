@@ -4848,10 +4848,10 @@ var init_StatusBar = __esm({
     init_text();
     activeGetMemoryInfo = null;
     getLatencyColor = (delay) => {
-      if (delay <= 500) return "#00a564";
+      if (delay <= 370) return "#00a564";
       if (delay >= 5e3) return "#ff0000";
       const points = [
-        { t: 500, r: 0, g: 165, b: 100 },
+        { t: 370, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3e3, r: 255, g: 120, b: 0 },
@@ -4941,7 +4941,7 @@ var init_StatusBar = __esm({
       let maxLimit = 262144;
       if (aiProvider === "NVIDIA" && (activeModel?.includes("glm") || activeModel?.includes("gpt") || activeModel?.includes("qwen"))) {
         maxLimit = 128e3;
-      } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid") {
+      } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && activeModel.includes("deepseek")) {
         maxLimit = 409600;
       }
       return /* @__PURE__ */ React5.createElement(
@@ -12082,14 +12082,14 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         return { text: fullText, usageMetadata };
       });
     };
-    consolidatePastMemories = async (currentChatId, settings) => {
+    consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
       try {
         const { aiProvider = "Google" } = settings;
-        const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
-        const totalMemoriesCount = Object.values(tempStorage).flat().length;
-        if (totalMemoriesCount <= 2) return;
-        const chatsToSummarize = Object.keys(tempStorage).filter((id) => {
-          return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 2;
+        const tempStorage2 = tempStorage2 || readEncryptedJson(TEMP_MEM_FILE, {});
+        const totalMemoriesCount = Object.values(tempStorage2).flat().length;
+        if (totalMemoriesCount <= 5) return;
+        const chatsToSummarize = Object.keys(tempStorage2).filter((id) => {
+          return id !== currentChatId && Array.isArray(tempStorage2[id]) && tempStorage2[id].length > 2;
         });
         if (chatsToSummarize.length === 0) return;
         let prompt = `You are a silent background process for the FluxFlow CLI Agent.
@@ -12110,7 +12110,7 @@ Chats to process:
 `;
         const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
         for (const id of chatsToSummarize) {
-          const rawMemories = tempStorage[id];
+          const rawMemories = tempStorage2[id];
           const newMemoryListStr = rawMemories.map((m) => `- ${m}`).join("\n");
           const oldSummary = cacheStorage[id];
           prompt += `[Chat ID: ${id}]
@@ -12340,8 +12340,12 @@ Provide a consolidated summary of the entire session.`;
           }
         }
         if (isFirstPrompt && isMemoryEnabled) {
-          yield { type: "status", content: "Condensing past chat memories..." };
-          await consolidatePastMemories(chatId, settings);
+          const tempStorage2 = readEncryptedJson(TEMP_MEM_FILE, {});
+          const totalMemoriesCount = Object.values(tempStorage2).flat().length;
+          if (totalMemoriesCount > 5) {
+            yield { type: "status", content: "Condensing past chat memories" };
+            await consolidatePastMemories(chatId, settings, tempStorage2);
+          }
         }
         const tempStorage = readEncryptedJson(TEMP_MEM_FILE, {});
         const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
@@ -15849,7 +15853,7 @@ var init_witty_phrases = __esm({
       "Letting the thoughts marinate",
       "Just remembered where I put my keys",
       "Pondering the orb",
-      "I've seen things you people wouldn't believe\u2026 like a user who reads loading messages.",
+      // "I've seen things you people wouldn't believe… like a user who reads loading messages.",
       "Initiating thoughtful gaze",
       "What's a computer's favorite snack? Microchips.",
       "Why do Java developers wear glasses? Because they don't C#.",
@@ -15868,7 +15872,8 @@ var init_witty_phrases = __esm({
       "Pretty sure there's a cat walking on the keyboard somewhere",
       "Enhancing\u2026 Enhancing\u2026 Still loading.",
       "It's not a bug, it's a feature\u2026 of this loading screen.",
-      "Have you tried turning it off and on again? (The loading screen, not me.)",
+      "Have you tried turning it off and on again?",
+      // 'Have you tried turning it off and on again? (The loading screen, not me.)',
       "Constructing additional pylons",
       "New line? That\u2019s Ctrl+J.",
       "Releasing the HypnoDrones",
@@ -16011,9 +16016,9 @@ var init_GlintText = __esm({
   "src/components/GlintText.jsx"() {
     GlintText = ({
       text,
-      baseColor = "white",
+      baseColor = "grey",
       glintColor = "gray",
-      speed = 150,
+      speed = 200,
       glintWidth = 6,
       typeSpeed = 30,
       // 👈 New prop! How fast it backspaces and types! ⌨️
@@ -16028,7 +16033,7 @@ var init_GlintText = __esm({
         return () => clearInterval(timer);
       }, [displayedText.length, speed, glintWidth]);
       useEffect11(() => {
-        if (text && text.includes("Trying to reach")) {
+        if (text && text.includes("Trying to reach") && displayedText && displayedText.includes("Trying to reach")) {
           setDisplayedText(text);
           return;
         }
@@ -19201,6 +19206,30 @@ Selection: ${val}`,
   useEffect12(() => {
     setSelectedIndex(0);
   }, [suggestions]);
+  const [suggestionVisibleCount, setSuggestionVisibleCount] = useState15(0);
+  const prevSuggestionsLenRef = useRef4(0);
+  useEffect12(() => {
+    const wasOpen = prevSuggestionsLenRef.current > 0;
+    const isOpen = suggestions.length > 0;
+    prevSuggestionsLenRef.current = suggestions.length;
+    if (!isOpen) {
+      setSuggestionVisibleCount(0);
+      return;
+    }
+    if (!wasOpen) {
+      setSuggestionVisibleCount(1);
+      return;
+    }
+    setSuggestionVisibleCount(suggestions.length);
+  }, [suggestions]);
+  useEffect12(() => {
+    if (suggestionVisibleCount > 0 && suggestionVisibleCount < suggestions.length) {
+      const t = setTimeout(() => {
+        setSuggestionVisibleCount((prev) => Math.min(prev + 1, suggestions.length));
+      }, 5);
+      return () => clearTimeout(t);
+    }
+  }, [suggestionVisibleCount, suggestions.length]);
   useEffect12(() => {
     if (activeView !== "providerBudgetSelect") return;
     const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
@@ -20161,14 +20190,14 @@ Selection: ${val}`,
           GlintText_default,
           {
             text: statusText.trimEnd(),
-            baseColor: "#BFD2CA",
-            glintColor: "#D8D2C8",
+            baseColor: "#B5B8D9",
+            glintColor: "#BFD4DB",
             speed: 60,
             italic: true,
             glintWidth: 2,
             typeSpeed: 10
           }
-        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Waiting for API"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: tempModelOverride || activeModel, baseColor: "white", glintColor: "gray", glintWidth: 1 }))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: "Waiting for API", baseColor: "white", glintColor: "gray", glintWidth: 4, speed: 80 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: wittyPhrase, italic: true, speed: 80, typeSpeed: 15 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: tempModelOverride || activeModel.split("/")[1] || activeModel, baseColor: "white", glintColor: "gray", glintWidth: 3 }))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: "#555555",
@@ -20281,7 +20310,7 @@ Selection: ${val}`,
         }
         return /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
       })() : null),
-      visible.map((s, i) => {
+      visible.slice(0, suggestionVisibleCount).map((s, i) => {
         const actualIdx = startIdx + i;
         const isActive = actualIdx === selectedIndex;
         const isGemmaDisabled = s.cmd === "gemma-4-31b-it" && apiTier !== "Free";
@@ -20592,10 +20621,10 @@ var init_app = __esm({
     })();
     cachedShortcut = "Ctrl + Enter";
     getLatencyColor2 = (delay) => {
-      if (delay <= 500) return "#00a564";
+      if (delay <= 370) return "#00a564";
       if (delay >= 5e3) return "#ff0000";
       const points = [
-        { t: 500, r: 0, g: 165, b: 100 },
+        { t: 370, r: 0, g: 165, b: 100 },
         { t: 800, r: 120, g: 220, b: 80 },
         { t: 1500, r: 250, g: 210, b: 40 },
         { t: 3e3, r: 255, g: 120, b: 0 },
