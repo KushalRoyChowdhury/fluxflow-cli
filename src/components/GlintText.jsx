@@ -24,7 +24,7 @@ const GlintText = ({
 
     // 2. The Smart Typewriter Effect 🪄
     useEffect(() => {
-        if (text && text.includes('Trying to reach') && displayedText && displayedText.includes('Trying to reach')) {
+        if (text && ((text.includes('Trying to reach') && displayedText && displayedText.includes('Trying to reach')) || (text.includes('Error Occurred') && displayedText && displayedText.includes('Error Occurred')))) {
             setDisplayedText(text);
             return;
         }
