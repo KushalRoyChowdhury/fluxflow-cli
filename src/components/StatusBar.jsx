@@ -15,19 +15,26 @@ const getLatencyColor = (delay) => {
     if (delay <= 370) return '#00a564'; // Deep green
     if (delay >= 5000) return '#ff0000'; // Pure red
 
+    // More stops = smoother perceptual gradient across the full range
     const points = [
-        { t: 370, r: 0, g: 165, b: 100 },
-        { t: 800, r: 120, g: 220, b: 80 },
-        { t: 1500, r: 250, g: 210, b: 40 },
-        { t: 3000, r: 255, g: 120, b: 0 },
-        { t: 5000, r: 255, g: 0, b: 0 }
+        { t:  370, r:   0, g: 165, b: 100 }, // deep green
+        { t:  550, r:  40, g: 195, b:  80 }, // green
+        { t:  800, r: 120, g: 220, b:  50 }, // lime-green
+        { t: 1100, r: 190, g: 225, b:  20 }, // yellow-green
+        { t: 1500, r: 250, g: 210, b:  15 }, // yellow
+        { t: 2000, r: 255, g: 170, b:   0 }, // amber
+        { t: 2800, r: 255, g: 110, b:   0 }, // orange
+        { t: 3800, r: 255, g:  50, b:   0 }, // deep orange
+        { t: 5000, r: 255, g:   0, b:   0 }  // red
     ];
 
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
-        const p2 = points[i+1];
+        const p2 = points[i + 1];
         if (delay >= p1.t && delay <= p2.t) {
-            const ratio = (delay - p1.t) / (p2.t - p1.t);
+            // Smoothstep easing so mid-range transitions feel less abrupt
+            let ratio = (delay - p1.t) / (p2.t - p1.t);
+            ratio = ratio * ratio * (3 - 2 * ratio); // smoothstep
             const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
             const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
             const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
@@ -46,6 +53,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
     const [dotColor, setDotColor] = useState('green');
     const chunkTimesRef = useRef([]);
+    const smoothedDelayRef = useRef(370); // EMA of delay, starts at fast/green
 
     useEffect(() => {
         if (!isProcessing) {
@@ -57,7 +65,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             const times = chunkTimesRef.current;
             if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
                 times.push(lastChunkTime);
-                if (times.length > 5) {
+                if (times.length > 10) {
                     times.shift();
                 }
             }
@@ -78,8 +86,24 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 averageInterval = sum / (times.length - 1);
             }
             const timeSinceLast = Date.now() - lastChunkTime;
-            const delay = Math.max(averageInterval, timeSinceLast);
-            setDotColor(getLatencyColor(delay));
+
+            // Two-zone logic:
+            // • Brief pause  (<2.5s): cap at 3× avg so tool calls / context pauses
+            //   don't catastrophize the color.
+            // • Genuine stall (≥2.5s): bypass cap entirely so the dot turns red,
+            //   signalling the model is dead — not just thinking.
+            const STALL_THRESHOLD = 2500;
+            const isStalled = timeSinceLast >= STALL_THRESHOLD;
+            const cappedTimeSinceLast = (!isStalled && averageInterval > 0)
+                ? Math.min(timeSinceLast, averageInterval * 3)
+                : timeSinceLast;
+            const rawDelay = Math.max(averageInterval, cappedTimeSinceLast);
+
+            // EMA: react faster (α=0.4) during a stall so red arrives in ~3 ticks,
+            // stay slow (α=0.2) during normal streaming to absorb spikes.
+            const alpha = isStalled ? 0.4 : 0.2;
+            smoothedDelayRef.current = smoothedDelayRef.current * (1 - alpha) + rawDelay * alpha;
+            setDotColor(getLatencyColor(smoothedDelayRef.current));
         };
 
         checkLatency();

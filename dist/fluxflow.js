@@ -2138,7 +2138,8 @@ var init_text = __esm({
           if (currentVisibleLength + tokenVisibleLength > width) {
             if (currentLine.trim().length > 0) {
               finalLines.push(currentLine.trimEnd());
-              currentLine = indent + token;
+              const cappedIndent = indent.substring(0, Math.min(indent.length, 8));
+              currentLine = cappedIndent + token;
               currentVisibleLength = getVisibleLength(currentLine);
             } else {
               if (ansiRegex.test(token)) {
@@ -2227,36 +2228,20 @@ var init_text = __esm({
       };
       const adjustIndentation = (newText, originalMatch, leadingContext = "") => {
         if (!newText || originalMatch === void 0) return newText;
-        const getIndentStyle = (text) => {
-          const lines = text.split("\n").filter((l) => l.trim() !== "");
-          if (lines.length === 0) return { char: " ", size: 4 };
-          const firstIndent = lines[0].match(/^\s*/)[0];
-          if (firstIndent.includes("	")) return { char: "	", size: 1 };
-          const indents = lines.map((l) => l.match(/^\s*/)[0].length).filter((l) => l > 0);
-          if (indents.length === 0) return { char: " ", size: firstIndent.length || 4 };
-          const gcd = (a, b) => b ? gcd(b, a % b) : a;
-          const step = indents.reduce((a, b) => gcd(a, b));
-          return { char: " ", size: step || 4 };
-        };
-        const fileStyle = getIndentStyle(originalMatch);
-        const modelStyle = getIndentStyle(newText);
-        const matchMinIndent = getMinIndent(originalMatch).length;
-        const leadingIndent = (leadingContext.match(/^\s*/) || [""])[0].length;
-        const targetBaseIndentRaw = leadingIndent + matchMinIndent;
-        const targetUnits = targetBaseIndentRaw / fileStyle.size;
-        const modelBaseUnits = getMinIndent(newText).length / modelStyle.size;
-        const deltaUnits = targetUnits - modelBaseUnits;
+        const usesTabs = /^\t/m.test(originalMatch);
+        const indentChar = usesTabs ? "	" : " ";
+        const firstNonEmpty = (text) => text.split("\n").find((l) => l.trim() !== "") ?? "";
+        const origFirstIndent = firstNonEmpty(originalMatch).match(/^\s*/)[0].length;
+        const newFirstIndent = firstNonEmpty(newText).match(/^\s*/)[0].length;
+        const delta = origFirstIndent - newFirstIndent;
+        const leadingLen = (leadingContext.match(/^\s*/) || [""])[0].length;
         const newLines = newText.split("\n");
         return newLines.map((line, i) => {
           if (line.trim() === "" && i !== 0) return "";
-          const currentLineUnits = line.match(/^\s*/)[0].length / modelStyle.size;
-          const finalUnits = Math.max(0, currentLineUnits + deltaUnits);
-          let unitCount = finalUnits;
-          if (i === 0) {
-            const leadingUnits = leadingIndent / fileStyle.size;
-            unitCount = Math.max(0, finalUnits - leadingUnits);
-          }
-          return fileStyle.char.repeat(unitCount * fileStyle.size) + line.trimStart();
+          const currentIndent = line.match(/^\s*/)[0].length;
+          let targetIndent = Math.max(0, currentIndent + delta);
+          if (i === 0) targetIndent = Math.max(0, targetIndent - leadingLen);
+          return indentChar.repeat(targetIndent) + line.trimStart();
         }).join("\n");
       };
       const patchMatches = [];
@@ -4311,12 +4296,12 @@ var init_ChatLayout = __esm({
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
           const blockColor = isRemoval ? "#ffdddd" : "#ddffdd";
-          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          const wrappedLines = wrapText(content, columns - 15).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
           const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
-          const wrappedLines = wrapText(content, columns - 14).split("\n");
+          const wrappedLines = wrapText(content, columns - 15).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor))));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
@@ -4340,7 +4325,7 @@ var init_ChatLayout = __esm({
           return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "gray" }, part.value);
         }));
       };
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
     });
     DiffBlock = React4.memo(({ text, columns = 80, extension }) => {
       const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
@@ -4744,7 +4729,7 @@ var init_ChatLayout = __esm({
             paddingLeft: 2,
             width: "100%"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(3, " "), " ")),
+          /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(4, " "), " ")),
           /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(text, lang, "#e1e4e8"))
         );
       }
@@ -4852,16 +4837,30 @@ var init_StatusBar = __esm({
       if (delay >= 5e3) return "#ff0000";
       const points = [
         { t: 370, r: 0, g: 165, b: 100 },
-        { t: 800, r: 120, g: 220, b: 80 },
-        { t: 1500, r: 250, g: 210, b: 40 },
-        { t: 3e3, r: 255, g: 120, b: 0 },
+        // deep green
+        { t: 550, r: 40, g: 195, b: 80 },
+        // green
+        { t: 800, r: 120, g: 220, b: 50 },
+        // lime-green
+        { t: 1100, r: 190, g: 225, b: 20 },
+        // yellow-green
+        { t: 1500, r: 250, g: 210, b: 15 },
+        // yellow
+        { t: 2e3, r: 255, g: 170, b: 0 },
+        // amber
+        { t: 2800, r: 255, g: 110, b: 0 },
+        // orange
+        { t: 3800, r: 255, g: 50, b: 0 },
+        // deep orange
         { t: 5e3, r: 255, g: 0, b: 0 }
+        // red
       ];
       for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
         if (delay >= p1.t && delay <= p2.t) {
-          const ratio = (delay - p1.t) / (p2.t - p1.t);
+          let ratio = (delay - p1.t) / (p2.t - p1.t);
+          ratio = ratio * ratio * (3 - 2 * ratio);
           const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
           const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
           const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
@@ -4877,6 +4876,7 @@ var init_StatusBar = __esm({
       const [memoryUnit, setMemoryUnit] = useState5("MB");
       const [dotColor, setDotColor] = useState5("green");
       const chunkTimesRef = useRef3([]);
+      const smoothedDelayRef = useRef3(370);
       useEffect4(() => {
         if (!isProcessing) {
           chunkTimesRef.current = [];
@@ -4886,7 +4886,7 @@ var init_StatusBar = __esm({
           const times = chunkTimesRef.current;
           if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
             times.push(lastChunkTime);
-            if (times.length > 5) {
+            if (times.length > 10) {
               times.shift();
             }
           }
@@ -4906,8 +4906,13 @@ var init_StatusBar = __esm({
             averageInterval = sum / (times.length - 1);
           }
           const timeSinceLast = Date.now() - lastChunkTime;
-          const delay = Math.max(averageInterval, timeSinceLast);
-          setDotColor(getLatencyColor(delay));
+          const STALL_THRESHOLD = 2500;
+          const isStalled = timeSinceLast >= STALL_THRESHOLD;
+          const cappedTimeSinceLast = !isStalled && averageInterval > 0 ? Math.min(timeSinceLast, averageInterval * 3) : timeSinceLast;
+          const rawDelay = Math.max(averageInterval, cappedTimeSinceLast);
+          const alpha = isStalled ? 0.4 : 0.2;
+          smoothedDelayRef.current = smoothedDelayRef.current * (1 - alpha) + rawDelay * alpha;
+          setDotColor(getLatencyColor(smoothedDelayRef.current));
         };
         checkLatency();
         const timer = setInterval(checkLatency, 100);
@@ -5200,11 +5205,11 @@ Info: 'initial' = user prompted for THIS active task, revert 'id' should be a tu
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop. Usage: ONLY in catastrophic situations. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
 ` : ""}
 - SUB AGENT TOOLS -
-**PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE PLAUSIBLE & BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
+**PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE EVEN SLIGHTLY BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
 Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
-- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Huge tokens/costs savings
-1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
+- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure. No terminal access
 2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT ONLY IF ITS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
@@ -10763,7 +10768,7 @@ var init_ai = __esm({
       "openai/gpt-5.5-pro",
       "moonshotai/kimi-k2.6",
       // NVIDIA vision models
-      "moonshotai/kimi-k2.6",
+      "moonshotai/kimi-k2.7",
       "stepfun-ai/step-3.7-flash",
       "google/gemma-4-31b-it",
       "mistralai/mistral-medium-3.5-128b",
@@ -11193,6 +11198,8 @@ var init_ai = __esm({
                 push({ value: { type: "status", content: `Queue ${depth || 1}` }, done: false });
               }
             }
+          } else if (!isStreamingStarted) {
+            push({ value: { type: "status", content: `Queue '${res.status}'` }, done: false });
           }
         } catch (e) {
         }
@@ -14953,7 +14960,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
         "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
         "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
-        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
+        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. Optional parameters default to false`,
         "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
@@ -17469,8 +17476,12 @@ function App({ args = [] }) {
       ] : aiProvider === "NVIDIA" ? [
         // --- Kimi (Moonshot AI) ---
         {
-          cmd: "moonshotai/kimi-k2.6",
+          cmd: "moonshotai/kimi-k2.7",
           desc: "Multimodal"
+        },
+        {
+          cmd: "moonshotai/kimi-k2.6",
+          desc: "[DEPRICATED]"
         },
         // --- DeepSeek Family ---
         {
@@ -17510,10 +17521,6 @@ function App({ args = [] }) {
           desc: "Text Only"
         },
         // --- GLM (Zhipu AI) ---
-        {
-          cmd: "z-ai/glm-5.1",
-          desc: "Text Only [DEPRICATED]"
-        },
         {
           cmd: "z-ai/glm-5.2",
           desc: "Text Only"
@@ -20625,16 +20632,30 @@ var init_app = __esm({
       if (delay >= 5e3) return "#ff0000";
       const points = [
         { t: 370, r: 0, g: 165, b: 100 },
-        { t: 800, r: 120, g: 220, b: 80 },
-        { t: 1500, r: 250, g: 210, b: 40 },
-        { t: 3e3, r: 255, g: 120, b: 0 },
+        // deep green
+        { t: 550, r: 40, g: 195, b: 80 },
+        // green
+        { t: 800, r: 120, g: 220, b: 50 },
+        // lime-green
+        { t: 1100, r: 190, g: 225, b: 20 },
+        // yellow-green
+        { t: 1500, r: 250, g: 210, b: 15 },
+        // yellow
+        { t: 2e3, r: 255, g: 170, b: 0 },
+        // amber
+        { t: 2800, r: 255, g: 110, b: 0 },
+        // orange
+        { t: 3800, r: 255, g: 50, b: 0 },
+        // deep orange
         { t: 5e3, r: 255, g: 0, b: 0 }
+        // red
       ];
       for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
         if (delay >= p1.t && delay <= p2.t) {
-          const ratio = (delay - p1.t) / (p2.t - p1.t);
+          let ratio = (delay - p1.t) / (p2.t - p1.t);
+          ratio = ratio * ratio * (3 - 2 * ratio);
           const r = Math.round(p1.r + (p2.r - p1.r) * ratio);
           const g = Math.round(p1.g + (p2.g - p1.g) * ratio);
           const b = Math.round(p1.b + (p2.b - p1.b) * ratio);
@@ -20646,6 +20667,7 @@ var init_app = __esm({
     SubagentRow = React16.memo(({ sa }) => {
       const [dotColor, setDotColor] = useState15("green");
       const chunkTimesRef = useRef4([]);
+      const smoothedDelayRef = useRef4(370);
       useEffect12(() => {
         if (sa.status !== "running") {
           chunkTimesRef.current = [];
@@ -20656,7 +20678,7 @@ var init_app = __esm({
           const times = chunkTimesRef.current;
           if (times.length === 0 || times[times.length - 1] !== lastChunkTime) {
             times.push(lastChunkTime);
-            if (times.length > 5) {
+            if (times.length > 10) {
               times.shift();
             }
           }
@@ -20676,8 +20698,13 @@ var init_app = __esm({
             averageInterval = sum / (times.length - 1);
           }
           const timeSinceLast = Date.now() - lastChunkTime;
-          const delay = Math.max(averageInterval, timeSinceLast);
-          setDotColor(getLatencyColor2(delay));
+          const STALL_THRESHOLD = 2500;
+          const isStalled = timeSinceLast >= STALL_THRESHOLD;
+          const cappedTimeSinceLast = !isStalled && averageInterval > 0 ? Math.min(timeSinceLast, averageInterval * 3) : timeSinceLast;
+          const rawDelay = Math.max(averageInterval, cappedTimeSinceLast);
+          const alpha = isStalled ? 0.4 : 0.2;
+          smoothedDelayRef.current = smoothedDelayRef.current * (1 - alpha) + rawDelay * alpha;
+          setDotColor(getLatencyColor2(smoothedDelayRef.current));
         };
         checkLatency();
         const timer = setInterval(checkLatency, 100);

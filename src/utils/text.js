@@ -42,7 +42,9 @@ export const wrapText = (text, width) => {
                 if (currentLine.trim().length > 0) {
                     finalLines.push(currentLine.trimEnd());
                     // Start new line with the current indent + the token
-                    currentLine = indent + token;
+                    // Cap continuation indent to avoid wild shifts on deeply-nested code
+                    const cappedIndent = indent.substring(0, Math.min(indent.length, 8));
+                    currentLine = cappedIndent + token;
                     currentVisibleLength = getVisibleLength(currentLine);
                 } else {
                     // Ultra long token (e.g. long path or string)
@@ -156,50 +158,36 @@ export const applyPatches = (content, patches) => {
     const adjustIndentation = (newText, originalMatch, leadingContext = '') => {
         if (!newText || originalMatch === undefined) return newText;
 
-        const getIndentStyle = (text) => {
-            const lines = text.split('\n').filter(l => l.trim() !== '');
-            if (lines.length === 0) return { char: ' ', size: 4 };
+        // Detect whether the file uses tabs (preserve char style)
+        const usesTabs = /^\t/m.test(originalMatch);
+        const indentChar = usesTabs ? '\t' : ' ';
 
-            const firstIndent = lines[0].match(/^\s*/)[0];
-            if (firstIndent.includes('\t')) return { char: '\t', size: 1 };
+        // Anchor: align new content so its first non-empty line matches
+        // the indent level of the first non-empty line of the original match.
+        // This avoids GCD-based style detection which collapses on large files
+        // with mixed nesting depths (e.g. GCD(4,6,8) = 2, not 4).
+        const firstNonEmpty = (text) => text.split('\n').find(l => l.trim() !== '') ?? '';
+        const origFirstIndent = firstNonEmpty(originalMatch).match(/^\s*/)[0].length;
+        const newFirstIndent  = firstNonEmpty(newText).match(/^\s*/)[0].length;
 
-            // Detect space step
-            const indents = lines.map(l => l.match(/^\s*/)[0].length).filter(l => l > 0);
-            if (indents.length === 0) return { char: ' ', size: firstIndent.length || 4 };
+        // Raw character delta: positive = need to add indent, negative = need to remove
+        const delta = origFirstIndent - newFirstIndent;
 
-            // Find greatest common divisor of indents to guess step
-            const gcd = (a, b) => b ? gcd(b, a % b) : a;
-            const step = indents.reduce((a, b) => gcd(a, b));
-            return { char: ' ', size: step || 4 };
-        };
-
-        const fileStyle = getIndentStyle(originalMatch);
-        const modelStyle = getIndentStyle(newText);
-
-        const matchMinIndent = getMinIndent(originalMatch).length;
-        const leadingIndent = (leadingContext.match(/^\s*/) || [''])[0].length;
-        const targetBaseIndentRaw = leadingIndent + matchMinIndent;
-
-        // Convert physical lengths to logical units
-        const targetUnits = targetBaseIndentRaw / fileStyle.size;
-        const modelBaseUnits = getMinIndent(newText).length / modelStyle.size;
-        const deltaUnits = targetUnits - modelBaseUnits;
+        // How many chars the leadingContext already contributes at the insertion point
+        const leadingLen = (leadingContext.match(/^\s*/) || [''])[0].length;
 
         const newLines = newText.split('\n');
         return newLines.map((line, i) => {
             if (line.trim() === '' && i !== 0) return '';
 
-            const currentLineUnits = line.match(/^\s*/)[0].length / modelStyle.size;
-            const finalUnits = Math.max(0, currentLineUnits + deltaUnits);
+            const currentIndent = line.match(/^\s*/)[0].length;
+            let targetIndent = Math.max(0, currentIndent + delta);
 
-            // Re-calculate for first line if it's already partially indented by leadingContext
-            let unitCount = finalUnits;
-            if (i === 0) {
-                const leadingUnits = leadingIndent / fileStyle.size;
-                unitCount = Math.max(0, finalUnits - leadingUnits);
-            }
+            // First line: the leadingContext is already in the file before our text,
+            // so subtract it to avoid double-indenting.
+            if (i === 0) targetIndent = Math.max(0, targetIndent - leadingLen);
 
-            return fileStyle.char.repeat(unitCount * fileStyle.size) + line.trimStart();
+            return indentChar.repeat(targetIndent) + line.trimStart();
         }).join('\n');
     };
 

@@ -486,7 +486,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
         // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
             const blockColor = isRemoval ? '#ffdddd' : '#ddffdd';
-            const wrappedLines = wrapText(content, columns - 14).split('\n');
+            const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
                     {wrappedLines.map((wl, idx) => (
@@ -501,7 +501,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
             const textColor = isRemoval ? '#885555' : (isAddition ? '#558866' : 'gray');
-            const wrappedLines = wrapText(content, columns - 14).split('\n');
+            const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
                     {wrappedLines.map((wl, idx) => (
@@ -564,7 +564,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     return (
         <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
             {/* Gutter Line Number */}
-            <Box width={3} flexShrink={0} justifyContent="flex-end">
+            <Box width={4} flexShrink={0} justifyContent="flex-end">
                 <Text color={finalNumColor}>{lineNum}</Text>
             </Box>
 
@@ -1320,8 +1320,8 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 paddingLeft={2}
                 width="100%"
             >
-                <Box width={4} flexShrink={0}>
-                    <Text color="gray" dimColor>{String(lineNum).padStart(3, ' ')} </Text>
+                <Box width={5} flexShrink={0}>
+                    <Text color="gray" dimColor>{String(lineNum).padStart(4, ' ')} </Text>
                 </Box>
                 <Box flexGrow={1}>
                     {renderHighlightedLine(text, lang, '#e1e4e8')}
