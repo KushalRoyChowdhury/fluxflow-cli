@@ -927,12 +927,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             <Box marginBottom={0} paddingX={1} width="100%">
                 <Box
                     flexDirection="column"
-                    borderStyle="single"
-                    borderLeft={true}
-                    borderRight={false}
-                    borderTop={false}
-                    borderBottom={false}
-                    borderColor="#444444"
+                    borderStyle="round"
+                    border={true}
+                    // borderColor="#444444"
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}
@@ -956,12 +953,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box
                     flexDirection="column"
-                    borderStyle="single"
-                    borderLeft={true}
-                    borderRight={false}
-                    borderTop={false}
-                    borderBottom={false}
-                    borderColor="#444444"
+                    borderStyle="round"
+                    border={true}
+                    // borderColor="#444444"
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}

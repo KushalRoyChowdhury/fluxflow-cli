@@ -4515,12 +4515,8 @@ var init_ChatLayout = __esm({
           Box3,
           {
             flexDirection: "column",
-            borderStyle: "single",
-            borderLeft: true,
-            borderRight: false,
-            borderTop: false,
-            borderBottom: false,
-            borderColor: "#444444",
+            borderStyle: "round",
+            border: true,
             paddingLeft: 2,
             paddingRight: 0,
             paddingTop: 1,
@@ -4537,12 +4533,8 @@ var init_ChatLayout = __esm({
           Box3,
           {
             flexDirection: "column",
-            borderStyle: "single",
-            borderLeft: true,
-            borderRight: false,
-            borderTop: false,
-            borderBottom: false,
-            borderColor: "#444444",
+            borderStyle: "round",
+            border: true,
             paddingLeft: 2,
             paddingRight: 0,
             paddingTop: 1,
@@ -16040,7 +16032,7 @@ var init_GlintText = __esm({
         return () => clearInterval(timer);
       }, [displayedText.length, speed, glintWidth]);
       useEffect11(() => {
-        if (text && text.includes("Trying to reach") && displayedText && displayedText.includes("Trying to reach")) {
+        if (text && (text.includes("Trying to reach") && displayedText && displayedText.includes("Trying to reach") || text.includes("Error Occurred") && displayedText && displayedText.includes("Error Occurred"))) {
           setDisplayedText(text);
           return;
         }
