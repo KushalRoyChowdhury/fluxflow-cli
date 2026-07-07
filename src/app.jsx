@@ -39,6 +39,7 @@ import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, clean
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
+import GlintText from './components/GlintText.jsx';
 
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -976,7 +977,7 @@ export default function App({ args = [] }) {
     useEffect(() => {
         let interval;
 
-        if (statusText) {
+        if (statusText && systemSettings.loadingPhrases !== false) {
             const updatePhrase = () => {
                 const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
                 setWittyPhrase(randomPhrase);
@@ -990,7 +991,7 @@ export default function App({ args = [] }) {
         return () => {
             clearInterval(interval);
         }
-    }, [statusText]);
+    }, [statusText, systemSettings]);
 
     const [isSpinnerActive, setIsSpinnerActive] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -3298,7 +3299,7 @@ export default function App({ args = [] }) {
                                                     {
                                                         id: 'ask-' + Date.now(),
                                                         role: 'system',
-                                                        text: `💬 **Ask User**\nSelection: ${val}`,
+                                                        text: `💬 **Ask User**\nQuestion: ${question}\nSelection: ${val}`,
                                                         isAskRecord: true
                                                     }
                                                 ];
@@ -3375,6 +3376,7 @@ export default function App({ args = [] }) {
                     // const signalRegex = /\[?_DISABLED_SIGNAL_REGEX_\]?/gi;
 
                     for await (const packet of stream) {
+                        // fs.appendFileSync("DEBUG.txt", `${JSON.stringify(packet)}\n\n`);
                         await new Promise(resolve => setTimeout(resolve, 3));
 
                         if (packet.type === 'text') {
@@ -3387,7 +3389,9 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'status') {
 
-                            setStatusText(packet.content);
+                            if (!packet.content?.includes('[start]')) {
+                                setStatusText(packet.content);
+                            }
 
                             if (packet.content?.includes('[start]')) {
                                 clearInterval(interval_for_timer);
@@ -5377,20 +5381,34 @@ export default function App({ args = [] }) {
                                 {statusText ? (
                                     <Box gap={1}>
                                         <Spinner />
-                                        <Text color="white" bold italic>{statusText.trimEnd()}</Text><Text color={'gray'}>{activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : ""}</Text>
-                                    </Box>
+
+                                        {/* Look at the shine! (≧∇≦)/ */}
+                                        <GlintText
+                                            text={statusText.trimEnd()}
+                                            baseColor="#BFD2CA"
+                                            glintColor="#D8D2C8"
+                                            speed={60}
+                                            italic={true}
+                                            glintWidth={2}
+                                            typeSpeed={10}
+                                        />
+
+                                        <Text color={'gray'}>
+                                            {activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : ""}
+                                        </Text>
+                                </Box>
                                 ) : (
-                                    <Text color="white" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
+                                    <Text color="grey" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
                                 {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running' && !statusText.toLowerCase().includes('waiting')) ? (
-                                    <Box><Text color="white" bold>Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
+                                    <Box><Text color="white">Waiting for API</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : wittyPhrase ? (
                                     <Box><Text color="gray" italic>{wittyPhrase}</Text><Text color="gray" dimColor> ┃ </Text></Box>
                                 ) : null}
                                 {/* <Text color="gray" bold>[ </Text> */}
-                                <Text color="white">{tempModelOverride || activeModel}</Text>
+                                <GlintText text={tempModelOverride || activeModel} baseColor="white" glintColor="gray" glintWidth={1} />
                                 {/* <Text color="gray" bold> ]</Text> */}
                             </Box>
                         </Box>
@@ -5499,7 +5517,7 @@ export default function App({ args = [] }) {
                                 ))}
                                 {activeCommand && (
                                     <Box marginTop={1}>
-                                        <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} terminalHeight={terminalSize.rows} />
+                                        <TerminalBox command={activeCommand} output={execOutput} isFocused={isTerminalFocused} isPty={isActiveCommandPty} terminalHeight={terminalSize.rows} columns={terminalSize.columns} />
                                     </Box>
                                 )}
                             </Box>

@@ -325,7 +325,8 @@ var init_settings = __esm({
         autoDeleteHistory: "7d",
         useExternalData: false,
         externalDataPath: "",
-        preserveThinking: true
+        preserveThinking: true,
+        loadingPhrases: true
       },
       profileData: {
         name: null,
@@ -3714,7 +3715,7 @@ var init_TerminalBox = __esm({
           setIsExpanded((prev) => !prev);
         }
       }, { isActive: isFocused });
-      const limit = Math.max(5, completed ? terminalHeight - 10 : terminalHeight - 20);
+      const limit = Math.max(5, completed ? terminalHeight - 10 : terminalHeight - 25);
       const hasCollapsibleContent = rawLines.length > limit;
       const collapsedCount = rawLines.length - limit;
       const visibleLines = hasCollapsibleContent && !isExpanded ? rawLines.slice(rawLines.length - limit) : rawLines;
@@ -3725,19 +3726,18 @@ var init_TerminalBox = __esm({
         {
           flexDirection: "column",
           borderStyle: isFocused ? "double" : "single",
-          borderLeft: true,
+          borderLeft: false,
           borderRight: false,
-          borderTop: false,
-          borderBottom: false,
-          borderColor: "#555555",
+          borderTop: true,
+          borderBottom: true,
           paddingLeft: 2,
           paddingRight: 0,
           paddingY: 1,
-          marginTop: 1,
-          width: "100%"
+          marginY: 1,
+          width: columns - 2
         },
-        /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, "ADVANCE"))),
-        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { flexDirection: "column", marginTop: 0, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, hasCollapsibleContent && !isExpanded && /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta" }, "...", collapsedCount, " lines collapsed... Press CTRL + O to expand.")), /* @__PURE__ */ React3.createElement(Text3, { color: completed ? "gray" : void 0 }, renderedOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", italic: true }, "Waiting for output...")),
+        /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "green", bold: true }, "ADVANCE"))),
+        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { flexDirection: "column", marginTop: 0, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1, width: "100%" }, hasCollapsibleContent && !isExpanded && /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta" }, "...", collapsedCount, " lines collapsed...")), /* @__PURE__ */ React3.createElement(Text3, { color: completed ? void 0 : void 0 }, renderedOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", italic: true }, "Waiting for output...")),
         /* @__PURE__ */ React3.createElement(Box2, { justifyContent: "space-between", marginTop: 1 }, !completed ? /* @__PURE__ */ React3.createElement(Text3, { color: "gray", italic: true }, isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging.") : /* @__PURE__ */ React3.createElement(Box2, null), /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u25CF ARCHIVED" : isFocused ? "\u25B6 TERMINAL FOCUSED" : "\u25CF LIVE (Press TAB to focus)"))
       );
     });
@@ -4031,7 +4031,7 @@ var init_ChatLayout = __esm({
       const availableWidth = columns - 10;
       const trimmed = cleaned.trim();
       if (!trimmed.includes("```")) {
-        return /* @__PURE__ */ React4.createElement(Box3, { width: "100%", flexDirection: "column" }, /* @__PURE__ */ React4.createElement(MarkdownText, { text: trimmed, color: "gray", columns: availableWidth, italic: true }));
+        return /* @__PURE__ */ React4.createElement(Box3, { width: "100%", flexDirection: "column" }, /* @__PURE__ */ React4.createElement(MarkdownText, { text: trimmed, color: "#969696", columns: availableWidth, italic: true }));
       }
       const parts = trimmed.split(/(```\w*\n?[\s\S]*?(?:```|$))/g);
       return /* @__PURE__ */ React4.createElement(Box3, { width: "100%", flexDirection: "column" }, parts.map((part, i) => {
@@ -4208,10 +4208,10 @@ var init_ChatLayout = __esm({
       const colChars = Math.floor(availableWidth / header.length) - 2;
       return (
         // Table MarginY here
-        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: "100%", flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
+        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: terminalWidth - 2 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
       );
     });
-    MarkdownText = React4.memo(({ text, color = "white", columns = 80, italic = false }) => {
+    MarkdownText = React4.memo(({ text, color = "#D6DAE3", columns = 80, italic = false }) => {
       if (!text) return null;
       const lines = text.split("\n");
       const result = [];
@@ -4500,26 +4500,29 @@ var init_ChatLayout = __esm({
       if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : "No selection";
+        const questionMatch = msg.text.match(/Question: (.*)/);
+        const question = questionMatch ? questionMatch[1] : null;
         const s = emojiSpace(2);
         return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(
           Box3,
           {
             flexDirection: "column",
             borderStyle: "single",
-            borderLeft: true,
+            borderLeft: false,
             borderRight: false,
-            borderTop: false,
-            borderBottom: false,
+            borderTop: true,
+            borderBottom: true,
             borderColor: "#444444",
             paddingLeft: 2,
             paddingRight: 0,
             paddingTop: 1,
             paddingBottom: 1,
-            backgroundColor: "#1a1a1a",
-            width: "100%"
+            marginY: 1,
+            width: columns - 2
           },
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "AGENT REQUEST: RESOLVED")),
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, selection)))
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "green", bold: true }, "AGENT REQUEST: RESOLVED")),
+          question && /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan" }, question)),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, selection)))
         ));
       }
       if (msg.isAboutRecord) {
@@ -4632,7 +4635,7 @@ var init_ChatLayout = __esm({
             finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
             columns - 7
           ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
-        ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]")) : null))
+        ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]")) : null))
       );
     });
     BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
@@ -4663,7 +4666,7 @@ var init_ChatLayout = __esm({
         );
       }
       if (type === "think-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
       }
       if (type === "think-line") {
         if (!showFullThinking) return null;
@@ -5175,7 +5178,7 @@ Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. *
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)" : ""}. Next Turn, verify tool results, plan next**
 ${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >>> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full Read\n- No tool spamming\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EVERY TURN***" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short
 
 - WEB TOOLS -
 1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown info/docs
@@ -5187,7 +5190,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variable
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit
+6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. Optional parameters default to false
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
@@ -5965,6 +5968,7 @@ function SettingsMenu({
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
           { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
+          { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -6127,6 +6131,12 @@ function SettingsMenu({
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
+    } else if (item.value === "loadingPhrases") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, loadingPhrases: s.loadingPhrases === false ? true : false };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     }
   };
   return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: "gray", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", borderStyle: "round", borderColor: activeColumn === "categories" ? "white" : "grey", padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? "white" : "grey", bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
@@ -6211,7 +6221,7 @@ function SettingsMenu({
     });
     if (currentCatId === "other") {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 16, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 15, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
       );
       elements.push(
         /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
@@ -6332,7 +6342,13 @@ var init_AskUserModal = __esm({
       const [isSuggestingElse, setIsSuggestingElse] = useState8(false);
       const [customInput, setCustomInput] = useState8("");
       const [selectedIndex, setSelectedIndex] = useState8(0);
-      const allOptions = [...options, { id: "CUSTOM", label: "Suggest something else...", description: "Provide a custom response" }];
+      let canceled = false;
+      let allOptions = [];
+      try {
+        allOptions = [...options, { id: "CUSTOM", label: "Suggest something else...", description: "Provide a custom response" }];
+      } catch (e) {
+        canceled = true;
+      }
       useInput4((input, key) => {
         if (isSuggestingElse) return;
         if (key.leftArrow || key.upArrow) {
@@ -6343,10 +6359,11 @@ var init_AskUserModal = __esm({
         }
         if (key.return) {
           const selected = allOptions[selectedIndex];
-          if (selected.id === "CUSTOM") {
+          if (selected?.id === "CUSTOM") {
             setIsSuggestingElse(true);
           } else {
-            onResolve(selected.label);
+            if (canceled) onResolve("Selected Nothing");
+            else onResolve(selected.label);
           }
         }
       });
@@ -6369,9 +6386,9 @@ var init_AskUserModal = __esm({
             backgroundColor: "#1a1a1a",
             width: "100%"
           },
-          /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4AC} SUGGEST SOMETHING ELSE")),
+          /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "SUGGEST SOMETHING ELSE")),
           /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { italic: true, color: "gray" }, "Replying to: ", question)),
-          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "\u{1F4A0} "), /* @__PURE__ */ React9.createElement(
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React9.createElement(
             TextInput3,
             {
               value: customInput,
@@ -6386,21 +6403,19 @@ var init_AskUserModal = __esm({
         Box8,
         {
           flexDirection: "column",
-          borderStyle: "single",
-          borderLeft: true,
-          borderRight: false,
-          borderTop: false,
-          borderBottom: false,
+          border: true,
+          borderStyle: "round",
           borderColor: "#444444",
           paddingLeft: 2,
           paddingRight: 0,
           paddingTop: 1,
           paddingBottom: 1,
-          backgroundColor: "#1a1a1a",
+          marginY: 1,
+          marginRight: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "AGENT REQUEST: ACTION REQUIRED")),
-        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { bold: true, color: "white" }, question)),
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "yellow", bold: true }, "AGENT REQUEST: ACTION REQUIRED")),
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white" }, question)),
         /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
           const isSelected = idx === selectedIndex;
           return /* @__PURE__ */ React9.createElement(
@@ -8890,10 +8905,22 @@ var init_search_keyword = __esm({
   "src/tools/search_keyword.js"() {
     init_arg_parser();
     search_keyword = async (args) => {
-      const { keyword, file, subString } = parseArgs(args);
+      const { keyword, file, subString, regex } = parseArgs(args);
       if (!keyword) return 'ERROR: Missing "keyword" argument.';
-      const matchSubstring = subString === true || subString === "true" || subString === 1 || subString === "1" || subString === "true" || subString === "yes" || subString === "yes" || false;
-      const wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
+      const toBool = (v) => v === true || v === "true" || v === 1 || v === "1" || v === "yes";
+      const matchRegex = toBool(regex);
+      const matchSubstring = !matchRegex && toBool(subString);
+      let regexPattern;
+      let wordRegex;
+      if (matchRegex) {
+        try {
+          regexPattern = new RegExp(keyword, "i");
+        } catch (e) {
+          return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+        }
+      } else {
+        wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
+      }
       const excludes = [
         "node_modules",
         ".git",
@@ -8933,7 +8960,7 @@ var init_search_keyword = __esm({
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
             for (let i = 0; i < lines.length; i++) {
-              const matched = matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) : wordRegex.test(lines[i]);
+              const matched = matchRegex ? regexPattern.test(lines[i]) : matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) : wordRegex.test(lines[i]);
               if (matched) {
                 fileMatches.push({ line: i + 1, content: lines[i].trim() });
               }
@@ -8959,10 +8986,11 @@ var init_search_keyword = __esm({
         if (typeof global.gc === "function") {
           global.gc();
         }
+        const modeLabel = matchRegex ? "(regex mode)" : matchSubstring ? "(subString mode)" : "";
         if (fileGroups.length === 0) {
-          return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${matchSubstring ? "(subString mode)" : ""}`;
+          return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${modeLabel}`;
         }
-        let output = `Found ${totalMatches} match${totalMatches === 1 ? "" : "es"} across ${fileGroups.length} file${fileGroups.length === 1 ? "" : "s"} ${matchSubstring ? "(subString mode)" : ""}:
+        let output = `Found ${totalMatches} match${totalMatches === 1 ? "" : "es"} across ${fileGroups.length} file${fileGroups.length === 1 ? "" : "s"} ${modeLabel}:
 
 `;
         for (const group of fileGroups) {
@@ -11036,80 +11064,104 @@ var init_ai = __esm({
           body.chat_template_kwargs = { enable_thinking: false };
         }
       }
-      const response = await fetchWithBackoff("https://integrate.api.nvidia.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(body),
-        signal
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
-        error.status = response.status;
-        throw error;
-      }
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let pendingParts = [];
-      let latestUsageMetadata = null;
-      let lastFlushTime = Date.now();
-      let hasNewData = false;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
-            yield {
-              candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
-              usageMetadata: latestUsageMetadata
-            };
+      let attempts = 0;
+      const maxAttempts = 6;
+      let hasYielded = false;
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          const response = await fetchWithBackoff("https://integrate.api.nvidia.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(body),
+            signal
+          });
+          if (!response.ok) {
+            const err = await response.json();
+            const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
+            error.status = response.status;
+            throw error;
           }
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === "data: [DONE]") continue;
-          if (trimmed.startsWith("data: ")) {
-            try {
-              const json = JSON.parse(trimmed.substring(6));
-              const usage = json.usage;
-              if (usage) {
-                latestUsageMetadata = {
-                  totalTokenCount: usage.total_tokens || usage.prompt_tokens + usage.completion_tokens,
-                  promptTokenCount: usage.prompt_tokens || 0,
-                  candidatesTokenCount: usage.completion_tokens || 0,
-                  thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let pendingParts = [];
+          let latestUsageMetadata = null;
+          let lastFlushTime = Date.now();
+          let hasNewData = false;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                yield {
+                  candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                  usageMetadata: latestUsageMetadata
                 };
-                hasNewData = true;
+                hasYielded = true;
               }
-              const thinking = json.choices?.[0]?.delta?.reasoning || json.choices?.[0]?.delta?.reasoning_content || "";
-              const content = json.choices?.[0]?.delta?.content || "";
-              if (thinking) {
-                pendingParts.push({ text: thinking, thought: true });
-                hasNewData = true;
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed === "data: [DONE]") continue;
+              if (trimmed.startsWith("data: ")) {
+                let json;
+                try {
+                  json = JSON.parse(trimmed.substring(6));
+                } catch (e) {
+                  continue;
+                }
+                if (json.error) {
+                  throw new Error(`NVIDIA Stream Error: ${json.error.message || JSON.stringify(json.error)}`);
+                }
+                try {
+                  const usage = json.usage;
+                  if (usage) {
+                    latestUsageMetadata = {
+                      totalTokenCount: usage.total_tokens || usage.prompt_tokens + usage.completion_tokens,
+                      promptTokenCount: usage.prompt_tokens || 0,
+                      candidatesTokenCount: usage.completion_tokens || 0,
+                      thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
+                    };
+                    hasNewData = true;
+                  }
+                  const thinking = json.choices?.[0]?.delta?.reasoning || json.choices?.[0]?.delta?.reasoning_content || "";
+                  const content = json.choices?.[0]?.delta?.content || "";
+                  if (thinking) {
+                    pendingParts.push({ text: thinking, thought: true });
+                    hasNewData = true;
+                  }
+                  if (content) {
+                    pendingParts.push({ text: content });
+                    hasNewData = true;
+                  }
+                } catch (e) {
+                }
               }
-              if (content) {
-                pendingParts.push({ text: content });
-                hasNewData = true;
-              }
-            } catch (e) {
+            }
+            if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+              yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+              };
+              hasYielded = true;
+              pendingParts = [];
+              lastFlushTime = Date.now();
+              hasNewData = false;
             }
           }
-        }
-        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
-          yield {
-            candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
-            usageMetadata: latestUsageMetadata
-          };
-          pendingParts = [];
-          lastFlushTime = Date.now();
-          hasNewData = false;
+          break;
+        } catch (error) {
+          if (hasYielded || attempts >= maxAttempts) {
+            throw error;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 3500));
         }
       }
     };
@@ -11138,7 +11190,7 @@ var init_ai = __esm({
             if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === "number") {
               const depth = data.queues[0].queueDepth;
               if (!isStreamingStarted) {
-                push({ value: { type: "status", content: `Queue Depth ${depth}...` }, done: false });
+                push({ value: { type: "status", content: `Queue ${depth || 1}` }, done: false });
               }
             }
           }
@@ -12528,7 +12580,7 @@ Provide a consolidated summary of the entire session.`;
           return result;
         };
         yield { type: "status", content: "[start]" };
-        yield { type: "status", content: "Gathering Context..." };
+        yield { type: "status", content: "Gathering Context" };
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
         if (totalFolders > 4096) dynamicMaxDepth = 1;
@@ -12858,7 +12910,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
         let lastUsage = null;
         const MAX_LOOPS = mode === "Flux" ? 100 : 10;
         const MAX_RETRIES = 16;
-        yield { type: "status", content: "Connecting..." };
+        yield { type: "status", content: "Connecting" };
         TERMINATION_SIGNAL = false;
         let fullAgentResponseChunks = [];
         let wasToolCalledInLastLoop = false;
@@ -12875,7 +12927,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
           }
           if (loop > 0) {
-            yield { type: "status", content: "Working..." };
+            yield { type: "status", content: "Working" };
           }
           if (TERMINATION_SIGNAL) {
             yield { type: "status", content: "Request Cancelled" };
@@ -13030,15 +13082,15 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false);
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
-                yield { type: "status", content: "Verifying..." };
                 await new Promise((resolve) => setTimeout(resolve, 2500));
+                yield { type: "status", content: "Verifying" };
                 const ideCtxJIT = await getIDEContext();
                 const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                 if (ideErr && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text) {
                   lastUserMsg.parts[0].text += `
 ${ideErr} [/ERROR]`;
                 }
-                yield { type: "status", content: "Working..." };
+                yield { type: "status", content: "Working" };
               }
               const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
               if (isGemma) {
@@ -13337,7 +13389,7 @@ ${ideErr} [/ERROR]`;
                   settings.onTokenChunk();
                 }
                 if (isFirstChunk) {
-                  yield { type: "status", content: "Thinking..." };
+                  yield { type: "status", content: "Thinking" };
                   isFirstChunk = false;
                 }
                 if (TERMINATION_SIGNAL) {
@@ -13493,11 +13545,11 @@ ${ideErr} [/ERROR]`;
                         }
                       }
                     }
-                    const currentLabel = `${TOOL_LABELS2[potentialTool] || potentialTool}${detail ? ` (${detail})` : ""}`;
+                    const currentLabel = `${TOOL_LABELS2[potentialTool] || potentialTool}${detail ? ` ${detail}` : ""}`;
                     if (potentialTool !== lastToolSniffed || detail !== lastToolDetail) {
                       lastToolSniffed = potentialTool;
                       lastToolDetail = detail;
-                      yield { type: "status", content: `${currentLabel}...` };
+                      yield { type: "status", content: `${currentLabel}` };
                       if (process.stdout.isTTY) {
                         const TOOL_TITLES = {
                           "WebSearch": "Searching",
@@ -13673,7 +13725,7 @@ ${ideErr} [/ERROR]`;
                     const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
                     const displayLabel = TOOL_LABELS2[normToolName] || toolCall.toolName;
                     const detail = getToolDetail(normToolName, toolCall.args);
-                    yield { type: "status", content: `${displayLabel}${detail ? ` (${detail})` : ""}...` };
+                    yield { type: "status", content: `${displayLabel}${detail ? ` ${detail}` : ""}` };
                     let label = "";
                     if (normToolName === "web_search") {
                       const { query, limit = 10 } = parseArgs(toolCall.args);
@@ -14176,7 +14228,7 @@ ${boxMid}}`) };
                                       continue;
                                     }
                                   }
-                                  yield { type: "status", content: `Opening Diff in IDE: ${path21.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening Diff in IDE: ${path21.basename(absPath)}` };
                                   showDiffInIDE(absPath, originalContent, modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -14188,7 +14240,7 @@ ${boxMid}}`) };
                                     fs22.mkdirSync(path21.dirname(absPath), { recursive: true });
                                     fs22.writeFileSync(absPath, "", "utf8");
                                   }
-                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path21.basename(absPath)}...` };
+                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path21.basename(absPath)}` };
                                   showDiffInIDE(absPath, "", modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -14748,13 +14800,13 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
                   accumulatedContext = "";
                   const waitTime = Math.min(1e3 * Math.pow(2, retryCount - 1), 32e3);
                   isInitialAttempt = true;
-                  yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1e3).toFixed(0)}s]...` };
+                  yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1e3).toFixed(0)}s]` };
                   for (let i = waitTime / 1e3; i > 0; i--) {
                     if (TERMINATION_SIGNAL) break;
-                    yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
+                    yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]` };
                     await new Promise((resolve) => setTimeout(resolve, 1e3));
                   }
-                  yield { type: "status", content: `Trying to reach ${modelName}...` };
+                  yield { type: "status", content: `Trying to reach ${modelName}` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
 Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
@@ -14785,7 +14837,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
           const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase()) || /\[\[END\]\]/i.test(signalSafeText.toLowerCase()) || true;
           const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
           const shouldContinue = toolCallPointer > 0;
-          yield { type: "status", content: "Thinking..." };
+          yield { type: "status", content: "Thinking" };
           const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, "").trim();
           let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
           isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
@@ -14900,7 +14952,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
         "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
         "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
-        "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences`
+        "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
 To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
@@ -15951,14 +16003,68 @@ var init_setup = __esm({
   }
 });
 
+// src/components/GlintText.jsx
+import React15, { useState as useState14, useEffect as useEffect11 } from "react";
+import { Text as Text15 } from "ink";
+var GlintText, GlintText_default;
+var init_GlintText = __esm({
+  "src/components/GlintText.jsx"() {
+    GlintText = ({
+      text,
+      baseColor = "white",
+      glintColor = "gray",
+      speed = 150,
+      glintWidth = 6,
+      typeSpeed = 30,
+      // 👈 New prop! How fast it backspaces and types! ⌨️
+      ...props
+    }) => {
+      const [position, setPosition] = useState14(-glintWidth);
+      const [displayedText, setDisplayedText] = useState14(text);
+      useEffect11(() => {
+        const timer = setInterval(() => {
+          setPosition((prev) => prev > displayedText.length + glintWidth ? -glintWidth - 40 : prev + 1);
+        }, speed);
+        return () => clearInterval(timer);
+      }, [displayedText.length, speed, glintWidth]);
+      useEffect11(() => {
+        if (text && text.includes("Trying to reach")) {
+          setDisplayedText(text);
+          return;
+        }
+        if (displayedText === text) return;
+        const timer = setTimeout(() => {
+          let commonLen = 0;
+          const minLen = Math.min(displayedText.length, text.length);
+          while (commonLen < minLen && displayedText[commonLen] === text[commonLen]) {
+            commonLen++;
+          }
+          if (displayedText.length > commonLen) {
+            setDisplayedText((prev) => prev.slice(0, -1));
+          } else if (displayedText.length < text.length) {
+            setDisplayedText(text.slice(0, displayedText.length + 1));
+          }
+        }, typeSpeed);
+        return () => clearTimeout(timer);
+      }, [text, displayedText, typeSpeed]);
+      return /* @__PURE__ */ React15.createElement(Text15, null, displayedText.split("").map((char, index) => {
+        const distance = Math.abs(index - position);
+        const color = distance <= glintWidth / 2 ? glintColor : baseColor;
+        return /* @__PURE__ */ React15.createElement(Text15, { key: index, color, ...props }, char);
+      }));
+    };
+    GlintText_default = GlintText;
+  }
+});
+
 // src/app.jsx
 var app_exports = {};
 __export(app_exports, {
   default: () => App
 });
 import os5 from "os";
-import React15, { useState as useState14, useEffect as useEffect11, useRef as useRef4, useMemo as useMemo2 } from "react";
-import { Box as Box14, Text as Text15, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
+import React16, { useState as useState15, useEffect as useEffect12, useRef as useRef4, useMemo as useMemo2 } from "react";
+import { Box as Box14, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
 import fs24 from "fs-extra";
 import path22 from "path";
 import { exec as exec2 } from "child_process";
@@ -15968,24 +16074,24 @@ import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
   let lastGCTime = 1;
-  const [confirmExit, setConfirmExit] = useState14(false);
-  const [exitCountdown, setExitCountdown] = useState14(10);
+  const [confirmExit, setConfirmExit] = useState15(false);
+  const [exitCountdown, setExitCountdown] = useState15(10);
   const { stdout } = useStdout2();
-  const [input, setInput] = useState14("");
-  const [inputKey, setInputKey] = useState14(0);
-  const [isExpanded, setIsExpanded] = useState14(false);
-  const [mode, setMode] = useState14("Flux");
-  const [terminalSize, setTerminalSize] = useState14({
+  const [input, setInput] = useState15("");
+  const [inputKey, setInputKey] = useState15(0);
+  const [isExpanded, setIsExpanded] = useState15(false);
+  const [mode, setMode] = useState15("Flux");
+  const [terminalSize, setTerminalSize] = useState15({
     columns: stdout?.columns || 80,
     rows: stdout?.rows || 24
   });
-  const [selectedIndex, setSelectedIndex] = useState14(0);
-  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState14(false);
-  const [showBridgePromo, setShowBridgePromo] = useState14(false);
-  const [promoSelectedIndex, setPromoSelectedIndex] = useState14(0);
+  const [selectedIndex, setSelectedIndex] = useState15(0);
+  const [isFilePickerDismissed, setIsFilePickerDismissed] = useState15(false);
+  const [showBridgePromo, setShowBridgePromo] = useState15(false);
+  const [promoSelectedIndex, setPromoSelectedIndex] = useState15(0);
   const suggestionOffsetRef = useRef4(0);
   const persistedModelRef = useRef4(null);
-  useEffect11(() => {
+  useEffect12(() => {
     const ideName = getIDEName();
     const isIDE = !["Terminal", "Windows Terminal"].includes(ideName) || !!process.env.VSC_TERMINAL_URL;
     const graceTimer = setTimeout(() => {
@@ -16179,7 +16285,7 @@ function App({ args = [] }) {
       }
     }
   };
-  useEffect11(() => {
+  useEffect12(() => {
     const handleResize = () => {
       stdout.write("\x1B[2J\x1B[3J\x1B[H");
       setTerminalSize({
@@ -16192,18 +16298,18 @@ function App({ args = [] }) {
       stdout.off("resize", handleResize);
     };
   }, [stdout]);
-  const [thinkingLevel, setThinkingLevel] = useState14("Medium");
-  const [aiProvider, setAiProvider] = useState14("Google");
-  const [setupStep, setSetupStep] = useState14(0);
-  const [latestVer, setLatestVer] = useState14(null);
-  const [showFullThinking, setShowFullThinking] = useState14(false);
-  const [activeModel, setActiveModel] = useState14("gemma-4-31b-it");
-  const [janitorModel, setJanitorModel] = useState14("gemma-4-26b-a4b-it");
-  const [isInitializing, setIsInitializing] = useState14(true);
-  const [isAppFocused, setIsAppFocused] = useState14(true);
+  const [thinkingLevel, setThinkingLevel] = useState15("Medium");
+  const [aiProvider, setAiProvider] = useState15("Google");
+  const [setupStep, setSetupStep] = useState15(0);
+  const [latestVer, setLatestVer] = useState15(null);
+  const [showFullThinking, setShowFullThinking] = useState15(false);
+  const [activeModel, setActiveModel] = useState15("gemma-4-31b-it");
+  const [janitorModel, setJanitorModel] = useState15("gemma-4-26b-a4b-it");
+  const [isInitializing, setIsInitializing] = useState15(true);
+  const [isAppFocused, setIsAppFocused] = useState15(true);
   const lastFocusEventTime = useRef4(0);
-  const [apiKey, setApiKey] = useState14(null);
-  const [tempKey, setTempKey] = useState14("");
+  const [apiKey, setApiKey] = useState15(null);
+  const [tempKey, setTempKey] = useState15("");
   const addShiftEnterBinding = async (ideName) => {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
@@ -16254,41 +16360,41 @@ function App({ args = [] }) {
       });
     }
   };
-  const [activeView, setActiveView] = useState14("chat");
-  const [apiTier, setApiTier] = useState14("Free");
-  const [quotas, setQuotas] = useState14({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0, providerBudgets: {} });
-  const [inputConfig, setInputConfig] = useState14(null);
-  const [budgetReturnView, setBudgetReturnView] = useState14("chat");
-  const [providerBudgetQueue, setProviderBudgetQueue] = useState14([]);
-  const [providerBudgetCursor, setProviderBudgetCursor] = useState14(0);
-  const [pbsCursor, setPbsCursor] = useState14(0);
-  const [pbsSelected, setPbsSelected] = useState14({});
-  const [systemSettings, setSystemSettings] = useState14({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
-  const [profileData, setProfileData] = useState14({ name: null, nickname: null, instructions: null });
-  const [imageSettings, setImageSettings] = useState14({ keyType: "Default", quality: "Low-High", apiKey: "" });
-  const [sessionStats, setSessionStats] = useState14({ tokens: 0 });
-  const [lastChunkTime, setLastChunkTime] = useState14(0);
-  const [sessionAgentCalls, setSessionAgentCalls] = useState14(0);
-  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState14(0);
-  const [sessionTotalTokens, setSessionTotalTokens] = useState14(0);
-  const [chatTokens, setChatTokens] = useState14(0);
+  const [activeView, setActiveView] = useState15("chat");
+  const [apiTier, setApiTier] = useState15("Free");
+  const [quotas, setQuotas] = useState15({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0, providerBudgets: {} });
+  const [inputConfig, setInputConfig] = useState15(null);
+  const [budgetReturnView, setBudgetReturnView] = useState15("chat");
+  const [providerBudgetQueue, setProviderBudgetQueue] = useState15([]);
+  const [providerBudgetCursor, setProviderBudgetCursor] = useState15(0);
+  const [pbsCursor, setPbsCursor] = useState15(0);
+  const [pbsSelected, setPbsSelected] = useState15({});
+  const [systemSettings, setSystemSettings] = useState15({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const [profileData, setProfileData] = useState15({ name: null, nickname: null, instructions: null });
+  const [imageSettings, setImageSettings] = useState15({ keyType: "Default", quality: "Low-High", apiKey: "" });
+  const [sessionStats, setSessionStats] = useState15({ tokens: 0 });
+  const [lastChunkTime, setLastChunkTime] = useState15(0);
+  const [sessionAgentCalls, setSessionAgentCalls] = useState15(0);
+  const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState15(0);
+  const [sessionTotalTokens, setSessionTotalTokens] = useState15(0);
+  const [chatTokens, setChatTokens] = useState15(0);
   const chatTokenStartRef = useRef4(0);
-  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState14(0);
-  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState14(0);
-  const [sessionToolSuccess, setSessionToolSuccess] = useState14(0);
-  const [sessionToolFailure, setSessionToolFailure] = useState14(0);
-  const [sessionToolDenied, setSessionToolDenied] = useState14(0);
-  const [sessionApiTime, setSessionApiTime] = useState14(0);
-  const [sessionToolTime, setSessionToolTime] = useState14(0);
-  const [sessionImageCount, setSessionImageCount] = useState14(0);
-  const [sessionImageCredits, setSessionImageCredits] = useState14(0);
-  const [dailyUsage, setDailyUsage] = useState14(null);
-  const [monthlyUsage, setMonthlyUsage] = useState14(null);
-  const [customPeriodUsage, setCustomPeriodUsage] = useState14(null);
-  const [statsMode, setStatsMode] = useState14("daily");
+  const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState15(0);
+  const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState15(0);
+  const [sessionToolSuccess, setSessionToolSuccess] = useState15(0);
+  const [sessionToolFailure, setSessionToolFailure] = useState15(0);
+  const [sessionToolDenied, setSessionToolDenied] = useState15(0);
+  const [sessionApiTime, setSessionApiTime] = useState15(0);
+  const [sessionToolTime, setSessionToolTime] = useState15(0);
+  const [sessionImageCount, setSessionImageCount] = useState15(0);
+  const [sessionImageCredits, setSessionImageCredits] = useState15(0);
+  const [dailyUsage, setDailyUsage] = useState15(null);
+  const [monthlyUsage, setMonthlyUsage] = useState15(null);
+  const [customPeriodUsage, setCustomPeriodUsage] = useState15(null);
+  const [statsMode, setStatsMode] = useState15("daily");
   const PLAYGROUND_CHAT_ID = "flow-playground";
-  const [chatId, setChatId] = useState14(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
-  useEffect11(() => {
+  const [chatId, setChatId] = useState15(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
+  useEffect12(() => {
     if (chatLoadingRef.current) return;
     const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
     setChatTokens(nextTokens);
@@ -16297,7 +16403,7 @@ function App({ args = [] }) {
       });
     }
   }, [sessionTotalTokens, chatId, sessionStats.tokens]);
-  useEffect11(() => {
+  useEffect12(() => {
     if (activeView === "apiTier") {
       const load = async () => {
         const d = await getDailyUsage();
@@ -16310,18 +16416,18 @@ function App({ args = [] }) {
       load();
     }
   }, [activeView, quotas.resetDay]);
-  const [activeCommand, setActiveCommand] = useState14(null);
-  const [execOutput, setExecOutput] = useState14("");
-  const [isTerminalFocused, setIsTerminalFocused] = useState14(false);
-  const [activeSubagents, setActiveSubagents] = useState14([]);
-  const [tick, setTick] = useState14(0);
+  const [activeCommand, setActiveCommand] = useState15(null);
+  const [execOutput, setExecOutput] = useState15("");
+  const [isTerminalFocused, setIsTerminalFocused] = useState15(false);
+  const [activeSubagents, setActiveSubagents] = useState15([]);
+  const [tick, setTick] = useState15(0);
   const isFirstRender = useRef4(true);
   const isSecondRender = useRef4(true);
   const isThirdRender = useRef4(true);
   const prevProviderRef = useRef4(aiProvider);
   const originalAllowExternalAccessRef = useRef4(false);
   const originalMemoryRef = useRef4(true);
-  useEffect11(() => {
+  useEffect12(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
       const hasStandard = aiProvider === "DeepSeek" || aiProvider === "NVIDIA";
@@ -16334,7 +16440,7 @@ function App({ args = [] }) {
       }
     }
   }, [aiProvider, activeModel, thinkingLevel]);
-  useEffect11(() => {
+  useEffect12(() => {
     if (!apiKey) return;
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -16408,15 +16514,15 @@ function App({ args = [] }) {
   }, []);
   const activeCommandRef = useRef4(null);
   const execOutputRef = useRef4("");
-  useEffect11(() => {
+  useEffect12(() => {
     activeCommandRef.current = activeCommand;
   }, [activeCommand]);
-  useEffect11(() => {
+  useEffect12(() => {
     execOutputRef.current = execOutput;
   }, [execOutput]);
-  const [autoAcceptWrites, setAutoAcceptWrites] = useState14(false);
-  const [pendingApproval, setPendingApproval] = useState14(null);
-  const [pendingAsk, setPendingAsk] = useState14(null);
+  const [autoAcceptWrites, setAutoAcceptWrites] = useState15(false);
+  const [pendingApproval, setPendingApproval] = useState15(null);
+  const [pendingAsk, setPendingAsk] = useState15(null);
   const resetPendingApproval = (decision) => {
     setPendingApproval(null);
     setActiveView("chat");
@@ -16435,14 +16541,14 @@ function App({ args = [] }) {
     if (ms < 1e3) return `${ms}ms`;
     return formatDuration(Math.floor(ms / 1e3));
   };
-  const [statusText, setStatusText] = useState14(null);
-  const [wittyPhrase, setWittyPhrase] = useState14("");
-  const [hasPasteBlock, setHasPasteBlock] = useState14(false);
-  const [activeTime, setActiveTime] = useState14(0);
+  const [statusText, setStatusText] = useState15(null);
+  const [wittyPhrase, setWittyPhrase] = useState15("");
+  const [hasPasteBlock, setHasPasteBlock] = useState15(false);
+  const [activeTime, setActiveTime] = useState15(0);
   let interval_for_timer;
-  useEffect11(() => {
+  useEffect12(() => {
     let interval;
-    if (statusText) {
+    if (statusText && systemSettings.loadingPhrases !== false) {
       const updatePhrase = () => {
         const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
         setWittyPhrase(randomPhrase);
@@ -16455,17 +16561,17 @@ function App({ args = [] }) {
     return () => {
       clearInterval(interval);
     };
-  }, [statusText]);
-  const [isSpinnerActive, setIsSpinnerActive] = useState14(true);
-  const [isProcessing, setIsProcessing] = useState14(false);
-  const [isCompressing, setIsCompressing] = useState14(false);
-  const [escPressed, setEscPressed] = useState14(false);
-  const [escTimer, setEscTimer] = useState14(null);
-  const [escPressCount, setEscPressCount] = useState14(0);
-  const [recentPrompts, setRecentPrompts] = useState14([]);
+  }, [statusText, systemSettings]);
+  const [isSpinnerActive, setIsSpinnerActive] = useState15(true);
+  const [isProcessing, setIsProcessing] = useState15(false);
+  const [isCompressing, setIsCompressing] = useState15(false);
+  const [escPressed, setEscPressed] = useState15(false);
+  const [escTimer, setEscTimer] = useState15(null);
+  const [escPressCount, setEscPressCount] = useState15(0);
+  const [recentPrompts, setRecentPrompts] = useState15([]);
   const escDoubleTimerRef = useRef4(null);
   const chatLoadingRef = useRef4(false);
-  useEffect11(() => {
+  useEffect12(() => {
     return () => {
       if (escDoubleTimerRef.current) {
         clearTimeout(escDoubleTimerRef.current);
@@ -16473,11 +16579,11 @@ function App({ args = [] }) {
     };
   }, []);
   const didSignalTerminationRef = useRef4(false);
-  const [queuedPrompt, setQueuedPrompt] = useState14(null);
-  const [resolutionData, setResolutionData] = useState14(null);
-  const [tempModelOverride, setTempModelOverride] = useState14(null);
-  useEffect11(() => setEscPressCount(0), [input]);
-  const [messages, rawSetMessages] = useState14(() => {
+  const [queuedPrompt, setQueuedPrompt] = useState15(null);
+  const [resolutionData, setResolutionData] = useState15(null);
+  const [tempModelOverride, setTempModelOverride] = useState15(null);
+  useEffect12(() => setEscPressCount(0), [input]);
+  const [messages, rawSetMessages] = useState15(() => {
     const logoMsg = { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true };
     const isHomeDir = process.cwd() === os5.homedir();
     const isSystemDir = (() => {
@@ -16526,11 +16632,11 @@ function App({ args = [] }) {
     });
   };
   const queuedPromptRef = useRef4(null);
-  const [btwResponse, setBtwResponse] = useState14("");
-  const [showBtwBox, setShowBtwBox] = useState14(false);
+  const [btwResponse, setBtwResponse] = useState15("");
+  const [showBtwBox, setShowBtwBox] = useState15(false);
   const btwResponseRef = useRef4("");
   const btwClosedRef = useRef4(null);
-  useEffect11(() => {
+  useEffect12(() => {
     if (messages.length === 0) return;
     const lastMsg = messages[messages.length - 1];
     if (lastMsg && (lastMsg.role === "agent" || lastMsg.role === "assistant")) {
@@ -16548,8 +16654,8 @@ function App({ args = [] }) {
       }
     }
   }, [messages]);
-  const [completedIndex, setCompletedIndex] = useState14(messages.length);
-  const [clearKey, setClearKey] = useState14(0);
+  const [completedIndex, setCompletedIndex] = useState15(messages.length);
+  const [clearKey, setClearKey] = useState15(0);
   const lastCompletedBlocksRef = useRef4([]);
   const cachedHistoryRef = useRef4({
     completedIndex: 0,
@@ -16886,7 +16992,7 @@ function App({ args = [] }) {
       setInput((prev) => prev.replace(/\\\r?$/, "").replace(/\r?$/, "") + "\n");
     }
   });
-  useEffect11(() => {
+  useEffect12(() => {
     process.stdout.write("\x1B[?1004h");
     const onData = (data) => {
       const str = data.toString();
@@ -16904,7 +17010,7 @@ function App({ args = [] }) {
       process.stdin.off("data", onData);
     };
   }, []);
-  useEffect11(() => {
+  useEffect12(() => {
     async function init() {
       try {
         const pkg = JSON.parse(fs24.readFileSync(path22.join(process.cwd(), "package.json"), "utf8"));
@@ -17126,7 +17232,7 @@ function App({ args = [] }) {
     }
     init();
   }, []);
-  useEffect11(() => {
+  useEffect12(() => {
     let timer;
     if (confirmExit) {
       setExitCountdown(10);
@@ -17144,7 +17250,7 @@ function App({ args = [] }) {
       if (timer) clearInterval(timer);
     };
   }, [confirmExit]);
-  useEffect11(() => {
+  useEffect12(() => {
     if (!isInitializing) {
       const modelToSave = parsedArgs.model && activeModel === parsedArgs.model ? persistedModelRef.current : activeModel;
       let settingsToSave = systemSettings;
@@ -17194,7 +17300,7 @@ function App({ args = [] }) {
     }
   };
   const lastSavedTimeRef = useRef4(SESSION_START_TIME);
-  useEffect11(() => {
+  useEffect12(() => {
     if (activeView === "exit") {
       const flush = async () => {
         const now = Date.now();
@@ -17212,7 +17318,7 @@ function App({ args = [] }) {
       return () => clearTimeout(timer);
     }
   }, [activeView]);
-  useEffect11(() => {
+  useEffect12(() => {
     const interval = setInterval(async () => {
       if (!isInitializing) {
         const now = Date.now();
@@ -18559,6 +18665,7 @@ ${timestamp}` };
                             id: "ask-" + Date.now(),
                             role: "system",
                             text: `\u{1F4AC} **Ask User**
+Question: ${question}
 Selection: ${val}`,
                             isAskRecord: true
                           }
@@ -18638,7 +18745,9 @@ Selection: ${val}`,
               isFirstPacket = false;
             }
             if (packet.type === "status") {
-              setStatusText(packet.content);
+              if (!packet.content?.includes("[start]")) {
+                setStatusText(packet.content);
+              }
               if (packet.content?.includes("[start]")) {
                 clearInterval(interval_for_timer);
                 setActiveTime(0);
@@ -19089,10 +19198,10 @@ Selection: ${val}`,
     }
     return [];
   }, [input, isFilePickerDismissed]);
-  useEffect11(() => {
+  useEffect12(() => {
     setSelectedIndex(0);
   }, [suggestions]);
-  useEffect11(() => {
+  useEffect12(() => {
     if (activeView !== "providerBudgetSelect") return;
     const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
     const existingBudgets = quotas.providerBudgets || {};
@@ -19103,7 +19212,7 @@ Selection: ${val}`,
     setPbsSelected(initialSelected);
     setPbsCursor(0);
   }, [activeView]);
-  useEffect11(() => {
+  useEffect12(() => {
     if (activeView !== "providerBudgetFlow") return;
     const currentProvider = providerBudgetQueue[providerBudgetCursor];
     if (!currentProvider) {
@@ -19175,7 +19284,7 @@ Selection: ${val}`,
   }, [activeView, providerBudgetCursor]);
   const CustomMenuItem = ({ label, isSelected }) => {
     const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
-    return /* @__PURE__ */ React15.createElement(
+    return /* @__PURE__ */ React16.createElement(
       Box14,
       {
         marginTop: isCancel ? 1 : 0,
@@ -19183,7 +19292,7 @@ Selection: ${val}`,
         paddingX: 1,
         width: "100%"
       },
-      /* @__PURE__ */ React15.createElement(Text15, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
+      /* @__PURE__ */ React16.createElement(Text16, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
     );
   };
   const renderProgressBar = (label, current, limit) => {
@@ -19200,12 +19309,12 @@ Selection: ${val}`,
     const isTokens = label.toLowerCase().includes("token");
     const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
     const displayCurrent = isTokens ? formatTokens(current) : current;
-    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, label, ": ")), /* @__PURE__ */ React15.createElement(Text15, { color: barColor }, barStr), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
       case "settings":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           SettingsMenu,
           {
             systemSettings,
@@ -19220,7 +19329,7 @@ Selection: ${val}`,
           }
         );
       case "selectProvider":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "SELECT AI PROVIDER",
@@ -19278,7 +19387,7 @@ Selection: ${val}`,
           }
         );
       case "apiTier": {
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "SELECT API MODE FOR ", aiProvider.toUpperCase())), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "SELECT API MODE FOR ", aiProvider.toUpperCase())), /* @__PURE__ */ React16.createElement(
           SelectInput2,
           {
             items: [
@@ -19308,10 +19417,10 @@ Selection: ${val}`,
             itemComponent: CustomMenuItem,
             indicatorComponent: () => null
           }
-        ), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)")));
+        ), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)")));
       }
       case "resetMode":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "SELECT MONTHLY RESET MODE",
@@ -19346,7 +19455,7 @@ Selection: ${val}`,
           }
         );
       case "budgetTypeSelect":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "SELECT BUDGET TYPE",
@@ -19413,16 +19522,16 @@ Selection: ${val}`,
       case "providerBudgetSelect": {
         const PROVIDERS_LIST = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
         const anySelected = PROVIDERS_LIST.some((p) => pbsSelected[p]);
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
           const isActive = i === pbsCursor;
           const isChecked = !!pbsSelected[prov];
-          return /* @__PURE__ */ React15.createElement(Box14, { key: prov, backgroundColor: isActive ? "#2a2a2a" : void 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? "\u276F " : "  ", /* @__PURE__ */ React15.createElement(Text15, { color: isChecked ? "green" : "gray" }, isChecked ? "\u2611" : "\u2610"), "  ", prov, isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React15.createElement(Text15, { color: "cyan" }, " (budget set)") : null));
-        }), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React15.createElement(Text15, { color: "yellow", italic: true }, "  Select at least one provider to continue")));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, backgroundColor: isActive ? "#2a2a2a" : void 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? "\u276F " : "  ", /* @__PURE__ */ React16.createElement(Text16, { color: isChecked ? "green" : "gray" }, isChecked ? "\u2611" : "\u2610"), "  ", prov, isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React16.createElement(Text16, { color: "cyan" }, " (budget set)") : null));
+        }), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", italic: true }, "  Select at least one provider to continue")));
       }
       case "providerBudgetFlow":
         return null;
       case "budgetResetMode":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "SELECT MONTHLY RESET MODE",
@@ -19482,7 +19591,7 @@ Selection: ${val}`,
           const monthName = resetDate.toLocaleString("default", { month: "short" });
           resetInfo = `Resets on: ${resetDay}-${monthName}`;
         }
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React15.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
           const pb = providerBudgetsMap[prov];
           const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
           let provTokenCurrent = 0;
@@ -19496,11 +19605,11 @@ Selection: ${val}`,
           for (const m in monthlyModels) {
             provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
           }
-          return /* @__PURE__ */ React15.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
-        }), resetInfo ? /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text15, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text15, { color: "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text15, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React15.createElement(Text15, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
+        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
       }
       case "input":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, inputConfig.note)), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, inputConfig.note)), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React16.createElement(
           TextInput4,
           {
             value: inputConfig?.value || "",
@@ -19603,7 +19712,7 @@ Selection: ${val}`,
               }
             }
           }
-        )), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "(Press Enter to confirm selection)")));
+        )), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "(Press Enter to confirm selection)")));
       case "stats": {
         const u = statsMode === "monthly" ? monthlyUsage : dailyUsage;
         const trackerTitle = statsMode === "monthly" ? "LAST 30 DAYS USAGE" : "TODAY's USAGE";
@@ -19613,13 +19722,13 @@ Selection: ${val}`,
         const imageCreditsLabel = statsMode === "monthly" ? "Image Credits:" : "Image Credits:";
         const codeChangesLabel = statsMode === "monthly" ? "Code Changes:" : "Code Changes:";
         const toolCallsLabel = statsMode === "monthly" ? "Tool Calls:" : "Tool Calls:";
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
           const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-          return /* @__PURE__ */ React15.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 40 }, /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React15.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 36 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React15.createElement(Box14, { width: 31 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 32 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, timeLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 21 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 23 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 25 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " "), /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " )")))), /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 40 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React16.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 36 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React16.createElement(Box14, { width: 31 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
+        })) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "autoExecDanger":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm Intent",
@@ -19636,7 +19745,7 @@ Selection: ${val}`,
           }
         )));
       case "advanceRollbackDanger":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React15.createElement(Text15, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React16.createElement(Text16, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm",
@@ -19653,7 +19762,7 @@ Selection: ${val}`,
           }
         )));
       case "externalDanger":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "SECURITY WARNING: EXTERNAL WORKSPACE ACCESS"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Access to sensitive system files (SSH keys, Browser data, etc.)"), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Potential for accidental or malicious deletion of OS-critical files."), /* @__PURE__ */ React15.createElement(Text15, null, "\u2022 Unauthorized script execution across your entire file system."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SECURITY WARNING: EXTERNAL WORKSPACE ACCESS"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Access to sensitive system files (SSH keys, Browser data, etc.)"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Potential for accidental or malicious deletion of OS-critical files."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Unauthorized script execution across your entire file system."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm Intent",
@@ -19670,7 +19779,7 @@ Selection: ${val}`,
           }
         )));
       case "doubleDanger":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "red", bold: true }, "THIS IS NOT RECOMMENDED."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1, color: "white" }, "THE CRITICAL RISK:"), /* @__PURE__ */ React15.createElement(Text15, null, "The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision."), /* @__PURE__ */ React15.createElement(Text15, { color: "red", italic: true, marginTop: 1 }, "A single hallucination or error could result in full system wipe or data theft."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "red", bold: true }, "THIS IS NOT RECOMMENDED."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "THE CRITICAL RISK:"), /* @__PURE__ */ React16.createElement(Text16, null, "The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision."), /* @__PURE__ */ React16.createElement(Text16, { color: "red", italic: true, marginTop: 1 }, "A single hallucination or error could result in full system wipe or data theft."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Final Confirmation",
@@ -19687,7 +19796,7 @@ Selection: ${val}`,
           }
         )));
       case "key":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "API KEY MANAGEMENT",
@@ -19711,10 +19820,10 @@ Selection: ${val}`,
           }
         );
       case "deleteKey":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1 }, (() => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1 }, (() => {
           const s = emojiSpace(2);
-          return /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "DANGER: CLEAR CREDENTIALS");
-        })(), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "This will permanently delete all saved API keys in credential cache. You will need to enter it again to use Flux."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+          return /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "DANGER: CLEAR CREDENTIALS");
+        })(), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "This will permanently delete all saved API keys in credential cache. You will need to enter it again to use Flux."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Are you sure?",
@@ -19738,7 +19847,7 @@ Selection: ${val}`,
       case "exit":
         return null;
       case "ask":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%" }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%" }, /* @__PURE__ */ React16.createElement(
           AskUserModal_default,
           {
             question: pendingAsk?.question,
@@ -19753,7 +19862,7 @@ Selection: ${val}`,
           }
         ));
       case "revert":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(
           RevertModal,
           {
             prompts: recentPrompts,
@@ -19824,7 +19933,7 @@ Selection: ${val}`,
           }
         ));
       case "resume":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(
           ResumeModal,
           {
             onSelect: async (id) => {
@@ -19861,7 +19970,7 @@ Selection: ${val}`,
           }
         ));
       case "keybindingsPrompt":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "\u2328 CONFIGURE SHIFT+ENTER NEWLINE"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "To support multi-line inputs with ", /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "white" }, "Shift + Enter"), " for newline, a terminal sequence keybinding needs to be added to your IDE configuration."), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "Would you like FluxFlow to automatically add this to your ", getIDEName(), " keybindings?"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "\u2328 CONFIGURE SHIFT+ENTER NEWLINE"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "To support multi-line inputs with ", /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "white" }, "Shift + Enter"), " for newline, a terminal sequence keybinding needs to be added to your IDE configuration."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Would you like FluxFlow to automatically add this to your ", getIDEName(), " keybindings?"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Add Keybinding?",
@@ -19880,11 +19989,11 @@ Selection: ${val}`,
           }
         )));
       case "memory":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(MemoryModal, { onClose: () => setActiveView("chat") }));
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(MemoryModal, { onClose: () => setActiveView("chat") }));
       case "parserDownload":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(ParserDownloadModal, { onClose: () => setActiveView("settings") }));
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(ParserDownloadModal, { onClose: () => setActiveView("settings") }));
       case "profile":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           ProfileForm,
           {
             initialData: profileData,
@@ -19897,7 +20006,7 @@ Selection: ${val}`,
           }
         );
       case "resolution":
-        return /* @__PURE__ */ React15.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(
           ResolutionModal,
           {
             data: resolutionData,
@@ -19916,7 +20025,7 @@ Selection: ${val}`,
           }
         ));
       case "approval":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "FILE WRITE PERMISSION"), /* @__PURE__ */ React15.createElement(Text15, { marginTop: 1 }, "The agent is attempting to modify: ", /* @__PURE__ */ React15.createElement(Text15, { color: "cyan" }, parseArgs(pendingApproval?.args || "{}").path || "Unknown File")), !isBridgeConnected() ? /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, borderStyle: "single", borderColor: "#333", paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "--- PROPOSED CONTENT ---"), (() => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "FILE WRITE PERMISSION"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "The agent is attempting to modify: ", /* @__PURE__ */ React16.createElement(Text16, { color: "cyan" }, parseArgs(pendingApproval?.args || "{}").path || "Unknown File")), !isBridgeConnected() ? /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, borderStyle: "single", borderColor: "#333", paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "--- PROPOSED CONTENT ---"), (() => {
           const args2 = parseArgs(pendingApproval?.args || "{}");
           const patchPairs = [];
           const indices = /* @__PURE__ */ new Set();
@@ -19942,15 +20051,15 @@ Selection: ${val}`,
             }
           });
           if (patchPairs.length > 0) {
-            return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, patchPairs.map((pair, idx) => {
+            return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, patchPairs.map((pair, idx) => {
               const hasOld = pair.replace !== null;
               const hasNew = pair.new !== null;
-              return /* @__PURE__ */ React15.createElement(Box14, { key: idx, flexDirection: "column", marginTop: idx > 0 ? 1 : 0 }, patchPairs.length > 1 && /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "Block ", idx + 1, ":"), hasOld && /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "red", wrap: "anywhere", bold: true }, "- ", pair.replace)), hasNew && /* @__PURE__ */ React15.createElement(Box14, { marginTop: hasOld ? 0 : 0 }, /* @__PURE__ */ React15.createElement(Text15, { color: "green", wrap: "anywhere", bold: true }, "+ ", pair.new.replace(/\[\/n\]?/g, "\\n"))));
+              return /* @__PURE__ */ React16.createElement(Box14, { key: idx, flexDirection: "column", marginTop: idx > 0 ? 1 : 0 }, patchPairs.length > 1 && /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Block ", idx + 1, ":"), hasOld && /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Text16, { color: "red", wrap: "anywhere", bold: true }, "- ", pair.replace)), hasNew && /* @__PURE__ */ React16.createElement(Box14, { marginTop: hasOld ? 0 : 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "green", wrap: "anywhere", bold: true }, "+ ", pair.new.replace(/\[\/n\]?/g, "\\n"))));
             }));
           }
           const newVal = args2.content || args2.ReplacementContent || args2.content_to_add || args2.replacementContent || args2.newContent || null;
-          return /* @__PURE__ */ React15.createElement(Text15, { color: "white", wrap: "anywhere" }, (newVal ? newVal.replace(/\[\/n\]?/g, "\\n") : null) || "Updating file content...");
-        })()) : /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", italic: true }, "\u26A1\uFE0F FluxFlow Companion is active. Review the changes in your editor.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+          return /* @__PURE__ */ React16.createElement(Text16, { color: "white", wrap: "anywhere" }, (newVal ? newVal.replace(/\[\/n\]?/g, "\\n") : null) || "Updating file content...");
+        })()) : /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", italic: true }, "\u26A1\uFE0F FluxFlow Companion is active. Review the changes in your editor.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Action Required",
@@ -19969,7 +20078,7 @@ Selection: ${val}`,
           }
         )));
       case "updateManager":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Select Preferred Update Manager",
@@ -20006,7 +20115,7 @@ Selection: ${val}`,
           }
         );
       case "update":
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           UpdateProcessor_default,
           {
             latest: latestVer,
@@ -20032,7 +20141,7 @@ Selection: ${val}`,
           }
         );
       case "terminalApproval":
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "TERMINAL COMMAND OVERSIGHT"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "Agent requested to run: ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow", bold: true }, parseArgs(pendingApproval?.args || "{}").command || "Unknown Command"))), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "TERMINAL COMMAND OVERSIGHT"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, null, "Agent requested to run: ", /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", bold: true }, parseArgs(pendingApproval?.args || "{}").command || "Unknown Command"))), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Risk Assessment Required",
@@ -20048,7 +20157,18 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React15.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React15.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, null, statusText ? /* @__PURE__ */ React15.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React15.createElement(build_default, null), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, italic: true }, statusText.trimEnd()), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, activeTime > 0 ? `[${activeTime.toFixed(0)}s]` : "")) : /* @__PURE__ */ React15.createElement(Text15, { color: "white", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React15.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "Waiting for API"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, tempModelOverride || activeModel))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
+          GlintText_default,
+          {
+            text: statusText.trimEnd(),
+            baseColor: "#BFD2CA",
+            glintColor: "#D8D2C8",
+            speed: 60,
+            italic: true,
+            glintWidth: 2,
+            typeSpeed: 10
+          }
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Waiting for API"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, wittyPhrase), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: tempModelOverride || activeModel, baseColor: "white", glintColor: "gray", glintWidth: 1 }))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: "#555555",
@@ -20057,7 +20177,7 @@ Selection: ${val}`,
             width: "100%",
             flexDirection: "column"
           },
-          /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "row", width: "100%", paddingY: 0 }, /* @__PURE__ */ React15.createElement(Box14, { flexShrink: 0, width: 4 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, isProcessing || isCompressing ? "\u2726  " : " \u276F  ")), /* @__PURE__ */ React15.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React15.createElement(Box14, { flexGrow: 1, position: "relative" }, input === "" && /* @__PURE__ */ React15.createElement(Box14, { position: "absolute", paddingLeft: 0 }, activeCommand && !isTerminalFocused ? /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal...") : activeCommand && isTerminalFocused ? /* @__PURE__ */ React15.createElement(Text15, { color: "yellow", bold: true }, "  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...") : escPressCount === 1 ? /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "  Press ESC again to ", input.length > 0 ? "clear input" : "revert codebase to checkpoint", "...") : /* @__PURE__ */ React15.createElement(Text15, { color: "#cccccc" }, escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compressing session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent.")), /* @__PURE__ */ React15.createElement(
+          /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", width: "100%", paddingY: 0 }, /* @__PURE__ */ React16.createElement(Box14, { flexShrink: 0, width: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, isProcessing || isCompressing ? "\u2726  " : " \u276F  ")), /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1, position: "relative" }, input === "" && /* @__PURE__ */ React16.createElement(Box14, { position: "absolute", paddingLeft: 0 }, activeCommand && !isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal...") : activeCommand && isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", bold: true }, "  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...") : escPressCount === 1 ? /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "  Press ESC again to ", input.length > 0 ? "clear input" : "revert codebase to checkpoint", "...") : /* @__PURE__ */ React16.createElement(Text16, { color: "#cccccc" }, escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compressing session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent.")), /* @__PURE__ */ React16.createElement(
             MultilineInput,
             {
               key: `input-${inputKey}`,
@@ -20082,10 +20202,10 @@ Selection: ${val}`,
               }
             }
           )))))
-        ), /* @__PURE__ */ React15.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React15.createElement(Text15, { color: "#555555" }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
+        ), /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
     }
   };
-  return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React15.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider }) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React15.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React15.createElement(
+  return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React16.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider }) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
     {
       key: block.key,
@@ -20095,7 +20215,7 @@ Selection: ${val}`,
       aiProvider,
       version: versionFluxflow
     }
-  ))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 0, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React15.createElement(
+  ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 0, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
     {
       key: block.key,
@@ -20105,7 +20225,7 @@ Selection: ${val}`,
       aiProvider,
       version: versionFluxflow
     }
-  )), activeCommand && /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty, terminalHeight: terminalSize.rows }))), isInitializing ? /* @__PURE__ */ React15.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React15.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(
+  )), activeCommand && /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty, terminalHeight: terminalSize.rows, columns: terminalSize.columns }))), isInitializing ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
     CommandMenu,
     {
       items: [
@@ -20119,7 +20239,7 @@ Selection: ${val}`,
         setSetupStep(1);
       }
     }
-  ))) : /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set /settings \u2192 Others \u2192 API Strategy to use premium models. Set budget limit at /budgets.)."), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React15.createElement(
+  ))) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set /settings \u2192 Others \u2192 API Strategy to use premium models. Set budget limit at /budgets.)."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React16.createElement(
     TextInput4,
     {
       value: tempKey,
@@ -20127,7 +20247,7 @@ Selection: ${val}`,
       onSubmit: handleSetup,
       mask: "*"
     }
-  )), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, "(Press ESC to go back to provider selection)")))), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm)" : "(Press Enter to confirm and initialize)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React15.createElement(Box14, { borderStyle: "round", borderColor: "white", paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, "Press "), /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, "CTRL + C"), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React15.createElement(Text15, { color: "gray", bold: true }, "ESC"), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " to cancel.")), suggestions.length > 0 && (() => {
+  )), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Press ESC to go back to provider selection)")))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm)" : "(Press Enter to confirm and initialize)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: "white", paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " to cancel.")), suggestions.length > 0 && (() => {
     const windowSize = 5;
     let startIdx = suggestionOffsetRef.current;
     if (selectedIndex < startIdx) {
@@ -20139,14 +20259,14 @@ Selection: ${val}`,
     suggestionOffsetRef.current = startIdx;
     const visible = suggestions.slice(startIdx, startIdx + windowSize);
     const remaining = suggestions.length - (startIdx + visible.length);
-    return /* @__PURE__ */ React15.createElement(
+    return /* @__PURE__ */ React16.createElement(
       Box14,
       {
         flexDirection: "column",
         width: "100%",
         marginBottom: 1
       },
-      /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") ? /* @__PURE__ */ React15.createElement(Text15, { color: "gray", italic: true }, "(Use '#Lstart-Lend' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
+      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use '#Lstart-Lend' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
         let url = "https://aistudio.google.com/billing";
         let label = "billing";
         if (aiProvider === "DeepSeek") {
@@ -20159,13 +20279,13 @@ Selection: ${val}`,
           url = "https://build.nvidia.com/settings/api-keys";
           label = "billing";
         }
-        return /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React15.createElement(Text15, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
+        return /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
       })() : null),
       visible.map((s, i) => {
         const actualIdx = startIdx + i;
         const isActive = actualIdx === selectedIndex;
         const isGemmaDisabled = s.cmd === "gemma-4-31b-it" && apiTier !== "Free";
-        return /* @__PURE__ */ React15.createElement(
+        return /* @__PURE__ */ React16.createElement(
           Box14,
           {
             key: s.cmd,
@@ -20173,9 +20293,9 @@ Selection: ${val}`,
             backgroundColor: isActive ? "#2a2a2a" : void 0,
             paddingX: 1
           },
-          /* @__PURE__ */ React15.createElement(Box14, { width: 3 }, /* @__PURE__ */ React15.createElement(Text15, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? " \u276F" : "  ")),
-          /* @__PURE__ */ React15.createElement(Box14, { width: 55 }, /* @__PURE__ */ React15.createElement(
-            Text15,
+          /* @__PURE__ */ React16.createElement(Box14, { width: 3 }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? " \u276F" : "  ")),
+          /* @__PURE__ */ React16.createElement(Box14, { width: 55 }, /* @__PURE__ */ React16.createElement(
+            Text16,
             {
               color: isGemmaDisabled ? "gray" : isActive ? "white" : "grey",
               bold: isActive
@@ -20186,12 +20306,12 @@ Selection: ${val}`,
               return parts[parts.length - 1];
             })() : s.cmd
           )),
-          /* @__PURE__ */ React15.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: `${!isActive ? "gray" : "white"}`, italic: true }, s.desc))
+          /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: `${!isActive ? "gray" : "white"}`, italic: true }, s.desc))
         );
       }),
-      suggestions.length > 5 && /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, height: 1 }, remaining > 0 ? /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "   ... (", remaining, " more commands available)") : /* @__PURE__ */ React15.createElement(Text15, { color: "gray", dimColor: true, italic: true }, "   (End of list)"))
+      suggestions.length > 5 && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, height: 1 }, remaining > 0 ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "   ... (", remaining, " more commands available)") : /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "   (End of list)"))
     );
-  })(), /* @__PURE__ */ React15.createElement(Box14, { flexShrink: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(
+  })(), /* @__PURE__ */ React16.createElement(Box14, { flexShrink: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(
     StatusBar_default,
     {
       mode,
@@ -20213,7 +20333,7 @@ Selection: ${val}`,
     const agentActiveMs = sessionApiTime + sessionToolTime;
     const apiPercent = agentActiveMs > 0 ? (sessionApiTime / agentActiveMs * 100).toFixed(1) : "0.0";
     const toolPercent = agentActiveMs > 0 ? (sessionToolTime / agentActiveMs * 100).toFixed(1) : "0.0";
-    return /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React15.createElement(Text15, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, chatId)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, successRate, "%")), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React15.createElement(Text15, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React15.createElement(Box14, { width: 16 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React15.createElement(React15.Fragment, null, /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React15.createElement(Box14, null, /* @__PURE__ */ React15.createElement(Box14, { width: 20 }, /* @__PURE__ */ React15.createElement(Text15, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React15.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React15.createElement(Box14, { width: 18 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, chatId)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, successRate, "%")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 16 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
 var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
@@ -20249,6 +20369,7 @@ var init_app = __esm({
     init_setup();
     init_text();
     init_editor();
+    init_GlintText();
     shouldClearValue = (val) => {
       const s = String(val);
       return s.startsWith("999") && s.endsWith("9");
@@ -20331,7 +20452,7 @@ var init_app = __esm({
     BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
       const ideName = getIDEName();
       const options = getPromoOptions(ideName);
-      return /* @__PURE__ */ React15.createElement(
+      return /* @__PURE__ */ React16.createElement(
         Box14,
         {
           flexDirection: "column",
@@ -20340,8 +20461,8 @@ var init_app = __esm({
           width,
           height
         },
-        /* @__PURE__ */ React15.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React15.createElement(Text15, null, getFluxLogo(versionFluxflow, aiProvider))),
-        /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React15.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React15.createElement(Text15, null, "You're in ", /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React15.createElement(Text15, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Real-time IDE context & Error Resolution"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Native DIFFing for AI edits"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React15.createElement(Text15, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React15.createElement(Box14, { key: i }, /* @__PURE__ */ React15.createElement(Text15, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React15.createElement(Text15, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
+        /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React16.createElement(Text16, null, getFluxLogo(versionFluxflow, aiProvider))),
+        /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React16.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React16.createElement(Text16, null, "You're in ", /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Real-time IDE context & Error Resolution"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Native DIFFing for AI edits"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React16.createElement(Box14, { key: i }, /* @__PURE__ */ React16.createElement(Text16, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(Text16, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
       );
     };
     SESSION_START_TIME = Date.now();
@@ -20351,7 +20472,7 @@ var init_app = __esm({
     packageJson = JSON.parse(fs24.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
-    ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React15.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React15.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React15.createElement(Text15, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React15.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React15.createElement(
+    ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React16.createElement(
       CommandMenu,
       {
         title: "Select Action",
@@ -20493,10 +20614,10 @@ var init_app = __esm({
       }
       return "#ff0000";
     };
-    SubagentRow = React15.memo(({ sa }) => {
-      const [dotColor, setDotColor] = useState14("green");
+    SubagentRow = React16.memo(({ sa }) => {
+      const [dotColor, setDotColor] = useState15("green");
       const chunkTimesRef = useRef4([]);
-      useEffect11(() => {
+      useEffect12(() => {
         if (sa.status !== "running") {
           chunkTimesRef.current = [];
           return;
@@ -20533,7 +20654,7 @@ var init_app = __esm({
         const timer = setInterval(checkLatency, 100);
         return () => clearInterval(timer);
       }, [sa.status, sa.lastChunkTime]);
-      return /* @__PURE__ */ React15.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React15.createElement(Text15, { color: "white" }, /* @__PURE__ */ React15.createElement(Text15, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React15.createElement(Text15, { color: dotColor }, " \u25CF")));
+      return /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React16.createElement(Text16, { color: dotColor }, " \u25CF")));
     });
   }
 });
@@ -20687,9 +20808,9 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
             process.exit(0);
           }
           const promptPackageManager = async () => {
-            const React17 = (await import("react")).default;
-            const { useState: useState15 } = React17;
-            const { render: render2, Box: Box15, Text: Text16 } = await import("ink");
+            const React18 = (await import("react")).default;
+            const { useState: useState16 } = React18;
+            const { render: render2, Box: Box15, Text: Text17 } = await import("ink");
             const SelectInput3 = (await import("ink-select-input")).default;
             const TextInput5 = (await import("ink-text-input")).default;
             return new Promise((resolve) => {
@@ -20701,12 +20822,12 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
                 { label: "Custom Command", value: "custom" }
               ];
               const CustomItem2 = ({ label, isSelected }) => {
-                return /* @__PURE__ */ React17.createElement(Box15, { width: "100%" }, /* @__PURE__ */ React17.createElement(Text16, { bold: isSelected }, "\u2514\u2500 ", isSelected ? "\x1B[32m\u25CF\x1B[0m" : "\u25CB", " ", label));
+                return /* @__PURE__ */ React18.createElement(Box15, { width: "100%" }, /* @__PURE__ */ React18.createElement(Text17, { bold: isSelected }, "\u2514\u2500 ", isSelected ? "\x1B[32m\u25CF\x1B[0m" : "\u25CB", " ", label));
               };
               let unmountFn;
               const PromptComponent = () => {
-                const [step, setStep] = useState15("select");
-                const [customCommand2, setCustomCommand] = useState15("");
+                const [step, setStep] = useState16("select");
+                const [customCommand2, setCustomCommand] = useState16("");
                 const handleSelect = (item) => {
                   if (item.value === "custom") {
                     setStep("custom");
@@ -20718,16 +20839,16 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
                   cleanupAndResolve({ manager: "custom", customCommand: value });
                 };
                 if (step === "custom") {
-                  return /* @__PURE__ */ React17.createElement(Box15, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React17.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React17.createElement(Text16, { color: "magenta", bold: true }, "\u{1F527} Enter custom update command:")), /* @__PURE__ */ React17.createElement(Box15, { flexDirection: "row" }, /* @__PURE__ */ React17.createElement(Text16, { color: "cyan", bold: true }, "   \u276F "), /* @__PURE__ */ React17.createElement(
+                  return /* @__PURE__ */ React18.createElement(Box15, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React18.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React18.createElement(Text17, { color: "magenta", bold: true }, "\u{1F527} Enter custom update command:")), /* @__PURE__ */ React18.createElement(Box15, { flexDirection: "row" }, /* @__PURE__ */ React18.createElement(Text17, { color: "cyan", bold: true }, "   \u276F "), /* @__PURE__ */ React18.createElement(
                     TextInput5,
                     {
                       value: customCommand2,
                       onChange: setCustomCommand,
                       onSubmit: handleCustomSubmit
                     }
-                  )), /* @__PURE__ */ React17.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React17.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "   (Press Enter to confirm)")));
+                  )), /* @__PURE__ */ React18.createElement(Box15, { marginTop: 1 }, /* @__PURE__ */ React18.createElement(Text17, { color: "gray", dimColor: true, italic: true }, "   (Press Enter to confirm)")));
                 }
-                return /* @__PURE__ */ React17.createElement(Box15, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React17.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React17.createElement(Text16, { color: "magenta", bold: true }, "\u{1F4E6} Select a package manager for the update:")), /* @__PURE__ */ React17.createElement(
+                return /* @__PURE__ */ React18.createElement(Box15, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React18.createElement(Box15, { marginBottom: 1 }, /* @__PURE__ */ React18.createElement(Text17, { color: "magenta", bold: true }, "\u{1F4E6} Select a package manager for the update:")), /* @__PURE__ */ React18.createElement(
                   SelectInput3,
                   {
                     items,
@@ -20741,7 +20862,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
                 if (unmountFn) unmountFn();
                 resolve(val);
               };
-              const { unmount } = render2(/* @__PURE__ */ React17.createElement(PromptComponent, null));
+              const { unmount } = render2(/* @__PURE__ */ React18.createElement(PromptComponent, null));
               unmountFn = unmount;
             });
           };
@@ -20781,7 +20902,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
       }
     }
   }
-  const { default: React16 } = await import("react");
+  const { default: React17 } = await import("react");
   const { render } = await import("ink");
   const { default: App2 } = await init_app().then(() => app_exports);
   process.env.NODE_NO_WARNINGS = "1";
@@ -20834,5 +20955,5 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
     } catch (e) {
     }
   }
-  render(/* @__PURE__ */ React16.createElement(App2, { args: process.argv.slice(2) }), { exitOnCtrlC: false });
+  render(/* @__PURE__ */ React17.createElement(App2, { args: process.argv.slice(2) }), { exitOnCtrlC: false });
 }

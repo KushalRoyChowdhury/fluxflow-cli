@@ -424,88 +424,120 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         }
     }
 
-    const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(body),
-        signal: signal
-    });
+    let attempts = 0;
+    const maxAttempts = 6;
+    let hasYielded = false;
 
-    if (!response.ok) {
-        const err = await response.json();
-        const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
-        error.status = response.status;
-        throw error;
-    }
+    while (attempts < maxAttempts) {
+        attempts++;
+        try {
+            const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify(body),
+                signal: signal
+            });
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    let pendingParts = [];
-    let latestUsageMetadata = null;
-    let lastFlushTime = Date.now();
-    let hasNewData = false;
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-            if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
-                yield {
-                    candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
-                    usageMetadata: latestUsageMetadata
-                };
+            if (!response.ok) {
+                const err = await response.json();
+                const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
+                error.status = response.status;
+                throw error;
             }
-            break;
-        }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed === 'data: [DONE]') continue;
-            if (trimmed.startsWith('data: ')) {
-                try {
-                    const json = JSON.parse(trimmed.substring(6));
-                    const usage = json.usage;
-                    if (usage) {
-                        latestUsageMetadata = {
-                            totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
-                            promptTokenCount: usage.prompt_tokens || 0,
-                            candidatesTokenCount: usage.completion_tokens || 0,
-                            thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
+            let pendingParts = [];
+            let latestUsageMetadata = null;
+            let lastFlushTime = Date.now();
+            let hasNewData = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                        yield {
+                            candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                            usageMetadata: latestUsageMetadata
                         };
-                        hasNewData = true;
+                        hasYielded = true;
                     }
+                    break;
+                }
 
-                    const thinking = json.choices?.[0]?.delta?.reasoning || json.choices?.[0]?.delta?.reasoning_content || '';
-                    const content = json.choices?.[0]?.delta?.content || '';
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
 
-                    if (thinking) {
-                        pendingParts.push({ text: thinking, thought: true });
-                        hasNewData = true;
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed === 'data: [DONE]') continue;
+                    if (trimmed.startsWith('data: ')) {
+                        let json;
+                        try {
+                            json = JSON.parse(trimmed.substring(6));
+                        } catch (e) {
+                            continue;
+                        }
+
+                        if (json.error) {
+                            throw new Error(`NVIDIA Stream Error: ${json.error.message || JSON.stringify(json.error)}`);
+                        }
+
+                        try {
+                            const usage = json.usage;
+                            if (usage) {
+                                latestUsageMetadata = {
+                                    totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                                    promptTokenCount: usage.prompt_tokens || 0,
+                                    candidatesTokenCount: usage.completion_tokens || 0,
+                                    thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
+                                };
+                                hasNewData = true;
+                            }
+
+                            const thinking = json.choices?.[0]?.delta?.reasoning || json.choices?.[0]?.delta?.reasoning_content || '';
+                            const content = json.choices?.[0]?.delta?.content || '';
+
+                            if (thinking) {
+                                pendingParts.push({ text: thinking, thought: true });
+                                hasNewData = true;
+                            }
+                            if (content) {
+                                pendingParts.push({ text: content });
+                                hasNewData = true;
+                            }
+                        } catch (e) { }
                     }
-                    if (content) {
-                        pendingParts.push({ text: content });
-                        hasNewData = true;
-                    }
-                } catch (e) { }
+                }
+
+                if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+                    yield {
+                        candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                        usageMetadata: latestUsageMetadata
+                    };
+                    hasYielded = true;
+                    pendingParts = [];
+                    lastFlushTime = Date.now();
+                    hasNewData = false;
+                }
             }
-        }
 
-        if (Date.now() - lastFlushTime >= 350 && hasNewData) {
-            yield {
-                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
-                usageMetadata: latestUsageMetadata
-            };
-            pendingParts = [];
-            lastFlushTime = Date.now();
-            hasNewData = false;
+            // Stream completed successfully
+            break;
+
+        } catch (error) {
+            // Only retry if we haven't yielded any tokens to the client yet
+            if (hasYielded || attempts >= maxAttempts) {
+                throw error;
+            }
+            // Wait 3 seconds before retrying
+            await new Promise(resolve => setTimeout(resolve, 3500));
         }
     }
 }
@@ -539,7 +571,7 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
                 if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === 'number') {
                     const depth = data.queues[0].queueDepth;
                     if (!isStreamingStarted) {
-                        push({ value: { type: 'status', content: `Queue Depth ${depth}...` }, done: false });
+                        push({ value: { type: 'status', content: `Queue ${depth || 1}` }, done: false });
                     }
                 }
             }
@@ -2067,7 +2099,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         };
 
         yield { type: 'status', content: '[start]' };
-        yield { type: 'status', content: 'Gathering Context...' };
+        yield { type: 'status', content: 'Gathering Context' };
         // Add a 300ms sleep for something
         // await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
@@ -2429,7 +2461,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let lastUsage = null;
         const MAX_LOOPS = mode === 'Flux' ? 100 : 10;
         const MAX_RETRIES = 16;
-        yield { type: 'status', content: 'Connecting...' };
+        yield { type: 'status', content: 'Connecting' };
 
         TERMINATION_SIGNAL = false; // Reset at start of new interaction
 
@@ -2455,7 +2487,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
             if (loop > 0) {
-                yield { type: 'status', content: 'Working...' };
+                yield { type: 'status', content: 'Working' };
             }
             if (TERMINATION_SIGNAL) {
                 yield { type: 'status', content: 'Request Cancelled' };
@@ -2636,14 +2668,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {
-                        yield { type: 'status', content: 'Verifying...' };
                         await new Promise(resolve => setTimeout(resolve, 2500)); // Buffer for IDE to parse the code
+                        yield { type: 'status', content: 'Verifying' };
                         const ideCtxJIT = await getIDEContext();
                         const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
                         if (ideErr && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text) {
                             lastUserMsg.parts[0].text += `\n${ideErr} [/ERROR]`;
                         }
-                        yield { type: 'status', content: 'Working...' };
+                        yield { type: 'status', content: 'Working' };
                     }
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
@@ -2986,7 +3018,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         if (isFirstChunk) {
-                            yield { type: 'status', content: 'Thinking...' };
+                            yield { type: 'status', content: 'Thinking' };
                             isFirstChunk = false;
                         }
 
@@ -3141,11 +3173,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 // Only update if something changed (to avoid jitter)
-                                const currentLabel = `${TOOL_LABELS[potentialTool] || potentialTool}${detail ? ` (${detail})` : ''}`;
+                                const currentLabel = `${TOOL_LABELS[potentialTool] || potentialTool}${detail ? ` ${detail}` : ''}`;
                                 if (potentialTool !== lastToolSniffed || detail !== lastToolDetail) {
                                     lastToolSniffed = potentialTool;
                                     lastToolDetail = detail;
-                                    yield { type: 'status', content: `${currentLabel}...` };
+                                    yield { type: 'status', content: `${currentLabel}` };
 
                                     if (process.stdout.isTTY) {
                                         const TOOL_TITLES = {
@@ -3325,7 +3357,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // Status Update
                                 const displayLabel = TOOL_LABELS[normToolName] || toolCall.toolName;
                                 const detail = getToolDetail(normToolName, toolCall.args);
-                                yield { type: 'status', content: `${displayLabel}${detail ? ` (${detail})` : ''}...` };
+                                yield { type: 'status', content: `${displayLabel}${detail ? ` ${detail}` : ''}` };
 
                                 // START VISUAL FEEDBACK FOR TOOLS
                                 let label = '';
@@ -3859,7 +3891,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 }
                                                             }
 
-                                                            yield { type: 'status', content: `Opening Diff in IDE: ${path.basename(absPath)}...` };
+                                                            yield { type: 'status', content: `Opening Diff in IDE: ${path.basename(absPath)}` };
                                                             showDiffInIDE(absPath, originalContent, modifiedContent);
                                                             diffOpened = true;
                                                             await new Promise(r => setTimeout(r, 50)); // Beat delay
@@ -3872,7 +3904,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 fs.mkdirSync(path.dirname(absPath), { recursive: true });
                                                                 fs.writeFileSync(absPath, '', 'utf8');
                                                             }
-                                                            yield { type: 'status', content: `Opening New File Diff in IDE: ${path.basename(absPath)}...` };
+                                                            yield { type: 'status', content: `Opening New File Diff in IDE: ${path.basename(absPath)}` };
                                                             showDiffInIDE(absPath, '', modifiedContent);
                                                             diffOpened = true;
                                                             await new Promise(r => setTimeout(r, 50)); // Beat delay
@@ -4502,14 +4534,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             accumulatedContext = '';     // [BUGFIX] - Clear stream recovery checkpoint on connection retry!
                             const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
                             isInitialAttempt = true;
-                            yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]...` };
+                            yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]` };
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
                                 if (TERMINATION_SIGNAL) break;
-                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
+                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
-                            yield { type: 'status', content: `Trying to reach ${modelName}...` };
+                            yield { type: 'status', content: `Trying to reach ${modelName}` };
                         } else {
                             throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
                         }
@@ -4549,7 +4581,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
             const shouldContinue = toolCallPointer > 0;
 
-            yield { type: 'status', content: 'Thinking...' };
+            yield { type: 'status', content: 'Thinking' };
 
             const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, '')
                 .trim();
@@ -4683,7 +4715,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false")]. Global project text search',
         'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
         'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape',
-        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences`
+        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --

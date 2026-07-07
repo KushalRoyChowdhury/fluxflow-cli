@@ -94,20 +94,35 @@ function fuzzyMatch(line, keyword) {
  * Search Keyword Tool
  * Searches for a specific keyword in the current workspace natively without shell commands.
  *
- * @param {string}  keyword   - The keyword/word to search for.
- * @param {string}  [file]    - Optional: restrict search to a specific file.
- * @param {boolean} [subString=false] - When true, matches any substring (with fuzzy fallback);
- *                                      when false (default), matches whole words only.
+ * @param {string}  keyword            - The keyword/word (or regex pattern) to search for.
+ * @param {string}  [file]             - Optional: restrict search to a specific file.
+ * @param {boolean} [subString=false]  - When true, matches any substring (with fuzzy fallback).
+ * @param {boolean} [regex=false]      - When true, treats keyword as a regex pattern (case-insensitive).
+ *                                       Takes priority over subString mode.
  */
 export const search_keyword = async (args) => {
-    const { keyword, file, subString } = parseArgs(args);
+    const { keyword, file, subString, regex } = parseArgs(args);
     if (!keyword) return 'ERROR: Missing "keyword" argument.';
 
-    // Normalise subString: accept boolean true or string 'true'
-    const matchSubstring = subString === true || subString === 'true' || subString === 1 || subString === '1' || subString === "true" || subString === "yes" || subString === 'yes' || false;
+    // Normalise boolean-like flags
+    const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';
+    const matchRegex     = toBool(regex);
+    const matchSubstring = !matchRegex && toBool(subString);
 
-    // Build a word-boundary regex for whole-word matching (case-insensitive)
-    const wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+    // Build search matcher
+    let regexPattern; // used for regex mode
+    let wordRegex;    // used for normal (whole-word) mode
+
+    if (matchRegex) {
+        try {
+            regexPattern = new RegExp(keyword, 'i');
+        } catch (e) {
+            return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+        }
+    } else {
+        // Build a word-boundary regex for whole-word matching (case-insensitive)
+        wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+    }
 
     const excludes = [
         'node_modules', '.git', 'dist', '.next', '.gemini',
@@ -144,9 +159,11 @@ export const search_keyword = async (args) => {
                 const fileMatches = [];
 
                 for (let i = 0; i < lines.length; i++) {
-                    const matched = matchSubstring
-                        ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword)  // substring + fuzzy fallback
-                        : wordRegex.test(lines[i]);                               // default: whole-word only (case-insensitive)
+                    const matched = matchRegex
+                        ? regexPattern.test(lines[i])                                                               // regex mode
+                        : matchSubstring
+                            ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) // substring + fuzzy fallback
+                            : wordRegex.test(lines[i]);                                                             // default: whole-word only (case-insensitive)
                     if (matched) {
                         fileMatches.push({ line: i + 1, content: lines[i].trim() });
                     }
@@ -178,11 +195,13 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
+        const modeLabel = matchRegex ? '(regex mode)' : matchSubstring ? '(subString mode)' : '';
+
         if (fileGroups.length === 0) {
-            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${matchSubstring ? '(subString mode)' : ''}`;
+            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${modeLabel}`;
         }
 
-        let output = `Found ${totalMatches} match${totalMatches === 1 ? '' : 'es'} across ${fileGroups.length} file${fileGroups.length === 1 ? '' : 's'} ${matchSubstring ? '(subString mode)' : ''}:\n\n`;
+        let output = `Found ${totalMatches} match${totalMatches === 1 ? '' : 'es'} across ${fileGroups.length} file${fileGroups.length === 1 ? '' : 's'} ${modeLabel}:\n\n`;
 
         for (const group of fileGroups) {
             output += `${group.path}\n`;

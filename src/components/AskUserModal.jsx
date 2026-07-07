@@ -7,8 +7,14 @@ const AskUserModal = ({ question, options, onResolve }) => {
     const [isSuggestingElse, setIsSuggestingElse] = useState(false);
     const [customInput, setCustomInput] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
+    let canceled = false;
+    let allOptions = [];
 
-    const allOptions = [...options, { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }];
+    try {
+        allOptions = [...options, { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }];
+    } catch (e) {
+        canceled = true;
+    }
 
     useInput((input, key) => {
         if (isSuggestingElse) return;
@@ -21,10 +27,11 @@ const AskUserModal = ({ question, options, onResolve }) => {
         }
         if (key.return) {
             const selected = allOptions[selectedIndex];
-            if (selected.id === 'CUSTOM') {
+            if (selected?.id === 'CUSTOM') {
                 setIsSuggestingElse(true);
             } else {
-                onResolve(selected.label);
+                if (canceled) onResolve('Selected Nothing');
+                else onResolve(selected.label);
             }
         }
     });
@@ -49,13 +56,12 @@ const AskUserModal = ({ question, options, onResolve }) => {
                 width="100%"
             >
                 <Box paddingX={1}>
-                    <Text color="white" bold>💬 SUGGEST SOMETHING ELSE</Text>
+                    <Text color="white" bold>SUGGEST SOMETHING ELSE</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1}>
                     <Text italic color="gray">Replying to: {question}</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1} flexDirection="row">
-                    <Text color="white" bold>💠 </Text>
                     <TextInput
                         value={customInput}
                         onChange={setCustomInput}
@@ -72,25 +78,24 @@ const AskUserModal = ({ question, options, onResolve }) => {
     return (
         <Box
             flexDirection="column"
-            borderStyle="single"
-            borderLeft={true}
-            borderRight={false}
-            borderTop={false}
-            borderBottom={false}
+            border={true}
+            borderStyle={'round'}
             borderColor="#444444"
             paddingLeft={2}
             paddingRight={0}
             paddingTop={1}
             paddingBottom={1}
-            backgroundColor="#1a1a1a"
+            marginY={1}
+            marginRight={1}
+            // backgroundColor="#1a1a1a"
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white" bold>AGENT REQUEST: ACTION REQUIRED</Text>
+                <Text color="yellow" bold>AGENT REQUEST: ACTION REQUIRED</Text>
             </Box>
 
             <Box paddingX={1} marginBottom={1}>
-                <Text bold color="white">{question}</Text>
+                <Text color="white">{question}</Text>
             </Box>
 
             {/* Vertical Options for better scannability */}

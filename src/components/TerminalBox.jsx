@@ -141,7 +141,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
     const cleanOutput = processPTY(output).replace(/\n{3,}/g, '\n\n');
 
     // Bypass wrapText for PTY output to let the native terminal handling do its work
-    const rawLines = isPty 
+    const rawLines = isPty
         ? (cleanOutput ? cleanOutput.split('\n') : [])
         : (cleanOutput ? wrapText(cleanOutput, columns - 6).split('\n') : []);
 
@@ -153,7 +153,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         }
     }, { isActive: isFocused });
 
-    const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 20));
+    const limit = Math.max(5, completed ? (terminalHeight - 10) : (terminalHeight - 25));
     const hasCollapsibleContent = rawLines.length > limit;
     const collapsedCount = rawLines.length - limit;
 
@@ -168,43 +168,43 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
         <Box
             flexDirection="column"
             borderStyle={isFocused ? 'double' : 'single'}
-            borderLeft={true}
+            borderLeft={false}
             borderRight={false}
-            borderTop={false}
-            borderBottom={false}
-            borderColor="#555555"
+            borderTop={true}
+            borderBottom={true}
+            // borderColor="#555555"
             paddingLeft={2}
             paddingRight={0}
             paddingY={1}
-            marginTop={1}
-            width="100%"
+            marginY={1}
+            width={columns - 2}
         >
             <Box marginBottom={1} justifyContent="space-between" width="100%">
                 <Box flexShrink={1} paddingRight={2}>
                     <Text>
-                        <Text color="gray" bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
+                        <Text color="white" bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
                         <Text color="white">{command}</Text>
                     </Text>
                 </Box>
                 {isPty && (
                     <Box flexShrink={0} paddingX={1}>
-                        <Text color="gray" bold>ADVANCE</Text>
+                        <Text color="green" bold>ADVANCE</Text>
                     </Box>
                 )}
             </Box>
 
             {displayOutput ? (
-                <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>
+                <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1} width="100%">
                     {hasCollapsibleContent && !isExpanded && (
                         <Box marginBottom={1}>
-                            <Text color="magenta">...{collapsedCount} lines collapsed... Press CTRL + O to expand.</Text>
+                            <Text color="magenta">...{collapsedCount} lines collapsed...</Text>
                         </Box>
                     )}
                     {/* Only apply gray color if completed; let ANSI colors show during live execution */}
-                    <Text color={completed ? "gray" : undefined}>{renderedOutput}</Text>
+                    <Text color={completed ? undefined : undefined}>{renderedOutput}</Text>
                 </Box>
             ) : !completed && (
-                <Box marginTop={1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1}>
+                <Box marginTop={1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1} width="100%">
                     <Text color="white" italic>Waiting for output...</Text>
                 </Box>
             )}

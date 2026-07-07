@@ -18,7 +18,7 @@ const formatThinkText = (cleaned, columns = 80) => {
     if (!trimmed.includes('```')) {
         return (
             <Box width="100%" flexDirection="column">
-                <MarkdownText text={trimmed} color="gray" columns={availableWidth} italic={true} />
+                <MarkdownText text={trimmed} color="#969696" columns={availableWidth} italic={true} />
             </Box>
         );
     }
@@ -312,7 +312,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
 
     return (
         // Table MarginY here
-        <Box flexDirection="column" borderStyle="round" borderColor="#454545ff" paddingX={1} marginY={0} width="100%" flexGrow={1}>
+        <Box flexDirection="column" borderStyle="round" borderColor="#454545ff" paddingX={1} marginY={0} width={terminalWidth - 2}>
             {/* Header with Integrated Divider */}
             <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor="#444" marginBottom={1} paddingBottom={0} width="100%">
                 {header.map((cell, i) => (
@@ -336,7 +336,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     );
 });
 
-const MarkdownText = React.memo(({ text, color = 'white', columns = 80, italic = false }) => {
+const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic = false }) => {
     if (!text) return null;
 
     const lines = text.split('\n');
@@ -884,6 +884,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : 'No selection';
+        const questionMatch = msg.text.match(/Question: (.*)/);
+        const question = questionMatch ? questionMatch[1] : null;
         const s = emojiSpace(2);
 
         return (
@@ -891,22 +893,28 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                 <Box
                     flexDirection="column"
                     borderStyle="single"
-                    borderLeft={true}
+                    borderLeft={false}
                     borderRight={false}
-                    borderTop={false}
-                    borderBottom={false}
+                    borderTop={true}
+                    borderBottom={true}
                     borderColor="#444444"
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}
                     paddingBottom={1}
-                    backgroundColor="#1a1a1a"
-                    width="100%"
+                    marginY={1}
+                    // backgroundColor="#1a1a1a"
+                    width={columns - 2}
                 >
                     <Box paddingX={1}>
-                        <Text color="white" bold>AGENT REQUEST: RESOLVED</Text>
+                        <Text color="green" bold>AGENT REQUEST: RESOLVED</Text>
                     </Box>
-                    <Box paddingX={1} marginTop={1} marginBottom={1}>
+                    {question && (
+                        <Box paddingX={1} marginTop={1}>
+                            <Text color="cyan">{question}</Text>
+                        </Box>
+                    )}
+                    <Box paddingX={1} marginTop={1} marginBottom={0}>
                         <Text color="white">Selection: <Text color="grey" bold>{selection}</Text></Text>
                     </Box>
                 </Box>
@@ -1096,9 +1104,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             ) : msg.role === 'think' ? (
                 <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
                     {msg.isStreaming && !msg.duration ? (
-                        <Text bold color="white">✧ Thinking...</Text>
+                        <Text bold color="#F2F2F2">✧ Thinking...</Text>
                     ) : (
-                        <Text bold color="white">
+                        <Text bold color="#F2F2F2">
                             ✦ Thought{msg.duration ? (
                                 <Text color="gray"> for <Text bold color="white">{formatThinkingDuration(msg.duration)}</Text></Text>
                             ) : '...'}
@@ -1167,9 +1175,9 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         return (
             <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
                 {isStreamingMsg ? (
-                    <Text bold color="white">✧ Thinking...</Text>
+                    <Text bold color="#F2F2F2">✧ Thinking...</Text>
                 ) : (
-                    <Text bold color="white">✦ Thought...</Text>
+                    <Text bold color="#F2F2F2">✦ Thought...</Text>
                 )}
                 {showFullThinking && (
                     <Box flexDirection="row" width="100%">

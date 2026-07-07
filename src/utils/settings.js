@@ -32,7 +32,8 @@ const DEFAULT_SETTINGS = {
         autoDeleteHistory: '7d',
         useExternalData: false,
         externalDataPath: '',
-        preserveThinking: true
+        preserveThinking: true,
+        loadingPhrases: true
     },
     profileData: {
         name: null,
