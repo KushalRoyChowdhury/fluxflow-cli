@@ -1,6 +1,12 @@
 import os from 'os';
 import { DATA_DIR } from './paths';
 import fs from 'fs';
+
+export const flattenString = (str) => {
+    if (typeof str !== 'string') return str;
+    return str.length > 12 ? (str + '').replace('', '') : str;
+};
+
 /**
  * High-fidelity word wrapping that preserves indentation and whitespace.
  * ANSI-aware: does not count escape sequences in width calculation.
@@ -75,7 +81,7 @@ export const wrapText = (text, width) => {
         }
     });
 
-    return finalLines.join('\n');
+    return flattenString(finalLines.join('\n'));
 };
 
 /**
@@ -101,9 +107,9 @@ export const truncatePath = (p, maxLength = 40) => {
     let data_dir = DATA_DIR.replaceAll('\\\\', '\\');
     // console.log('D - ' + data_dir + '\nP - ' + p);
     p = p.replace(os.homedir(), '~').replace(data_dir, 'FluxFlow').replaceAll('\\', '/');
-    if (!p || p.length <= maxLength) return p;
+    if (!p || p.length <= maxLength) return flattenString(p);
     const half = Math.floor((maxLength - 3) / 2);
-    return p.substring(0, half) + '...' + p.substring(p.length - half).replaceAll('\\', '/');
+    return flattenString(p.substring(0, half) + '...' + p.substring(p.length - half).replaceAll('\\', '/'));
 };
 
 export const parsePatchPairs = (args) => {
@@ -416,7 +422,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     }
 
     diffText += `[DIFF_END]`;
-    return diffText;
+    return flattenString(diffText);
 };
 
 export const parseLineInfo = (l) => {
@@ -434,8 +440,8 @@ export const parseLineInfo = (l) => {
     const splitIdx = rest.indexOf('|');
 
     // Extract gutter values cleanly
-    const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : '';
-    const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+    const num = splitIdx !== -1 ? flattenString(rest.substring(0, splitIdx).trim()) : '';
+    const content = splitIdx !== -1 ? flattenString(rest.substring(splitIdx + 1)) : flattenString(rest);
 
     return { isR, isA, num, content };
 };
@@ -443,24 +449,48 @@ export const parseLineInfo = (l) => {
 export const getSimilarity = (s1, s2) => {
     if (!s1 && !s2) return 1.0;
     if (!s1 || !s2) return 0.0;
+    
     const l1 = s1.length;
     const l2 = s2.length;
-    const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
-    for (let i = 0; i <= l1; i++) dp[i][0] = i;
-    for (let j = 0; j <= l2; j++) dp[0][j] = j;
-    for (let i = 1; i <= l1; i++) {
-        for (let j = 1; j <= l2; j++) {
-            if (s1[i - 1] === s2[j - 1]) {
-                dp[i][j] = dp[i - 1][j - 1];
+    
+    // Optimisation: Make sure s2 is the shorter string to save space/time
+    let str1 = s1;
+    let str2 = s2;
+    if (l1 < l2) {
+        str1 = s2;
+        str2 = s1;
+    }
+    
+    const n = str1.length;
+    const m = str2.length;
+    
+    const prevRow = new Int32Array(m + 1);
+    const currRow = new Int32Array(m + 1);
+    
+    for (let j = 0; j <= m; j++) {
+        prevRow[j] = j;
+    }
+    
+    for (let i = 1; i <= n; i++) {
+        currRow[0] = i;
+        const char1 = str1[i - 1];
+        for (let j = 1; j <= m; j++) {
+            if (char1 === str2[j - 1]) {
+                currRow[j] = prevRow[j - 1];
             } else {
-                dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+                currRow[j] = Math.min(prevRow[j], currRow[j - 1], prevRow[j - 1]) + 1;
             }
         }
+        // Copy currRow to prevRow for next iteration
+        prevRow.set(currRow);
     }
+    
+    const dist = prevRow[m];
     const maxLen = Math.max(l1, l2);
     if (maxLen === 0) return 1.0;
-    return 1.0 - dp[l1][l2] / maxLen;
+    return 1.0 - dist / maxLen;
 };
+
 
 export const alignChangeGroup = (group) => {
     const removals = [];
@@ -552,7 +582,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
     }
-    const text = cleanSignals(msg.text || '');
+    const text = flattenString(cleanSignals(msg.text || ''));
 
     const streamCacheKey = `${msg.id}-${columns}`;
     let cachedBlocks = new Map();
@@ -577,14 +607,14 @@ export const parseMessageToBlocks = (msg, columns) => {
         }
 
         // V8 Memory Leak Fix: Flatten strings so cached blocks don't retain the giant growing streaming strings.
-        const flatText = typeof textContent === 'string' ? (' ' + textContent).slice(1) : textContent;
+        const flatText = flattenString(textContent);
 
         const flatExtra = { ...extra };
         if (typeof flatExtra.pairContent === 'string') {
-            flatExtra.pairContent = (' ' + flatExtra.pairContent).slice(1);
+            flatExtra.pairContent = flattenString(flatExtra.pairContent);
         }
         if (Array.isArray(flatExtra.wrappedLines)) {
-            flatExtra.wrappedLines = flatExtra.wrappedLines.map(l => typeof l === 'string' ? (' ' + l).slice(1) : l);
+            flatExtra.wrappedLines = flatExtra.wrappedLines.map(flattenString);
         }
 
         return {

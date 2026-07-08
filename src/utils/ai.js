@@ -993,7 +993,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     } else if (aiProvider === 'NVIDIA') {
                         const stream = getNVIDIAStream(
                             apiKey,
-                            'moonshotai/kimi-k2.6',
+                            'deepseek-ai/deepseek-v4-flash',
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -1678,7 +1678,7 @@ Chats to process:
         let targetModel = 'gemma-4-26b-a4b-it';
         if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
         if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-        if (aiProvider === 'NVIDIA') targetModel = 'moonshotai/kimi-k2.6';
+        if (aiProvider === 'NVIDIA') targetModel = 'deepseek-ai/deepseek-v4-flash';
 
         while (attempts <= maxAttempts && !success) {
             // console.log(targetModel, settings);
@@ -1753,7 +1753,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         let targetModel = 'gemma-4-26b-a4b-it';
         if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
         if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-        if (aiProvider === 'NVIDIA') targetModel = 'moonshotai/kimi-k2.6';
+        if (aiProvider === 'NVIDIA') targetModel = 'deepseek-ai/deepseek-v4-flash';
 
         let attempts = 0;
         let success = false;

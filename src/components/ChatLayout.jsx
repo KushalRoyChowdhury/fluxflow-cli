@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import fs from 'fs';
 import { Box, Text } from 'ink';
 import { TerminalBox } from './TerminalBox.jsx';
-import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup } from '../utils/text.js';
+import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup, flattenString } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
 
@@ -129,7 +129,7 @@ const tokenizeLine = (line, lang) => {
         const matchText = match[0];
         const matchIndex = match.index;
         if (matchIndex > lastIndex) {
-            tokens.push({ text: line.substring(lastIndex, matchIndex) });
+            tokens.push({ text: flattenString(line.substring(lastIndex, matchIndex)) });
         }
         let color = undefined;
         let bold = false;
@@ -147,11 +147,11 @@ const tokenizeLine = (line, lang) => {
         } else if (match[7] || match[8]) {
             color = '#ff9e64';
         }
-        tokens.push({ text: matchText, color, bold });
+        tokens.push({ text: flattenString(matchText), color, bold });
         lastIndex = REGEX_SYNTAX.lastIndex;
     }
     if (lastIndex < line.length) {
-        tokens.push({ text: line.substring(lastIndex) });
+        tokens.push({ text: flattenString(line.substring(lastIndex)) });
     }
 
     if (tokenCache.size >= MAX_TOKEN_CACHE_SIZE) {

@@ -37,7 +37,7 @@ import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './u
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
-import { formatTokens, parseMessageToBlocks, clearBlocksCache } from './utils/text.js';
+import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 
@@ -301,16 +301,16 @@ const parseAgentText = (text) => {
 
         if (endIdx !== -1) {
             // Text before the tool call
-            const beforeText = text.substring(lastIdx, match.index);
+            const beforeText = flattenString(text.substring(lastIdx, match.index));
             if (beforeText.trim()) {
                 blocks.push({ type: 'output', content: beforeText });
             }
 
-            const finalArgsText = text.substring(startIdx + 1, closingParenIdx);
+            const finalArgsText = flattenString(text.substring(startIdx + 1, closingParenIdx));
             blocks.push({
                 type: 'tool',
-                toolName: toolName.trim(),
-                args: finalArgsText.trim()
+                toolName: flattenString(toolName.trim()),
+                args: flattenString(finalArgsText.trim())
             });
 
             lastIdx = endIdx + 1;
@@ -322,7 +322,7 @@ const parseAgentText = (text) => {
     }
 
     if (lastIdx < text.length) {
-        const remainingText = text.substring(lastIdx);
+        const remainingText = flattenString(text.substring(lastIdx));
         if (remainingText.trim()) {
             blocks.push({ type: 'output', content: remainingText });
         }
@@ -337,15 +337,17 @@ const getProjectFiles = (() => {
 
     return (dir) => {
         const now = Date.now();
-        if (cachedFiles && now - lastScanTime < 5000) { // Cache for 5 seconds
+        if (cachedFiles && now - lastScanTime < 10000) { // Cache for 10 seconds
             return cachedFiles;
         }
 
         const fileList = [];
         const scan = (currentDir) => {
+            if (fileList.length >= 2000) return; // Hard cap to prevent memory bloat
             try {
                 const files = fs.readdirSync(currentDir);
                 for (const file of files) {
+                    if (fileList.length >= 2000) return;
                     if (['node_modules', '.git', '.gemini', 'dist', 'build', '.next', '.cache', 'out'].includes(file)) {
                         continue;
                     }
@@ -355,8 +357,8 @@ const getProjectFiles = (() => {
                         scan(filePath);
                     } else {
                         fileList.push({
-                            name: file,
-                            relativePath: path.relative(process.cwd(), filePath)
+                            name: flattenString(file),
+                            relativePath: flattenString(path.relative(process.cwd(), filePath))
                         });
                     }
                 }
@@ -478,7 +480,7 @@ const SubagentRow = React.memo(({ sa }) => {
 });
 
 export default function App({ args = [] }) {
-    let lastGCTime = 1;
+    const lastGCTimeRef = useRef(1);
     const [confirmExit, setConfirmExit] = useState(false);
     const [exitCountdown, setExitCountdown] = useState(10);
     const { stdout } = useStdout();
@@ -517,11 +519,11 @@ export default function App({ args = [] }) {
         }, 1000);
 
         // If there is no GC in last 30s invoke a GC
-        lastGCTime = Date.now();
+        lastGCTimeRef.current = Date.now();
         const memInterval = setInterval(() => {
             // console.log("[GC] Memory check");
-            if (lastGCTime) {
-                const diff = Date.now() - lastGCTime || 0;
+            if (lastGCTimeRef.current) {
+                const diff = Date.now() - lastGCTimeRef.current || 0;
                 if (diff > 30000) {
                     if (global.gc) {
                         const gCAsync = async () => {
@@ -530,15 +532,15 @@ export default function App({ args = [] }) {
                                 // Wait for the next tick of the event loop
                                 await new Promise(resolve => setImmediate(resolve));
                             }
-                            lastGCTime = Date.now();
+                            lastGCTimeRef.current = Date.now();
                         }
                         gCAsync();
                     }
                 }
-                // else console.log(lastGCTime, diff);
+                // else console.log(lastGCTimeRef.current, diff);
             }
         }, 3000);
-        // console.log(lastGCTime, memInterval);
+        // console.log(lastGCTimeRef.current, memInterval);
 
         return () => {
             clearTimeout(graceTimer);
@@ -913,8 +915,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash (Free default)';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
-                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
+                defaultModel = 'deepseek-ai/deepseek-v4-flash';
+                modelDisplayName = 'DeepSeek V4 Flash (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'google/gemma-4-31b-it:free';
                 modelDisplayName = 'Gemma 4 (Free default)';
@@ -927,8 +929,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
-                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
+                defaultModel = 'deepseek-ai/deepseek-v4-flash';
+                modelDisplayName = 'DeepSeek V4 Flash (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'deepseek/deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
@@ -1615,7 +1617,7 @@ export default function App({ args = [] }) {
                     } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'google/gemma-4-31b-it:free';
                     } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'moonshotai/kimi-k2.6';
+                        defaultModel = 'deepseek-ai/deepseek-v4-flash';
                     }
                 } else {
                     if (startupProvider === 'Google') {
@@ -1625,7 +1627,7 @@ export default function App({ args = [] }) {
                     } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'deepseek/deepseek-v4-flash';
                     } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'moonshotai/kimi-k2.6';
+                        defaultModel = 'deepseek-ai/deepseek-v4-flash';
                     }
                 }
                 setActiveModel(defaultModel);
@@ -1870,7 +1872,7 @@ export default function App({ args = [] }) {
             } else if (aiProvider === 'DeepSeek') {
                 defaultModel = 'deepseek-v4-flash';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
+                defaultModel = 'deepseek-ai/deepseek-v4-flash';
             }
             setActiveModel(defaultModel);
 
@@ -2070,10 +2072,6 @@ export default function App({ args = [] }) {
                             {
                                 cmd: 'moonshotai/kimi-k2.7',
                                 desc: 'Multimodal'
-                            },
-                            {
-                                cmd: 'moonshotai/kimi-k2.6',
-                                desc: '[DEPRICATED]'
                             },
 
                             // --- DeepSeek Family ---
@@ -2501,7 +2499,7 @@ export default function App({ args = [] }) {
                                     global.gc();
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
-                                lastGCTime = Date.now();
+                                lastGCTimeRef.current = Date.now();
                             }
                             gCAsync();
                         }
@@ -2528,7 +2526,7 @@ export default function App({ args = [] }) {
                                     global.gc();
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
-                                lastGCTime = Date.now();
+                                lastGCTimeRef.current = Date.now();
                             }
                             gCAsync();
                         }
@@ -3472,8 +3470,8 @@ export default function App({ args = [] }) {
                                 const newMsgs = prev.map(m => {
                                     if (m.isStreaming) {
                                         // V8 ConsString memory flush: Sever fragmented string trees immediately mid-stream
-                                        const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
-                                        const flatFullText = m.fullText ? (' ' + m.fullText).slice(1) : m.fullText;
+                                        const flatText = m.text ? flattenString(m.text) : m.text;
+                                        const flatFullText = m.fullText ? flattenString(m.fullText) : m.fullText;
                                         return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
                                     }
                                     return m;
@@ -3490,7 +3488,7 @@ export default function App({ args = [] }) {
                                     // Wait for the next tick of the event loop
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
-                                lastGCTime = Date.now();
+                                lastGCTimeRef.current = Date.now();
                             }
 
                             continue;
@@ -3651,7 +3649,7 @@ export default function App({ args = [] }) {
                                     // Wait for the next tick of the event loop
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
-                                lastGCTime = Date.now();
+                                lastGCTimeRef.current = Date.now();
                             }
                             continue;
                         }
@@ -3815,6 +3813,22 @@ export default function App({ args = [] }) {
                         appendCancelMessage();
                     }
 
+                    setMessages(prev => {
+                        const newMsgs = prev.map(m => {
+                            if (m.text || m.fullText) {
+                                return {
+                                    ...m,
+                                    text: m.text ? flattenString(m.text) : m.text,
+                                    fullText: m.fullText ? flattenString(m.fullText) : m.fullText,
+                                    isStreaming: false
+                                };
+                            }
+                            return m;
+                        });
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
+
                     clearBlocksCache();
 
                     // Add this aggressive double-GC cleanup specifically for end-of-stream
@@ -3825,7 +3839,7 @@ export default function App({ args = [] }) {
                                 // Wait for the next tick of the event loop
                                 await new Promise(resolve => setImmediate(resolve));
                             }
-                            lastGCTime = Date.now();
+                            lastGCTimeRef.current = Date.now();
                         } catch (e) { }
                     }
 
@@ -4165,7 +4179,7 @@ export default function App({ args = [] }) {
                                 } else if (selectedProvider === 'DeepSeek') {
                                     defaultModel = 'deepseek-v4-flash';
                                 } else if (selectedProvider === 'NVIDIA') {
-                                    defaultModel = 'moonshotai/kimi-k2.6';
+                                    defaultModel = 'deepseek-ai/deepseek-v4-flash';
                                 }
                                 setActiveModel(defaultModel);
                                 const targetTier = (quotas.providerTiers || {})[selectedProvider] || 'Free';

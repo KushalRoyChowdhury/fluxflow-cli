@@ -2110,10 +2110,14 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
+var flattenString, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
+    flattenString = (str) => {
+      if (typeof str !== "string") return str;
+      return str.length > 12 ? (str + "").replace("", "") : str;
+    };
     wrapText = (text, width) => {
       if (!text) return "";
       const ansiRegex = /\x1B\[[0-?]*[ -/]*[@-~]/g;
@@ -2165,7 +2169,7 @@ var init_text = __esm({
           finalLines.push(currentLine.trimEnd());
         }
       });
-      return finalLines.join("\n");
+      return flattenString(finalLines.join("\n"));
     };
     formatTokens = (tokens) => {
       if (!tokens && tokens !== 0) return "0.0k";
@@ -2180,9 +2184,9 @@ var init_text = __esm({
     truncatePath = (p, maxLength = 40) => {
       let data_dir = DATA_DIR.replaceAll("\\\\", "\\");
       p = p.replace(os2.homedir(), "~").replace(data_dir, "FluxFlow").replaceAll("\\", "/");
-      if (!p || p.length <= maxLength) return p;
+      if (!p || p.length <= maxLength) return flattenString(p);
       const half = Math.floor((maxLength - 3) / 2);
-      return p.substring(0, half) + "..." + p.substring(p.length - half).replaceAll("\\", "/");
+      return flattenString(p.substring(0, half) + "..." + p.substring(p.length - half).replaceAll("\\", "/"));
     };
     parsePatchPairs = (args) => {
       const patchPairs = [];
@@ -2437,7 +2441,7 @@ var init_text = __esm({
         }
       }
       diffText += `[DIFF_END]`;
-      return diffText;
+      return flattenString(diffText);
     };
     parseLineInfo = (l) => {
       if (!l) return null;
@@ -2447,8 +2451,8 @@ var init_text = __esm({
       let rest = isR || isA ? clean.substring(1) : clean;
       rest = rest.trim();
       const splitIdx = rest.indexOf("|");
-      const num = splitIdx !== -1 ? rest.substring(0, splitIdx).trim() : "";
-      const content = splitIdx !== -1 ? rest.substring(splitIdx + 1) : rest;
+      const num = splitIdx !== -1 ? flattenString(rest.substring(0, splitIdx).trim()) : "";
+      const content = splitIdx !== -1 ? flattenString(rest.substring(splitIdx + 1)) : flattenString(rest);
       return { isR, isA, num, content };
     };
     getSimilarity = (s1, s2) => {
@@ -2456,21 +2460,35 @@ var init_text = __esm({
       if (!s1 || !s2) return 0;
       const l1 = s1.length;
       const l2 = s2.length;
-      const dp = Array.from({ length: l1 + 1 }, () => Array(l2 + 1).fill(0));
-      for (let i = 0; i <= l1; i++) dp[i][0] = i;
-      for (let j = 0; j <= l2; j++) dp[0][j] = j;
-      for (let i = 1; i <= l1; i++) {
-        for (let j = 1; j <= l2; j++) {
-          if (s1[i - 1] === s2[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1];
+      let str1 = s1;
+      let str2 = s2;
+      if (l1 < l2) {
+        str1 = s2;
+        str2 = s1;
+      }
+      const n = str1.length;
+      const m = str2.length;
+      const prevRow = new Int32Array(m + 1);
+      const currRow = new Int32Array(m + 1);
+      for (let j = 0; j <= m; j++) {
+        prevRow[j] = j;
+      }
+      for (let i = 1; i <= n; i++) {
+        currRow[0] = i;
+        const char1 = str1[i - 1];
+        for (let j = 1; j <= m; j++) {
+          if (char1 === str2[j - 1]) {
+            currRow[j] = prevRow[j - 1];
           } else {
-            dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+            currRow[j] = Math.min(prevRow[j], currRow[j - 1], prevRow[j - 1]) + 1;
           }
         }
+        prevRow.set(currRow);
       }
+      const dist = prevRow[m];
       const maxLen = Math.max(l1, l2);
       if (maxLen === 0) return 1;
-      return 1 - dp[l1][l2] / maxLen;
+      return 1 - dist / maxLen;
     };
     alignChangeGroup = (group) => {
       const removals = [];
@@ -2548,7 +2566,7 @@ var init_text = __esm({
       if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
       }
-      const text = cleanSignals(msg.text || "");
+      const text = flattenString(cleanSignals(msg.text || ""));
       const streamCacheKey = `${msg.id}-${columns}`;
       let cachedBlocks = /* @__PURE__ */ new Map();
       if (msg.isStreaming) {
@@ -2562,13 +2580,13 @@ var init_text = __esm({
         if (existing && existing.text === textContent && existing.type === type && !!existing.isActiveBlock === !!extra.isActiveBlock && !!existing.isStreaming === !!extra.isStreaming && existing.pairContent === extra.pairContent) {
           return existing;
         }
-        const flatText = typeof textContent === "string" ? (" " + textContent).slice(1) : textContent;
+        const flatText = flattenString(textContent);
         const flatExtra = { ...extra };
         if (typeof flatExtra.pairContent === "string") {
-          flatExtra.pairContent = (" " + flatExtra.pairContent).slice(1);
+          flatExtra.pairContent = flattenString(flatExtra.pairContent);
         }
         if (Array.isArray(flatExtra.wrappedLines)) {
-          flatExtra.wrappedLines = flatExtra.wrappedLines.map((l) => typeof l === "string" ? (" " + l).slice(1) : l);
+          flatExtra.wrappedLines = flatExtra.wrappedLines.map(flattenString);
         }
         return {
           key,
@@ -4075,7 +4093,7 @@ var init_ChatLayout = __esm({
         const matchText = match[0];
         const matchIndex = match.index;
         if (matchIndex > lastIndex) {
-          tokens.push({ text: line.substring(lastIndex, matchIndex) });
+          tokens.push({ text: flattenString(line.substring(lastIndex, matchIndex)) });
         }
         let color = void 0;
         let bold = false;
@@ -4093,11 +4111,11 @@ var init_ChatLayout = __esm({
         } else if (match[7] || match[8]) {
           color = "#ff9e64";
         }
-        tokens.push({ text: matchText, color, bold });
+        tokens.push({ text: flattenString(matchText), color, bold });
         lastIndex = REGEX_SYNTAX.lastIndex;
       }
       if (lastIndex < line.length) {
-        tokens.push({ text: line.substring(lastIndex) });
+        tokens.push({ text: flattenString(line.substring(lastIndex)) });
       }
       if (tokenCache.size >= MAX_TOKEN_CACHE_SIZE) {
         const firstKey = tokenCache.keys().next().value;
@@ -11539,7 +11557,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
               } else if (aiProvider === "NVIDIA") {
                 const stream = getNVIDIAStream(
                   apiKey,
-                  "moonshotai/kimi-k2.6",
+                  "deepseek-ai/deepseek-v4-flash",
                   janitorContents,
                   janitorPrompt,
                   "Fast",
@@ -12134,7 +12152,7 @@ ${newMemoryListStr}
         let targetModel = "gemma-4-26b-a4b-it";
         if (aiProvider === "OpenRouter") targetModel = "google/gemma-4-26b-a4b-it:free";
         if (aiProvider === "DeepSeek") targetModel = "deepseek-v4-flash";
-        if (aiProvider === "NVIDIA") targetModel = "moonshotai/kimi-k2.6";
+        if (aiProvider === "NVIDIA") targetModel = "deepseek-ai/deepseek-v4-flash";
         while (attempts <= maxAttempts && !success) {
           attempts++;
           try {
@@ -12201,7 +12219,7 @@ Provide a consolidated summary of the entire session.`;
         let targetModel = "gemma-4-26b-a4b-it";
         if (aiProvider === "OpenRouter") targetModel = "google/gemma-4-26b-a4b-it:free";
         if (aiProvider === "DeepSeek") targetModel = "deepseek-v4-flash";
-        if (aiProvider === "NVIDIA") targetModel = "moonshotai/kimi-k2.6";
+        if (aiProvider === "NVIDIA") targetModel = "deepseek-ai/deepseek-v4-flash";
         let attempts = 0;
         let success = false;
         let response = null;
@@ -16077,7 +16095,7 @@ import TextInput4 from "ink-text-input";
 import SelectInput2 from "ink-select-input";
 import gradient2 from "gradient-string";
 function App({ args = [] }) {
-  let lastGCTime = 1;
+  const lastGCTimeRef = useRef4(1);
   const [confirmExit, setConfirmExit] = useState15(false);
   const [exitCountdown, setExitCountdown] = useState15(10);
   const { stdout } = useStdout2();
@@ -16108,10 +16126,10 @@ function App({ args = [] }) {
         setShowBridgePromo(false);
       }
     }, 1e3);
-    lastGCTime = Date.now();
+    lastGCTimeRef.current = Date.now();
     const memInterval = setInterval(() => {
-      if (lastGCTime) {
-        const diff = Date.now() - lastGCTime || 0;
+      if (lastGCTimeRef.current) {
+        const diff = Date.now() - lastGCTimeRef.current || 0;
         if (diff > 3e4) {
           if (global.gc) {
             const gCAsync = async () => {
@@ -16119,7 +16137,7 @@ function App({ args = [] }) {
                 global.gc();
                 await new Promise((resolve) => setImmediate(resolve));
               }
-              lastGCTime = Date.now();
+              lastGCTimeRef.current = Date.now();
             };
             gCAsync();
           }
@@ -16473,8 +16491,8 @@ function App({ args = [] }) {
         defaultModel = "deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash (Free default)";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
-        modelDisplayName = "Moonshot Kimi (NVIDIA)";
+        defaultModel = "deepseek-ai/deepseek-v4-flash";
+        modelDisplayName = "DeepSeek V4 Flash (NVIDIA)";
       } else {
         defaultModel = "google/gemma-4-31b-it:free";
         modelDisplayName = "Gemma 4 (Free default)";
@@ -16487,8 +16505,8 @@ function App({ args = [] }) {
         defaultModel = "deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
-        modelDisplayName = "Moonshot Kimi (NVIDIA)";
+        defaultModel = "deepseek-ai/deepseek-v4-flash";
+        modelDisplayName = "DeepSeek V4 Flash (NVIDIA)";
       } else {
         defaultModel = "deepseek/deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash";
@@ -17067,7 +17085,7 @@ function App({ args = [] }) {
           } else if (startupProvider === "OpenRouter") {
             defaultModel = "google/gemma-4-31b-it:free";
           } else if (startupProvider === "NVIDIA") {
-            defaultModel = "moonshotai/kimi-k2.6";
+            defaultModel = "deepseek-ai/deepseek-v4-flash";
           }
         } else {
           if (startupProvider === "Google") {
@@ -17077,7 +17095,7 @@ function App({ args = [] }) {
           } else if (startupProvider === "OpenRouter") {
             defaultModel = "deepseek/deepseek-v4-flash";
           } else if (startupProvider === "NVIDIA") {
-            defaultModel = "moonshotai/kimi-k2.6";
+            defaultModel = "deepseek-ai/deepseek-v4-flash";
           }
         }
         setActiveModel(defaultModel);
@@ -17294,7 +17312,7 @@ function App({ args = [] }) {
       } else if (aiProvider === "DeepSeek") {
         defaultModel = "deepseek-v4-flash";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
+        defaultModel = "deepseek-ai/deepseek-v4-flash";
       }
       setActiveModel(defaultModel);
       setMessages((prev) => [...prev, { role: "system", text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
@@ -17470,10 +17488,6 @@ function App({ args = [] }) {
         {
           cmd: "moonshotai/kimi-k2.7",
           desc: "Multimodal"
-        },
-        {
-          cmd: "moonshotai/kimi-k2.6",
-          desc: "[DEPRICATED]"
         },
         // --- DeepSeek Family ---
         {
@@ -17857,7 +17871,7 @@ ${cleanText}`, color: "magenta" }];
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
-                lastGCTime = Date.now();
+                lastGCTimeRef.current = Date.now();
               };
               gCAsync();
             }
@@ -17884,7 +17898,7 @@ ${cleanText}`, color: "magenta" }];
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
-                lastGCTime = Date.now();
+                lastGCTimeRef.current = Date.now();
               };
               gCAsync();
             }
@@ -18803,8 +18817,8 @@ Selection: ${val}`,
               setMessages((prev) => {
                 const newMsgs = prev.map((m) => {
                   if (m.isStreaming) {
-                    const flatText = m.text ? (" " + m.text).slice(1) : m.text;
-                    const flatFullText = m.fullText ? (" " + m.fullText).slice(1) : m.fullText;
+                    const flatText = m.text ? flattenString(m.text) : m.text;
+                    const flatFullText = m.fullText ? flattenString(m.fullText) : m.fullText;
                     return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
                   }
                   return m;
@@ -18818,7 +18832,7 @@ Selection: ${val}`,
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
-                lastGCTime = Date.now();
+                lastGCTimeRef.current = Date.now();
               }
               continue;
             }
@@ -18960,7 +18974,7 @@ Selection: ${val}`,
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
-                lastGCTime = Date.now();
+                lastGCTimeRef.current = Date.now();
               }
               continue;
             }
@@ -19097,6 +19111,21 @@ Selection: ${val}`,
           if (didSignalTerminationRef.current) {
             appendCancelMessage();
           }
+          setMessages((prev) => {
+            const newMsgs = prev.map((m) => {
+              if (m.text || m.fullText) {
+                return {
+                  ...m,
+                  text: m.text ? flattenString(m.text) : m.text,
+                  fullText: m.fullText ? flattenString(m.fullText) : m.fullText,
+                  isStreaming: false
+                };
+              }
+              return m;
+            });
+            setCompletedIndex(newMsgs.length);
+            return newMsgs;
+          });
           clearBlocksCache();
           if (global.gc) {
             try {
@@ -19104,7 +19133,7 @@ Selection: ${val}`,
                 global.gc();
                 await new Promise((resolve) => setImmediate(resolve));
               }
-              lastGCTime = Date.now();
+              lastGCTimeRef.current = Date.now();
             } catch (e) {
             }
           }
@@ -19385,7 +19414,7 @@ Selection: ${val}`,
                 } else if (selectedProvider === "DeepSeek") {
                   defaultModel = "deepseek-v4-flash";
                 } else if (selectedProvider === "NVIDIA") {
-                  defaultModel = "moonshotai/kimi-k2.6";
+                  defaultModel = "deepseek-ai/deepseek-v4-flash";
                 }
                 setActiveModel(defaultModel);
                 const targetTier = (quotas.providerTiers || {})[selectedProvider] || "Free";
@@ -20558,15 +20587,15 @@ var init_app = __esm({
           }
         }
         if (endIdx !== -1) {
-          const beforeText = text.substring(lastIdx, match.index);
+          const beforeText = flattenString(text.substring(lastIdx, match.index));
           if (beforeText.trim()) {
             blocks.push({ type: "output", content: beforeText });
           }
-          const finalArgsText = text.substring(startIdx + 1, closingParenIdx);
+          const finalArgsText = flattenString(text.substring(startIdx + 1, closingParenIdx));
           blocks.push({
             type: "tool",
-            toolName: toolName.trim(),
-            args: finalArgsText.trim()
+            toolName: flattenString(toolName.trim()),
+            args: flattenString(finalArgsText.trim())
           });
           lastIdx = endIdx + 1;
           toolRegex.lastIndex = lastIdx;
@@ -20575,7 +20604,7 @@ var init_app = __esm({
         }
       }
       if (lastIdx < text.length) {
-        const remainingText = text.substring(lastIdx);
+        const remainingText = flattenString(text.substring(lastIdx));
         if (remainingText.trim()) {
           blocks.push({ type: "output", content: remainingText });
         }
@@ -20587,14 +20616,16 @@ var init_app = __esm({
       let lastScanTime = 0;
       return (dir) => {
         const now = Date.now();
-        if (cachedFiles && now - lastScanTime < 5e3) {
+        if (cachedFiles && now - lastScanTime < 1e4) {
           return cachedFiles;
         }
         const fileList = [];
         const scan = (currentDir) => {
+          if (fileList.length >= 2e3) return;
           try {
             const files = fs24.readdirSync(currentDir);
             for (const file of files) {
+              if (fileList.length >= 2e3) return;
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
@@ -20604,8 +20635,8 @@ var init_app = __esm({
                 scan(filePath);
               } else {
                 fileList.push({
-                  name: file,
-                  relativePath: path22.relative(process.cwd(), filePath)
+                  name: flattenString(file),
+                  relativePath: flattenString(path22.relative(process.cwd(), filePath))
                 });
               }
             }
