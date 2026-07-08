@@ -2562,7 +2562,7 @@ var init_text = __esm({
     };
     parseMessageToBlocks = (msg, columns) => {
       if (!msg) return { completed: [], active: [] };
-      const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
+      const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}-${msg.workedDuration || 0}`;
       if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
       }
@@ -4257,7 +4257,7 @@ var init_ChatLayout = __esm({
             const level = headingMatch[1].length;
             const hText = headingMatch[2];
             result.push(
-              /* @__PURE__ */ React4.createElement(Box3, { key: i, marginTop: 1, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "purple" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : "white", underline: true }, hText.toUpperCase()))
+              /* @__PURE__ */ React4.createElement(Box3, { key: i, marginTop: 1, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "purple" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : "white", underline: true }, hText))
             );
             return;
           }
@@ -8923,8 +8923,15 @@ var init_search_keyword = __esm({
       const { keyword, file, subString, regex } = parseArgs(args);
       if (!keyword) return 'ERROR: Missing "keyword" argument.';
       const toBool = (v) => v === true || v === "true" || v === 1 || v === "1" || v === "yes";
-      const matchRegex = toBool(regex);
-      const matchSubstring = !matchRegex && toBool(subString);
+      const regexExplicitlyFalse = regex === false || regex === "false" || regex === 0 || regex === "0" || regex === "no";
+      let matchRegex = toBool(regex);
+      let matchSubstring = !matchRegex && toBool(subString);
+      const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword);
+      let isAutoRegex = false;
+      if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
+        matchRegex = true;
+        isAutoRegex = true;
+      }
       let regexPattern;
       let wordRegex;
       if (matchRegex) {
@@ -9001,7 +9008,7 @@ var init_search_keyword = __esm({
         if (typeof global.gc === "function") {
           global.gc();
         }
-        const modeLabel = matchRegex ? "(regex mode)" : matchSubstring ? "(subString mode)" : "";
+        const modeLabel = matchRegex ? isAutoRegex ? "(auto-regex mode)" : "(regex mode)" : matchSubstring ? "(subString mode)" : "";
         if (fileGroups.length === 0) {
           return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${modeLabel}`;
         }
@@ -16833,11 +16840,9 @@ function App({ args = [] }) {
       for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
       for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
     }
-    const finalCompleted = [...historicalBlocks];
-    for (let j = 0; j < streamingCompletedBlocks.length; j++) {
-      finalCompleted.push(streamingCompletedBlocks[j]);
-    }
+    let finalCompleted = streamingCompletedBlocks.length === 0 ? historicalBlocks : historicalBlocks.concat(streamingCompletedBlocks);
     if (finalCompleted.length >= 75e3) {
+      finalCompleted = [...finalCompleted];
       finalCompleted.push({
         key: `memory-warning-block-${finalCompleted.length}`,
         msg: {
@@ -19148,6 +19153,10 @@ Selection: ${val}`,
             return [...prev, { id: "error-" + Date.now(), role: "system", text: `\u274C ERROR: ${err.message}` }];
           });
         } finally {
+          const totalDuration = Date.now() - apiStart;
+          if (activeStreamingMsgRef.current) {
+            activeStreamingMsgRef.current.workedDuration = totalDuration;
+          }
           setIsProcessing(false);
           setStatusText(null);
           setActiveTime(0);
@@ -19193,7 +19202,7 @@ Selection: ${val}`,
             setActiveView("resolution");
           }
           setMessages((prev) => {
-            const totalDuration = Date.now() - apiStart;
+            const totalDuration2 = Date.now() - apiStart;
             let foundLastAgent = false;
             const newMsgs = [...prev].reverse().map((m) => {
               let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
@@ -19202,7 +19211,7 @@ Selection: ${val}`,
               }
               if (!foundLastAgent && updated.role === "agent") {
                 foundLastAgent = true;
-                updated = { ...updated, workedDuration: totalDuration };
+                updated = { ...updated, workedDuration: totalDuration2 };
               }
               return updated;
             }).reverse();

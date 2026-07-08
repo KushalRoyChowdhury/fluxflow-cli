@@ -1265,14 +1265,15 @@ export default function App({ args = [] }) {
         }
 
         // Combine history cache + newly completed lines from the active stream
-        // V8 optimized for React reference checks
-        const finalCompleted = [...historicalBlocks];
-        for (let j = 0; j < streamingCompletedBlocks.length; j++) {
-            finalCompleted.push(streamingCompletedBlocks[j]);
-        }
+        // OPT: Reuse cached reference when nothing new committed (avoids 50k+ item spread on every streaming tick)
+        let finalCompleted = streamingCompletedBlocks.length === 0
+            ? historicalBlocks
+            : historicalBlocks.concat(streamingCompletedBlocks);
 
         // Give warning so the user can manually clear, preventing real OOM
         if (finalCompleted.length >= 75000) {
+            // Clone before mutating — finalCompleted may be the cached historicalBlocks reference
+            finalCompleted = [...finalCompleted];
             finalCompleted.push({
                 key: `memory-warning-block-${finalCompleted.length}`,
                 msg: {
@@ -3809,6 +3810,12 @@ export default function App({ args = [] }) {
                         return [...prev, { id: 'error-' + Date.now(), role: 'system', text: `❌ ERROR: ${err.message}` }];
                     });
                 } finally {
+                    // Inject workedDuration BEFORE commit so it's parsed from the very first render
+                    const totalDuration = Date.now() - apiStart;
+                    if (activeStreamingMsgRef.current) {
+                        activeStreamingMsgRef.current.workedDuration = totalDuration;
+                    }
+
                     setIsProcessing(false);
                     setStatusText(null);
                     setActiveTime(0);

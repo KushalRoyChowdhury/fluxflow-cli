@@ -106,8 +106,17 @@ export const search_keyword = async (args) => {
 
     // Normalise boolean-like flags
     const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';
-    const matchRegex     = toBool(regex);
-    const matchSubstring = !matchRegex && toBool(subString);
+    const regexExplicitlyFalse = regex === false || regex === 'false' || regex === 0 || regex === '0' || regex === 'no';
+    let matchRegex     = toBool(regex);
+    let matchSubstring = !matchRegex && toBool(subString);
+
+    // Auto-detect regex if not explicitly true/false but contains pipe or regex escape sequences
+    const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword);
+    let isAutoRegex = false;
+    if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
+        matchRegex = true;
+        isAutoRegex = true;
+    }
 
     // Build search matcher
     let regexPattern; // used for regex mode
@@ -195,7 +204,7 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
-        const modeLabel = matchRegex ? '(regex mode)' : matchSubstring ? '(subString mode)' : '';
+        const modeLabel = matchRegex ? (isAutoRegex ? '(auto-regex mode)' : '(regex mode)') : matchSubstring ? '(subString mode)' : '';
 
         if (fileGroups.length === 0) {
             return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${modeLabel}`;

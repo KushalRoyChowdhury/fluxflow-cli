@@ -393,7 +393,7 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
                 result.push(
                     <Box key={i} marginTop={1} marginBottom={0} width="100%">
                         <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'purple' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : 'white'} underline>
-                            {hText.toUpperCase()}
+                            {hText}
                         </Text>
                     </Box>
                 );

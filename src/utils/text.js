@@ -578,7 +578,8 @@ const indexBlockIntoMap = (b, map) => {
 
 export const parseMessageToBlocks = (msg, columns) => {
     if (!msg) return { completed: [], active: [] };
-    const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
+    // Cache key includes workedDuration — prevents stale cache hits when duration is set post-parse
+    const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}-${msg.workedDuration || 0}`;
     if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
     }
