@@ -500,6 +500,26 @@ export default function App({ args = [] }) {
     const [promoSelectedIndex, setPromoSelectedIndex] = useState(0);
     const suggestionOffsetRef = useRef(0);
     const persistedModelRef = useRef(null);
+    const activeStreamingMsgRef = useRef(null);
+    const [renderTick, setRenderTick] = useState(0);
+    const forceRender = () => setRenderTick(t => t + 1);
+
+    const commitActiveStreamingMessage = () => {
+        if (activeStreamingMsgRef.current) {
+            const msg = {
+                ...activeStreamingMsgRef.current,
+                text: flattenString(activeStreamingMsgRef.current.text),
+                isStreaming: false
+            };
+            setMessages(prev => {
+                const next = [...prev, msg];
+                setCompletedIndex(next.length);
+                return next;
+            });
+            activeStreamingMsgRef.current = null;
+        }
+    };
+
     useEffect(() => {
         const ideName = getIDEName();
         const isIDE = !['Terminal', 'Windows Terminal'].includes(ideName) || !!process.env.VSC_TERMINAL_URL;
@@ -1237,6 +1257,13 @@ export default function App({ args = [] }) {
             for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
         }
 
+        // Integrate our ref-based active streaming message so lines can commit to Static scrollback immediately
+        if (activeStreamingMsgRef.current) {
+            const parsed = parseMessageToBlocks(activeStreamingMsgRef.current, columns);
+            for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
+            for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
+        }
+
         // Combine history cache + newly completed lines from the active stream
         // V8 optimized for React reference checks
         const finalCompleted = [...historicalBlocks];
@@ -1263,7 +1290,7 @@ export default function App({ args = [] }) {
             active: activeBlocks
         };
 
-    }, [messages, completedIndex, terminalSize.columns, clearKey, chatId]);
+    }, [messages, completedIndex, terminalSize.columns, clearKey, chatId, renderTick]);
 
     // useEffect(() => {
     //     fs.writeFileSync('DEBUG.json', JSON.stringify(parsedBlocks.completed, null, 4));
@@ -3430,6 +3457,7 @@ export default function App({ args = [] }) {
                                 sendStatus(packet.content);
                             }
                             if (packet.content === 'Request Cancelled') {
+                                commitActiveStreamingMessage();
                                 appendCancelMessage();
                             }
                             continue;
@@ -3533,12 +3561,12 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
+                            commitActiveStreamingMessage();
                             setMessages(prev => {
-                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                const newMsgs = [...updatedPrev, {
+                                const newMsgs = [...prev, {
                                     id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
                                     role: 'system',
-                                    text: packet.content,
+                                    text: flattenString(packet.content),
                                     isVisualFeedback: true
                                 }];
                                 setCompletedIndex(newMsgs.length);
@@ -3573,13 +3601,13 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'tool_result') {
+                            commitActiveStreamingMessage();
                             setMessages(prev => {
-                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                const newMsgs = [...updatedPrev, {
+                                const newMsgs = [...prev, {
                                     id: 'tool-' + Date.now(),
                                     role: 'system',
-                                    text: packet.content,
-                                    fullText: packet.aiContent, // Preserve raw data for next turn
+                                    text: flattenString(packet.content),
+                                    fullText: flattenString(packet.aiContent), // Preserve raw data for next turn
                                     binaryPart: packet.binaryPart, // v1.5.0 Multimodal Support
                                     toolName: packet.toolName
                                 }];
@@ -3696,81 +3724,64 @@ export default function App({ args = [] }) {
                             const afterText = chunkText.substring(tagIndex);
 
                             if (beforeText) {
-                                if (!currentAgentId) {
-                                    currentAgentId = 'agent-' + Date.now();
-                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: beforeText, isStreaming: true }]);
+                                if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
+                                    activeStreamingMsgRef.current = { id: 'agent-' + Date.now(), role: 'agent', text: flattenString(beforeText), isStreaming: true };
                                 } else {
-                                    setMessages(prev => prev.map(m =>
-                                        m.id === currentAgentId
-                                            ? { ...m, text: m.text + beforeText, isStreaming: true }
-                                            : m
-                                    ));
+                                    activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + beforeText);
                                 }
                             }
+
+                            commitActiveStreamingMessage();
 
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
                             let thinkStartText = afterText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: thinkStartText, isStreaming: true, startTime: Date.now() }]);
+                            activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: flattenString(thinkStartText), isStreaming: true, startTime: Date.now() };
+                            forceRender();
                             continue;
                         }
 
                         // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
-                        if ((chunkLower.includes('</think>') || chunkLower.includes('</thought>')) && currentThinkId) {
+                        if ((chunkLower.includes('</think>') || chunkLower.includes('</thought>')) && activeStreamingMsgRef.current?.role === 'think') {
                             const parts = chunkText.split(/<\/(think|thought)>/gi);
                             const thinkPart = parts[0] || '';
                             const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
-                            setMessages(prev => {
-                                const newMsgs = prev.map(m => {
-                                    if (m.id === currentThinkId && typeof m.id === 'string') {
-                                        const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
-                                        const duration = Date.now() - startTime;
-                                        return { ...m, text: m.text + thinkPart, isStreaming: false, duration };
-                                    }
-                                    return m;
-                                });
+                            activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + thinkPart);
+                            const startTime = activeStreamingMsgRef.current.startTime || Date.now();
+                            activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
-                                inThinkMode = false;
-                                currentAgentId = 'agent-' + Date.now();
-                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart, isStreaming: true }];
-                            });
+                            commitActiveStreamingMessage();
+
+                            inThinkMode = false;
+                            currentAgentId = 'agent-' + Date.now();
+                            activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(agentPart), isStreaming: true };
+                            forceRender();
                             continue;
                         }
 
                         // 3. Append to target role with Leak Protection
-                        if (inThinkMode && currentThinkId) {
-                            setMessages(prev => {
-                                const next = [...prev];
-                                let transitioning = false;
-                                let transitionContent = '';
+                        if (inThinkMode && activeStreamingMsgRef.current?.role === 'think') {
+                            const newText = activeStreamingMsgRef.current.text + chunkText;
+                            if (newText.toLowerCase().includes('</think>')) {
+                                const parts = newText.split(/<\/think>/gi);
+                                const thinkPart = parts[0] || '';
+                                const agentPart = parts.slice(1).join('</think>') || '';
 
-                                // Iterate backwards: instantly finds active block, avoiding full array map
-                                for (let i = next.length - 1; i >= 0; i--) {
-                                    if (next[i].id === currentThinkId) {
-                                        const newText = next[i].text + chunkText;
-                                        if (newText.toLowerCase().includes('</think>')) {
-                                            transitioning = true;
-                                            const parts = newText.split(/<\/think>/gi);
-                                            transitionContent = parts.slice(1).join('</think>') || '';
-                                            const startTime = next[i].startTime || parseInt(String(next[i].id).split('-')[1]) || Date.now();
-                                            const duration = Date.now() - startTime;
-                                            next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
-                                        } else {
-                                            next[i] = { ...next[i], text: newText, isStreaming: true };
-                                        }
-                                        break;
-                                    }
-                                }
+                                activeStreamingMsgRef.current.text = flattenString(thinkPart);
+                                const startTime = activeStreamingMsgRef.current.startTime || Date.now();
+                                activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
-                                if (transitioning) {
-                                    inThinkMode = false;
-                                    currentAgentId = 'agent-' + Date.now();
-                                    next.push({ id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true });
-                                }
-                                return next;
-                            });
+                                commitActiveStreamingMessage();
+
+                                inThinkMode = false;
+                                currentAgentId = 'agent-' + Date.now();
+                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(agentPart.replace(/<\/?(think|thought)>/gi, '')), isStreaming: true };
+                            } else {
+                                activeStreamingMsgRef.current.text = flattenString(newText);
+                            }
+                            forceRender();
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
@@ -3778,22 +3789,13 @@ export default function App({ args = [] }) {
                                 toolCallEncounteredInTurn = true;
                             }
 
-                            if (!currentAgentId) {
+                            if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
                                 currentAgentId = 'agent-' + Date.now();
-                                setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: chunkText, isStreaming: true }]);
+                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(chunkText), isStreaming: true };
                             } else {
-                                setMessages(prev => {
-                                    const next = [...prev];
-                                    // Iterate backwards to update active text without array cloning overhead
-                                    for (let i = next.length - 1; i >= 0; i--) {
-                                        if (next[i].id === currentAgentId) {
-                                            next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
-                                            break;
-                                        }
-                                    }
-                                    return next;
-                                });
+                                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + chunkText);
                             }
+                            forceRender();
                         }
                     }
                     const apiEnd = Date.now();
@@ -3809,25 +3811,11 @@ export default function App({ args = [] }) {
                     setActiveTime(0);
                     clearInterval(interval_for_timer);
 
+                    commitActiveStreamingMessage();
+
                     if (didSignalTerminationRef.current) {
                         appendCancelMessage();
                     }
-
-                    setMessages(prev => {
-                        const newMsgs = prev.map(m => {
-                            if (m.text || m.fullText) {
-                                return {
-                                    ...m,
-                                    text: m.text ? flattenString(m.text) : m.text,
-                                    fullText: m.fullText ? flattenString(m.fullText) : m.fullText,
-                                    isStreaming: false
-                                };
-                            }
-                            return m;
-                        });
-                        setCompletedIndex(newMsgs.length);
-                        return newMsgs;
-                    });
 
                     clearBlocksCache();
 
