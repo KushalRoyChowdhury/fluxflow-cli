@@ -4776,7 +4776,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
         'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
         'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="true/false optional")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. Optional parameters default to false',
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect',
         'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
         'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape',
         'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`

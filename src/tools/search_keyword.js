@@ -204,7 +204,7 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
-        const modeLabel = matchRegex ? (isAutoRegex ? '(auto-regex mode)' : '(regex mode)') : matchSubstring ? '(subString mode)' : '';
+        const modeLabel = matchRegex ? (isAutoRegex ? '(regex mode)' : '(keyword mode)') : matchSubstring ? '(subString mode)' : '';
 
         if (fileGroups.length === 0) {
             return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${modeLabel}`;
