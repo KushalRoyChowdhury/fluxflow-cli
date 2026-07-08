@@ -3285,6 +3285,9 @@ export default function App({ args = [] }) {
                                 setActiveCommand(null);
                                 setIsTerminalFocused(false);
                                 setExecOutput('');
+                                // Explicitly nullify refs immediately (not relying on useEffect mirroring)
+                                activeCommandRef.current = null;
+                                execOutputRef.current = '';
                             },
                             onToolResult: (status, toolName) => {
                                 if (status === 'success') {

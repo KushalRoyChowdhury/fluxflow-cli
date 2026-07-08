@@ -132,9 +132,18 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
         }
         try {
             const response = await fetch(url, options);
+            // Clear performance measures to prevent undici/fetch buffer overflow (Node 18+)
+            if (typeof performance !== 'undefined' && performance.clearMeasures) {
+                performance.clearMeasures();
+                performance.clearMarks();
+            }
             if (response.ok) return response;
             if (response.status !== 429 && response.status < 500) return response;
         } catch (e) {
+            if (typeof performance !== 'undefined' && performance.clearMeasures) {
+                performance.clearMeasures();
+                performance.clearMarks();
+            }
             if (e.name === 'AbortError' || signal?.aborted) throw e;
             if (i === retries - 1) throw e;
         }
@@ -157,7 +166,12 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     if (signal?.aborted) {
         throw new DOMException('The user aborted a request.', 'AbortError');
     }
-    return fetch(url, options);
+    const response = await fetch(url, options);
+    if (typeof performance !== 'undefined' && performance.clearMeasures) {
+        performance.clearMeasures();
+        performance.clearMarks();
+    }
+    return response;
 };
 
 const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.99) {
@@ -1497,6 +1511,41 @@ export const initAI = (apiKey, settings = {}) => {
     if (!apiKey) return null;
     globalSettings = settings;
     client = new GoogleGenAI({ apiKey });
+
+    // 🧹 GLOBAL PERFORMANCE BUFFER CLEANUP
+    // Prevents Node's undici/fetch performance entries from accumulating (capped at 1M default)
+    // This covers ALL providers including Gemini SDK's internal HTTP calls
+    if (!globalThis.__perfCleanupInstalled) {
+        globalThis.__perfCleanupInstalled = true;
+
+        // Periodic sweeper (every 60s) as a safety net
+        setInterval(() => {
+            if (typeof performance !== 'undefined' && performance.clearMeasures) {
+                performance.clearMeasures();
+                performance.clearMarks();
+            }
+        }, 60000);
+
+        // Monkey-patch global fetch to auto-clear after every request
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async (...args) => {
+            try {
+                const response = await originalFetch(...args);
+                if (typeof performance !== 'undefined' && performance.clearMeasures) {
+                    performance.clearMeasures();
+                    performance.clearMarks();
+                }
+                return response;
+            } catch (e) {
+                if (typeof performance !== 'undefined' && performance.clearMeasures) {
+                    performance.clearMeasures();
+                    performance.clearMarks();
+                }
+                throw e;
+            }
+        };
+    }
+
     return client;
 };
 
@@ -4700,6 +4749,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (connectionPollInterval) {
             clearInterval(connectionPollInterval);
             connectionPollInterval = null;
+        }
+        // 🧹 Clear performance buffer after each GPT/agent response cycle
+        if (typeof performance !== 'undefined' && performance.clearMeasures) {
+            performance.clearMeasures();
+            performance.clearMarks();
         }
         await RevertManager.commitTransaction();
         if (systemSettings?.advanceRollback) {

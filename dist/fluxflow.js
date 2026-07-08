@@ -10820,10 +10820,18 @@ var init_ai = __esm({
           throw new DOMException("The user aborted a request.", "AbortError");
         }
         try {
-          const response = await fetch(url, options);
-          if (response.ok) return response;
-          if (response.status !== 429 && response.status < 500) return response;
+          const response2 = await fetch(url, options);
+          if (typeof performance !== "undefined" && performance.clearMeasures) {
+            performance.clearMeasures();
+            performance.clearMarks();
+          }
+          if (response2.ok) return response2;
+          if (response2.status !== 429 && response2.status < 500) return response2;
         } catch (e) {
+          if (typeof performance !== "undefined" && performance.clearMeasures) {
+            performance.clearMeasures();
+            performance.clearMarks();
+          }
           if (e.name === "AbortError" || signal?.aborted) throw e;
           if (i === retries - 1) throw e;
         }
@@ -10846,7 +10854,12 @@ var init_ai = __esm({
       if (signal?.aborted) {
         throw new DOMException("The user aborted a request.", "AbortError");
       }
-      return fetch(url, options);
+      const response = await fetch(url, options);
+      if (typeof performance !== "undefined" && performance.clearMeasures) {
+        performance.clearMeasures();
+        performance.clearMarks();
+      }
+      return response;
     };
     getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.99) {
       const messages = [];
@@ -11995,6 +12008,32 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       if (!apiKey) return null;
       globalSettings = settings;
       client = new GoogleGenAI({ apiKey });
+      if (!globalThis.__perfCleanupInstalled) {
+        globalThis.__perfCleanupInstalled = true;
+        setInterval(() => {
+          if (typeof performance !== "undefined" && performance.clearMeasures) {
+            performance.clearMeasures();
+            performance.clearMarks();
+          }
+        }, 6e4);
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = async (...args) => {
+          try {
+            const response = await originalFetch(...args);
+            if (typeof performance !== "undefined" && performance.clearMeasures) {
+              performance.clearMeasures();
+              performance.clearMarks();
+            }
+            return response;
+          } catch (e) {
+            if (typeof performance !== "undefined" && performance.clearMeasures) {
+              performance.clearMeasures();
+              performance.clearMarks();
+            }
+            throw e;
+          }
+        };
+      }
       return client;
     };
     generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.75, usageKey = "agent") => {
@@ -14952,6 +14991,10 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
         if (connectionPollInterval) {
           clearInterval(connectionPollInterval);
           connectionPollInterval = null;
+        }
+        if (typeof performance !== "undefined" && performance.clearMeasures) {
+          performance.clearMeasures();
+          performance.clearMarks();
         }
         await RevertManager.commitTransaction();
         if (systemSettings?.advanceRollback) {
@@ -18647,6 +18690,8 @@ ${timestamp}` };
                 setActiveCommand(null);
                 setIsTerminalFocused(false);
                 setExecOutput("");
+                activeCommandRef.current = null;
+                execOutputRef.current = "";
               },
               onToolResult: (status, toolName) => {
                 if (status === "success") {
