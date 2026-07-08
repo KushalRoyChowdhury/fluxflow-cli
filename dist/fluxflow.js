@@ -18652,10 +18652,12 @@ ${timestamp}` };
           typewriterIntervalRef.current = setInterval(() => {
             const queue = typewriterQueueRef.current;
             if (queue.length > 0) {
-              let batchSize = 1;
-              if (queue.length > 35) batchSize = 5;
-              else if (queue.length > 15) batchSize = 3;
-              else if (queue.length > 5) batchSize = 2;
+              let batchSize = 2;
+              if (queue.length > 65) batchSize = 16;
+              else if (queue.length > 50) batchSize = 12;
+              else if (queue.length > 35) batchSize = 8;
+              else if (queue.length > 15) batchSize = 6;
+              else if (queue.length > 5) batchSize = 4;
               let changed = false;
               const nextMsgs = [...activeStreamMessagesRef.current];
               const clonedIndices = /* @__PURE__ */ new Set();
@@ -18697,7 +18699,7 @@ ${timestamp}` };
               typewriterIntervalRef.current = null;
               finalizeTurn(apiStartVal);
             }
-          }, 35);
+          }, 100);
         };
         const awaitTypewriter = async () => {
           while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {

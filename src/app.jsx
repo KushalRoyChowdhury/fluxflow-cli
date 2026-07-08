@@ -3311,10 +3311,12 @@ export default function App({ args = [] }) {
                     typewriterIntervalRef.current = setInterval(() => {
                         const queue = typewriterQueueRef.current;
                         if (queue.length > 0) {
-                            let batchSize = 1;
-                            if (queue.length > 35) batchSize = 5;
-                            else if (queue.length > 15) batchSize = 3;
-                            else if (queue.length > 5) batchSize = 2;
+                            let batchSize = 2;
+                            if (queue.length > 65) batchSize = 16;
+                            else if (queue.length > 50) batchSize = 12;
+                            else if (queue.length > 35) batchSize = 8;
+                            else if (queue.length > 15) batchSize = 6;
+                            else if (queue.length > 5) batchSize = 4;
 
                             let changed = false;
                             const nextMsgs = [...activeStreamMessagesRef.current];
@@ -3358,7 +3360,7 @@ export default function App({ args = [] }) {
                             typewriterIntervalRef.current = null;
                             finalizeTurn(apiStartVal);
                         }
-                    }, 35);
+                    },100); // [ANIMATION TICK]
                 };
 
                 const awaitTypewriter = async () => {
