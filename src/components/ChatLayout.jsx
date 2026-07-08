@@ -109,7 +109,9 @@ const SYNTAX_RULES = [
     /\b(true|false|null|undefined|nil|None)\b/.source,
     /\b(\d+(?:\.\d+)?|0x[0-9a-fA-F]+)\b/.source
 ];
-const REGEX_SYNTAX = new RegExp(SYNTAX_RULES.join('|'), 'g');
+// REGEX_SYNTAX is intentionally not declared at module scope.
+// A local instance is created per tokenizeLine call to avoid .lastIndex
+// corruption under React 18 concurrent rendering (see tokenizeLine below).
 const tokenCache = new Map();
 const MAX_TOKEN_CACHE_SIZE = 1000;
 
@@ -123,9 +125,10 @@ const tokenizeLine = (line, lang) => {
     let lastIndex = 0;
     const tokens = [];
     let match;
-    REGEX_SYNTAX.lastIndex = 0; // Reset stateful global regex pointer
+    // Local instance: safe under concurrent rendering (no shared .lastIndex state)
+    const localRegex = new RegExp(SYNTAX_RULES.join('|'), 'g');
 
-    while ((match = REGEX_SYNTAX.exec(line)) !== null) {
+    while ((match = localRegex.exec(line)) !== null) {
         const matchText = match[0];
         const matchIndex = match.index;
         if (matchIndex > lastIndex) {
@@ -148,7 +151,7 @@ const tokenizeLine = (line, lang) => {
             color = '#ff9e64';
         }
         tokens.push({ text: matchText, color, bold });
-        lastIndex = REGEX_SYNTAX.lastIndex;
+        lastIndex = localRegex.lastIndex;
     }
     if (lastIndex < line.length) {
         tokens.push({ text: line.substring(lastIndex) });

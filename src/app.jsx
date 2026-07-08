@@ -206,7 +206,7 @@ const versionFluxflow = packageJson.version;
 const updatedOn = packageJson.date || '2026-05-20';
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-let interval_for_timer;
+
 
 const StatusSpinner = () => {
     const [tick, setTick] = useState(0);
@@ -913,8 +913,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash (Free default)';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
-                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
+                defaultModel = 'stepfun-ai/step-3.7-flash';
+                modelDisplayName = 'Step 3.7 Flash (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'google/gemma-4-31b-it:free';
                 modelDisplayName = 'Gemma 4 (Free default)';
@@ -927,8 +927,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
-                modelDisplayName = 'Moonshot Kimi (NVIDIA)';
+                defaultModel = 'stepfun-ai/step-3.7-flash';
+                modelDisplayName = 'Step 3.7 Flash (NVIDIA)';
             } else { // OpenRouter
                 defaultModel = 'deepseek/deepseek-v4-flash';
                 modelDisplayName = 'DeepSeek Flash';
@@ -996,7 +996,7 @@ export default function App({ args = [] }) {
     const [wittyPhrase, setWittyPhrase] = useState('');
     const [hasPasteBlock, setHasPasteBlock] = useState(false);
     const [activeTime, setActiveTime] = useState(0);
-    let interval_for_timer;
+    const activeTimeIntervalRef = useRef(null);
 
     useEffect(() => {
         let interval;
@@ -1124,6 +1124,15 @@ export default function App({ args = [] }) {
     const [completedIndex, setCompletedIndex] = useState(messages.length);
     const [clearKey, setClearKey] = useState(0);
 
+    // [GC FIX] Separate state for actively-streaming messages.
+    // Token updates only touch this small array (O(1)), never the full messages array.
+    // On turn boundaries, these are flushed into messages once.
+    const [activeStreamMessages, setActiveStreamMessages] = useState([]);
+    const activeStreamMessagesRef = useRef([]);
+    const typewriterQueueRef = useRef([]);
+    const typewriterIntervalRef = useRef(null);
+    const streamFinishedRef = useRef(false);
+
     const lastCompletedBlocksRef = useRef([]);
 
     // Put this near your hooks
@@ -1216,7 +1225,7 @@ export default function App({ args = [] }) {
             }
         }
 
-        const activeMsgs = messages.slice(completedIndex);
+        const activeMsgs = activeStreamMessages;
         const streamingCompletedBlocks = [];
         const activeBlocks = [];
 
@@ -1237,7 +1246,15 @@ export default function App({ args = [] }) {
 
         // Combine history cache + newly completed lines from the active stream
         // V8 optimized for React reference checks
-        const finalCompleted = [...historicalBlocks];
+        const finalCompleted = historicalBlocks.map(block => {
+            if (block.type === 'full-message' && block.msg) {
+                const latestMsg = messages.find(m => m.id === block.msg.id);
+                if (latestMsg && latestMsg !== block.msg) {
+                    return { ...block, msg: latestMsg };
+                }
+            }
+            return block;
+        });
         for (let j = 0; j < streamingCompletedBlocks.length; j++) {
             finalCompleted.push(streamingCompletedBlocks[j]);
         }
@@ -1261,7 +1278,7 @@ export default function App({ args = [] }) {
             active: activeBlocks
         };
 
-    }, [messages, completedIndex, terminalSize.columns, clearKey, chatId]);
+    }, [messages, activeStreamMessages, completedIndex, terminalSize.columns, clearKey, chatId]);
 
     // useEffect(() => {
     //     fs.writeFileSync('DEBUG.json', JSON.stringify(parsedBlocks.completed, null, 4));
@@ -1615,7 +1632,7 @@ export default function App({ args = [] }) {
                     } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'google/gemma-4-31b-it:free';
                     } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'moonshotai/kimi-k2.6';
+                        defaultModel = 'stepfun-ai/step-3.7-flash';
                     }
                 } else {
                     if (startupProvider === 'Google') {
@@ -1625,7 +1642,7 @@ export default function App({ args = [] }) {
                     } else if (startupProvider === 'OpenRouter') {
                         defaultModel = 'deepseek/deepseek-v4-flash';
                     } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'moonshotai/kimi-k2.6';
+                        defaultModel = 'stepfun-ai/step-3.7-flash';
                     }
                 }
                 setActiveModel(defaultModel);
@@ -1870,7 +1887,7 @@ export default function App({ args = [] }) {
             } else if (aiProvider === 'DeepSeek') {
                 defaultModel = 'deepseek-v4-flash';
             } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'moonshotai/kimi-k2.6';
+                defaultModel = 'stepfun-ai/step-3.7-flash';
             }
             setActiveModel(defaultModel);
 
@@ -2497,7 +2514,7 @@ export default function App({ args = [] }) {
                     setTimeout(() => {
                         if (global.gc) {
                             const gCAsync = async () => {
-                                for (let i = 0; i < 5; i++) {
+                                for (let i = 0; i < 3; i++) {
                                     global.gc();
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
@@ -2524,7 +2541,7 @@ export default function App({ args = [] }) {
                     setTimeout(() => {
                         if (global.gc) {
                             const gCAsync = async () => {
-                                for (let i = 0; i < 5; i++) {
+                                for (let i = 0; i < 3; i++) {
                                     global.gc();
                                     await new Promise(resolve => setImmediate(resolve));
                                 }
@@ -3142,12 +3159,28 @@ export default function App({ args = [] }) {
                 const appendCancelMessage = () => {
                     if (didAppendCancel) return;
                     didAppendCancel = true;
+
+                    // Flush active stream messages if there are any
+                    const dangling = activeStreamMessagesRef.current;
+                    activeStreamMessagesRef.current = [];
+                    setActiveStreamMessages([]);
+
+                    if (typewriterIntervalRef.current) {
+                        clearInterval(typewriterIntervalRef.current);
+                        typewriterIntervalRef.current = null;
+                    }
+                    typewriterQueueRef.current = [];
+
                     setMessages(prev => {
                         const lastMsg = prev[prev.length - 1];
                         if (lastMsg && lastMsg.text && lastMsg.text.includes('Request Cancelled')) {
                             return prev;
                         }
-                        const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
+                        const flushed = dangling.map(m => {
+                            const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
+                            return { ...m, isStreaming: false, text: flatText };
+                        });
+                        const updatedPrev = [...prev, ...flushed].map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
                         const newMsgs = [...updatedPrev, {
                             id: 'cancel-' + Date.now(),
                             role: 'system',
@@ -3157,6 +3190,181 @@ export default function App({ args = [] }) {
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;
                     });
+                };
+
+                const finalizeTurn = async (apiStartVal) => {
+                    // Safety flush: if any streaming messages remain in the buffer, commit them
+                    const dangling = activeStreamMessagesRef.current;
+                    if (dangling.length > 0) {
+                        activeStreamMessagesRef.current = [];
+                        setActiveStreamMessages([]);
+                        setMessages(prev => {
+                            const totalDuration = Date.now() - apiStartVal;
+                            const flushed = dangling.map(m => {
+                                const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
+                                return {
+                                    ...m,
+                                    isStreaming: false,
+                                    text: flatText,
+                                    workedDuration: m.role === 'agent' ? totalDuration : m.workedDuration
+                                };
+                            });
+                            const newMsgs = [...prev, ...flushed];
+                            setCompletedIndex(newMsgs.length);
+                            return newMsgs;
+                        });
+                    }
+                    setIsProcessing(false);
+                    setStatusText(null);
+                    setActiveTime(0);
+                    clearInterval(activeTimeIntervalRef.current);
+
+                    if (didSignalTerminationRef.current) {
+                        appendCancelMessage();
+                    }
+
+                    clearBlocksCache();
+
+                    // Add this aggressive double-GC cleanup specifically for end-of-stream
+                    if (global.gc) {
+                        try {
+                            for (let i = 0; i < 3; i++) {
+                                global.gc();
+                                // Wait for the next tick of the event loop
+                                await new Promise(resolve => setImmediate(resolve));
+                            }
+                            lastGCTime = Date.now();
+                        } catch (e) { }
+                    }
+
+                    if (!hasFiredJanitor) {
+                        if (process.stdout.isTTY) {
+                            process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+                            process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+                        }
+                    }
+
+                    // If a prompt was queued but the agent finished, show resolution modal
+                    if (queuedPromptRef.current) {
+                        setResolutionData(queuedPromptRef.current);
+                        setQueuedPrompt(null);
+                        const hintToResolve = queuedPromptRef.current;
+                        queuedPromptRef.current = null;
+
+                        // [SYNC] Mark as "BUFFERED" (waiting for resolution)
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]') || m.text?.includes('[QUESTION: QUEUED]'));
+                            if (hintMsg) {
+                                if (hintMsg.text.includes('[STEERING HINT: QUEUED]')) {
+                                    hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: FINISHED_TURN]');
+                                } else if (hintMsg.text.includes('[QUESTION: QUEUED]')) {
+                                    hintMsg.text = hintMsg.text.replace('[QUESTION: QUEUED]', '[QUESTION: FINISHED_TURN]');
+                                }
+                            }
+                            return newMsgs.reverse();
+                        });
+
+                        setActiveView('resolution');
+                    }
+
+                    setMessages(prev => {
+                        const totalDuration = Date.now() - apiStartVal;
+                        let foundLastAgent = false;
+                        const newMsgs = [...prev].reverse().map(m => {
+                            let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
+
+                            // Flatten final strings to free V8 ConsString memory permanently
+                            if (updated.text) {
+                                updated.text = (' ' + updated.text).slice(1);
+                            }
+
+                            if (!foundLastAgent && updated.role === 'agent') {
+                                foundLastAgent = true;
+                                updated = { ...updated, workedDuration: totalDuration };
+                            }
+                            return updated;
+                        }).reverse();
+                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && (!m.isMeta || (m.text && m.text.includes('Request Cancelled'))));
+                        saveChat(chatId, null, historyToSave);
+                        setCompletedIndex(newMsgs.length);
+                        return newMsgs;
+                    });
+                };
+
+                const pushTokenText = (id, text) => {
+                    if (systemSettings.progressiveRendering) {
+                        const tokens = text.split(/(\s+)/).filter(Boolean);
+                        for (const tok of tokens) {
+                            typewriterQueueRef.current.push({ type: 'text', id, text: tok });
+                        }
+                    }
+                };
+
+                const startTypewriter = (apiStartVal) => {
+                    if (typewriterIntervalRef.current) {
+                        clearInterval(typewriterIntervalRef.current);
+                    }
+                    streamFinishedRef.current = false;
+                    typewriterQueueRef.current = [];
+
+                    typewriterIntervalRef.current = setInterval(() => {
+                        const queue = typewriterQueueRef.current;
+                        if (queue.length > 0) {
+                            let batchSize = 1;
+                            if (queue.length > 35) batchSize = 5;
+                            else if (queue.length > 15) batchSize = 3;
+                            else if (queue.length > 5) batchSize = 2;
+
+                            let changed = false;
+                            const nextMsgs = [...activeStreamMessagesRef.current];
+                            const clonedIndices = new Set();
+
+                            for (let i = 0; i < batchSize; i++) {
+                                if (queue.length === 0) break;
+                                const task = queue.shift();
+                                if (task.type === 'create') {
+                                    nextMsgs.push(task.msg);
+                                    changed = true;
+                                } else if (task.type === 'text') {
+                                    const idx = nextMsgs.findIndex(m => m.id === task.id);
+                                    if (idx !== -1) {
+                                        if (!clonedIndices.has(idx)) {
+                                            nextMsgs[idx] = { ...nextMsgs[idx] };
+                                            clonedIndices.add(idx);
+                                        }
+                                        nextMsgs[idx].text += task.text;
+                                        changed = true;
+                                    }
+                                } else if (task.type === 'finalize-think') {
+                                    const idx = nextMsgs.findIndex(m => m.id === task.id);
+                                    if (idx !== -1) {
+                                        if (!clonedIndices.has(idx)) {
+                                            nextMsgs[idx] = { ...nextMsgs[idx] };
+                                            clonedIndices.add(idx);
+                                        }
+                                        nextMsgs[idx].isStreaming = false;
+                                        nextMsgs[idx].duration = task.duration;
+                                        changed = true;
+                                    }
+                                }
+                            }
+                            if (changed) {
+                                activeStreamMessagesRef.current = nextMsgs;
+                                setActiveStreamMessages(nextMsgs);
+                            }
+                        } else if (streamFinishedRef.current) {
+                            clearInterval(typewriterIntervalRef.current);
+                            typewriterIntervalRef.current = null;
+                            finalizeTurn(apiStartVal);
+                        }
+                    }, 35);
+                };
+
+                const awaitTypewriter = async () => {
+                    while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
                 };
 
                 let hasFiredJanitor = false;
@@ -3401,7 +3609,7 @@ export default function App({ args = [] }) {
 
                     for await (const packet of stream) {
                         // fs.appendFileSync("DEBUG.txt", `${JSON.stringify(packet)}\n\n`);
-                        await new Promise(resolve => setTimeout(resolve, 3));
+                        // await new Promise(resolve => setTimeout(resolve, 3));
 
                         if (packet.type === 'text') {
                             setLastChunkTime(Date.now());
@@ -3410,6 +3618,9 @@ export default function App({ args = [] }) {
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
                             isFirstPacket = false;
+                            if (systemSettings.progressiveRendering) {
+                                startTypewriter(apiStart);
+                            }
                         }
                         if (packet.type === 'status') {
 
@@ -3418,14 +3629,14 @@ export default function App({ args = [] }) {
                             }
 
                             if (packet.content?.includes('[start]')) {
-                                clearInterval(interval_for_timer);
+                                clearInterval(activeTimeIntervalRef.current);
                                 setActiveTime(0);
-                                interval_for_timer = setInterval(() => {
+                                activeTimeIntervalRef.current = setInterval(() => {
                                     setActiveTime(prev => prev + 1);
                                 }, 1000);
                             } else if (packet.content?.includes('[end]')) {
                                 setActiveTime(0);
-                                clearInterval(interval_for_timer);
+                                clearInterval(activeTimeIntervalRef.current);
                             }
 
                             if (isBridgeConnected()) {
@@ -3461,6 +3672,9 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'turn_reset') {
+                            if (systemSettings.progressiveRendering) {
+                                await awaitTypewriter();
+                            }
                             currentThinkId = null;
                             currentAgentId = null;
                             inThinkMode = false;
@@ -3468,16 +3682,26 @@ export default function App({ args = [] }) {
                             inToolCall = false;
                             toolCallEncounteredInTurn = false;
                             thinkConsumedInTurn = false;
+
+                            // Flush active stream buffer into messages once (O(1) messages writes, not O(N*tokens))
+                            const streamingMsgs = activeStreamMessagesRef.current;
+                            activeStreamMessagesRef.current = [];
+                            setActiveStreamMessages([]);
                             setMessages(prev => {
-                                const newMsgs = prev.map(m => {
-                                    if (m.isStreaming) {
-                                        // V8 ConsString memory flush: Sever fragmented string trees immediately mid-stream
-                                        const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
-                                        const flatFullText = m.fullText ? (' ' + m.fullText).slice(1) : m.fullText;
-                                        return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
-                                    }
-                                    return m;
+                                const totalDuration = Date.now() - apiStart;
+                                const flushed = streamingMsgs.map(m => {
+                                    // V8 ConsString memory flush: Sever fragmented string trees
+                                    const flatText = m.text ? (' ' + m.text).slice(1) : m.text;
+                                    const flatFullText = m.fullText ? (' ' + m.fullText).slice(1) : m.fullText;
+                                    return {
+                                        ...m,
+                                        isStreaming: false,
+                                        text: flatText,
+                                        fullText: flatFullText,
+                                        workedDuration: m.role === 'agent' ? totalDuration : m.workedDuration
+                                    };
                                 });
+                                const newMsgs = [...prev, ...flushed];
                                 setCompletedIndex(newMsgs.length);
                                 return newMsgs;
                             });
@@ -3485,7 +3709,7 @@ export default function App({ args = [] }) {
                             clearBlocksCache();
 
                             if (global.gc) {
-                                for (let i = 0; i < 2; i++) {
+                                for (let i = 0; i < 1; i++) {
                                     global.gc();
                                     // Wait for the next tick of the event loop
                                     await new Promise(resolve => setImmediate(resolve));
@@ -3498,7 +3722,7 @@ export default function App({ args = [] }) {
                         if (packet.type === 'interactive_turn_finished') {
                             setIsProcessing(false);
                             setActiveTime(0);
-                            clearInterval(interval_for_timer);
+                            clearInterval(activeTimeIntervalRef.current);
                             if (isBridgeConnected()) {
                                 sendStatus(null);
                             }
@@ -3535,9 +3759,16 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
+                            if (systemSettings.progressiveRendering) {
+                                await awaitTypewriter();
+                            }
+                            // Flush active stream buffer, then append visual feedback
+                            const streamingMsgs = activeStreamMessagesRef.current;
+                            activeStreamMessagesRef.current = [];
+                            setActiveStreamMessages([]);
                             setMessages(prev => {
-                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                const newMsgs = [...updatedPrev, {
+                                const flushed = streamingMsgs.map(m => ({ ...m, isStreaming: false }));
+                                const newMsgs = [...prev, ...flushed, {
                                     id: 'feedback-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9),
                                     role: 'system',
                                     text: packet.content,
@@ -3575,9 +3806,16 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'tool_result') {
+                            if (systemSettings.progressiveRendering) {
+                                await awaitTypewriter();
+                            }
+                            // Flush active stream buffer, then append tool result
+                            const streamingMsgs = activeStreamMessagesRef.current;
+                            activeStreamMessagesRef.current = [];
+                            setActiveStreamMessages([]);
                             setMessages(prev => {
-                                const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
-                                const newMsgs = [...updatedPrev, {
+                                const flushed = streamingMsgs.map(m => ({ ...m, isStreaming: false }));
+                                const newMsgs = [...prev, ...flushed, {
                                     id: 'tool-' + Date.now(),
                                     role: 'system',
                                     text: packet.content,
@@ -3646,7 +3884,7 @@ export default function App({ args = [] }) {
                         let chunkText = packet.content;
                         if (packet.type === 'text' && chunkText.includes('Request Cancelled')) {
                             if (global.gc) {
-                                for (let i = 0; i < 5; i++) {
+                                for (let i = 0; i < 3; i++) {
                                     global.gc();
                                     // Wait for the next tick of the event loop
                                     await new Promise(resolve => setImmediate(resolve));
@@ -3700,13 +3938,26 @@ export default function App({ args = [] }) {
                             if (beforeText) {
                                 if (!currentAgentId) {
                                     currentAgentId = 'agent-' + Date.now();
-                                    setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: beforeText, isStreaming: true }]);
+                                    const newMsg = { id: currentAgentId, role: 'agent', text: beforeText, isStreaming: true };
+                                    if (systemSettings.progressiveRendering) {
+                                        typewriterQueueRef.current.push({ type: 'create', msg: { ...newMsg, text: '' } });
+                                        pushTokenText(currentAgentId, beforeText);
+                                    } else {
+                                        activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, newMsg];
+                                    }
                                 } else {
-                                    setMessages(prev => prev.map(m =>
-                                        m.id === currentAgentId
-                                            ? { ...m, text: m.text + beforeText, isStreaming: true }
-                                            : m
-                                    ));
+                                    if (systemSettings.progressiveRendering) {
+                                        pushTokenText(currentAgentId, beforeText);
+                                    } else {
+                                        activeStreamMessagesRef.current = activeStreamMessagesRef.current.map(m =>
+                                            m.id === currentAgentId
+                                                ? { ...m, text: m.text + beforeText, isStreaming: true }
+                                                : m
+                                        );
+                                    }
+                                }
+                                if (!systemSettings.progressiveRendering) {
+                                    setActiveStreamMessages([...activeStreamMessagesRef.current]);
                                 }
                             }
 
@@ -3714,7 +3965,16 @@ export default function App({ args = [] }) {
                             thinkConsumedInTurn = true;
                             let thinkStartText = afterText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            setMessages(prev => [...prev, { id: currentThinkId, role: 'think', text: thinkStartText, isStreaming: true, startTime: Date.now() }]);
+                            const thinkMsg = { id: currentThinkId, role: 'think', text: thinkStartText, isStreaming: true, startTime: Date.now() };
+                            if (systemSettings.progressiveRendering) {
+                                typewriterQueueRef.current.push({ type: 'create', msg: { ...thinkMsg, text: '', startTime: Date.now() } });
+                                if (thinkStartText) {
+                                    pushTokenText(currentThinkId, thinkStartText);
+                                }
+                            } else {
+                                activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, thinkMsg];
+                                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                            }
                             continue;
                         }
 
@@ -3724,8 +3984,24 @@ export default function App({ args = [] }) {
                             const thinkPart = parts[0] || '';
                             const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
-                            setMessages(prev => {
-                                const newMsgs = prev.map(m => {
+                            inThinkMode = false;
+                            currentAgentId = 'agent-' + Date.now();
+
+                            if (systemSettings.progressiveRendering) {
+                                if (thinkPart) {
+                                    pushTokenText(currentThinkId, thinkPart);
+                                }
+                                const startTime = parseInt(currentThinkId.split('-')[1]) || Date.now();
+                                const duration = Date.now() - startTime;
+                                typewriterQueueRef.current.push({ type: 'finalize-think', id: currentThinkId, duration });
+
+                                const newAgentMsg = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
+                                typewriterQueueRef.current.push({ type: 'create', msg: newAgentMsg });
+                                if (agentPart) {
+                                    pushTokenText(currentAgentId, agentPart);
+                                }
+                            } else {
+                                activeStreamMessagesRef.current = activeStreamMessagesRef.current.map(m => {
                                     if (m.id === currentThinkId && typeof m.id === 'string') {
                                         const startTime = m.startTime || parseInt(m.id.split('-')[1]) || Date.now();
                                         const duration = Date.now() - startTime;
@@ -3733,46 +4009,61 @@ export default function App({ args = [] }) {
                                     }
                                     return m;
                                 });
-
-                                inThinkMode = false;
-                                currentAgentId = 'agent-' + Date.now();
-                                return [...newMsgs, { id: currentAgentId, role: 'agent', text: agentPart, isStreaming: true }];
-                            });
+                                activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, { id: currentAgentId, role: 'agent', text: agentPart, isStreaming: true }];
+                                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                            }
                             continue;
                         }
 
-                        // 3. Append to target role with Leak Protection
                         if (inThinkMode && currentThinkId) {
-                            setMessages(prev => {
-                                const next = [...prev];
-                                let transitioning = false;
-                                let transitionContent = '';
+                            let transitioning = false;
+                            let transitionContent = '';
 
-                                // Iterate backwards: instantly finds active block, avoiding full array map
-                                for (let i = next.length - 1; i >= 0; i--) {
-                                    if (next[i].id === currentThinkId) {
-                                        const newText = next[i].text + chunkText;
+                            if (systemSettings.progressiveRendering) {
+                                if (chunkText.toLowerCase().includes('</think>')) {
+                                    transitioning = true;
+                                    const parts = chunkText.split(/<\/think>/gi);
+                                    const thinkPart = parts[0] || '';
+                                    transitionContent = parts.slice(1).join('</think>') || '';
+
+                                    if (thinkPart) pushTokenText(currentThinkId, thinkPart);
+                                    const startTime = parseInt(currentThinkId.split('-')[1]) || Date.now();
+                                    const duration = Date.now() - startTime;
+                                    typewriterQueueRef.current.push({ type: 'finalize-think', id: currentThinkId, duration });
+
+                                    inThinkMode = false;
+                                    currentAgentId = 'agent-' + Date.now();
+                                    typewriterQueueRef.current.push({ type: 'create', msg: { id: currentAgentId, role: 'agent', text: '', isStreaming: true } });
+                                    if (transitionContent) {
+                                        pushTokenText(currentAgentId, transitionContent.replace(/<\/?(think|thought)>/gi, ''));
+                                    }
+                                } else {
+                                    pushTokenText(currentThinkId, chunkText);
+                                }
+                            } else {
+                                activeStreamMessagesRef.current = activeStreamMessagesRef.current.map(m => {
+                                    if (m.id === currentThinkId) {
+                                        const newText = m.text + chunkText;
                                         if (newText.toLowerCase().includes('</think>')) {
                                             transitioning = true;
                                             const parts = newText.split(/<\/think>/gi);
                                             transitionContent = parts.slice(1).join('</think>') || '';
-                                            const startTime = next[i].startTime || parseInt(String(next[i].id).split('-')[1]) || Date.now();
+                                            const startTime = m.startTime || parseInt(String(m.id).split('-')[1]) || Date.now();
                                             const duration = Date.now() - startTime;
-                                            next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
-                                        } else {
-                                            next[i] = { ...next[i], text: newText, isStreaming: true };
+                                            return { ...m, text: parts[0], isStreaming: false, duration };
                                         }
-                                        break;
+                                        return { ...m, text: newText, isStreaming: true };
                                     }
-                                }
+                                    return m;
+                                });
 
                                 if (transitioning) {
                                     inThinkMode = false;
                                     currentAgentId = 'agent-' + Date.now();
-                                    next.push({ id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true });
+                                    activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, { id: currentAgentId, role: 'agent', text: transitionContent.replace(/<\/?(think|thought)>/gi, ''), isStreaming: true }];
                                 }
-                                return next;
-                            });
+                                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                            }
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
@@ -3782,107 +4073,72 @@ export default function App({ args = [] }) {
 
                             if (!currentAgentId) {
                                 currentAgentId = 'agent-' + Date.now();
-                                setMessages(prev => [...prev, { id: currentAgentId, role: 'agent', text: chunkText, isStreaming: true }]);
+                                const newMsg = { id: currentAgentId, role: 'agent', text: chunkText, isStreaming: true };
+                                if (systemSettings.progressiveRendering) {
+                                    typewriterQueueRef.current.push({ type: 'create', msg: { ...newMsg, text: '' } });
+                                    pushTokenText(currentAgentId, chunkText);
+                                } else {
+                                    activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, newMsg];
+                                    setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                                }
                             } else {
-                                setMessages(prev => {
-                                    const next = [...prev];
-                                    // Iterate backwards to update active text without array cloning overhead
+                                if (systemSettings.progressiveRendering) {
+                                    pushTokenText(currentAgentId, chunkText);
+                                } else {
+                                    // Iterate backwards to update active text (O(1) in practice — last item)
+                                    const next = [...activeStreamMessagesRef.current];
                                     for (let i = next.length - 1; i >= 0; i--) {
                                         if (next[i].id === currentAgentId) {
                                             next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
                                             break;
                                         }
                                     }
-                                    return next;
-                                });
+                                    activeStreamMessagesRef.current = next;
+                                    setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                                }
                             }
                         }
+                    }
+                    if (systemSettings.progressiveRendering) {
+                        streamFinishedRef.current = true;
+                    } else {
+                        await finalizeTurn(apiStart);
                     }
                     const apiEnd = Date.now();
                     setSessionApiTime(prev => prev + (apiEnd - apiStart));
                 } catch (err) {
+                    if (typewriterIntervalRef.current) {
+                        clearInterval(typewriterIntervalRef.current);
+                        typewriterIntervalRef.current = null;
+                    }
+                    typewriterQueueRef.current = [];
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
                         return [...prev, { id: 'error-' + Date.now(), role: 'system', text: `❌ ERROR: ${err.message}` }];
                     });
                 } finally {
-                    setIsProcessing(false);
-                    setStatusText(null);
-                    setActiveTime(0);
-                    clearInterval(interval_for_timer);
+                    if (!systemSettings.progressiveRendering) {
+                        setIsProcessing(false);
+                        setStatusText(null);
+                        setActiveTime(0);
+                        clearInterval(activeTimeIntervalRef.current);
 
-                    if (didSignalTerminationRef.current) {
-                        appendCancelMessage();
-                    }
+                        if (didSignalTerminationRef.current) {
+                            appendCancelMessage();
+                        }
 
-                    clearBlocksCache();
+                        clearBlocksCache();
 
-                    // Add this aggressive double-GC cleanup specifically for end-of-stream
-                    if (global.gc) {
-                        try {
-                            for (let i = 0; i < 5; i++) {
-                                global.gc();
-                                // Wait for the next tick of the event loop
-                                await new Promise(resolve => setImmediate(resolve));
-                            }
-                            lastGCTime = Date.now();
-                        } catch (e) { }
-                    }
-
-                    if (!hasFiredJanitor) {
-                        if (process.stdout.isTTY) {
-                            process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
-                            process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+                        if (global.gc) {
+                            try {
+                                for (let i = 0; i < 3; i++) {
+                                    global.gc();
+                                    await new Promise(resolve => setImmediate(resolve));
+                                }
+                                lastGCTime = Date.now();
+                            } catch (e) { }
                         }
                     }
-
-                    // If a prompt was queued but the agent finished, show resolution modal
-                    if (queuedPromptRef.current) {
-                        setResolutionData(queuedPromptRef.current);
-                        setQueuedPrompt(null);
-                        const hintToResolve = queuedPromptRef.current;
-                        queuedPromptRef.current = null;
-
-                        // [SYNC] Mark as "BUFFERED" (waiting for resolution)
-                        setMessages(prev => {
-                            const newMsgs = [...prev];
-                            const hintMsg = newMsgs.reverse().find(m => m.text?.includes('[STEERING HINT: QUEUED]') || m.text?.includes('[QUESTION: QUEUED]'));
-                            if (hintMsg) {
-                                if (hintMsg.text.includes('[STEERING HINT: QUEUED]')) {
-                                    hintMsg.text = hintMsg.text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: FINISHED_TURN]');
-                                } else if (hintMsg.text.includes('[QUESTION: QUEUED]')) {
-                                    hintMsg.text = hintMsg.text.replace('[QUESTION: QUEUED]', '[QUESTION: FINISHED_TURN]');
-                                }
-                            }
-                            return newMsgs.reverse();
-                        });
-
-                        setActiveView('resolution');
-                    }
-
-                    setMessages(prev => {
-                        const totalDuration = Date.now() - apiStart;
-                        let foundLastAgent = false;
-                        const newMsgs = [...prev].reverse().map(m => {
-                            let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
-
-                            // Flatten final strings to free V8 ConsString memory permanently
-                            if (updated.text) {
-                                updated.text = (' ' + updated.text).slice(1);
-                            }
-
-                            if (!foundLastAgent && updated.role === 'agent') {
-                                foundLastAgent = true;
-                                updated = { ...updated, workedDuration: totalDuration };
-                            }
-                            return updated;
-                        }).reverse();
-                        const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && (!m.isMeta || (m.text && m.text.includes('Request Cancelled'))));
-                        // Pass null as name to preserve whatever the Janitor has set in the background
-                        saveChat(chatId, null, historyToSave);
-                        setCompletedIndex(newMsgs.length);
-                        return newMsgs;
-                    });
                 }
             };
 
@@ -4165,7 +4421,7 @@ export default function App({ args = [] }) {
                                 } else if (selectedProvider === 'DeepSeek') {
                                     defaultModel = 'deepseek-v4-flash';
                                 } else if (selectedProvider === 'NVIDIA') {
-                                    defaultModel = 'moonshotai/kimi-k2.6';
+                                    defaultModel = 'stepfun-ai/step-3.7-flash';
                                 }
                                 setActiveModel(defaultModel);
                                 const targetTier = (quotas.providerTiers || {})[selectedProvider] || 'Free';
@@ -4615,7 +4871,7 @@ export default function App({ args = [] }) {
                                         } else if (prov === 'DeepSeek') {
                                             defaultModel = 'deepseek-v4-flash';
                                         } else if (prov === 'NVIDIA') {
-                                            defaultModel = 'moonshotai/kimi-k2.6';
+                                            defaultModel = 'stepfun-ai/step-3.7-flash';
                                         } setActiveModel(defaultModel);
                                         const targetTier = (quotas.providerTiers || {})[prov] || 'Free';
                                         setApiTier(targetTier);

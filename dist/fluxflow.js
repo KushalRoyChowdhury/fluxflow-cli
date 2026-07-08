@@ -326,7 +326,8 @@ var init_settings = __esm({
         useExternalData: false,
         externalDataPath: "",
         preserveThinking: true,
-        loadingPhrases: true
+        loadingPhrases: true,
+        progressiveRendering: false
       },
       profileData: {
         name: null,
@@ -2544,7 +2545,7 @@ var init_text = __esm({
     };
     parseMessageToBlocks = (msg, columns) => {
       if (!msg) return { completed: [], active: [] };
-      const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
+      const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}-${msg.workedDuration || 0}-${msg.memoryUpdated ? 1 : 0}-${msg.color || ""}`;
       if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
       }
@@ -4002,7 +4003,7 @@ ${coloredArt[7]}`;
 import React4, { useState as useState4, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
 import { diffWordsWithSpace } from "diff";
-var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, SYNTAX_KEYWORDS, SYNTAX_RULES, REGEX_SYNTAX, tokenCache, MAX_TOKEN_CACHE_SIZE, tokenizeLine, renderHighlightedLine, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, SYNTAX_KEYWORDS, SYNTAX_RULES, tokenCache, MAX_TOKEN_CACHE_SIZE, tokenizeLine, renderHighlightedLine, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
@@ -4058,7 +4059,6 @@ var init_ChatLayout = __esm({
       /\b(true|false|null|undefined|nil|None)\b/.source,
       /\b(\d+(?:\.\d+)?|0x[0-9a-fA-F]+)\b/.source
     ];
-    REGEX_SYNTAX = new RegExp(SYNTAX_RULES.join("|"), "g");
     tokenCache = /* @__PURE__ */ new Map();
     MAX_TOKEN_CACHE_SIZE = 1e3;
     tokenizeLine = (line, lang) => {
@@ -4070,8 +4070,8 @@ var init_ChatLayout = __esm({
       let lastIndex = 0;
       const tokens = [];
       let match;
-      REGEX_SYNTAX.lastIndex = 0;
-      while ((match = REGEX_SYNTAX.exec(line)) !== null) {
+      const localRegex = new RegExp(SYNTAX_RULES.join("|"), "g");
+      while ((match = localRegex.exec(line)) !== null) {
         const matchText = match[0];
         const matchIndex = match.index;
         if (matchIndex > lastIndex) {
@@ -4094,7 +4094,7 @@ var init_ChatLayout = __esm({
           color = "#ff9e64";
         }
         tokens.push({ text: matchText, color, bold });
-        lastIndex = REGEX_SYNTAX.lastIndex;
+        lastIndex = localRegex.lastIndex;
       }
       if (lastIndex < line.length) {
         tokens.push({ text: line.substring(lastIndex) });
@@ -5966,6 +5966,7 @@ function SettingsMenu({
           { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
+          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -6134,6 +6135,12 @@ function SettingsMenu({
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
+    } else if (item.value === "progressiveRendering") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, progressiveRendering: !s.progressiveRendering };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     }
   };
   return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: "gray", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", borderStyle: "round", borderColor: activeColumn === "categories" ? "white" : "grey", padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? "white" : "grey", bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
@@ -6170,7 +6177,7 @@ function SettingsMenu({
     currentItems.forEach((item, index) => {
       const isSelected = activeColumn === "items" && selectedItemIndex === index;
       const labelLength = item.label.length;
-      const dotsCount = Math.max(2, 35 - labelLength);
+      const dotsCount = Math.max(2, 38 - labelLength);
       const dots = ".".repeat(dotsCount);
       const getStatusColor = (item2) => {
         if (currentCatId === "security") {
@@ -6218,7 +6225,7 @@ function SettingsMenu({
     });
     if (currentCatId === "other") {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 15, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 14, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
       );
       elements.push(
         /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
@@ -16473,8 +16480,8 @@ function App({ args = [] }) {
         defaultModel = "deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash (Free default)";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
-        modelDisplayName = "Moonshot Kimi (NVIDIA)";
+        defaultModel = "stepfun-ai/step-3.7-flash";
+        modelDisplayName = "Step 3.7 Flash (NVIDIA)";
       } else {
         defaultModel = "google/gemma-4-31b-it:free";
         modelDisplayName = "Gemma 4 (Free default)";
@@ -16487,8 +16494,8 @@ function App({ args = [] }) {
         defaultModel = "deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
-        modelDisplayName = "Moonshot Kimi (NVIDIA)";
+        defaultModel = "stepfun-ai/step-3.7-flash";
+        modelDisplayName = "Step 3.7 Flash (NVIDIA)";
       } else {
         defaultModel = "deepseek/deepseek-v4-flash";
         modelDisplayName = "DeepSeek Flash";
@@ -16549,7 +16556,7 @@ function App({ args = [] }) {
   const [wittyPhrase, setWittyPhrase] = useState15("");
   const [hasPasteBlock, setHasPasteBlock] = useState15(false);
   const [activeTime, setActiveTime] = useState15(0);
-  let interval_for_timer;
+  const activeTimeIntervalRef = useRef4(null);
   useEffect12(() => {
     let interval;
     if (statusText && systemSettings.loadingPhrases !== false) {
@@ -16660,6 +16667,11 @@ function App({ args = [] }) {
   }, [messages]);
   const [completedIndex, setCompletedIndex] = useState15(messages.length);
   const [clearKey, setClearKey] = useState15(0);
+  const [activeStreamMessages, setActiveStreamMessages] = useState15([]);
+  const activeStreamMessagesRef = useRef4([]);
+  const typewriterQueueRef = useRef4([]);
+  const typewriterIntervalRef = useRef4(null);
+  const streamFinishedRef = useRef4(false);
   const lastCompletedBlocksRef = useRef4([]);
   const cachedHistoryRef = useRef4({
     completedIndex: 0,
@@ -16733,7 +16745,7 @@ function App({ args = [] }) {
         };
       }
     }
-    const activeMsgs = messages.slice(completedIndex);
+    const activeMsgs = activeStreamMessages;
     const streamingCompletedBlocks = [];
     const activeBlocks = [];
     for (let i = 0; i < activeMsgs.length; i++) {
@@ -16749,7 +16761,15 @@ function App({ args = [] }) {
       for (let j = 0; j < parsed.completed.length; j++) streamingCompletedBlocks.push(parsed.completed[j]);
       for (let j = 0; j < parsed.active.length; j++) activeBlocks.push(parsed.active[j]);
     }
-    const finalCompleted = [...historicalBlocks];
+    const finalCompleted = historicalBlocks.map((block) => {
+      if (block.type === "full-message" && block.msg) {
+        const latestMsg = messages.find((m) => m.id === block.msg.id);
+        if (latestMsg && latestMsg !== block.msg) {
+          return { ...block, msg: latestMsg };
+        }
+      }
+      return block;
+    });
     for (let j = 0; j < streamingCompletedBlocks.length; j++) {
       finalCompleted.push(streamingCompletedBlocks[j]);
     }
@@ -16769,7 +16789,7 @@ function App({ args = [] }) {
       completed: finalCompleted,
       active: activeBlocks
     };
-  }, [messages, completedIndex, terminalSize.columns, clearKey, chatId]);
+  }, [messages, activeStreamMessages, completedIndex, terminalSize.columns, clearKey, chatId]);
   const isTerminalWaitingForInput = useMemo2(() => {
     if (!activeCommand || !execOutput) return false;
     const lastChunk = execOutput.trim();
@@ -17067,7 +17087,7 @@ function App({ args = [] }) {
           } else if (startupProvider === "OpenRouter") {
             defaultModel = "google/gemma-4-31b-it:free";
           } else if (startupProvider === "NVIDIA") {
-            defaultModel = "moonshotai/kimi-k2.6";
+            defaultModel = "stepfun-ai/step-3.7-flash";
           }
         } else {
           if (startupProvider === "Google") {
@@ -17077,7 +17097,7 @@ function App({ args = [] }) {
           } else if (startupProvider === "OpenRouter") {
             defaultModel = "deepseek/deepseek-v4-flash";
           } else if (startupProvider === "NVIDIA") {
-            defaultModel = "moonshotai/kimi-k2.6";
+            defaultModel = "stepfun-ai/step-3.7-flash";
           }
         }
         setActiveModel(defaultModel);
@@ -17294,7 +17314,7 @@ function App({ args = [] }) {
       } else if (aiProvider === "DeepSeek") {
         defaultModel = "deepseek-v4-flash";
       } else if (aiProvider === "NVIDIA") {
-        defaultModel = "moonshotai/kimi-k2.6";
+        defaultModel = "stepfun-ai/step-3.7-flash";
       }
       setActiveModel(defaultModel);
       setMessages((prev) => [...prev, { role: "system", text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
@@ -17853,7 +17873,7 @@ ${cleanText}`, color: "magenta" }];
           setTimeout(() => {
             if (global.gc) {
               const gCAsync = async () => {
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < 3; i++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
@@ -17880,7 +17900,7 @@ ${cleanText}`, color: "magenta" }];
           setTimeout(() => {
             if (global.gc) {
               const gCAsync = async () => {
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < 3; i++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
@@ -18503,12 +18523,24 @@ ${timestamp}` };
         const appendCancelMessage = () => {
           if (didAppendCancel) return;
           didAppendCancel = true;
+          const dangling = activeStreamMessagesRef.current;
+          activeStreamMessagesRef.current = [];
+          setActiveStreamMessages([]);
+          if (typewriterIntervalRef.current) {
+            clearInterval(typewriterIntervalRef.current);
+            typewriterIntervalRef.current = null;
+          }
+          typewriterQueueRef.current = [];
           setMessages((prev) => {
             const lastMsg = prev[prev.length - 1];
             if (lastMsg && lastMsg.text && lastMsg.text.includes("Request Cancelled")) {
               return prev;
             }
-            const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
+            const flushed = dangling.map((m) => {
+              const flatText = m.text ? (" " + m.text).slice(1) : m.text;
+              return { ...m, isStreaming: false, text: flatText };
+            });
+            const updatedPrev = [...prev, ...flushed].map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
             const newMsgs = [...updatedPrev, {
               id: "cancel-" + Date.now(),
               role: "system",
@@ -18518,6 +18550,159 @@ ${timestamp}` };
             setCompletedIndex(newMsgs.length);
             return newMsgs;
           });
+        };
+        const finalizeTurn = async (apiStartVal) => {
+          const dangling = activeStreamMessagesRef.current;
+          if (dangling.length > 0) {
+            activeStreamMessagesRef.current = [];
+            setActiveStreamMessages([]);
+            setMessages((prev) => {
+              const totalDuration = Date.now() - apiStartVal;
+              const flushed = dangling.map((m) => {
+                const flatText = m.text ? (" " + m.text).slice(1) : m.text;
+                return {
+                  ...m,
+                  isStreaming: false,
+                  text: flatText,
+                  workedDuration: m.role === "agent" ? totalDuration : m.workedDuration
+                };
+              });
+              const newMsgs = [...prev, ...flushed];
+              setCompletedIndex(newMsgs.length);
+              return newMsgs;
+            });
+          }
+          setIsProcessing(false);
+          setStatusText(null);
+          setActiveTime(0);
+          clearInterval(activeTimeIntervalRef.current);
+          if (didSignalTerminationRef.current) {
+            appendCancelMessage();
+          }
+          clearBlocksCache();
+          if (global.gc) {
+            try {
+              for (let i = 0; i < 3; i++) {
+                global.gc();
+                await new Promise((resolve) => setImmediate(resolve));
+              }
+              lastGCTime = Date.now();
+            } catch (e) {
+            }
+          }
+          if (!hasFiredJanitor) {
+            if (process.stdout.isTTY) {
+              process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
+              process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow | Idle\x07");
+            }
+          }
+          if (queuedPromptRef.current) {
+            setResolutionData(queuedPromptRef.current);
+            setQueuedPrompt(null);
+            const hintToResolve = queuedPromptRef.current;
+            queuedPromptRef.current = null;
+            setMessages((prev) => {
+              const newMsgs = [...prev];
+              const hintMsg = newMsgs.reverse().find((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
+              if (hintMsg) {
+                if (hintMsg.text.includes("[STEERING HINT: QUEUED]")) {
+                  hintMsg.text = hintMsg.text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: FINISHED_TURN]");
+                } else if (hintMsg.text.includes("[QUESTION: QUEUED]")) {
+                  hintMsg.text = hintMsg.text.replace("[QUESTION: QUEUED]", "[QUESTION: FINISHED_TURN]");
+                }
+              }
+              return newMsgs.reverse();
+            });
+            setActiveView("resolution");
+          }
+          setMessages((prev) => {
+            const totalDuration = Date.now() - apiStartVal;
+            let foundLastAgent = false;
+            const newMsgs = [...prev].reverse().map((m) => {
+              let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
+              if (updated.text) {
+                updated.text = (" " + updated.text).slice(1);
+              }
+              if (!foundLastAgent && updated.role === "agent") {
+                foundLastAgent = true;
+                updated = { ...updated, workedDuration: totalDuration };
+              }
+              return updated;
+            }).reverse();
+            const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && (!m.isMeta || m.text && m.text.includes("Request Cancelled")));
+            saveChat(chatId, null, historyToSave);
+            setCompletedIndex(newMsgs.length);
+            return newMsgs;
+          });
+        };
+        const pushTokenText = (id, text) => {
+          if (systemSettings.progressiveRendering) {
+            const tokens = text.split(/(\s+)/).filter(Boolean);
+            for (const tok of tokens) {
+              typewriterQueueRef.current.push({ type: "text", id, text: tok });
+            }
+          }
+        };
+        const startTypewriter = (apiStartVal) => {
+          if (typewriterIntervalRef.current) {
+            clearInterval(typewriterIntervalRef.current);
+          }
+          streamFinishedRef.current = false;
+          typewriterQueueRef.current = [];
+          typewriterIntervalRef.current = setInterval(() => {
+            const queue = typewriterQueueRef.current;
+            if (queue.length > 0) {
+              let batchSize = 1;
+              if (queue.length > 35) batchSize = 5;
+              else if (queue.length > 15) batchSize = 3;
+              else if (queue.length > 5) batchSize = 2;
+              let changed = false;
+              const nextMsgs = [...activeStreamMessagesRef.current];
+              const clonedIndices = /* @__PURE__ */ new Set();
+              for (let i = 0; i < batchSize; i++) {
+                if (queue.length === 0) break;
+                const task = queue.shift();
+                if (task.type === "create") {
+                  nextMsgs.push(task.msg);
+                  changed = true;
+                } else if (task.type === "text") {
+                  const idx = nextMsgs.findIndex((m) => m.id === task.id);
+                  if (idx !== -1) {
+                    if (!clonedIndices.has(idx)) {
+                      nextMsgs[idx] = { ...nextMsgs[idx] };
+                      clonedIndices.add(idx);
+                    }
+                    nextMsgs[idx].text += task.text;
+                    changed = true;
+                  }
+                } else if (task.type === "finalize-think") {
+                  const idx = nextMsgs.findIndex((m) => m.id === task.id);
+                  if (idx !== -1) {
+                    if (!clonedIndices.has(idx)) {
+                      nextMsgs[idx] = { ...nextMsgs[idx] };
+                      clonedIndices.add(idx);
+                    }
+                    nextMsgs[idx].isStreaming = false;
+                    nextMsgs[idx].duration = task.duration;
+                    changed = true;
+                  }
+                }
+              }
+              if (changed) {
+                activeStreamMessagesRef.current = nextMsgs;
+                setActiveStreamMessages(nextMsgs);
+              }
+            } else if (streamFinishedRef.current) {
+              clearInterval(typewriterIntervalRef.current);
+              typewriterIntervalRef.current = null;
+              finalizeTurn(apiStartVal);
+            }
+          }, 35);
+        };
+        const awaitTypewriter = async () => {
+          while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
         };
         let hasFiredJanitor = false;
         setIsProcessing(true);
@@ -18740,27 +18925,29 @@ Selection: ${val}`,
           let inToolCallString = null;
           const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
           for await (const packet of stream) {
-            await new Promise((resolve) => setTimeout(resolve, 3));
             if (packet.type === "text") {
               setLastChunkTime(Date.now());
             }
             if (isFirstPacket && packet.type === "text") {
               apiStart = Date.now();
               isFirstPacket = false;
+              if (systemSettings.progressiveRendering) {
+                startTypewriter(apiStart);
+              }
             }
             if (packet.type === "status") {
               if (!packet.content?.includes("[start]")) {
                 setStatusText(packet.content);
               }
               if (packet.content?.includes("[start]")) {
-                clearInterval(interval_for_timer);
+                clearInterval(activeTimeIntervalRef.current);
                 setActiveTime(0);
-                interval_for_timer = setInterval(() => {
+                activeTimeIntervalRef.current = setInterval(() => {
                   setActiveTime((prev) => prev + 1);
                 }, 1e3);
               } else if (packet.content?.includes("[end]")) {
                 setActiveTime(0);
-                clearInterval(interval_for_timer);
+                clearInterval(activeTimeIntervalRef.current);
               }
               if (isBridgeConnected()) {
                 sendStatus(packet.content);
@@ -18793,6 +18980,9 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "turn_reset") {
+              if (systemSettings.progressiveRendering) {
+                await awaitTypewriter();
+              }
               currentThinkId = null;
               currentAgentId = null;
               inThinkMode = false;
@@ -18800,21 +18990,29 @@ Selection: ${val}`,
               inToolCall = false;
               toolCallEncounteredInTurn = false;
               thinkConsumedInTurn = false;
+              const streamingMsgs = activeStreamMessagesRef.current;
+              activeStreamMessagesRef.current = [];
+              setActiveStreamMessages([]);
               setMessages((prev) => {
-                const newMsgs = prev.map((m) => {
-                  if (m.isStreaming) {
-                    const flatText = m.text ? (" " + m.text).slice(1) : m.text;
-                    const flatFullText = m.fullText ? (" " + m.fullText).slice(1) : m.fullText;
-                    return { ...m, isStreaming: false, text: flatText, fullText: flatFullText };
-                  }
-                  return m;
+                const totalDuration = Date.now() - apiStart;
+                const flushed = streamingMsgs.map((m) => {
+                  const flatText = m.text ? (" " + m.text).slice(1) : m.text;
+                  const flatFullText = m.fullText ? (" " + m.fullText).slice(1) : m.fullText;
+                  return {
+                    ...m,
+                    isStreaming: false,
+                    text: flatText,
+                    fullText: flatFullText,
+                    workedDuration: m.role === "agent" ? totalDuration : m.workedDuration
+                  };
                 });
+                const newMsgs = [...prev, ...flushed];
                 setCompletedIndex(newMsgs.length);
                 return newMsgs;
               });
               clearBlocksCache();
               if (global.gc) {
-                for (let i = 0; i < 2; i++) {
+                for (let i = 0; i < 1; i++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
@@ -18825,7 +19023,7 @@ Selection: ${val}`,
             if (packet.type === "interactive_turn_finished") {
               setIsProcessing(false);
               setActiveTime(0);
-              clearInterval(interval_for_timer);
+              clearInterval(activeTimeIntervalRef.current);
               if (isBridgeConnected()) {
                 sendStatus(null);
               }
@@ -18848,9 +19046,15 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
+              if (systemSettings.progressiveRendering) {
+                await awaitTypewriter();
+              }
+              const streamingMsgs = activeStreamMessagesRef.current;
+              activeStreamMessagesRef.current = [];
+              setActiveStreamMessages([]);
               setMessages((prev) => {
-                const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-                const newMsgs = [...updatedPrev, {
+                const flushed = streamingMsgs.map((m) => ({ ...m, isStreaming: false }));
+                const newMsgs = [...prev, ...flushed, {
                   id: "feedback-" + Date.now() + "-" + Math.random().toString(36).substring(2, 9),
                   role: "system",
                   text: packet.content,
@@ -18888,9 +19092,15 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "tool_result") {
+              if (systemSettings.progressiveRendering) {
+                await awaitTypewriter();
+              }
+              const streamingMsgs = activeStreamMessagesRef.current;
+              activeStreamMessagesRef.current = [];
+              setActiveStreamMessages([]);
               setMessages((prev) => {
-                const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
-                const newMsgs = [...updatedPrev, {
+                const flushed = streamingMsgs.map((m) => ({ ...m, isStreaming: false }));
+                const newMsgs = [...prev, ...flushed, {
                   id: "tool-" + Date.now(),
                   role: "system",
                   text: packet.content,
@@ -18956,7 +19166,7 @@ Selection: ${val}`,
             let chunkText = packet.content;
             if (packet.type === "text" && chunkText.includes("Request Cancelled")) {
               if (global.gc) {
-                for (let i = 0; i < 5; i++) {
+                for (let i = 0; i < 3; i++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
@@ -18999,26 +19209,62 @@ Selection: ${val}`,
               if (beforeText) {
                 if (!currentAgentId) {
                   currentAgentId = "agent-" + Date.now();
-                  setMessages((prev) => [...prev, { id: currentAgentId, role: "agent", text: beforeText, isStreaming: true }]);
+                  const newMsg = { id: currentAgentId, role: "agent", text: beforeText, isStreaming: true };
+                  if (systemSettings.progressiveRendering) {
+                    typewriterQueueRef.current.push({ type: "create", msg: { ...newMsg, text: "" } });
+                    pushTokenText(currentAgentId, beforeText);
+                  } else {
+                    activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, newMsg];
+                  }
                 } else {
-                  setMessages((prev) => prev.map(
-                    (m) => m.id === currentAgentId ? { ...m, text: m.text + beforeText, isStreaming: true } : m
-                  ));
+                  if (systemSettings.progressiveRendering) {
+                    pushTokenText(currentAgentId, beforeText);
+                  } else {
+                    activeStreamMessagesRef.current = activeStreamMessagesRef.current.map(
+                      (m) => m.id === currentAgentId ? { ...m, text: m.text + beforeText, isStreaming: true } : m
+                    );
+                  }
+                }
+                if (!systemSettings.progressiveRendering) {
+                  setActiveStreamMessages([...activeStreamMessagesRef.current]);
                 }
               }
               inThinkMode = true;
               thinkConsumedInTurn = true;
               let thinkStartText = afterText.replace(/<(think|thought)>/gi, "");
               currentThinkId = "think-" + Date.now();
-              setMessages((prev) => [...prev, { id: currentThinkId, role: "think", text: thinkStartText, isStreaming: true, startTime: Date.now() }]);
+              const thinkMsg = { id: currentThinkId, role: "think", text: thinkStartText, isStreaming: true, startTime: Date.now() };
+              if (systemSettings.progressiveRendering) {
+                typewriterQueueRef.current.push({ type: "create", msg: { ...thinkMsg, text: "", startTime: Date.now() } });
+                if (thinkStartText) {
+                  pushTokenText(currentThinkId, thinkStartText);
+                }
+              } else {
+                activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, thinkMsg];
+                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+              }
               continue;
             }
             if ((chunkLower.includes("</think>") || chunkLower.includes("</thought>")) && currentThinkId) {
               const parts = chunkText.split(/<\/(think|thought)>/gi);
               const thinkPart = parts[0] || "";
               const agentPart = parts.slice(2).join("").replace(/<\/?(think|thought)>/gi, "");
-              setMessages((prev) => {
-                const newMsgs = prev.map((m) => {
+              inThinkMode = false;
+              currentAgentId = "agent-" + Date.now();
+              if (systemSettings.progressiveRendering) {
+                if (thinkPart) {
+                  pushTokenText(currentThinkId, thinkPart);
+                }
+                const startTime = parseInt(currentThinkId.split("-")[1]) || Date.now();
+                const duration = Date.now() - startTime;
+                typewriterQueueRef.current.push({ type: "finalize-think", id: currentThinkId, duration });
+                const newAgentMsg = { id: currentAgentId, role: "agent", text: "", isStreaming: true };
+                typewriterQueueRef.current.push({ type: "create", msg: newAgentMsg });
+                if (agentPart) {
+                  pushTokenText(currentAgentId, agentPart);
+                }
+              } else {
+                activeStreamMessagesRef.current = activeStreamMessagesRef.current.map((m) => {
                   if (m.id === currentThinkId && typeof m.id === "string") {
                     const startTime = m.startTime || parseInt(m.id.split("-")[1]) || Date.now();
                     const duration = Date.now() - startTime;
@@ -19026,40 +19272,56 @@ Selection: ${val}`,
                   }
                   return m;
                 });
-                inThinkMode = false;
-                currentAgentId = "agent-" + Date.now();
-                return [...newMsgs, { id: currentAgentId, role: "agent", text: agentPart, isStreaming: true }];
-              });
+                activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, { id: currentAgentId, role: "agent", text: agentPart, isStreaming: true }];
+                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+              }
               continue;
             }
             if (inThinkMode && currentThinkId) {
-              setMessages((prev) => {
-                const next = [...prev];
-                let transitioning = false;
-                let transitionContent = "";
-                for (let i = next.length - 1; i >= 0; i--) {
-                  if (next[i].id === currentThinkId) {
-                    const newText = next[i].text + chunkText;
+              let transitioning = false;
+              let transitionContent = "";
+              if (systemSettings.progressiveRendering) {
+                if (chunkText.toLowerCase().includes("</think>")) {
+                  transitioning = true;
+                  const parts = chunkText.split(/<\/think>/gi);
+                  const thinkPart = parts[0] || "";
+                  transitionContent = parts.slice(1).join("</think>") || "";
+                  if (thinkPart) pushTokenText(currentThinkId, thinkPart);
+                  const startTime = parseInt(currentThinkId.split("-")[1]) || Date.now();
+                  const duration = Date.now() - startTime;
+                  typewriterQueueRef.current.push({ type: "finalize-think", id: currentThinkId, duration });
+                  inThinkMode = false;
+                  currentAgentId = "agent-" + Date.now();
+                  typewriterQueueRef.current.push({ type: "create", msg: { id: currentAgentId, role: "agent", text: "", isStreaming: true } });
+                  if (transitionContent) {
+                    pushTokenText(currentAgentId, transitionContent.replace(/<\/?(think|thought)>/gi, ""));
+                  }
+                } else {
+                  pushTokenText(currentThinkId, chunkText);
+                }
+              } else {
+                activeStreamMessagesRef.current = activeStreamMessagesRef.current.map((m) => {
+                  if (m.id === currentThinkId) {
+                    const newText = m.text + chunkText;
                     if (newText.toLowerCase().includes("</think>")) {
                       transitioning = true;
                       const parts = newText.split(/<\/think>/gi);
                       transitionContent = parts.slice(1).join("</think>") || "";
-                      const startTime = next[i].startTime || parseInt(String(next[i].id).split("-")[1]) || Date.now();
+                      const startTime = m.startTime || parseInt(String(m.id).split("-")[1]) || Date.now();
                       const duration = Date.now() - startTime;
-                      next[i] = { ...next[i], text: parts[0], isStreaming: false, duration };
-                    } else {
-                      next[i] = { ...next[i], text: newText, isStreaming: true };
+                      return { ...m, text: parts[0], isStreaming: false, duration };
                     }
-                    break;
+                    return { ...m, text: newText, isStreaming: true };
                   }
-                }
+                  return m;
+                });
                 if (transitioning) {
                   inThinkMode = false;
                   currentAgentId = "agent-" + Date.now();
-                  next.push({ id: currentAgentId, role: "agent", text: transitionContent.replace(/<\/?(think|thought)>/gi, ""), isStreaming: true });
+                  activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, { id: currentAgentId, role: "agent", text: transitionContent.replace(/<\/?(think|thought)>/gi, ""), isStreaming: true }];
                 }
-                return next;
-              });
+                setActiveStreamMessages([...activeStreamMessagesRef.current]);
+              }
             } else if (!inThinkMode) {
               const chunkLower2 = chunkText.toLowerCase();
               if (!toolCallEncounteredInTurn && (chunkLower2.includes("tool:functions.") || chunkLower2.includes("agent:generalist."))) {
@@ -19067,91 +19329,69 @@ Selection: ${val}`,
               }
               if (!currentAgentId) {
                 currentAgentId = "agent-" + Date.now();
-                setMessages((prev) => [...prev, { id: currentAgentId, role: "agent", text: chunkText, isStreaming: true }]);
+                const newMsg = { id: currentAgentId, role: "agent", text: chunkText, isStreaming: true };
+                if (systemSettings.progressiveRendering) {
+                  typewriterQueueRef.current.push({ type: "create", msg: { ...newMsg, text: "" } });
+                  pushTokenText(currentAgentId, chunkText);
+                } else {
+                  activeStreamMessagesRef.current = [...activeStreamMessagesRef.current, newMsg];
+                  setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                }
               } else {
-                setMessages((prev) => {
-                  const next = [...prev];
+                if (systemSettings.progressiveRendering) {
+                  pushTokenText(currentAgentId, chunkText);
+                } else {
+                  const next = [...activeStreamMessagesRef.current];
                   for (let i = next.length - 1; i >= 0; i--) {
                     if (next[i].id === currentAgentId) {
                       next[i] = { ...next[i], text: next[i].text + chunkText, isStreaming: true };
                       break;
                     }
                   }
-                  return next;
-                });
+                  activeStreamMessagesRef.current = next;
+                  setActiveStreamMessages([...activeStreamMessagesRef.current]);
+                }
               }
             }
+          }
+          if (systemSettings.progressiveRendering) {
+            streamFinishedRef.current = true;
+          } else {
+            await finalizeTurn(apiStart);
           }
           const apiEnd = Date.now();
           setSessionApiTime((prev) => prev + (apiEnd - apiStart));
         } catch (err) {
+          if (typewriterIntervalRef.current) {
+            clearInterval(typewriterIntervalRef.current);
+            typewriterIntervalRef.current = null;
+          }
+          typewriterQueueRef.current = [];
           setMessages((prev) => {
             setCompletedIndex(prev.length + 1);
             return [...prev, { id: "error-" + Date.now(), role: "system", text: `\u274C ERROR: ${err.message}` }];
           });
         } finally {
-          setIsProcessing(false);
-          setStatusText(null);
-          setActiveTime(0);
-          clearInterval(interval_for_timer);
-          if (didSignalTerminationRef.current) {
-            appendCancelMessage();
-          }
-          clearBlocksCache();
-          if (global.gc) {
-            try {
-              for (let i = 0; i < 5; i++) {
-                global.gc();
-                await new Promise((resolve) => setImmediate(resolve));
-              }
-              lastGCTime = Date.now();
-            } catch (e) {
+          if (!systemSettings.progressiveRendering) {
+            setIsProcessing(false);
+            setStatusText(null);
+            setActiveTime(0);
+            clearInterval(activeTimeIntervalRef.current);
+            if (didSignalTerminationRef.current) {
+              appendCancelMessage();
             }
-          }
-          if (!hasFiredJanitor) {
-            if (process.stdout.isTTY) {
-              process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
-              process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow | Idle\x07");
-            }
-          }
-          if (queuedPromptRef.current) {
-            setResolutionData(queuedPromptRef.current);
-            setQueuedPrompt(null);
-            const hintToResolve = queuedPromptRef.current;
-            queuedPromptRef.current = null;
-            setMessages((prev) => {
-              const newMsgs = [...prev];
-              const hintMsg = newMsgs.reverse().find((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
-              if (hintMsg) {
-                if (hintMsg.text.includes("[STEERING HINT: QUEUED]")) {
-                  hintMsg.text = hintMsg.text.replace("[STEERING HINT: QUEUED]", "[STEERING HINT: FINISHED_TURN]");
-                } else if (hintMsg.text.includes("[QUESTION: QUEUED]")) {
-                  hintMsg.text = hintMsg.text.replace("[QUESTION: QUEUED]", "[QUESTION: FINISHED_TURN]");
+            clearBlocksCache();
+            if (global.gc) {
+              try {
+                for (let i = 0; i < 3; i++) {
+                  global.gc();
+                  await new Promise((resolve) => setImmediate(resolve));
                 }
+                lastGCTime = Date.now();
+              } catch (e) {
               }
-              return newMsgs.reverse();
-            });
-            setActiveView("resolution");
+            }
           }
-          setMessages((prev) => {
-            const totalDuration = Date.now() - apiStart;
-            let foundLastAgent = false;
-            const newMsgs = [...prev].reverse().map((m) => {
-              let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
-              if (updated.text) {
-                updated.text = (" " + updated.text).slice(1);
-              }
-              if (!foundLastAgent && updated.role === "agent") {
-                foundLastAgent = true;
-                updated = { ...updated, workedDuration: totalDuration };
-              }
-              return updated;
-            }).reverse();
-            const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && (!m.isMeta || m.text && m.text.includes("Request Cancelled")));
-            saveChat(chatId, null, historyToSave);
-            setCompletedIndex(newMsgs.length);
-            return newMsgs;
-          });
         }
       };
       streamChat();
@@ -19385,7 +19625,7 @@ Selection: ${val}`,
                 } else if (selectedProvider === "DeepSeek") {
                   defaultModel = "deepseek-v4-flash";
                 } else if (selectedProvider === "NVIDIA") {
-                  defaultModel = "moonshotai/kimi-k2.6";
+                  defaultModel = "stepfun-ai/step-3.7-flash";
                 }
                 setActiveModel(defaultModel);
                 const targetTier = (quotas.providerTiers || {})[selectedProvider] || "Free";
@@ -19713,7 +19953,7 @@ Selection: ${val}`,
                 } else if (prov === "DeepSeek") {
                   defaultModel = "deepseek-v4-flash";
                 } else if (prov === "NVIDIA") {
-                  defaultModel = "moonshotai/kimi-k2.6";
+                  defaultModel = "stepfun-ai/step-3.7-flash";
                 }
                 setActiveModel(defaultModel);
                 const targetTier = (quotas.providerTiers || {})[prov] || "Free";
