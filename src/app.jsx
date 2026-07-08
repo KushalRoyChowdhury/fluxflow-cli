@@ -504,6 +504,10 @@ export default function App({ args = [] }) {
     const [renderTick, setRenderTick] = useState(0);
     const forceRender = () => setRenderTick(t => t + 1);
 
+    // Typewriter effect refs
+    const typewriterQueueRef = useRef([]);
+    const typewriterTickRef = useRef(null);
+
     const commitActiveStreamingMessage = () => {
         if (activeStreamingMsgRef.current) {
             const msg = {
@@ -519,6 +523,72 @@ export default function App({ args = [] }) {
             activeStreamingMsgRef.current = null;
         }
     };
+
+    // ── Typewriter Effect ─────────────────────────────────────────────
+    // When progressiveRendering is ON, text chunks are queued and rendered gradually
+    // via a tick interval instead of appearing instantly.
+
+    const startTypewriter = () => {
+        if (typewriterTickRef.current) {
+            clearInterval(typewriterTickRef.current);
+        }
+        typewriterQueueRef.current = [];
+        typewriterTickRef.current = setInterval(() => {
+            const queue = typewriterQueueRef.current;
+            if (queue.length > 0 && activeStreamingMsgRef.current) {
+                // Adaptive batch size: catch up faster when queue grows deep
+                let batchSize = 2;
+                if (queue.length > 65) batchSize = 16;
+                else if (queue.length > 50) batchSize = 12;
+                else if (queue.length > 35) batchSize = 8;
+                else if (queue.length > 15) batchSize = 6;
+                else if (queue.length > 5) batchSize = 4;
+
+                let batchedText = '';
+                for (let i = 0; i < batchSize && queue.length > 0; i++) {
+                    batchedText += queue.shift();
+                }
+                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
+                forceRender();
+            }
+        }, 100); // [ANIMATION TICK]
+    };
+
+    const awaitTypewriter = async () => {
+        while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+    };
+
+    const flushTypewriterNow = () => {
+        const queue = typewriterQueueRef.current;
+        if (queue.length > 0 && activeStreamingMsgRef.current) {
+            const remaining = queue.join('');
+            queue.length = 0;
+            activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
+            forceRender();
+        }
+    };
+
+    // Queue text for typewriter or append directly when OFF
+    const appendStreamText = (chunkText) => {
+        if (systemSettings.progressiveRendering && typewriterTickRef.current) {
+            // Split into word tokens for smooth progressive appearance
+            const tokens = chunkText.split(/(\s+)/).filter(Boolean);
+            for (const tok of tokens) {
+                typewriterQueueRef.current.push(tok);
+            }
+        } else {
+            // Direct append (instant render)
+            if (!activeStreamingMsgRef.current) {
+                activeStreamingMsgRef.current = { id: 'agent-' + Date.now(), role: 'agent', text: flattenString(chunkText), isStreaming: true };
+            } else {
+                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + chunkText);
+            }
+            forceRender();
+        }
+    };
+    // ──────────────────────────────────────────────────────────────────
 
     useEffect(() => {
         const ideName = getIDEName();
@@ -3176,7 +3246,7 @@ export default function App({ args = [] }) {
                         const updatedPrev = prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m);
                         const newMsgs = [...updatedPrev, {
                             id: 'cancel-' + Date.now(),
-                            role: 'system',
+                            role: 'agent',
                             text: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m',
                             isMeta: false
                         }];
@@ -3439,6 +3509,9 @@ export default function App({ args = [] }) {
                         if (isFirstPacket && packet.type === 'text') {
                             apiStart = Date.now();
                             isFirstPacket = false;
+                            if (systemSettings.progressiveRendering) {
+                                startTypewriter();
+                            }
                         }
                         if (packet.type === 'status') {
 
@@ -3461,6 +3534,8 @@ export default function App({ args = [] }) {
                                 sendStatus(packet.content);
                             }
                             if (packet.content === 'Request Cancelled') {
+                                // Drain queued tokens into the current message so partial response is preserved
+                                flushTypewriterNow();
                                 commitActiveStreamingMessage();
                                 appendCancelMessage();
                             }
@@ -3491,6 +3566,10 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'turn_reset') {
+                            // Flush any queued typewriter text before resetting
+                            flushTypewriterNow();
+                            // Keep the tick alive — it will resume automatically when a new message ref is set
+
                             currentThinkId = null;
                             currentAgentId = null;
                             inThinkMode = false;
@@ -3565,6 +3644,8 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'visual_feedback') {
+                            // Flush typewriter queue so queued text appears before the feedback
+                            flushTypewriterNow();
                             commitActiveStreamingMessage();
                             setMessages(prev => {
                                 const newMsgs = [...prev, {
@@ -3735,14 +3816,15 @@ export default function App({ args = [] }) {
                                 }
                             }
 
+                            flushTypewriterNow();
                             commitActiveStreamingMessage();
 
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
                             let thinkStartText = afterText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
-                            activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: flattenString(thinkStartText), isStreaming: true, startTime: Date.now() };
-                            forceRender();
+                            activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() };
+                            appendStreamText(thinkStartText);
                             continue;
                         }
 
@@ -3756,12 +3838,13 @@ export default function App({ args = [] }) {
                             const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                             activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
+                            flushTypewriterNow();
                             commitActiveStreamingMessage();
 
                             inThinkMode = false;
                             currentAgentId = 'agent-' + Date.now();
-                            activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(agentPart), isStreaming: true };
-                            forceRender();
+                            activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
+                            appendStreamText(agentPart);
                             continue;
                         }
 
@@ -3777,15 +3860,16 @@ export default function App({ args = [] }) {
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                                 activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
+                                flushTypewriterNow();
                                 commitActiveStreamingMessage();
 
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
-                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(agentPart.replace(/<\/?(think|thought)>/gi, '')), isStreaming: true };
+                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
+                                appendStreamText(agentPart.replace(/<\/?(think|thought)>/gi, ''));
                             } else {
-                                activeStreamingMsgRef.current.text = flattenString(newText);
+                                appendStreamText(chunkText);
                             }
-                            forceRender();
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
@@ -3795,11 +3879,13 @@ export default function App({ args = [] }) {
 
                             if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
                                 currentAgentId = 'agent-' + Date.now();
+                                // Set initial text directly (first chunk should always appear instantly)
                                 activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: flattenString(chunkText), isStreaming: true };
+                                forceRender();
                             } else {
-                                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + chunkText);
+                                // Queue subsequent chunks (instant when OFF, progressive when ON)
+                                appendStreamText(chunkText);
                             }
-                            forceRender();
                         }
                     }
                     const apiEnd = Date.now();
@@ -3814,6 +3900,13 @@ export default function App({ args = [] }) {
                     const totalDuration = Date.now() - apiStart;
                     if (activeStreamingMsgRef.current) {
                         activeStreamingMsgRef.current.workedDuration = totalDuration;
+                    }
+
+                    // Let typewriter finish naturally — no rush, nothing else needs to render
+                    if (typewriterTickRef.current) {
+                        await awaitTypewriter();
+                        clearInterval(typewriterTickRef.current);
+                        typewriterTickRef.current = null;
                     }
 
                     setIsProcessing(false);

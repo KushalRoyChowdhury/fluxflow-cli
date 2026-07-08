@@ -326,7 +326,8 @@ var init_settings = __esm({
         useExternalData: false,
         externalDataPath: "",
         preserveThinking: true,
-        loadingPhrases: true
+        loadingPhrases: true,
+        progressiveRendering: false
       },
       profileData: {
         name: null,
@@ -4124,10 +4125,10 @@ var init_ChatLayout = __esm({
       tokenCache.set(cacheKey, tokens);
       return tokens;
     };
-    renderHighlightedLine = (line, lang, defaultColor = void 0) => {
-      if (!line) return /* @__PURE__ */ React4.createElement(Text4, null, " ");
+    renderHighlightedLine = (line, lang, defaultColor = void 0, defaultBgColor = void 0) => {
+      if (!line) return /* @__PURE__ */ React4.createElement(Text4, { backgroundColor: defaultBgColor }, " ");
       const tokens = tokenizeLine(line, lang);
-      return /* @__PURE__ */ React4.createElement(Text4, { color: defaultColor }, tokens.map((token, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: token.color || defaultColor, bold: token.bold }, token.text)));
+      return /* @__PURE__ */ React4.createElement(Text4, { color: defaultColor, backgroundColor: defaultBgColor }, tokens.map((token, idx) => /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: token.color || defaultColor, backgroundColor: defaultBgColor, bold: token.bold }, token.text)));
     };
     renderLatexText = (content, key) => {
       if (!content) return null;
@@ -4313,14 +4314,16 @@ var init_ChatLayout = __esm({
       const displayPrefix = isRemoval ? "-" : isAddition ? "+" : " ";
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
-          const blockColor = isRemoval ? "#ffdddd" : "#ddffdd";
+          const blockColor = isRemoval ? "#ff3333" : "#33ff66";
+          const textBgColor = isRemoval ? "#5a1818" : "#185a25";
           const wrappedLines = wrapText(content, columns - 15).split("\n");
-          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor))));
+          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor, textBgColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
           const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
+          const textBgColor = void 0;
           const wrappedLines = wrapText(content, columns - 15).split("\n");
-          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor))));
+          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor, textBgColor))));
         }
         return /* @__PURE__ */ React4.createElement(Text4, { wrap: "anywhere" }, words.map((part, idx) => {
           const isWhitespace = /^\s+$/.test(part.value);
@@ -4969,7 +4972,11 @@ var init_StatusBar = __esm({
         },
         /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "MEM: "), /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, isMemoryEnabled ? "ON" : "OFF"))),
         /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", italic: true }, truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", /* @__PURE__ */ React5.createElement(Text5, { dimColor: true }, (tokens / maxLimit * 100).toFixed(0), "%"))), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "PAID"))))
+        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", (() => {
+          const pct = tokens / maxLimit * 100;
+          const color = pct < 60 ? "white" : pct < 80 ? "yellow" : "red";
+          return /* @__PURE__ */ React5.createElement(Text5, { color, dimColor: true }, pct.toFixed(0), "%");
+        })())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "PAID"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -5205,7 +5212,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variable
 4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. Optional parameters default to false
+6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
@@ -5984,6 +5991,7 @@ function SettingsMenu({
           { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
+          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -6152,6 +6160,12 @@ function SettingsMenu({
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
+    } else if (item.value === "progressiveRendering") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, progressiveRendering: !s.progressiveRendering };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     }
   };
   return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: "gray", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", borderStyle: "round", borderColor: activeColumn === "categories" ? "white" : "grey", padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? "white" : "grey", bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
@@ -6188,7 +6202,7 @@ function SettingsMenu({
     currentItems.forEach((item, index) => {
       const isSelected = activeColumn === "items" && selectedItemIndex === index;
       const labelLength = item.label.length;
-      const dotsCount = Math.max(2, 35 - labelLength);
+      const dotsCount = Math.max(2, 38 - labelLength);
       const dots = ".".repeat(dotsCount);
       const getStatusColor = (item2) => {
         if (currentCatId === "security") {
@@ -6236,7 +6250,7 @@ function SettingsMenu({
     });
     if (currentCatId === "other") {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 15, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 14, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
       );
       elements.push(
         /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
@@ -9008,7 +9022,7 @@ var init_search_keyword = __esm({
         if (typeof global.gc === "function") {
           global.gc();
         }
-        const modeLabel = matchRegex ? isAutoRegex ? "(auto-regex mode)" : "(regex mode)" : matchSubstring ? "(subString mode)" : "";
+        const modeLabel = matchRegex ? isAutoRegex ? "(regex mode)" : "(keyword mode)" : matchSubstring ? "(subString mode)" : "";
         if (fileGroups.length === 0) {
           return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${modeLabel}`;
         }
@@ -12957,7 +12971,7 @@ ${boxMid}
         }
         let taggedContextStr = "";
         if (taggedContextBlocks.length > 0) {
-          taggedContextStr = "[TAGGED CONTEXT]\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED CONTEXT]\n";
+          taggedContextStr = "[TAGGED FILE CONTENTS] Auto Read, System Provided Context\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED FILE CONTENTS]\n";
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
@@ -12965,7 +12979,7 @@ OS: ${osDetected}
 CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : "\n"}${taggedContextStr}[USER PROMPT] ${cleanAgentText.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
@@ -13011,7 +13025,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 [SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
 [QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
                 }
               } else {
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
@@ -13019,7 +13033,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 
 [STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
                 }
               }
               yield { type: "status", content: `${hint.startsWith("/btw") ? "Question Forwarded..." : "Steering Hint Injected..."}` };
@@ -14961,8 +14975,8 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
 
 [SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
 `, "").replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
-**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
-`, "").replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+`, "").replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
 `, "");
             if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
               const jitInstructionFast = `
@@ -15020,7 +15034,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
         "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
         "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
-        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="true/false optional")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. Optional parameters default to false`,
+        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect`,
         "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
@@ -15112,17 +15126,20 @@ ${cleanResponse}
           } else if (normalizedToolName === "web_scrape" || normalizedToolName === "webscrape") {
             label = `\u2714 \x1B[95mScraped\x1B[0m`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
-            label = `\u2714 \x1B[95mRead File\x1B[0m`;
+            const path23 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mRead File\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
-            label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m`;
+            const path23 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path23 = parseArgs(toolCall.args).path || "...";
+            const path23 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path23 = parseArgs(toolCall.args).path || "...";
+            const path23 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
-            label = `\u2714 \x1B[95mIndexed\x1B[0m`;
+            const path23 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mIndexed\x1B[0m: ${path23}`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;
@@ -16166,6 +16183,8 @@ function App({ args = [] }) {
   const activeStreamingMsgRef = useRef4(null);
   const [renderTick, setRenderTick] = useState15(0);
   const forceRender = () => setRenderTick((t) => t + 1);
+  const typewriterQueueRef = useRef4([]);
+  const typewriterTickRef = useRef4(null);
   const commitActiveStreamingMessage = () => {
     if (activeStreamingMsgRef.current) {
       const msg = {
@@ -16179,6 +16198,58 @@ function App({ args = [] }) {
         return next;
       });
       activeStreamingMsgRef.current = null;
+    }
+  };
+  const startTypewriter = () => {
+    if (typewriterTickRef.current) {
+      clearInterval(typewriterTickRef.current);
+    }
+    typewriterQueueRef.current = [];
+    typewriterTickRef.current = setInterval(() => {
+      const queue = typewriterQueueRef.current;
+      if (queue.length > 0 && activeStreamingMsgRef.current) {
+        let batchSize = 2;
+        if (queue.length > 65) batchSize = 16;
+        else if (queue.length > 50) batchSize = 12;
+        else if (queue.length > 35) batchSize = 8;
+        else if (queue.length > 15) batchSize = 6;
+        else if (queue.length > 5) batchSize = 4;
+        let batchedText = "";
+        for (let i = 0; i < batchSize && queue.length > 0; i++) {
+          batchedText += queue.shift();
+        }
+        activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
+        forceRender();
+      }
+    }, 100);
+  };
+  const awaitTypewriter = async () => {
+    while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  };
+  const flushTypewriterNow = () => {
+    const queue = typewriterQueueRef.current;
+    if (queue.length > 0 && activeStreamingMsgRef.current) {
+      const remaining = queue.join("");
+      queue.length = 0;
+      activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
+      forceRender();
+    }
+  };
+  const appendStreamText = (chunkText) => {
+    if (systemSettings.progressiveRendering && typewriterTickRef.current) {
+      const tokens = chunkText.split(/(\s+)/).filter(Boolean);
+      for (const tok of tokens) {
+        typewriterQueueRef.current.push(tok);
+      }
+    } else {
+      if (!activeStreamingMsgRef.current) {
+        activeStreamingMsgRef.current = { id: "agent-" + Date.now(), role: "agent", text: flattenString(chunkText), isStreaming: true };
+      } else {
+        activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + chunkText);
+      }
+      forceRender();
     }
   };
   useEffect12(() => {
@@ -18596,7 +18667,7 @@ ${timestamp}` };
             const updatedPrev = prev.map((m) => m.isStreaming ? { ...m, isStreaming: false } : m);
             const newMsgs = [...updatedPrev, {
               id: "cancel-" + Date.now(),
-              role: "system",
+              role: "agent",
               text: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m",
               isMeta: false
             }];
@@ -18834,6 +18905,9 @@ Selection: ${val}`,
             if (isFirstPacket && packet.type === "text") {
               apiStart = Date.now();
               isFirstPacket = false;
+              if (systemSettings.progressiveRendering) {
+                startTypewriter();
+              }
             }
             if (packet.type === "status") {
               if (!packet.content?.includes("[start]")) {
@@ -18853,6 +18927,7 @@ Selection: ${val}`,
                 sendStatus(packet.content);
               }
               if (packet.content === "Request Cancelled") {
+                flushTypewriterNow();
                 commitActiveStreamingMessage();
                 appendCancelMessage();
               }
@@ -18881,6 +18956,7 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "turn_reset") {
+              flushTypewriterNow();
               currentThinkId = null;
               currentAgentId = null;
               inThinkMode = false;
@@ -18936,6 +19012,7 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "visual_feedback") {
+              flushTypewriterNow();
               commitActiveStreamingMessage();
               setMessages((prev) => {
                 const newMsgs = [...prev, {
@@ -19091,13 +19168,14 @@ Selection: ${val}`,
                   activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + beforeText);
                 }
               }
+              flushTypewriterNow();
               commitActiveStreamingMessage();
               inThinkMode = true;
               thinkConsumedInTurn = true;
               let thinkStartText = afterText.replace(/<(think|thought)>/gi, "");
               currentThinkId = "think-" + Date.now();
-              activeStreamingMsgRef.current = { id: currentThinkId, role: "think", text: flattenString(thinkStartText), isStreaming: true, startTime: Date.now() };
-              forceRender();
+              activeStreamingMsgRef.current = { id: currentThinkId, role: "think", text: "", isStreaming: true, startTime: Date.now() };
+              appendStreamText(thinkStartText);
               continue;
             }
             if ((chunkLower.includes("</think>") || chunkLower.includes("</thought>")) && activeStreamingMsgRef.current?.role === "think") {
@@ -19107,11 +19185,12 @@ Selection: ${val}`,
               activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + thinkPart);
               const startTime = activeStreamingMsgRef.current.startTime || Date.now();
               activeStreamingMsgRef.current.duration = Date.now() - startTime;
+              flushTypewriterNow();
               commitActiveStreamingMessage();
               inThinkMode = false;
               currentAgentId = "agent-" + Date.now();
-              activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: flattenString(agentPart), isStreaming: true };
-              forceRender();
+              activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: "", isStreaming: true };
+              appendStreamText(agentPart);
               continue;
             }
             if (inThinkMode && activeStreamingMsgRef.current?.role === "think") {
@@ -19123,14 +19202,15 @@ Selection: ${val}`,
                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                 activeStreamingMsgRef.current.duration = Date.now() - startTime;
+                flushTypewriterNow();
                 commitActiveStreamingMessage();
                 inThinkMode = false;
                 currentAgentId = "agent-" + Date.now();
-                activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: flattenString(agentPart.replace(/<\/?(think|thought)>/gi, "")), isStreaming: true };
+                activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: "", isStreaming: true };
+                appendStreamText(agentPart.replace(/<\/?(think|thought)>/gi, ""));
               } else {
-                activeStreamingMsgRef.current.text = flattenString(newText);
+                appendStreamText(chunkText);
               }
-              forceRender();
             } else if (!inThinkMode) {
               const chunkLower2 = chunkText.toLowerCase();
               if (!toolCallEncounteredInTurn && (chunkLower2.includes("tool:functions.") || chunkLower2.includes("agent:generalist."))) {
@@ -19139,10 +19219,10 @@ Selection: ${val}`,
               if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== "agent") {
                 currentAgentId = "agent-" + Date.now();
                 activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: flattenString(chunkText), isStreaming: true };
+                forceRender();
               } else {
-                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + chunkText);
+                appendStreamText(chunkText);
               }
-              forceRender();
             }
           }
           const apiEnd = Date.now();
@@ -19156,6 +19236,11 @@ Selection: ${val}`,
           const totalDuration = Date.now() - apiStart;
           if (activeStreamingMsgRef.current) {
             activeStreamingMsgRef.current.workedDuration = totalDuration;
+          }
+          if (typewriterTickRef.current) {
+            await awaitTypewriter();
+            clearInterval(typewriterTickRef.current);
+            typewriterTickRef.current = null;
           }
           setIsProcessing(false);
           setStatusText(null);

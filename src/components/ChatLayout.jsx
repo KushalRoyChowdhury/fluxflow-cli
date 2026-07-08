@@ -162,13 +162,13 @@ const tokenizeLine = (line, lang) => {
     return tokens;
 };
 
-const renderHighlightedLine = (line, lang, defaultColor = undefined) => {
-    if (!line) return <Text>{' '}</Text>;
+const renderHighlightedLine = (line, lang, defaultColor = undefined, defaultBgColor = undefined) => {
+    if (!line) return <Text backgroundColor={defaultBgColor}>{' '}</Text>;
     const tokens = tokenizeLine(line, lang);
     return (
-        <Text color={defaultColor}>
+        <Text color={defaultColor} backgroundColor={defaultBgColor}>
             {tokens.map((token, idx) => (
-                <Text key={idx} color={token.color || defaultColor} bold={token.bold}>
+                <Text key={idx} color={token.color || defaultColor} backgroundColor={defaultBgColor} bold={token.bold}>
                     {token.text}
                 </Text>
             ))}
@@ -485,13 +485,14 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     const renderInlineDiff = () => {
         // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
-            const blockColor = isRemoval ? '#ffdddd' : '#ddffdd';
+            const blockColor = isRemoval ? '#ff3333' : '#33ff66';
+            const textBgColor = isRemoval ? '#5a1818' : '#185a25';
             const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
                     {wrappedLines.map((wl, idx) => (
                         <Box key={idx}>
-                            {renderHighlightedLine(wl, extension, blockColor)}
+                            {renderHighlightedLine(wl, extension, blockColor, textBgColor)}
                         </Box>
                     ))}
                 </Box>
@@ -501,12 +502,13 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
             const textColor = isRemoval ? '#885555' : (isAddition ? '#558866' : 'gray');
+            const textBgColor = undefined;
             const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
                     {wrappedLines.map((wl, idx) => (
                         <Box key={idx}>
-                            {renderHighlightedLine(wl, extension, textColor)}
+                            {renderHighlightedLine(wl, extension, textColor, textBgColor)}
                         </Box>
                     ))}
                 </Box>

@@ -2501,12 +2501,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let taggedContextStr = '';
         if (taggedContextBlocks.length > 0) {
-            taggedContextStr = '[TAGGED CONTEXT]\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED CONTEXT]\n';
+            taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read, System Provided Context\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
         }
 
         const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}${taggedContextStr}[USER] ${cleanAgentText.trim()} [/USER]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : '\n'}${taggedContextStr}[USER PROMPT] ${cleanAgentText.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -2564,14 +2564,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                             modifiedHistory[modifiedHistory.length - 1].text += `\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]`;
                         } else {
-                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
                         }
                     } else {
                         // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                             modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
                         } else {
-                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
                         }
                     }
                     yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
@@ -4721,8 +4721,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 // Clean up JIT question injection markers
                 msg.text = msg.text
                     .replace(`\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n`, '')
-                    .replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
-                    .replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS CRITICAL PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '');
+                    .replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
+                    .replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '');
 
                 if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google" && msg.text.startsWith('[TOOL RESULT]')) {
                     const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
@@ -4876,25 +4876,28 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
             }
 
             else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
-                label = `✔ \x1b[95mRead File\x1b[0m`;
+                const path = parseArgs(toolCall.args).path || '';
+                label = `✔ \x1b[95mRead File\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
-                label = `✔ \x1b[95mBrowsed Folder\x1b[0m`;
+                const path = parseArgs(toolCall.args).path || '';
+                label = `✔ \x1b[95mBrowsed Folder\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
-                const path = parseArgs(toolCall.args).path || '...';
+                const path = parseArgs(toolCall.args).path || '';
                 label = `✔ \x1b[95mFile Created\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
-                const path = parseArgs(toolCall.args).path || '...';
+                const path = parseArgs(toolCall.args).path || '';
                 label = `✔ \x1b[95mFile Edited\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {
-                label = `✔ \x1b[95mIndexed\x1b[0m`;
+                const path = parseArgs(toolCall.args).path || '';
+                label = `✔ \x1b[95mIndexed\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'await') {
