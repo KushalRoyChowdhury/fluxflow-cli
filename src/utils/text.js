@@ -168,7 +168,7 @@ export const applyPatches = (content, patches) => {
         // with mixed nesting depths (e.g. GCD(4,6,8) = 2, not 4).
         const firstNonEmpty = (text) => text.split('\n').find(l => l.trim() !== '') ?? '';
         const origFirstIndent = firstNonEmpty(originalMatch).match(/^\s*/)[0].length;
-        const newFirstIndent  = firstNonEmpty(newText).match(/^\s*/)[0].length;
+        const newFirstIndent = firstNonEmpty(newText).match(/^\s*/)[0].length;
 
         // Raw character delta: positive = need to add indent, negative = need to remove
         const delta = origFirstIndent - newFirstIndent;
@@ -548,7 +548,7 @@ const indexBlockIntoMap = (b, map) => {
 
 export const parseMessageToBlocks = (msg, columns) => {
     if (!msg) return { completed: [], active: [] };
-    const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}-${msg.workedDuration || 0}-${msg.memoryUpdated ? 1 : 0}-${msg.color || ''}`;
+    const cacheKey = `${msg.id}-${msg.text?.length || 0}-${columns}-${msg.isStreaming}`;
     if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
     }
@@ -903,7 +903,7 @@ export const cleanSignals = (text) => {
             const lowerResult = result.toLowerCase();
             let triggerIdx = lowerResult.indexOf(trigger);
             let subagentIdx = lowerResult.indexOf(subagentTrigger);
-            
+
             let currentTrigger = trigger;
             let triggerIdxToUse = triggerIdx;
             if (triggerIdx === -1 || (subagentIdx !== -1 && subagentIdx < triggerIdx)) {

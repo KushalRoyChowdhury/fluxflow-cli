@@ -149,7 +149,6 @@ export default function SettingsMenu({
                     { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') },
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Loading Phrases', value: 'loadingPhrases', status: systemSettings.loadingPhrases !== false ? 'ON' : 'OFF' },
-                    { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ]; default:
                 return [];
@@ -322,12 +321,6 @@ export default function SettingsMenu({
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
-        } else if (item.value === 'progressiveRendering') {
-            setSystemSettings(s => {
-                const newSysSettings = { ...s, progressiveRendering: !s.progressiveRendering };
-                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
-                return newSysSettings;
-            });
         }
     };
 
@@ -393,7 +386,7 @@ export default function SettingsMenu({
                                 const isSelected = activeColumn === 'items' && selectedItemIndex === index;
                                 // Calculate padding to align statuses perfectly
                                 const labelLength = item.label.length;
-                                const dotsCount = Math.max(2, 38 - labelLength);
+                                const dotsCount = Math.max(2, 35 - labelLength);
                                 const dots = '.'.repeat(dotsCount);
 
                                 const getStatusColor = (item) => {
@@ -472,7 +465,7 @@ export default function SettingsMenu({
 
                             if (currentCatId === 'other') {
                                 elements.push(
-                                    <Box key="pty-notice" marginTop={14} paddingX={1}>
+                                    <Box key="pty-notice" marginTop={15} paddingX={1}>
                                         <Text color="white">
                                             {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
                                         </Text>

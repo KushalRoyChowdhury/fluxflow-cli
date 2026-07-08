@@ -33,8 +33,7 @@ const DEFAULT_SETTINGS = {
         useExternalData: false,
         externalDataPath: '',
         preserveThinking: true,
-        loadingPhrases: true,
-        progressiveRendering: false
+        loadingPhrases: true
     },
     profileData: {
         name: null,
