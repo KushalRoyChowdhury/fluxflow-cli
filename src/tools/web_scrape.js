@@ -104,16 +104,16 @@ export const web_scrape = async (args) => {
                 .replace(/\s+/g, ' ')      // Collapse whitespace
                 .replace(/>\s+</g, '><')   // Remove space between tags
                 .trim()
-                .substring(0, 30000);     // Increased limit for rich HTML context
+                .substring(0, 50000);     // Increased limit for rich HTML context
 
             // // Log for audit
             // const toolLogDir = path.join(LOGS_DIR, 'tools');
             // if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            // fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toLocaleString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
+            // fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toLocaleString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
 
             await browser.close();
             // fs.writeFileSync('scraped.html', cleanedHtml);
-            return `CLEANED HTML FROM [${url}]:\n\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 30K CHARS]' : ''}`;
+            return `CLEANED HTML FROM [${url}]:\n\n${cleanedHtml}${htmlContent.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`;
 
         } catch (err) {
             lastError = err;

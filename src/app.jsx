@@ -5553,7 +5553,7 @@ export default function App({ args = [] }) {
                                         <GlintText
                                             text={statusText.trimEnd()}
                                             baseColor="#B5B8D9"
-                                            glintColor="#BFD4DB"
+                                            glintColor="#D4DEE7"
                                             // glintColor="#D7D1E6"
                                             speed={60}
                                             italic={true}

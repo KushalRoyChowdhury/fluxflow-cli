@@ -1139,7 +1139,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             if (mem.score === undefined) {
                                 mem.score = 0.5;
                             }
-                            mem.score *= 0.9995; // 0.05% decay when no memory is referenced
+                            mem.score *= 0.99995; // 0.005% decay when no memory is referenced
                             if (mem.score < 0.05) mem.score = 0.0; // Cutoff cliff edge
 
                             mem.score = Math.round(mem.score * 100000) / 100000;

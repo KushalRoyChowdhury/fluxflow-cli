@@ -5226,7 +5226,7 @@ Info: 'initial' = user prompted for THIS active task, revert 'id' should be a tu
 Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
-1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure. No terminal access
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT ONLY IF ITS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
@@ -8202,11 +8202,11 @@ var init_web_scrape = __esm({
             return document.body.innerHTML;
           });
           if (!htmlContent) throw new Error("EMPTY_RENDER_RESULT");
-          const cleanedHtml = htmlContent.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim().substring(0, 3e4);
+          const cleanedHtml = htmlContent.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim().substring(0, 5e4);
           await browser.close();
           return `CLEANED HTML FROM [${url}]:
 
-${cleanedHtml}${htmlContent.length > 3e4 ? "\n\n[TRUNCATED AT 30K CHARS]" : ""}`;
+${cleanedHtml}${htmlContent.length > 5e4 ? "\n\n[TRUNCATED AT 50K CHARS]" : ""}`;
         } catch (err) {
           lastError = err;
           if (browser) await browser.close();
@@ -11715,7 +11715,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   if (mem.score === void 0) {
                     mem.score = 0.5;
                   }
-                  mem.score *= 0.9995;
+                  mem.score *= 0.99995;
                   if (mem.score < 0.05) mem.score = 0;
                   mem.score = Math.round(mem.score * 1e5) / 1e5;
                   if (mem.score > 0) {
@@ -20397,7 +20397,7 @@ Selection: ${val}`,
           {
             text: statusText.trimEnd(),
             baseColor: "#B5B8D9",
-            glintColor: "#BFD4DB",
+            glintColor: "#D4DEE7",
             speed: 60,
             italic: true,
             glintWidth: 2,
