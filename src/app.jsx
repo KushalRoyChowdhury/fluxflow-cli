@@ -3332,6 +3332,8 @@ export default function App({ args = [] }) {
                                 setActiveSubagents(subagentProgress.map(sa => ({ ...sa })));
                             },
                             onExecStart: (cmd) => {
+                                flushTypewriterNow();
+                                commitActiveStreamingMessage();
                                 setActiveCommand(cmd);
                                 setExecOutput('');
                             },
@@ -3406,6 +3408,8 @@ export default function App({ args = [] }) {
                                 });
                             },
                             onAskUser: async (question, options) => {
+                                flushTypewriterNow();
+                                commitActiveStreamingMessage();
                                 return new Promise((resolve) => {
                                     let resolvedFlag = false;
                                     setPendingAsk({
@@ -3660,6 +3664,8 @@ export default function App({ args = [] }) {
                             continue;
                         }
                         if (packet.type === 'exec_start') {
+                            flushTypewriterNow();
+                            commitActiveStreamingMessage();
                             continue; // Yield consumed just to trigger React render loop
                         }
                         if (packet.type === 'liveTokens') {

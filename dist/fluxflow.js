@@ -18791,6 +18791,8 @@ ${timestamp}` };
                 setActiveSubagents(subagentProgress.map((sa) => ({ ...sa })));
               },
               onExecStart: (cmd) => {
+                flushTypewriterNow();
+                commitActiveStreamingMessage();
                 setActiveCommand(cmd);
                 setExecOutput("");
               },
@@ -18858,6 +18860,8 @@ ${timestamp}` };
                 });
               },
               onAskUser: async (question, options) => {
+                flushTypewriterNow();
+                commitActiveStreamingMessage();
                 return new Promise((resolve) => {
                   let resolvedFlag = false;
                   setPendingAsk({
@@ -19075,6 +19079,8 @@ Selection: ${val}`,
               continue;
             }
             if (packet.type === "exec_start") {
+              flushTypewriterNow();
+              commitActiveStreamingMessage();
               continue;
             }
             if (packet.type === "liveTokens") {
