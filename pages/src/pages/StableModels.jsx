@@ -112,7 +112,7 @@ export default function StableModels() {
                     </thead>
                     <tbody>
                         <tr>
-                            <td><code>moonshotai/kimi-k2.6</code></td>
+                            <td><code>moonshotai/kimi-k2.7 [COMING SOON]</code></td>
                             <td>Multimodal</td>
                         </tr>
 
@@ -159,7 +159,7 @@ export default function StableModels() {
                         </tr>
 
                         <tr>
-                            <td><code>z-ai/glm-5.1</code></td>
+                            <td><code>z-ai/glm-5.2</code></td>
                             <td>Text Only</td>
                         </tr>
 

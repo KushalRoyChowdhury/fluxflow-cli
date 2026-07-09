@@ -5,6 +5,7 @@ import { TerminalBox } from './TerminalBox.jsx';
 import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup, flattenString } from '../utils/text.js';
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
+import { isAbsolute } from 'path';
 
 const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
     return targetText;
@@ -681,7 +682,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                 <Box
                     flexDirection="column"
                     borderStyle="single"
-                    borderLeft={true}
+                    borderLeft={false}
                     borderRight={false}
                     borderTop={false}
                     borderBottom={false}
@@ -753,7 +754,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                 paddingRight={0}
                                 width="100%"
                             >
-                                <Box marginBottom={1}>
+                                <Box>
                                     <Text color="gray" bold>▶_ {lang.toUpperCase() || 'CODE'}</Text>
                                 </Box>
                                 <Box flexDirection="column" width="100%">
@@ -1057,6 +1058,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         return msg.isStreaming ? content : content.trimEnd();
     }, [content, msg.role, showFullThinking, msg.isStreaming]);
 
+    if (msg.role === 'agent' && finalContent.trim() === '') {
+        return null;
+    }
+
     return (
         // [SPACE POINT]
         <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
@@ -1235,7 +1240,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
 
     if (type === 'agent-line') {
         if (!text || text.trim() === '') {
-            return <Box height={1} />;
+            return null;
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return (
@@ -1360,7 +1365,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 flexDirection="row"
                 width={columns}
                 borderStyle="single"
-                borderLeft={true}
+                borderLeft={false}
                 borderRight={false}
                 borderTop={false}
                 borderBottom={false}
@@ -1386,7 +1391,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     flexDirection="row"
                     width={columns}
                     borderStyle="single"
-                    borderLeft={true}
+                    borderLeft={false}
                     borderRight={false}
                     borderTop={false}
                     borderBottom={false}

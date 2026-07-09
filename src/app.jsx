@@ -3271,37 +3271,97 @@ export default function App({ args = [] }) {
                         );
 
                     const cleanHistoryForAI = [];
-                    rawHistory.forEach((m, idx) => {
-                        let text = m.fullText || m.text;
-                        // Strip metadata from older user messages
+                    const preprocessed = rawHistory.map((m, idx) => {
+                        let text = m.fullText || m.text || '';
                         if (m.role === 'user' && idx < rawHistory.length - 1) {
                             if (text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
-                                const summaryIndex = text.indexOf('[SYSTEM METADATA (PRIORITY: DYNAMIC)]');
+                                const summaryIndex = text.indexOf('**CONTEXT SUMMARY OF PREVIOUS TURNS');
                                 if (summaryIndex !== -1) {
-                                    text = text.substring(summaryIndex).trim();
+                                    const prefix = text.substring(0, summaryIndex);
+                                    const metadataIndex = prefix.lastIndexOf('[SYSTEM METADATA]');
+                                    if (metadataIndex !== -1) {
+                                        text = text.substring(metadataIndex).trim();
+                                    } else {
+                                        text = text.substring(summaryIndex).trim();
+                                    }
                                 }
                             } else {
                                 const userIndex = text.lastIndexOf('[USER]');
+                                const userPromptIndex = text.lastIndexOf('[USER PROMPT]');
                                 if (userIndex !== -1) {
                                     text = text.substring(userIndex + 6).trim();
+                                } else if (userPromptIndex !== -1) {
+                                    text = text.substring(userPromptIndex).trim();
                                 }
                             }
                         }
+                        return { ...m, text };
+                    });
 
-                        // Group consecutive tool results
-                        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
-                            const prev = cleanHistoryForAI[cleanHistoryForAI.length - 1];
-                            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
-                                prev.text += '\n\n' + text;
-                                return;
+                    let i = 0;
+                    while (i < preprocessed.length) {
+                        const msg = preprocessed[i];
+                        if (msg.role === 'user') {
+                            cleanHistoryForAI.push(msg);
+                            i++;
+                        } else {
+                            const turnMessages = [];
+                            while (i < preprocessed.length && preprocessed[i].role !== 'user') {
+                                turnMessages.push(preprocessed[i]);
+                                i++;
+                            }
+
+                            const toolCalls = [];
+                            const toolResults = [];
+                            const finalResponses = [];
+
+                            turnMessages.forEach(tm => {
+                                const textLower = (tm.text || '').toLowerCase();
+                                const hasTool = textLower.includes('tool:functions.') || textLower.includes('agent:generalist.');
+                                const isResult = tm.role === 'system' && (
+                                    tm.text?.startsWith('[TOOL RESULT]') ||
+                                    tm.text?.startsWith('SUCCESS:') ||
+                                    tm.text?.startsWith('ERROR:') ||
+                                    tm.text?.startsWith('[TERMINAL_RECORD]') ||
+                                    tm.isTerminalRecord
+                                );
+
+                                if (tm.role === 'agent') {
+                                    if (hasTool) {
+                                        toolCalls.push(tm.text);
+                                    } else {
+                                        finalResponses.push(tm.text);
+                                    }
+                                } else if (isResult) {
+                                    toolResults.push(tm.text);
+                                } else {
+                                    finalResponses.push(tm.text);
+                                }
+                            });
+
+                            if (toolCalls.length > 0) {
+                                cleanHistoryForAI.push({
+                                    role: 'agent',
+                                    text: toolCalls.map(tc => tc.trim()).filter(Boolean).join('\n')
+                                });
+                            }
+                            if (toolResults.length > 0) {
+                                cleanHistoryForAI.push({
+                                    role: 'system',
+                                    text: toolResults.map(tr => {
+                                        const trimmed = tr.trim();
+                                        return trimmed.startsWith('[TOOL RESULT]') ? trimmed : `[TOOL RESULT]: ${trimmed}`;
+                                    }).filter(Boolean).join('\n\n')
+                                });
+                            }
+                            if (finalResponses.length > 0) {
+                                cleanHistoryForAI.push({
+                                    role: 'agent',
+                                    text: finalResponses.map(fr => fr.trim()).filter(Boolean).join('\n\n')
+                                });
                             }
                         }
-
-                        cleanHistoryForAI.push({
-                            ...m,
-                            text
-                        });
-                    });
+                    }
                     const stream = getAIStream(
                         activeModel,
                         cleanHistoryForAI,

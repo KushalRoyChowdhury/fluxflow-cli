@@ -95,26 +95,94 @@ export const isModelMultimodal = (model) => {
 };
 
 export const getCleanGroupedLength = (rawHistory) => {
-    const cleanHistory = [];
-    rawHistory.forEach((m) => {
-        const isCleanMsg = (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
+    const preprocessed = rawHistory
+        .filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') &&
             m.role !== 'think' &&
             !m.isVisualFeedback &&
             !m.isMeta &&
-            !String(m.id).startsWith('welcome');
-        if (!isCleanMsg) return;
+            !String(m.id).startsWith('welcome')
+        )
+        .map((m, idx, arr) => {
+            let text = m.fullText || m.text || '';
+            if (m.role === 'user' && idx < arr.length - 1) {
+                if (text.includes('**CONTEXT SUMMARY OF PREVIOUS TURNS')) {
+                    const summaryIndex = text.indexOf('**CONTEXT SUMMARY OF PREVIOUS TURNS');
+                    if (summaryIndex !== -1) {
+                        const prefix = text.substring(0, summaryIndex);
+                        const metadataIndex = prefix.lastIndexOf('[SYSTEM METADATA]');
+                        if (metadataIndex !== -1) {
+                            text = text.substring(metadataIndex).trim();
+                        } else {
+                            text = text.substring(summaryIndex).trim();
+                        }
+                    }
+                } else {
+                    const userIndex = text.lastIndexOf('[USER]');
+                    const userPromptIndex = text.lastIndexOf('[USER PROMPT]');
+                    if (userIndex !== -1) {
+                        text = text.substring(userIndex + 6).trim();
+                    } else if (userPromptIndex !== -1) {
+                        text = text.substring(userPromptIndex).trim();
+                    }
+                }
+            }
+            return { ...m, text };
+        });
 
-        let text = m.fullText || m.text || '';
-        if (m.role === 'system' && text?.startsWith('[TOOL RESULT]')) {
-            const prev = cleanHistory[cleanHistory.length - 1];
-            if (prev && prev.role === 'system' && prev.text?.startsWith('[TOOL RESULT]')) {
-                prev.text += '\n\n' + text;
-                return;
+    const cleanHistoryForAI = [];
+    let i = 0;
+    while (i < preprocessed.length) {
+        const msg = preprocessed[i];
+        if (msg.role === 'user') {
+            cleanHistoryForAI.push(msg);
+            i++;
+        } else {
+            const turnMessages = [];
+            while (i < preprocessed.length && preprocessed[i].role !== 'user') {
+                turnMessages.push(preprocessed[i]);
+                i++;
+            }
+
+            const toolCalls = [];
+            const toolResults = [];
+            const finalResponses = [];
+
+            turnMessages.forEach(tm => {
+                const textLower = (tm.text || '').toLowerCase();
+                const hasTool = textLower.includes('tool:functions.') || textLower.includes('agent:generalist.');
+                const isResult = tm.role === 'system' && (
+                    tm.text?.startsWith('[TOOL RESULT]') ||
+                    tm.text?.startsWith('SUCCESS:') ||
+                    tm.text?.startsWith('ERROR:') ||
+                    tm.text?.startsWith('[TERMINAL_RECORD]') ||
+                    tm.isTerminalRecord
+                );
+
+                if (tm.role === 'agent') {
+                    if (hasTool) {
+                        toolCalls.push(tm.text);
+                    } else {
+                        finalResponses.push(tm.text);
+                    }
+                } else if (isResult) {
+                    toolResults.push(tm.text);
+                } else {
+                    finalResponses.push(tm.text);
+                }
+            });
+
+            if (toolCalls.length > 0) {
+                cleanHistoryForAI.push({ role: 'agent', text: 'combined' });
+            }
+            if (toolResults.length > 0) {
+                cleanHistoryForAI.push({ role: 'system', text: 'combined' });
+            }
+            if (finalResponses.length > 0) {
+                cleanHistoryForAI.push({ role: 'agent', text: 'combined' });
             }
         }
-        cleanHistory.push({ ...m, text });
-    });
-    return cleanHistory.length;
+    }
+    return cleanHistoryForAI.length;
 };
 
 
@@ -2403,7 +2471,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let taggedContextBlocks = [];
         let attachedBinaryPart = null;
 
-        for (const tag of tagsFound) {
+        for (let tIdx = 0; tIdx < tagsFound.length; tIdx++) {
+            const tag = tagsFound[tIdx];
             try {
                 let tagClean = tag.trim().replace(/^["']|["']$/g, '');
                 const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
@@ -2438,11 +2507,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const boxLines = [label];
                             const maxLen = Math.max(...boxLines.map(l => l.length));
                             const boxWidth = Math.min(maxLen + 4, terminalWidth);
-                            const boxTop = `${' '.repeat(boxWidth)}`;
                             const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
-                            // console.log(boxMid) // This not executing
-                            const boxBottom = `${' '.repeat(boxWidth)}`;
-                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                            const isFirst = tIdx === 0;
+                            const isLast = tIdx === tagsFound.length - 1;
+                            yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
                             // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                             continue;
                         }
@@ -2504,8 +2572,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const maxLen = Math.max(...boxLines.map(l => l.length));
                                 const boxWidth = Math.min(maxLen + 4, terminalWidth);
                                 const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
-                                const boxBottom = `${' '.repeat(boxWidth)}`;
-                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                                const isFirst = tIdx === 0;
+                                const isLast = tIdx === tagsFound.length - 1;
+                                yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
                                 // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
                                 // const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
                                 // const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
@@ -3487,9 +3556,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     label = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}\n`;
+                                    label = `✔  Generated: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `✔  Created: ${parseArgs(toolCall.args).path || '...'}\n`;
+                                    label = `✔  Generated: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'file_map') {
                                     label = `✔  Indexed: ${parseArgs(toolCall.args).path || '...'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
@@ -4116,7 +4185,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                             const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                                             const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                            yield { type: 'visual_feedback', content: colorMainWords(`\n${boxMid}`) };
+                                            const isFirst = toolCallPointer === 0;
+                                            const isLast = toolCallPointer === allToolsFound.length - 1;
+                                            yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
 
                                             const toolEnd = Date.now();
                                             lastToolFinishedAt = toolEnd;
@@ -4182,8 +4253,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`\n${boxMid}${boxMid.includes('Created') || boxMid.includes('Edited') || boxMid.includes('Written') ? '' : `\n${boxBottom}`}`) };
+                                    const isFirst = toolCallPointer === 0;
+                                    const isLast = toolCallPointer === allToolsFound.length - 1;
+                                    yield {
+                                        type: 'visual_feedback', content: colorMainWords(
+                                            (isFirst ? '\n' : '') +
+                                            boxMid +
+                                            (isLast && !/(Created|Edited)/.test(boxMid) ? '\n' : '')
+                                    ) };
                                 }
 
                                 // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
@@ -4268,8 +4345,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                                    const isFirst = toolCallPointer === 0;
+                                    const isLast = toolCallPointer === allToolsFound.length - 1;
+                                    yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
                                 }
 
                                 if (normToolName === 'EmergencyRollback') {
@@ -4290,8 +4368,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                        const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                        yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}\n`) };
+                                        const isFirst = toolCallPointer === 0;
+                                        const isLast = toolCallPointer === allToolsFound.length - 1;
+                                        yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
                                     }
                                 }
 
@@ -4349,11 +4428,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         // Premium, minimal layout without the boxy cage
                                         const output = [
                                             `${uiTitle}`, // Clean title with a slight indent aligned with other feedbacks
-                                            ...listItems.map(item => `    ${item}`), // Sub-indented items for that premium look
-                                            '' // Bottom padding spacing
+                                            ...listItems.map(item => `    ${item}`) // Sub-indented items for that premium look
                                         ].join('\n');
-
-                                        yield { type: 'visual_feedback', content: `\n${colorMainWords(output)}` };
+                                        const isFirst = toolCallPointer === 0;
+                                        const isLast = toolCallPointer === allToolsFound.length - 1;
+                                        yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + output + (isLast ? '\n' : '')) };
                                     }
                                 }
 
@@ -4760,7 +4839,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const agentErrDir = path.join(LOGS_DIR, 'agent');
         yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog}` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
-        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${errLog}\n\n----------------------------------------------------------------------\n\n`);
+        fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}\n\n----------------------------------------------------------------------\n\n`);
 
         if (typeof flushGoogleBuffer === 'function') {
             yield* flushGoogleBuffer();

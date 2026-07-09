@@ -4410,7 +4410,7 @@ var init_ChatLayout = __esm({
           {
             flexDirection: "column",
             borderStyle: "single",
-            borderLeft: true,
+            borderLeft: false,
             borderRight: false,
             borderTop: false,
             borderBottom: false,
@@ -4449,7 +4449,7 @@ var init_ChatLayout = __esm({
                 paddingRight: 0,
                 width: "100%"
               },
-              /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
+              /* @__PURE__ */ React4.createElement(Box3, null, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
               /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, lang, "#e1e4e8")))))
             );
           }
@@ -4618,6 +4618,9 @@ var init_ChatLayout = __esm({
         }
         return msg.isStreaming ? content : content.trimEnd();
       }, [content, msg.role, showFullThinking, msg.isStreaming]);
+      if (msg.role === "agent" && finalContent.trim() === "") {
+        return null;
+      }
       return (
         // [SPACE POINT]
         /* @__PURE__ */ React4.createElement(Box3, { marginBottom: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, marginTop: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, flexDirection: "column", flexShrink: 0, width: "100%", flexGrow: 1 }, msg.role === "user" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 1 }, /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2584".repeat(Math.max(1, columns - 1)))), /* @__PURE__ */ React4.createElement(
@@ -4693,7 +4696,7 @@ var init_ChatLayout = __esm({
       }
       if (type === "agent-line") {
         if (!text || text.trim() === "") {
-          return /* @__PURE__ */ React4.createElement(Box3, { height: 1 });
+          return null;
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns }));
@@ -4775,7 +4778,7 @@ var init_ChatLayout = __esm({
             flexDirection: "row",
             width: columns,
             borderStyle: "single",
-            borderLeft: true,
+            borderLeft: false,
             borderRight: false,
             borderTop: false,
             borderBottom: false,
@@ -4794,7 +4797,7 @@ var init_ChatLayout = __esm({
             flexDirection: "row",
             width: columns,
             borderStyle: "single",
-            borderLeft: true,
+            borderLeft: false,
             borderRight: false,
             borderTop: false,
             borderBottom: false,
@@ -10828,21 +10831,78 @@ var init_ai = __esm({
       return MULTIMODAL_MODELS.some((m) => m.toLowerCase() === lower);
     };
     getCleanGroupedLength = (rawHistory) => {
-      const cleanHistory = [];
-      rawHistory.forEach((m) => {
-        const isCleanMsg = (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome");
-        if (!isCleanMsg) return;
+      const preprocessed = rawHistory.filter(
+        (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
+      ).map((m, idx, arr) => {
         let text = m.fullText || m.text || "";
-        if (m.role === "system" && text?.startsWith("[TOOL RESULT]")) {
-          const prev = cleanHistory[cleanHistory.length - 1];
-          if (prev && prev.role === "system" && prev.text?.startsWith("[TOOL RESULT]")) {
-            prev.text += "\n\n" + text;
-            return;
+        if (m.role === "user" && idx < arr.length - 1) {
+          if (text.includes("**CONTEXT SUMMARY OF PREVIOUS TURNS")) {
+            const summaryIndex = text.indexOf("**CONTEXT SUMMARY OF PREVIOUS TURNS");
+            if (summaryIndex !== -1) {
+              const prefix = text.substring(0, summaryIndex);
+              const metadataIndex = prefix.lastIndexOf("[SYSTEM METADATA]");
+              if (metadataIndex !== -1) {
+                text = text.substring(metadataIndex).trim();
+              } else {
+                text = text.substring(summaryIndex).trim();
+              }
+            }
+          } else {
+            const userIndex = text.lastIndexOf("[USER]");
+            const userPromptIndex = text.lastIndexOf("[USER PROMPT]");
+            if (userIndex !== -1) {
+              text = text.substring(userIndex + 6).trim();
+            } else if (userPromptIndex !== -1) {
+              text = text.substring(userPromptIndex).trim();
+            }
           }
         }
-        cleanHistory.push({ ...m, text });
+        return { ...m, text };
       });
-      return cleanHistory.length;
+      const cleanHistoryForAI = [];
+      let i = 0;
+      while (i < preprocessed.length) {
+        const msg = preprocessed[i];
+        if (msg.role === "user") {
+          cleanHistoryForAI.push(msg);
+          i++;
+        } else {
+          const turnMessages = [];
+          while (i < preprocessed.length && preprocessed[i].role !== "user") {
+            turnMessages.push(preprocessed[i]);
+            i++;
+          }
+          const toolCalls = [];
+          const toolResults = [];
+          const finalResponses = [];
+          turnMessages.forEach((tm) => {
+            const textLower = (tm.text || "").toLowerCase();
+            const hasTool = textLower.includes("tool:functions.") || textLower.includes("agent:generalist.");
+            const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:") || tm.text?.startsWith("[TERMINAL_RECORD]") || tm.isTerminalRecord);
+            if (tm.role === "agent") {
+              if (hasTool) {
+                toolCalls.push(tm.text);
+              } else {
+                finalResponses.push(tm.text);
+              }
+            } else if (isResult) {
+              toolResults.push(tm.text);
+            } else {
+              finalResponses.push(tm.text);
+            }
+          });
+          if (toolCalls.length > 0) {
+            cleanHistoryForAI.push({ role: "agent", text: "combined" });
+          }
+          if (toolResults.length > 0) {
+            cleanHistoryForAI.push({ role: "system", text: "combined" });
+          }
+          if (finalResponses.length > 0) {
+            cleanHistoryForAI.push({ role: "agent", text: "combined" });
+          }
+        }
+      }
+      return cleanHistoryForAI.length;
     };
     stripAnsi2 = (str) => {
       if (typeof str !== "string") return str;
@@ -12897,7 +12957,8 @@ ${ideCtx.warnings}
         }
         let taggedContextBlocks = [];
         let attachedBinaryPart = null;
-        for (const tag of tagsFound) {
+        for (let tIdx = 0; tIdx < tagsFound.length; tIdx++) {
+          const tag = tagsFound[tIdx];
           try {
             let tagClean = tag.trim().replace(/^["']|["']$/g, "");
             const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
@@ -12929,12 +12990,10 @@ ${ideCtx.warnings}
                   const boxLines = [label];
                   const maxLen = Math.max(...boxLines.map((l) => l.length));
                   const boxWidth = Math.min(maxLen + 4, terminalWidth);
-                  const boxTop = `${" ".repeat(boxWidth)}`;
                   const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
-                  const boxBottom = `${" ".repeat(boxWidth)}`;
-                  yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}
-`) };
+                  const isFirst = tIdx === 0;
+                  const isLast = tIdx === tagsFound.length - 1;
+                  yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
                   continue;
                 }
                 const finalStart = startLine !== null ? startLine : 1;
@@ -12990,10 +13049,9 @@ ${boxMid}
                     const maxLen = Math.max(...boxLines.map((l) => l.length));
                     const boxWidth = Math.min(maxLen + 4, terminalWidth);
                     const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
-                    const boxBottom = `${" ".repeat(boxWidth)}`;
-                    yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}
-`) };
+                    const isFirst = tIdx === 0;
+                    const isLast = tIdx === tagsFound.length - 1;
+                    yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
                   }
                 }
               }
@@ -13884,10 +13942,10 @@ ${ideErr} [/ERROR]`;
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
                     } else if (normToolName === "write_pdf") {
-                      label = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+                      label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "write_docx") {
-                      label = `\u2714  Created: ${parseArgs(toolCall.args).path || "..."}
+                      label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "file_map") {
                       label = `\u2714  Indexed: ${parseArgs(toolCall.args).path || "..."}`;
@@ -14483,8 +14541,9 @@ ${snippet2}
                           }
                           const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                           const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                          yield { type: "visual_feedback", content: colorMainWords(`
-${boxMid}`) };
+                          const isFirst = toolCallPointer === 0;
+                          const isLast = toolCallPointer === allToolsFound.length - 1;
+                          yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
                           const toolEnd2 = Date.now();
                           lastToolFinishedAt = toolEnd2;
                           yield { type: "tool_time", content: toolEnd2 - executionStart };
@@ -14543,10 +14602,14 @@ ${boxMid}`) };
                       }
                       const boxWidth = Math.min(label.length + 4, terminalWidth);
                       const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                      const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                      yield { type: "visual_feedback", content: colorMainWords(`
-${boxMid}${boxMid.includes("Created") || boxMid.includes("Edited") || boxMid.includes("Written") ? "" : `
-${boxBottom}`}`) };
+                      const isFirst = toolCallPointer === 0;
+                      const isLast = toolCallPointer === allToolsFound.length - 1;
+                      yield {
+                        type: "visual_feedback",
+                        content: colorMainWords(
+                          (isFirst ? "\n" : "") + boxMid + (isLast && !/(Created|Edited)/.test(boxMid) ? "\n" : "")
+                        )
+                      };
                     }
                     if (lastToolFinishedAt > 0) {
                       const timeSinceLastTool = Date.now() - lastToolFinishedAt;
@@ -14622,10 +14685,9 @@ ${boxBottom}`}`) };
                       }
                       const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                       const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                      const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                      yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}
-`) };
+                      const isFirst = toolCallPointer === 0;
+                      const isLast = toolCallPointer === allToolsFound.length - 1;
+                      yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
                     }
                     if (normToolName === "EmergencyRollback") {
                       const { method } = parseArgs(toolCall.args);
@@ -14643,10 +14705,9 @@ ${boxMid}
                         }
                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                        const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                        yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}
-`) };
+                        const isFirst = toolCallPointer === 0;
+                        const isLast = toolCallPointer === allToolsFound.length - 1;
+                        yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
                       }
                     }
                     if (normToolName === "todo") {
@@ -14695,13 +14756,12 @@ ${boxMid}
                         const output = [
                           `${uiTitle}`,
                           // Clean title with a slight indent aligned with other feedbacks
-                          ...listItems.map((item) => `    ${item}`),
+                          ...listItems.map((item) => `    ${item}`)
                           // Sub-indented items for that premium look
-                          ""
-                          // Bottom padding spacing
                         ].join("\n");
-                        yield { type: "visual_feedback", content: `
-${colorMainWords(output)}` };
+                        const isFirst = toolCallPointer === 0;
+                        const isLast = toolCallPointer === allToolsFound.length - 1;
+                        yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + output + (isLast ? "\n" : "")) };
                       }
                     }
                     if (normToolName === "exec_command" && settings.onExecEnd) {
@@ -15032,7 +15092,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
         const agentErrDir = path21.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
         if (!fs22.existsSync(agentErrDir)) fs22.mkdirSync(agentErrDir, { recursive: true });
-        fs22.appendFileSync(path21.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${errLog}
+        fs22.appendFileSync(path21.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
 
 ----------------------------------------------------------------------
 
@@ -18734,33 +18794,86 @@ ${timestamp}` };
             (m) => m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
           );
           const cleanHistoryForAI = [];
-          rawHistory.forEach((m, idx) => {
-            let text = m.fullText || m.text;
+          const preprocessed = rawHistory.map((m, idx) => {
+            let text = m.fullText || m.text || "";
             if (m.role === "user" && idx < rawHistory.length - 1) {
               if (text.includes("**CONTEXT SUMMARY OF PREVIOUS TURNS")) {
-                const summaryIndex = text.indexOf("[SYSTEM METADATA (PRIORITY: DYNAMIC)]");
+                const summaryIndex = text.indexOf("**CONTEXT SUMMARY OF PREVIOUS TURNS");
                 if (summaryIndex !== -1) {
-                  text = text.substring(summaryIndex).trim();
+                  const prefix = text.substring(0, summaryIndex);
+                  const metadataIndex = prefix.lastIndexOf("[SYSTEM METADATA]");
+                  if (metadataIndex !== -1) {
+                    text = text.substring(metadataIndex).trim();
+                  } else {
+                    text = text.substring(summaryIndex).trim();
+                  }
                 }
               } else {
                 const userIndex = text.lastIndexOf("[USER]");
+                const userPromptIndex = text.lastIndexOf("[USER PROMPT]");
                 if (userIndex !== -1) {
                   text = text.substring(userIndex + 6).trim();
+                } else if (userPromptIndex !== -1) {
+                  text = text.substring(userPromptIndex).trim();
                 }
               }
             }
-            if (m.role === "system" && text?.startsWith("[TOOL RESULT]")) {
-              const prev = cleanHistoryForAI[cleanHistoryForAI.length - 1];
-              if (prev && prev.role === "system" && prev.text?.startsWith("[TOOL RESULT]")) {
-                prev.text += "\n\n" + text;
-                return;
+            return { ...m, text };
+          });
+          let i = 0;
+          while (i < preprocessed.length) {
+            const msg = preprocessed[i];
+            if (msg.role === "user") {
+              cleanHistoryForAI.push(msg);
+              i++;
+            } else {
+              const turnMessages = [];
+              while (i < preprocessed.length && preprocessed[i].role !== "user") {
+                turnMessages.push(preprocessed[i]);
+                i++;
+              }
+              const toolCalls = [];
+              const toolResults = [];
+              const finalResponses = [];
+              turnMessages.forEach((tm) => {
+                const textLower = (tm.text || "").toLowerCase();
+                const hasTool = textLower.includes("tool:functions.") || textLower.includes("agent:generalist.");
+                const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:") || tm.text?.startsWith("[TERMINAL_RECORD]") || tm.isTerminalRecord);
+                if (tm.role === "agent") {
+                  if (hasTool) {
+                    toolCalls.push(tm.text);
+                  } else {
+                    finalResponses.push(tm.text);
+                  }
+                } else if (isResult) {
+                  toolResults.push(tm.text);
+                } else {
+                  finalResponses.push(tm.text);
+                }
+              });
+              if (toolCalls.length > 0) {
+                cleanHistoryForAI.push({
+                  role: "agent",
+                  text: toolCalls.map((tc) => tc.trim()).filter(Boolean).join("\n")
+                });
+              }
+              if (toolResults.length > 0) {
+                cleanHistoryForAI.push({
+                  role: "system",
+                  text: toolResults.map((tr) => {
+                    const trimmed = tr.trim();
+                    return trimmed.startsWith("[TOOL RESULT]") ? trimmed : `[TOOL RESULT]: ${trimmed}`;
+                  }).filter(Boolean).join("\n\n")
+                });
+              }
+              if (finalResponses.length > 0) {
+                cleanHistoryForAI.push({
+                  role: "agent",
+                  text: finalResponses.map((fr) => fr.trim()).filter(Boolean).join("\n\n")
+                });
               }
             }
-            cleanHistoryForAI.push({
-              ...m,
-              text
-            });
-          });
+          }
           const stream = getAIStream(
             activeModel,
             cleanHistoryForAI,
@@ -19030,7 +19143,7 @@ Selection: ${val}`,
               });
               clearBlocksCache();
               if (global.gc) {
-                for (let i = 0; i < 2; i++) {
+                for (let i2 = 0; i2 < 2; i2++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
@@ -19175,7 +19288,7 @@ Selection: ${val}`,
             let chunkText = packet.content;
             if (packet.type === "text" && chunkText.includes("Request Cancelled")) {
               if (global.gc) {
-                for (let i = 0; i < 3; i++) {
+                for (let i2 = 0; i2 < 3; i2++) {
                   global.gc();
                   await new Promise((resolve) => setImmediate(resolve));
                 }
