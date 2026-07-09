@@ -115,8 +115,18 @@ export const invoke = async (args, context = {}) => {
         if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
         }
-    }).catch((err) => {
-        if (taskEntry.status === 'cancelled') return;
+    }).catch(async (err) => {
+        const { isTerminationSignaled } = await import('../utils/ai.js');
+        const isCancelled = err.message === 'Subagent task was cancelled.' || taskEntry.status === 'cancelled' || isTerminationSignaled();
+        if (isCancelled) {
+            taskEntry.status = 'cancelled';
+            currentTurnLogs.push(`[SUBAGENT CANCELLED] Task was cancelled.`);
+            taskEntry.progress.push([...currentTurnLogs]);
+            if (context.onSubagentUpdate) {
+                context.onSubagentUpdate();
+            }
+            return;
+        }
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
         taskEntry.progress.push([...currentTurnLogs]);
         taskEntry.status = 'failed';

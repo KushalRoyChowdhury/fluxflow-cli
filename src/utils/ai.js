@@ -826,6 +826,10 @@ export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
 
+export const isTerminationSignaled = () => {
+    return TERMINATION_SIGNAL;
+};
+
 const TOOL_LABELS = {
     'write_file': 'Writing',
     'update_file': 'Editing',
@@ -1563,81 +1567,98 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
             ? [{ role: 'user', parts: [{ text: contents }] }]
             : contents;
 
-        let stream;
-        if (aiProvider === 'OpenRouter') {
-            stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else if (aiProvider === 'DeepSeek') {
-            stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else if (aiProvider === 'NVIDIA') {
-            stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else {
-            const genStream = await client.models.generateContentStream({
-                model: model,
-                contents: normalizedContents,
-                config: {
-                    systemInstruction: systemInstruction,
-                    temperature: temperature,
-                    thinkingConfig: (() => {
-                        const modelLower = (model || "").toLowerCase();
-                        const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
-                        const isGemini3 = modelLower.includes('gemini-3');
+        const abortController = new AbortController();
+        const signal = abortController.signal;
 
-                        if (isGemma4 || isGemini3) {
-                            if (isGemma4) {
-                                if (thinkingLevel.toLowerCase() !== 'xhigh' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
-                                else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+        let connectionPollInterval = setInterval(() => {
+            if (TERMINATION_SIGNAL) {
+                abortController.abort();
+                clearInterval(connectionPollInterval);
+            }
+        }, 100);
+
+        try {
+            let stream;
+            if (aiProvider === 'OpenRouter') {
+                stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            } else if (aiProvider === 'DeepSeek') {
+                stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            } else if (aiProvider === 'NVIDIA') {
+                stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            } else {
+                const genStream = await client.models.generateContentStream({
+                    model: model,
+                    contents: normalizedContents,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        temperature: temperature,
+                        thinkingConfig: (() => {
+                            const modelLower = (model || "").toLowerCase();
+                            const isGemma4 = modelLower.includes('gemma-4') || modelLower.startsWith('gemma');
+                            const isGemini3 = modelLower.includes('gemini-3');
+
+                            if (isGemma4 || isGemini3) {
+                                if (isGemma4) {
+                                    if (thinkingLevel.toLowerCase() !== 'xhigh' || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                                    else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+                                }
+                                return {
+                                    includeThoughts: true,
+                                    thinkingLevel: {
+                                        'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                                        'Low': ThinkingLevel.LOW,
+                                        'Medium': ThinkingLevel.MEDIUM,
+                                        'Standard': ThinkingLevel.MEDIUM,
+                                        'High': ThinkingLevel.HIGH,
+                                        'xHigh': ThinkingLevel.HIGH
+                                    }[thinkingLevel] || ThinkingLevel.MEDIUM
+                                };
+                            } else {
+                                const budget = {
+                                    'Fast': 0,
+                                    'Low': 512,
+                                    'Medium': 2048,
+                                    'Standard': 2048,
+                                    'High': 16384,
+                                    'xHigh': 24576
+                                }[thinkingLevel] || 2048;
+
+                                if (budget === 0) {
+                                    return { includeThoughts: false };
+                                }
+                                return {
+                                    includeThoughts: true,
+                                    thinkingBudget: budget
+                                };
                             }
-                            return {
-                                includeThoughts: true,
-                                thinkingLevel: {
-                                    'Fast': modelLower.includes('pro') ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
-                                    'Low': ThinkingLevel.LOW,
-                                    'Medium': ThinkingLevel.MEDIUM,
-                                    'Standard': ThinkingLevel.MEDIUM,
-                                    'High': ThinkingLevel.HIGH,
-                                    'xHigh': ThinkingLevel.HIGH
-                                }[thinkingLevel] || ThinkingLevel.MEDIUM
-                            };
-                        } else {
-                            const budget = {
-                                'Fast': 0,
-                                'Low': 512,
-                                'Medium': 2048,
-                                'Standard': 2048,
-                                'High': 16384,
-                                'xHigh': 24576
-                            }[thinkingLevel] || 2048;
+                        })()
+                    }
+                }, { signal });
+                stream = genStream;
+            }
 
-                            if (budget === 0) {
-                                return { includeThoughts: false };
-                            }
-                            return {
-                                includeThoughts: true,
-                                thinkingBudget: budget
-                            };
-                        }
-                    })()
-                }
-            });
-            stream = genStream;
-        }
-
-        for await (const chunk of stream) {
-            if (settings?.taskId && typeof subagentProgress !== 'undefined') {
-                const taskObj = subagentProgress.find(t => t.id === settings.taskId);
-                if (taskObj && taskObj.status === 'cancelled') {
+            for await (const chunk of stream) {
+                if (TERMINATION_SIGNAL) {
                     throw new Error('Subagent task was cancelled.');
                 }
-            }
-            if (settings && typeof settings.onTokenChunk === 'function') {
-                settings.onTokenChunk();
-            }
-            if (chunk.candidates?.[0]?.content?.parts) {
-                for (const part of chunk.candidates[0].content.parts) {
-                    if (part.text && !part.thought) fullText += part.text;
+                if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+                    const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+                    if (taskObj && taskObj.status === 'cancelled') {
+                        throw new Error('Subagent task was cancelled.');
+                    }
                 }
+                if (settings && typeof settings.onTokenChunk === 'function') {
+                    settings.onTokenChunk();
+                }
+                if (chunk.candidates?.[0]?.content?.parts) {
+                    for (const part of chunk.candidates[0].content.parts) {
+                        if (part.text && !part.thought) fullText += part.text;
+                    }
+                }
+                if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
             }
-            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+        } finally {
+            clearInterval(connectionPollInterval);
         }
 
         if (usageMetadata) {
@@ -2627,6 +2648,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (msg.role === 'agent') {
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                                 // text = text.replaceAll('<think>', '[Previous Thoughts: ').replaceAll('</think>', ']');
+                                text = text.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
                             }
                             const parts = [{ text }];
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -4819,6 +4841,14 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
     let finalAnswer = '';
 
     while (turn < maxTurns) {
+        if (TERMINATION_SIGNAL) {
+            if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+                const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+                if (taskObj) taskObj.status = 'cancelled';
+            }
+            if (logCallback) logCallback(`[SUBAGENT CANCELLED] Subagent task was cancelled.`);
+            throw new Error('Subagent task was cancelled.');
+        }
         if (settings?.taskId && typeof subagentProgress !== 'undefined') {
             const taskObj = subagentProgress.find(t => t.id === settings.taskId);
             if (taskObj && taskObj.status === 'cancelled') {
@@ -4850,6 +4880,13 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
 
         let toolResultsStr = '';
         for (const toolCall of toolCalls) {
+            if (TERMINATION_SIGNAL) {
+                if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+                    const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+                    if (taskObj) taskObj.status = 'cancelled';
+                }
+                throw new Error('Subagent task was cancelled.');
+            }
             if (settings?.taskId && typeof subagentProgress !== 'undefined') {
                 const taskObj = subagentProgress.find(t => t.id === settings.taskId);
                 if (taskObj && taskObj.status === 'cancelled') {

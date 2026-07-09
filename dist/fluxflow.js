@@ -9846,8 +9846,11 @@ var init_invokeSync = __esm({
         }
         return result;
       } catch (err) {
+        const { isTerminationSignaled: isTerminationSignaled2 } = await init_ai().then(() => ai_exports);
+        const isCancelled = err.message === "Subagent task was cancelled by user." || isTerminationSignaled2();
         if (context.onVisualFeedback) {
-          context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title} [FAILED]
+          const statusLabel = isCancelled ? "[CANCELLED]" : "[FAILED]";
+          context.onVisualFeedback(`\x1B[95mSubAgent\x1B[0m: \x1B[32mGeneralist\x1B[0m \u2192 ${title} ${statusLabel}
 `);
         }
         return `ERROR: Subagent execution failed: ${err.message}`;
@@ -9967,8 +9970,18 @@ ${finalAnswer}`);
         if (context.onSubagentUpdate) {
           context.onSubagentUpdate();
         }
-      }).catch((err) => {
-        if (taskEntry.status === "cancelled") return;
+      }).catch(async (err) => {
+        const { isTerminationSignaled: isTerminationSignaled2 } = await init_ai().then(() => ai_exports);
+        const isCancelled = err.message === "Subagent task was cancelled." || taskEntry.status === "cancelled" || isTerminationSignaled2();
+        if (isCancelled) {
+          taskEntry.status = "cancelled";
+          currentTurnLogs.push(`[SUBAGENT CANCELLED] Task was cancelled.`);
+          taskEntry.progress.push([...currentTurnLogs]);
+          if (context.onSubagentUpdate) {
+            context.onSubagentUpdate();
+          }
+          return;
+        }
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
         taskEntry.progress.push([...currentTurnLogs]);
         taskEntry.status = "failed";
@@ -10721,6 +10734,7 @@ __export(ai_exports, {
   getCleanGroupedLength: () => getCleanGroupedLength,
   initAI: () => initAI,
   isModelMultimodal: () => isModelMultimodal,
+  isTerminationSignaled: () => isTerminationSignaled,
   runJanitorTask: () => runJanitorTask,
   runSubagent: () => runSubagent,
   signalTermination: () => signalTermination
@@ -10728,7 +10742,7 @@ __export(ai_exports, {
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path21, { normalize } from "path";
 import fs22 from "fs";
-var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, MULTIMODAL_MODELS, isModelMultimodal, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -11449,6 +11463,9 @@ var init_ai = __esm({
     signalTermination = () => {
       TERMINATION_SIGNAL = true;
     };
+    isTerminationSignaled = () => {
+      return TERMINATION_SIGNAL;
+    };
     TOOL_LABELS2 = {
       "write_file": "Writing",
       "update_file": "Editing",
@@ -12063,78 +12080,93 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         let fullText = "";
         let usageMetadata = null;
         const normalizedContents = typeof contents === "string" ? [{ role: "user", parts: [{ text: contents }] }] : contents;
-        let stream;
-        if (aiProvider === "OpenRouter") {
-          stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else if (aiProvider === "DeepSeek") {
-          stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else if (aiProvider === "NVIDIA") {
-          stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, null, temperature);
-        } else {
-          const genStream = await client.models.generateContentStream({
-            model,
-            contents: normalizedContents,
-            config: {
-              systemInstruction,
-              temperature,
-              thinkingConfig: (() => {
-                const modelLower = (model || "").toLowerCase();
-                const isGemma4 = modelLower.includes("gemma-4") || modelLower.startsWith("gemma");
-                const isGemini3 = modelLower.includes("gemini-3");
-                if (isGemma4 || isGemini3) {
-                  if (isGemma4) {
-                    if (thinkingLevel.toLowerCase() !== "xhigh" || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
-                    else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+        const abortController = new AbortController();
+        const signal = abortController.signal;
+        let connectionPollInterval = setInterval(() => {
+          if (TERMINATION_SIGNAL) {
+            abortController.abort();
+            clearInterval(connectionPollInterval);
+          }
+        }, 100);
+        try {
+          let stream;
+          if (aiProvider === "OpenRouter") {
+            stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+          } else if (aiProvider === "DeepSeek") {
+            stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+          } else if (aiProvider === "NVIDIA") {
+            stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+          } else {
+            const genStream = await client.models.generateContentStream({
+              model,
+              contents: normalizedContents,
+              config: {
+                systemInstruction,
+                temperature,
+                thinkingConfig: (() => {
+                  const modelLower = (model || "").toLowerCase();
+                  const isGemma4 = modelLower.includes("gemma-4") || modelLower.startsWith("gemma");
+                  const isGemini3 = modelLower.includes("gemini-3");
+                  if (isGemma4 || isGemini3) {
+                    if (isGemma4) {
+                      if (thinkingLevel.toLowerCase() !== "xhigh" || false) return { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL };
+                      else return { includeThoughts: true, thinkingLevel: ThinkingLevel.HIGH };
+                    }
+                    return {
+                      includeThoughts: true,
+                      thinkingLevel: {
+                        "Fast": modelLower.includes("pro") ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
+                        "Low": ThinkingLevel.LOW,
+                        "Medium": ThinkingLevel.MEDIUM,
+                        "Standard": ThinkingLevel.MEDIUM,
+                        "High": ThinkingLevel.HIGH,
+                        "xHigh": ThinkingLevel.HIGH
+                      }[thinkingLevel] || ThinkingLevel.MEDIUM
+                    };
+                  } else {
+                    const budget = {
+                      "Fast": 0,
+                      "Low": 512,
+                      "Medium": 2048,
+                      "Standard": 2048,
+                      "High": 16384,
+                      "xHigh": 24576
+                    }[thinkingLevel] || 2048;
+                    if (budget === 0) {
+                      return { includeThoughts: false };
+                    }
+                    return {
+                      includeThoughts: true,
+                      thinkingBudget: budget
+                    };
                   }
-                  return {
-                    includeThoughts: true,
-                    thinkingLevel: {
-                      "Fast": modelLower.includes("pro") ? ThinkingLevel.LOW : ThinkingLevel.MINIMAL,
-                      "Low": ThinkingLevel.LOW,
-                      "Medium": ThinkingLevel.MEDIUM,
-                      "Standard": ThinkingLevel.MEDIUM,
-                      "High": ThinkingLevel.HIGH,
-                      "xHigh": ThinkingLevel.HIGH
-                    }[thinkingLevel] || ThinkingLevel.MEDIUM
-                  };
-                } else {
-                  const budget = {
-                    "Fast": 0,
-                    "Low": 512,
-                    "Medium": 2048,
-                    "Standard": 2048,
-                    "High": 16384,
-                    "xHigh": 24576
-                  }[thinkingLevel] || 2048;
-                  if (budget === 0) {
-                    return { includeThoughts: false };
-                  }
-                  return {
-                    includeThoughts: true,
-                    thinkingBudget: budget
-                  };
-                }
-              })()
-            }
-          });
-          stream = genStream;
-        }
-        for await (const chunk of stream) {
-          if (settings?.taskId && typeof subagentProgress !== "undefined") {
-            const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
-            if (taskObj && taskObj.status === "cancelled") {
+                })()
+              }
+            }, { signal });
+            stream = genStream;
+          }
+          for await (const chunk of stream) {
+            if (TERMINATION_SIGNAL) {
               throw new Error("Subagent task was cancelled.");
             }
-          }
-          if (settings && typeof settings.onTokenChunk === "function") {
-            settings.onTokenChunk();
-          }
-          if (chunk.candidates?.[0]?.content?.parts) {
-            for (const part of chunk.candidates[0].content.parts) {
-              if (part.text && !part.thought) fullText += part.text;
+            if (settings?.taskId && typeof subagentProgress !== "undefined") {
+              const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+              if (taskObj && taskObj.status === "cancelled") {
+                throw new Error("Subagent task was cancelled.");
+              }
             }
+            if (settings && typeof settings.onTokenChunk === "function") {
+              settings.onTokenChunk();
+            }
+            if (chunk.candidates?.[0]?.content?.parts) {
+              for (const part of chunk.candidates[0].content.parts) {
+                if (part.text && !part.thought) fullText += part.text;
+              }
+            }
+            if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
           }
-          if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+        } finally {
+          clearInterval(connectionPollInterval);
         }
         if (usageMetadata) {
           const total = usageMetadata.totalTokenCount || 0;
@@ -13080,6 +13112,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                 let text = msg.text || "";
                 if (msg.role === "agent") {
                   text = text.replace(/\[turn:\s*finish\]/gi, "").replace(/\[\[END\]\]/gi, "").trim();
+                  text = text.replaceAll("\x1B[33m\u24D8 Request Cancelled\x1B[0m", "*User Cancelled Response Generation*");
                 }
                 const parts = [{ text }];
                 if (msg.binaryPart && isModelMultimodal(targetModel)) {
@@ -15077,6 +15110,14 @@ Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "nu
       let turn = 0;
       let finalAnswer = "";
       while (turn < maxTurns) {
+        if (TERMINATION_SIGNAL) {
+          if (settings?.taskId && typeof subagentProgress !== "undefined") {
+            const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+            if (taskObj) taskObj.status = "cancelled";
+          }
+          if (logCallback) logCallback(`[SUBAGENT CANCELLED] Subagent task was cancelled.`);
+          throw new Error("Subagent task was cancelled.");
+        }
         if (settings?.taskId && typeof subagentProgress !== "undefined") {
           const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
           if (taskObj && taskObj.status === "cancelled") {
@@ -15103,6 +15144,13 @@ ${cleanResponse}
         }
         let toolResultsStr = "";
         for (const toolCall of toolCalls) {
+          if (TERMINATION_SIGNAL) {
+            if (settings?.taskId && typeof subagentProgress !== "undefined") {
+              const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+              if (taskObj) taskObj.status = "cancelled";
+            }
+            throw new Error("Subagent task was cancelled.");
+          }
           if (settings?.taskId && typeof subagentProgress !== "undefined") {
             const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
             if (taskObj && taskObj.status === "cancelled") {

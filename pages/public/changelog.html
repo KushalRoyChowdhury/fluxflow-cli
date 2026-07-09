@@ -232,18 +232,26 @@
         // Thanks to Gemini CLI. (つ╥﹏╥)つ JUNE 18.
         // Logging Off...
         // ...hopefully no bugs now... phew..
-        const stableVersions = ["3.3.0"]
+        const stableVersions = ["3.3.1"]
         const changelogData = {
+            "3.3.1": {
+                "note": "JULY 9.",
+                "added": [],
+                "changed": [],
+                "fixes": [
+                    "Minor improvements with SubAgents & Response Cancellations."
+                ]
+            },
             "3.3.0": {
                 "note": "JULY 9.",
                 "added": [
                     "Progressive Rendering (typewriter effect) — smooth text animation. Toggle in Settings → Other. May use bit more memory."
                 ],
                 "changed": [
-                    "`Kimi k2.6` Depricated. Looking forward with `Kimi k2.7` soon."
+                    "`Kimi k2.6` Deprecated. Looking forward with `Kimi k2.7` soon."
                 ],
                 "fixes": [
-                    "Fixed \"Memory Leak v3: Definative Edition\". Enjoy your agent even with 1GB RAM."
+                    "Fixed \"Memory Leak v3: Definitive Edition\". Enjoy your agent even with 1GB RAM."
                 ]
             },
             "3.2.2": {
@@ -261,8 +269,8 @@
                 "note": "JULY 7.",
                 "added": [
                     "Added more info about API state/queue for NVIDIA API [EXPERIMENTAL].",
-                    "Added new option in /settings → Others → Preserve Thinking. Turning off will result in deletion of previous thought blocks from persisting in Chat. Will have disk space.",
-                    "cat.txt - A File Containing a lore. Can be found of official [GitHub Repository](https://github.com/KushalRoyChowdhury/fluxflow-cli) & NPM Pckage installed in your device (just 237B)."
+                    "Added new option in /settings → Others → Preserve Thinking. Turning off will result in deletion of previous thought blocks from persisting in Chat. Will save disk space.",
+                    "cat.txt - A File Containing a lore. Can be found in the official [GitHub Repository](https://github.com/KushalRoyChowdhury/fluxflow-cli) & NPM Package installed in your device (just 237B)."
                 ],
                 "changed": [
                     "Improved Emergency Rollback [EXPERIMENTAL].",
@@ -275,7 +283,7 @@
             "3.1.0": {
                 "note": "JULY 5.",
                 "added": [
-                    "Added Emergency Rollback System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.** This feature is currectly *EXPERIMENTAL*, can be turned on in /settings → Security. Will use more disk space."
+                    "Added Emergency Rollback System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.** This feature is currently *EXPERIMENTAL*, can be turned on in /settings → Security. Will use more disk space."
                 ],
                 "changed": [],
                 "fixes": []
@@ -311,19 +319,19 @@
                 ]
             },
             "3.0.10": {
-                "note": "JULY 3 - Stabity Patch for API Health Indiacator & FluxFixer.",
+                "note": "JULY 3 - Stability Patch for API Health Indicator & FluxFixer.",
                 "added": [],
                 "changed": [
-                    "Improved API Health indicator to monitor to include subagents."
+                    "Improved API Health Indicator to include SubAgents."
                 ],
                 "fixes": [
-                    "Fixed issue where API Health Indiacator was missed during tool calls"
+                    "Fixed issue where API Health Indicator was missed during tool calls"
                 ]
             },
             "3.0.8": {
                 "note": "JULY 3.",
                 "added": [
-                    "Added realtime API Health indicator so you know who to blame, FluxFlow? OR API Provider?"
+                    "Added realtime API Health Indicator so you know who to blame: FluxFlow or your API provider?"
                 ],
                 "changed": [],
                 "fixes": []
@@ -331,7 +339,7 @@
             "3.0.5": {
                 "note": "JULY 3.",
                 "added": [
-                    "The SubAgents can now ask the user directly for ambiguity resolution, similar to Main Agent."
+                    "SubAgents can now ask the user directly to resolve ambiguity, similar to the Main Agent."
                 ],
                 "changed": [
                     "Improved Reliability & Stability of SubAgents."
@@ -341,10 +349,10 @@
             "3.0.0": {
                 "note": "JULY 3 - MultiAgent Architecture.",
                 "added": [
-                    "Added SubAgent & MultiAgent Architecture. With 2 invocation methods when main agent decides, `invokeSync` & `invoke` based on task complexity and parallelism benefits. May consume many tokens."
+                    "Added SubAgent & Multi-Agent Architecture. With 2 invocation methods when main agent decides, `invokeSync` & `invoke` based on task complexity and parallelism benefits. May consume additional tokens."
                 ],
                 "changed": [
-                    "Depricated GLM 5.1 on NVIDIA API."
+                    "Deprecated GLM 5.1 on NVIDIA API."
                 ],
                 "fixes": [
                     "See you in v3.0.1 soon."
@@ -494,7 +502,7 @@
                     "Reduce false positives for other command executes when terminal network access is off.",
                     "Improved IDE connection stability.",
                     "Better 'Recent Manual Edits' context for Agent from IDE (requires IDE Companion v1.4.0+).",
-                    "Depricated Image Generation for all previous versions.",
+                    "Deprecated Image Generation for all previous versions.",
                     "Updated IDE Companion to v1.4.0. Download for [VS Code](https://marketplace.visualstudio.com/items?itemName=fluxflow-cli.fluxflow-cli-companion), with [VSIX](https://github.com/KushalRoyChowdhury/fluxflow-cli/releases/tag/1.4)"
                 ],
                 "fixes": [

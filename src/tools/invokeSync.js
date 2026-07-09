@@ -38,8 +38,11 @@ export const invokeSync = async (args, context = {}) => {
         }
         return result;
     } catch (err) {
+        const { isTerminationSignaled } = await import('../utils/ai.js');
+        const isCancelled = err.message === 'Subagent task was cancelled by user.' || isTerminationSignaled();
         if (context.onVisualFeedback) {
-            context.onVisualFeedback(`\x1b[95mSubAgent\x1b[0m: \x1b[32mGeneralist\x1b[0m → ${title} [FAILED]\n`);
+            const statusLabel = isCancelled ? '[CANCELLED]' : '[FAILED]';
+            context.onVisualFeedback(`\x1b[95mSubAgent\x1b[0m: \x1b[32mGeneralist\x1b[0m → ${title} ${statusLabel}\n`);
         }
         return `ERROR: Subagent execution failed: ${err.message}`;
     }
