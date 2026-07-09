@@ -1,6 +1,6 @@
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
-import { getTruncatedHistory } from './history.js';
+import { getTruncatedHistory, loadHistory } from './history.js';
 import { checkQuota, incrementUsage, addToUsage } from './usage.js';
 import { dispatchTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
@@ -1253,10 +1253,19 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         }
     }
 
-    // Restore title to Idle when janitor finishes
+    // Restore title based on chat name when janitor finishes
     if (process.stdout.isTTY) {
-        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
-        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+        try {
+            const historyIndex = await loadHistory();
+            const chatData = historyIndex[chatId];
+            const chatName = chatData?.name || '';
+            const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+            process.stdout.write(`\x1b]0;${title}\x07`);
+            process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+        } catch (e) {
+            process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+            process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
+        }
     }
 };
 

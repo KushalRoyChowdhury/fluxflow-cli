@@ -2,7 +2,7 @@ export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true)
 Your tool syntax is: '[tool:functions.ToolName(args...)]'
 
 -- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS ALWAYS) --
-[tool:functions.Chat(title="<short creative title of FULL conversation in 3-5 words>")]. Consider full chat context to generate title NOT just latest message.
+[tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message.
 [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
 ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
