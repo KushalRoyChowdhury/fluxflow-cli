@@ -5197,7 +5197,7 @@ var init_main_tools = __esm({
     };
     TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
 -- TOOL DEFINITIONS --
-Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+Internal tools. **MUST use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)" : ""}. Next Turn, verify tool results, plan next**
@@ -6602,7 +6602,7 @@ Check these first; These Files > Training Data. Safety rules apply
 ` : "";
       }
       const projectContextBlock = cachedProjectContextBlock;
-      return `${nameStr}${nicknameStr}${userInstrStr}=== SYSTEM PROMPT ===
+      return `${nameStr}${nicknameStr}${userInstrStr}=== SYSTEM PROMPT (Internal testing Enviroment) ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
 Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
 
@@ -13158,6 +13158,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           let accumulatedContext = "";
           let dedupeBuffer = "";
           let isDedupeActive = false;
+          let detectedAnyToolCalls = false;
           let targetModel = modelName;
           let currentSystemInstruction = "";
           while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
@@ -13649,6 +13650,7 @@ ${ideErr} [/ERROR]`;
                   }
                   const toolContext = getActiveToolContext(turnText);
                   if (toolContext.inside) {
+                    detectedAnyToolCalls = true;
                     if (!lastToolEventTime) lastToolEventTime = Date.now();
                     const NORMALIZE_MAP = {
                       "Ask": "ask",
@@ -15024,6 +15026,7 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
           const cleanedTurnText = contextSafeReplace(turnText, /(\[\s*(turn\s*:)?\s*(continue|finish)\s*\]|\[\[END\]\])/gi, "").trim();
           let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
           isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
+          isActuallyFinished = detectedAnyToolCalls || wasToolCalledInLastLoop ? false : isActuallyFinished;
           if (turnText && turnText.trim().endsWith('")]') && toolResults.length === 0) {
             isActuallyFinished = false;
           }
@@ -15051,13 +15054,20 @@ Error Log can be found in ${path21.join(LOGS_DIR, "agent", "error.log")}`);
           modifiedHistory.push({ role: "agent", text: nextAgentMsg });
           if (toolResults.length > 0 || anyToolExecutedInThisTurn) {
             if (toolResults.length > 0) {
-              const combinedText = toolResults.map((tr) => tr.text).join("\n\n");
+              let combinedText = toolResults.map((tr) => tr.text).join("\n\n");
+              const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
+              const attemptedToolsCount = (toolActionableText.match(/\[tool:functions/g) || []).length;
+              if (toolResults.length < attemptedToolsCount) {
+                combinedText += `
+
+[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try again the failed calls [/SYSTEM]`;
+              }
               const binaryPart = toolResults.find((tr) => tr.binaryPart)?.binaryPart || null;
               modifiedHistory.push({ role: "user", text: combinedText, binaryPart });
             }
           } else {
-            if (wasToolCalledInLastLoop) {
-              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to verify tool execution, MUST check if executed or failed. On failure try again [/SYSTEM]` });
+            if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
+              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to execute some tools. Verify proper syntax compliance & try again [/SYSTEM]` });
             } else {
               modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task use [[END]]"}`} [/SYSTEM]` });
             }

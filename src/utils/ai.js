@@ -2700,6 +2700,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let dedupeBuffer = '';
             let isDedupeActive = false;
 
+            let detectedAnyToolCalls = false;
+
             let targetModel = modelName;
             let currentSystemInstruction = '';
 
@@ -3271,6 +3273,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             // [LIVE TOOL SNIFFING] - Zero latency feedback & Telemetry start
                             const toolContext = getActiveToolContext(turnText);
                             if (toolContext.inside) {
+                                detectedAnyToolCalls = true;
                                 if (!lastToolEventTime) lastToolEventTime = Date.now();
                                 const NORMALIZE_MAP = {
                                     'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
@@ -4762,6 +4765,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // [BUGFIX] - We also MUST NOT finish if we are in a recovery state (loop detection triggered).
             let isActuallyFinished = (hasFinish || toolResults.length === 0) && !isThinkingLoop && !isStutteringLoop && !isGeneralLoop;
             isActuallyFinished = toolResults.length === 0 ? isActuallyFinished : false;
+            isActuallyFinished = detectedAnyToolCalls || wasToolCalledInLastLoop ? false : isActuallyFinished;
 
             if (turnText && turnText.trim().endsWith('")]') && toolResults.length === 0) {
                 isActuallyFinished = false;
@@ -4803,13 +4807,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             // If there are no tool results, we send a 'continue' signal to prompt the model.
             if (toolResults.length > 0 || anyToolExecutedInThisTurn) {
                 if (toolResults.length > 0) {
-                    const combinedText = toolResults.map(tr => tr.text).join('\n\n');
+                    let combinedText = toolResults.map(tr => tr.text).join('\n\n');
+                    const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
+                    const attemptedToolsCount = (toolActionableText.match(/\[tool:functions/g) || []).length;
+                    if (toolResults.length < attemptedToolsCount) {
+                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try again the failed calls [/SYSTEM]`;
+                    }
                     const binaryPart = toolResults.find(tr => tr.binaryPart)?.binaryPart || null;
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });
                 }
             } else {
-                if (wasToolCalledInLastLoop) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to verify tool execution, MUST check if executed or failed. On failure try again [/SYSTEM]` });
+                if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to execute some tools. Verify proper syntax compliance & try again [/SYSTEM]` });
                 } else {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`} [/SYSTEM]` });
                 }
