@@ -31,6 +31,7 @@ import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
+import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue } from './data/model_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -824,8 +825,8 @@ export default function App({ args = [] }) {
     const [setupStep, setSetupStep] = useState(0);
     const [latestVer, setLatestVer] = useState(null);
     const [showFullThinking, setShowFullThinking] = useState(false);
-    const [activeModel, setActiveModel] = useState('gemma-4-31b-it');
-    const [janitorModel, setJanitorModel] = useState('gemma-4-26b-a4b-it');
+    const [activeModel, setActiveModel] = useState(getDefaultModel('Google', 'Free') || 'gemma-4-31b-it');
+    const [janitorModel, setJanitorModel] = useState(getFallbackValue('gemma_janitor_fallback_google') || 'gemma-4-26b-a4b-it');
     const [isInitializing, setIsInitializing] = useState(true);
     const [isAppFocused, setIsAppFocused] = useState(true);
     const lastFocusEventTime = useRef(0);
@@ -993,38 +994,14 @@ export default function App({ args = [] }) {
             return;
         }
 
-        const s = emojiSpace(2);
-        let defaultModel = '';
-        let modelDisplayName = '';
-
-        if (apiTier === 'Free') {
-            if (aiProvider === 'Google') {
-                defaultModel = 'gemma-4-31b-it';
-                modelDisplayName = 'Gemma 4 (Free default)';
-            } else if (aiProvider === 'DeepSeek') {
-                defaultModel = 'deepseek-v4-flash';
-                modelDisplayName = 'DeepSeek Flash (Free default)';
-            } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'deepseek-ai/deepseek-v4-flash';
-                modelDisplayName = 'DeepSeek V4 Flash (NVIDIA)';
-            } else { // OpenRouter
-                defaultModel = 'google/gemma-4-31b-it:free';
-                modelDisplayName = 'Gemma 4 (Free default)';
-            }
-        } else {
-            if (aiProvider === 'Google') {
-                defaultModel = 'gemini-3-flash-preview';
-                modelDisplayName = 'Gemini 3 Flash';
-            } else if (aiProvider === 'DeepSeek') {
-                defaultModel = 'deepseek-v4-flash';
-                modelDisplayName = 'DeepSeek Flash';
-            } else if (aiProvider === 'NVIDIA') {
-                defaultModel = 'deepseek-ai/deepseek-v4-flash';
-                modelDisplayName = 'DeepSeek V4 Flash (NVIDIA)';
-            } else { // OpenRouter
-                defaultModel = 'deepseek/deepseek-v4-flash';
-                modelDisplayName = 'DeepSeek Flash';
-            }
+        const defaultModel = getDefaultModel(aiProvider, apiTier);
+        let modelDisplayName = defaultModel;
+        if (defaultModel.includes('gemma')) {
+            modelDisplayName = 'Gemma';
+        } else if (defaultModel.includes('deepseek')) {
+            modelDisplayName = 'DeepSeek Flash';
+        } else if (defaultModel.includes('gemini')) {
+            modelDisplayName = 'Gemini Flash';
         }
 
         setActiveModel(defaultModel);
@@ -1582,11 +1559,39 @@ export default function App({ args = [] }) {
         // 2. Suggestion Interaction (Arrows & Enter)
         if (suggestions.length > 0 && activeView === 'chat') {
             if (key.upArrow) {
-                setSelectedIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+                setSelectedIndex(prev => {
+                    let nextIdx = prev > 0 ? prev - 1 : suggestions.length - 1;
+                    let loops = 0;
+                    while (nextIdx !== prev && loops < suggestions.length) {
+                        const sug = suggestions[nextIdx];
+                        const cmdName = sug?.cmd || sug || '';
+                        if (typeof cmdName === 'string' && cmdName.trimStart().startsWith('---')) {
+                            nextIdx = nextIdx > 0 ? nextIdx - 1 : suggestions.length - 1;
+                            loops++;
+                        } else {
+                            break;
+                        }
+                    }
+                    return nextIdx;
+                });
                 return;
             }
             if (key.downArrow) {
-                setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+                setSelectedIndex(prev => {
+                    let nextIdx = prev < suggestions.length - 1 ? prev + 1 : 0;
+                    let loops = 0;
+                    while (nextIdx !== prev && loops < suggestions.length) {
+                        const sug = suggestions[nextIdx];
+                        const cmdName = sug?.cmd || sug || '';
+                        if (typeof cmdName === 'string' && cmdName.trimStart().startsWith('---')) {
+                            nextIdx = nextIdx < suggestions.length - 1 ? nextIdx + 1 : 0;
+                            loops++;
+                        } else {
+                            break;
+                        }
+                    }
+                    return nextIdx;
+                });
                 return;
             }
             if (key.return) {
@@ -1681,7 +1686,10 @@ export default function App({ args = [] }) {
                 });
             }
 
-            // 1. Load persisted settings
+            // 1. Load remote model config
+            await loadRemoteModelConfig();
+
+            // 2. Load persisted settings
             const saved = await loadSettings();
             originalAllowExternalAccessRef.current = saved.systemSettings?.allowExternalAccess ?? false;
             originalMemoryRef.current = saved.systemSettings?.memory ?? true;
@@ -1706,28 +1714,7 @@ export default function App({ args = [] }) {
             if (parsedArgs.model) {
                 setActiveModel(parsedArgs.model);
             } else if (parsedArgs.provider) {
-                let defaultModel = '';
-                if (currentTier === 'Free') {
-                    if (startupProvider === 'Google') {
-                        defaultModel = 'gemma-4-31b-it';
-                    } else if (startupProvider === 'DeepSeek') {
-                        defaultModel = 'deepseek-v4-flash';
-                    } else if (startupProvider === 'OpenRouter') {
-                        defaultModel = 'google/gemma-4-31b-it:free';
-                    } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'deepseek-ai/deepseek-v4-flash';
-                    }
-                } else {
-                    if (startupProvider === 'Google') {
-                        defaultModel = 'gemini-3-flash-preview';
-                    } else if (startupProvider === 'DeepSeek') {
-                        defaultModel = 'deepseek-v4-flash';
-                    } else if (startupProvider === 'OpenRouter') {
-                        defaultModel = 'deepseek/deepseek-v4-flash';
-                    } else if (startupProvider === 'NVIDIA') {
-                        defaultModel = 'deepseek-ai/deepseek-v4-flash';
-                    }
-                }
+                const defaultModel = getDefaultModel(startupProvider, currentTier);
                 setActiveModel(defaultModel);
             } else {
                 setActiveModel(saved.activeModel);
@@ -2075,232 +2062,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: aiProvider === 'OpenRouter'
-                ? (apiTier === 'Free'
-                    ? [
-                        {
-                            cmd: 'google/gemma-4-31b-it:free',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'moonshotai/kimi-k2.6:free',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'qwen/qwen3-coder:free',
-                            desc: 'Text Only'
-                        },
-                        {
-                            cmd: 'z-ai/glm-4.5-air:free',
-                            desc: 'Text Only'
-                        },
-                    ]
-                    : [
-                        {
-                            cmd: 'google/gemini-3.5-flash',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'qwen/qwen3.7-plus',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'minimax/minimax-m3',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'anthropic/claude-sonnet-4.5',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'anthropic/claude-opus-4.6',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'anthropic/claude-opus-4.8',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'deepseek/deepseek-v4-pro',
-                            desc: 'Text Only'
-                        },
-                        {
-                            cmd: 'deepseek/deepseek-v4-flash',
-                            desc: 'Text Only'
-                        },
-                        {
-                            cmd: 'xiaomi/mimo-v2.5-pro',
-                            desc: 'Text Only'
-                        },
-                        {
-                            cmd: 'z-ai/glm-5',
-                            desc: 'Text Only'
-                        },
-                        {
-                            cmd: 'openai/gpt-5.2-codex',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'openai/gpt-5.2-pro',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'openai/gpt-5.5-pro',
-                            desc: 'Multimodal'
-                        },
-                        {
-                            cmd: 'moonshotai/kimi-k2.6',
-                            desc: 'Multimodal'
-                        },
-                    ])
-                : aiProvider === 'DeepSeek'
-                    ? [
-                        {
-                            cmd: 'deepseek-v4-flash',
-                            desc: 'Fast & Efficient (Text Only)'
-                        },
-                        {
-                            cmd: 'deepseek-v4-pro',
-                            desc: 'High-Intelligence Reasoning (Text Only)'
-                        }
-                    ]
-                    : aiProvider === 'NVIDIA'
-                        ? [
-                            // --- Kimi (Moonshot AI) ---
-                            {
-                                cmd: 'moonshotai/kimi-k2.7',
-                                desc: 'Multimodal'
-                            },
-
-                            // --- DeepSeek Family ---
-                            {
-                                cmd: 'deepseek-ai/deepseek-v4-flash',
-                                desc: 'Text Only'
-                            },
-                            {
-                                cmd: 'deepseek-ai/deepseek-v4-pro',
-                                desc: 'Text Only'
-                            },
-
-                            // --- StepFun ---
-                            {
-                                cmd: 'stepfun-ai/step-3.7-flash',
-                                desc: 'Multimodal'
-                            },
-
-                            // --- Gemma Family (Google) ---
-                            {
-                                cmd: 'google/gemma-4-31b-it',
-                                desc: 'Multimodal'
-                            },
-                            {
-                                cmd: 'google/diffusiongemma-26b-a4b-it',
-                                desc: 'Mega Fast [Experimental]'
-                            },
-
-                            // --- Mistral ---
-                            {
-                                cmd: 'mistralai/mistral-medium-3.5-128b',
-                                desc: 'Multimodal'
-                            },
-
-                            // --- GPT Open Source Series (OpenAI) ---
-                            {
-                                cmd: 'openai/gpt-oss-20b',
-                                desc: 'Text Only'
-                            },
-                            {
-                                cmd: 'openai/gpt-oss-120b',
-                                desc: 'Text Only'
-                            },
-
-                            // --- GLM (Zhipu AI) ---
-                            {
-                                cmd: 'z-ai/glm-5.2',
-                                desc: 'Text Only'
-                            },
-
-                            // --- MiniMax Family ---
-                            {
-                                cmd: 'minimaxai/minimax-m2.7',
-                                desc: 'Text Only'
-                            },
-                            {
-                                cmd: 'minimaxai/minimax-m3',
-                                desc: 'Text Only'
-                            },
-
-                            // QWEN
-                            {
-                                cmd: 'qwen/qwen3.5-397b-a17b',
-                                desc: 'Multimodal'
-                            },
-
-                            // NVIDIA NEMOTRON
-                            {
-                                cmd: 'nvidia/nemotron-3-ultra-550b-a55b',
-                                desc: 'Text Only [EXPERIMENTAL]'
-                            }
-                        ]
-
-                        : (apiTier === 'Free'
-                            ? [
-                                {
-                                    cmd: 'gemma-4-26b-a4b-it',
-                                    desc: 'Standard & Faster (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemma-4-31b-it',
-                                    desc: 'Standard Default (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-2.5-flash-lite',
-                                    desc: 'Fast & Cheap (Multimodal) [Limited Free Quota]'
-                                },
-                                {
-                                    cmd: 'gemini-2.5-flash',
-                                    desc: 'Fast & Reliable (Multimodal) [Limited Free Quota]'
-                                },
-                                {
-                                    cmd: 'gemini-3-flash-preview',
-                                    desc: 'Fast & Lightweight (Multimodal) [Limited Free Quota]'
-                                },
-                                {
-                                    cmd: 'gemini-3.5-flash',
-                                    desc: 'Flash Latest (Multimodal) [Limited Free Quota] Instability Issues'
-                                }
-                            ]
-                            : [
-                                {
-                                    cmd: 'gemini-2.5-flash-lite',
-                                    desc: 'Fast & Cheap (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-2.5-flash',
-                                    desc: 'Fast & Reliable (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-2.5-pro',
-                                    desc: 'Last gen Pro reasoning (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-3.1-flash-lite',
-                                    desc: 'Ultra-Fast & Lite (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-3-flash-preview',
-                                    desc: 'Default, Fast & Lightweight (Multimodal)'
-                                },
-                                {
-                                    cmd: 'gemini-3.5-flash',
-                                    desc: 'Flash Latest (Multimodal) [Instability Issues]'
-                                },
-                                {
-                                    cmd: 'gemini-3.1-pro-preview',
-                                    desc: 'Pro Reasoning (Multimodal)'
-                                },
-
-                            ])
+            subs: getModels(aiProvider, apiTier)
         },
         {
             cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
@@ -2809,17 +2571,19 @@ export default function App({ args = [] }) {
                 case '/model': {
                     if (parts[1]) {
                         const mod = parts.slice(1).join(' ');
-                        if (mod === 'gemma-4-31b-it' && apiTier !== 'Free' && aiProvider === 'Google') {
+                        const freeDefault = getDefaultModel('Google', 'Free');
+                        const paidDefault = getDefaultModel('Google', 'Paid');
+                        if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `**[ACCESS DENIED]** Gemma is restricted to the Free API tier. Automatically switching you to **Gemini 3 Flash Preview** for optimal performance.`,
+                                    text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
                                     isMeta: true
                                 }];
                             });
-                            setActiveModel('gemini-3-flash-preview');
+                            setActiveModel(paidDefault);
                         } else {
                             setActiveModel(mod);
                             const s = emojiSpace(2);
@@ -4117,9 +3881,19 @@ export default function App({ args = [] }) {
         return [];
     }, [input, isFilePickerDismissed]);
 
-    // Reset selected index when input changes to avoid OOB
+    // Reset selected index when input changes to avoid OOB, skipping dividers
     useEffect(() => {
-        setSelectedIndex(0);
+        let startIdx = 0;
+        while (startIdx < suggestions.length) {
+            const sug = suggestions[startIdx];
+            const cmdName = sug?.cmd || sug || '';
+            if (typeof cmdName === 'string' && cmdName.trimStart().startsWith('---')) {
+                startIdx++;
+            } else {
+                break;
+            }
+        }
+        setSelectedIndex(startIdx < suggestions.length ? startIdx : 0);
     }, [suggestions]);
 
     // Slide-down animation for suggestion box 🎞️
@@ -4330,16 +4104,9 @@ export default function App({ args = [] }) {
                                 setAiProvider(selectedProvider);
                                 setApiKey(key);
                                 initAI(key, { aiProvider: selectedProvider, onIDEApproval: resetPendingApproval });
-                                let defaultModel = 'gemma-4-31b-it';
-                                if (selectedProvider === 'OpenRouter') {
-                                    defaultModel = 'google/gemma-4-31b-it:free';
-                                } else if (selectedProvider === 'DeepSeek') {
-                                    defaultModel = 'deepseek-v4-flash';
-                                } else if (selectedProvider === 'NVIDIA') {
-                                    defaultModel = 'deepseek-ai/deepseek-v4-flash';
-                                }
-                                setActiveModel(defaultModel);
                                 const targetTier = (quotas.providerTiers || {})[selectedProvider] || 'Free';
+                                const defaultModel = getDefaultModel(selectedProvider, targetTier);
+                                setActiveModel(defaultModel);
                                 setApiTier(targetTier);
                                 saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
                                 setMessages(prev => [
@@ -4780,15 +4547,9 @@ export default function App({ args = [] }) {
                                         setAiProvider(prov);
                                         setApiKey(keyInput);
                                         initAI(keyInput, { aiProvider: prov, onIDEApproval: resetPendingApproval });
-                                        let defaultModel = 'gemma-4-31b-it';
-                                        if (prov === 'OpenRouter') {
-                                            defaultModel = 'google/gemma-4-31b-it:free';
-                                        } else if (prov === 'DeepSeek') {
-                                            defaultModel = 'deepseek-v4-flash';
-                                        } else if (prov === 'NVIDIA') {
-                                            defaultModel = 'moonshotai/kimi-k2.6';
-                                        } setActiveModel(defaultModel);
                                         const targetTier = (quotas.providerTiers || {})[prov] || 'Free';
+                                        const defaultModel = getDefaultModel(prov, targetTier);
+                                        setActiveModel(defaultModel);
                                         setApiTier(targetTier);
                                         newSettings.aiProvider = prov;
                                         newSettings.activeModel = defaultModel;
@@ -5823,8 +5584,22 @@ export default function App({ args = [] }) {
                             const windowSize = 5;
                             let startIdx = suggestionOffsetRef.current;
 
+                            // Find the first selectable index
+                            let firstSelectableIndex = 0;
+                            while (firstSelectableIndex < suggestions.length) {
+                                const sug = suggestions[firstSelectableIndex];
+                                const cmdName = sug?.cmd || sug || '';
+                                if (typeof cmdName === 'string' && cmdName.trimStart().startsWith('---')) {
+                                    firstSelectableIndex++;
+                                } else {
+                                    break;
+                                }
+                            }
+
                             // Adjust offset based on selectedIndex to scroll only at edges
-                            if (selectedIndex < startIdx) {
+                            if (selectedIndex <= firstSelectableIndex) {
+                                startIdx = 0;
+                            } else if (selectedIndex < startIdx) {
                                 startIdx = selectedIndex;
                             } else if (selectedIndex >= startIdx + windowSize) {
                                 startIdx = selectedIndex - windowSize + 1;
@@ -5849,7 +5624,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                         {suggestions[0]?.cmd?.startsWith('@') ? (
                                             <Text color="gray" italic>
-                                                (Use '#Lstart-Lend' to specify line numbers)
+                                                (Use \'#Lstart-Lend\' to specify line numbers)
                                             </Text>
                                         ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
                                             let url = "https://aistudio.google.com/billing";
@@ -5875,7 +5650,8 @@ export default function App({ args = [] }) {
                                     {visible.slice(0, suggestionVisibleCount).map((s, i) => {
                                         const actualIdx = startIdx + i;
                                         const isActive = actualIdx === selectedIndex;
-                                        const isGemmaDisabled = s.cmd === 'gemma-4-31b-it' && apiTier !== 'Free';
+                                        const isDivider = typeof s.cmd === 'string' && s.cmd.trimStart().startsWith('---');
+                                        const isGemmaDisabled = s.cmd === getDefaultModel('Google', 'Free') && apiTier !== 'Free';
 
                                         return (
                                             <Box
@@ -5885,19 +5661,19 @@ export default function App({ args = [] }) {
                                                 paddingX={1}
                                             >
                                                 <Box width={3}>
-                                                    <Text color={isActive ? "white" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
+                                                    <Text color={isActive ? "#B8BDC9" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
                                                 </Box>
                                                 <Box width={55}>
                                                     <Text
-                                                        color={isGemmaDisabled ? "gray" : (isActive ? "white" : "grey")}
-                                                        bold={isActive}
+                                                        color={isDivider ? "#D0CCD8" : (isGemmaDisabled ? "gray" : (isActive ? "white" : "grey"))}
+                                                        bold={false}
                                                     // dimColor={isGemmaDisabled && !isActive}
                                                     >
                                                         {s.cmd?.startsWith('@[') && s.cmd?.endsWith(']') ? (() => {
                                                             const pathPart = s.cmd.slice(2, -1);
                                                             const parts = pathPart.split(/[/\\]/);
                                                             return parts[parts.length - 1];
-                                                        })() : s.cmd}
+                                                        })() : (s.cmd && s.cmd.includes('/') ? s.cmd.split('/').pop() : s.cmd)}
                                                     </Text>
                                                 </Box>
                                                 <Box flexGrow={1}>

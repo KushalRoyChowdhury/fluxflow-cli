@@ -13,6 +13,7 @@ import { emojiSpace } from './terminal.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.js';
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
+import { isModelMultimodal, getFallbackValue } from '../data/model_config.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
@@ -61,38 +62,8 @@ const withRetry = async (fn, maxRetries = 8, initialDelayMs = 1000, maxDelayMs =
 
 let TERMINATION_SIGNAL = false;
 
-const MULTIMODAL_MODELS = [
-    // OpenRouter models
-    'google/gemma-4-31b-it:free',
-    'moonshotai/kimi-k2.6:free',
-    'google/gemini-3.5-flash',
-    'qwen/qwen3.7-plus',
-    'minimax/minimax-m3',
-    'anthropic/claude-sonnet-4.5',
-    'anthropic/claude-opus-4.6',
-    'anthropic/claude-opus-4.8',
-    'openai/gpt-5.2-codex',
-    'openai/gpt-5.2-pro',
-    'openai/gpt-5.5-pro',
-    'moonshotai/kimi-k2.6',
+export { isModelMultimodal };
 
-    // NVIDIA vision models
-    "moonshotai/kimi-k2.7",
-    "stepfun-ai/step-3.7-flash",
-    "google/gemma-4-31b-it",
-    "mistralai/mistral-medium-3.5-128b",
-    "qwen/qwen3.5-397b-a17b"
-
-    // Google models
-    // No need. All models on Gemini API is Multimodal
-];
-
-export const isModelMultimodal = (model) => {
-    if (!model) return false;
-    const lower = model.toLowerCase();
-    if (lower.startsWith('gemini-') || lower.startsWith('gemma-')) return true;
-    return MULTIMODAL_MODELS.some(m => m.toLowerCase() === lower);
-};
 
 export const getCleanGroupedLength = (rawHistory) => {
     const preprocessed = rawHistory
@@ -453,6 +424,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isGPT = model.includes('gpt');
     const isQwen = model.includes('qwen');
     const isNemotron = model.includes('nemotron');
+    const isLlama3 = model.includes('llama-3');
 
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
@@ -475,7 +447,9 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 
-    if (isKimi) {
+    if (isLlama3) {
+        // Llama-3 does not support thinking parameters
+    } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
     } else if (isGemma) {
         body.chat_template_kwargs = { enable_thinking: isThinking };
@@ -640,7 +614,12 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
         }
     };
 
-    const cleanModelId = modelName.split('/').pop();
+    let cleanModelId = modelName.split('/').pop();
+
+    // Llama 3.3 uses . while the API craves _
+    cleanModelId = cleanModelId.replace('llama-3.3', 'llama-3_3');
+
+
     const pollUrl = `https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
 
     let isStreamingStarted = false;
@@ -1046,7 +1025,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
                 const streamPromise = (async () => {
                     if (aiProvider === 'OpenRouter') {
-                        const janitorOpenRouterModel = 'google/gemma-4-26b-a4b-it:free';
+                        const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
                         const stream = getOpenRouterStream(
                             apiKey,
                             janitorOpenRouterModel,
@@ -1064,7 +1043,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     } else if (aiProvider === 'DeepSeek') {
                         const stream = getDeepSeekStream(
                             apiKey,
-                            'deepseek-chat',
+                            getFallbackValue('deepseek_fast_fallback'),
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -1079,7 +1058,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     } else if (aiProvider === 'NVIDIA') {
                         const stream = getNVIDIAStream(
                             apiKey,
-                            'deepseek-ai/deepseek-v4-flash',
+                            getFallbackValue('nvidia_janitor_fallback'),
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -1093,7 +1072,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         return { iterator, firstResult };
                     } else {
                         const stream = await client.models.generateContentStream({
-                            model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? 'gemini-3.1-flash-lite' : 'gemma-4-26b-a4b-it'),
+                            model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
                             contents: janitorContents,
                             config: {
                                 systemInstruction: janitorPrompt,
@@ -1142,7 +1121,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     const total = lastUsage.totalTokenCount || 0;
                     const cached = lastUsage.cachedContentTokenCount || 0;
                     const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
-                    const jModel = janitorModel || 'gemini-3.1-flash-lite';
+                    const jModel = janitorModel || getFallbackValue('janitor_default');
                     await addToUsage('tokens', total, aiProvider, jModel);
                     if (cached > 0) {
                         await addToUsage('cachedTokens', cached, aiProvider, jModel);
@@ -1822,10 +1801,10 @@ Chats to process:
         const maxAttempts = 5;
         let success = false;
 
-        let targetModel = 'gemma-4-26b-a4b-it';
-        if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
-        if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-        if (aiProvider === 'NVIDIA') targetModel = 'deepseek-ai/deepseek-v4-flash';
+        let targetModel = getFallbackValue('gemma_janitor_fallback_google');
+        if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
+        if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
+        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
 
         while (attempts <= maxAttempts && !success) {
             // console.log(targetModel, settings);
@@ -1897,10 +1876,10 @@ export const compressHistory = async (settings, history, isAuto = false) => {
             ? `Here is the previous summary:\n${oldSummary}\n\nHere is the new conversation history:\n${flattenedText}\n\nProvide a new consolidated summary of the entire session.`
             : `Here is the conversation history:\n${flattenedText}\n\nProvide a consolidated summary of the entire session.`;
 
-        let targetModel = 'gemma-4-26b-a4b-it';
-        if (aiProvider === 'OpenRouter') targetModel = 'google/gemma-4-26b-a4b-it:free';
-        if (aiProvider === 'DeepSeek') targetModel = 'deepseek-v4-flash';
-        if (aiProvider === 'NVIDIA') targetModel = 'deepseek-ai/deepseek-v4-flash';
+        let targetModel = getFallbackValue('gemma_janitor_fallback_google');
+        if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
+        if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
+        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
 
         let attempts = 0;
         let success = false;
@@ -1915,7 +1894,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
                 if (attempts > 3) {
                     if (aiProvider === 'Google') {
                         try {
-                            const fallbackModel = 'gemini-3.1-flash-lite';
+                            const fallbackModel = getFallbackValue('general_fallback');
                             const fallback = await generateSimpleContent(settings, fallbackModel, prompt, systemInstruction, 'Fast');
 
                             return fallback.text || '';
@@ -2807,21 +2786,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
                     targetModel = modelName;
+                    /*
                     if (aiProvider === 'DeepSeek' && thinkingLevel === 'Fast' && targetModel.includes('flash')) {
-                        targetModel = 'deepseek-chat';
+                        targetModel = getFallbackValue('deepseek_fast_fallback');
                     }
                     if (retryCount === MAX_RETRIES - 1) {
-                        targetModel = aiProvider === 'DeepSeek' ? 'deepseek-v4-flash' : 'gemini-3-flash-preview';
+                        targetModel = aiProvider === 'DeepSeek' ? getFallbackValue('deepseek_level_1') : getFallbackValue('google_level_1');
                         yield { type: 'model_update', content: 'Trying with fallback model' };
                     } else if (retryCount === MAX_RETRIES) {
-                        targetModel = aiProvider === 'DeepSeek' ? 'deepseek-v4-pro' : 'gemini-3.5-flash';
+                        targetModel = aiProvider === 'DeepSeek' ? getFallbackValue('deepseek_level_2') : getFallbackValue('google_level_2');
                         yield { type: 'model_update', content: 'Trying with fallback model' };
                     } else if (retryCount > 12 && retryCount < MAX_RETRIES - 2 && settings.apiKey !== "custom") {
-                        targetModel = 'gemma-4-31b-it';
+                        targetModel = getFallbackValue('gemma_emergency');
                         yield { type: 'model_update', content: 'Trying with fallback Gemma Model' };
                     } else if (retryCount > 0) {
                         yield { type: 'model_update', content: null };
                     }
+                    */
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
@@ -4811,7 +4792,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
                     const attemptedToolsCount = (toolActionableText.match(/\[tool:functions/g) || []).length;
                     if (toolResults.length < attemptedToolsCount) {
-                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try again the failed calls [/SYSTEM]`;
+                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try failed calls again [/SYSTEM]`;
                     }
                     const binaryPart = toolResults.find(tr => tr.binaryPart)?.binaryPart || null;
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });

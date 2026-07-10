@@ -2,12 +2,14 @@ import fs from 'fs-extra';
 import path from 'path';
 import { SETTINGS_FILE } from './paths.js';
 import { readAesEncryptedJson, writeAesEncryptedJson } from './crypto.js';
+import { getDefaultModel } from '../data/model_config.js';
 
 const DEFAULT_SETTINGS = {
     mode: 'Flux',
     thinkingLevel: 'Medium',
     aiProvider: 'Google',
-    activeModel: 'gemma-4-31b-it',
+    activeModel: getDefaultModel('Google', 'Free') || 'gemma-4-31b-it',
+
     showFullThinking: true,
     apiTier: 'Free',
     quotas: {

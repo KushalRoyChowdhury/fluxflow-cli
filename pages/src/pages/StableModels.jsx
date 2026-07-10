@@ -167,6 +167,14 @@ export default function StableModels() {
                             <td><code>nvidia/nemotron-3-ultra-550b-a55b</code></td>
                             <td>Text Only [EXPERIMENTAL]</td>
                         </tr>
+                        <tr>
+                            <td><code>meta/llama-3.3-70b-instruct</code></td>
+                            <td>Text Only</td>
+                        </tr>
+                        <tr>
+                            <td><code>meta/llama-3.2-90b-vision-instruct</code></td>
+                            <td>Multimodal</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -219,6 +227,22 @@ export default function StableModels() {
                             <td><code>openai/gpt-5.5-pro</code></td>
                             <td>Multimodal</td>
                         </tr>
+                        <tr>
+                            <td><code>openai/gpt-5.6-terra</code></td>
+                            <td>Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td><code>openai/gpt-5.6-luna</code></td>
+                            <td>Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td><code>openai/gpt-5.6-sol</code></td>
+                            <td>Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td><code>anthropic/claude-fable-5</code></td>
+                            <td>Multimodal</td>
+                        </tr>
 
                         {/*
                         <!-- ========================================== -->
@@ -249,6 +273,10 @@ export default function StableModels() {
                             <td><code>xiaomi/mimo-v2.5-pro</code></td>
                             <td>Multimodal</td>
                         </tr>
+                        <tr>
+                            <td><code>x-ai/grok-4.5</code></td>
+                            <td>Multimodal</td>
+                        </tr>
 
                         {/*
                         <!-- ========================================== -->
@@ -257,6 +285,10 @@ export default function StableModels() {
                         */}
                         <tr>
                             <td><code>z-ai/glm-5</code></td>
+                            <td>Text Only</td>
+                        </tr>
+                        <tr>
+                            <td><code>z-ai/glm-5.2</code></td>
                             <td>Text Only</td>
                         </tr>
                     </tbody>

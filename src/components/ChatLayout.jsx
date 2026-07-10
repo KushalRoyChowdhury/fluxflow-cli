@@ -1240,7 +1240,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
 
     if (type === 'agent-line') {
         if (!text || text.trim() === '') {
-            return null;
+            return <Box height={1} />;
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return (
