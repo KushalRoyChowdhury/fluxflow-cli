@@ -1,5 +1,5 @@
 {
-    "version": 3,
+    "version": 4,
     "release": 20260711,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -9,7 +9,7 @@
         "deepseek_fast_fallback": "deepseek-chat",
         "deepseek_level_1": "deepseek-v4-flash",
         "deepseek_level_2": "deepseek-v4-pro",
-        "nvidia_janitor_fallback": "mistralai/mistral-small-4-119b-2603",
+        "nvidia_janitor_fallback": "google/gemma-4-31b-it",
         "google_level_1": "gemini-3-flash-preview",
         "google_level_2": "gemini-3.5-flash",
         "gemma_emergency": "gemma-4-31b-it",
