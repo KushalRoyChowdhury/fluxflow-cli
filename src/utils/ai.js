@@ -921,9 +921,13 @@ const getToolDetail = (toolName, argsStr) => {
 };
 
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
+    // if (process.stdout.isTTY) {
+    //     process.stdout.write(`\x1b]0;Finalizing...\x07`);
+    //     process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
+    // }
     if (process.stdout.isTTY) {
-        process.stdout.write(`\x1b]0;Finalizing...\x07`);
-        process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
+        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
+        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
     }
 
     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
@@ -1006,10 +1010,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
 
     while (attempts <= MAX_JANITOR_RETRIES) {
-        if (process.stdout.isTTY) {
-            process.stdout.write(`\x1b]0;Retrying Finalizing... (${attempts + 1})...\x07`);
-            process.stdout.write(`\x1b]633;P;TerminalTitle=Retrying Finalizing... (${attempts + 1})...\x07`);
-        }
+        // if (process.stdout.isTTY) {
+        //     process.stdout.write(`\x1b]0;Retrying Finalizing... (${attempts + 1})...\x07`);
+        //     process.stdout.write(`\x1b]633;P;TerminalTitle=Retrying Finalizing... (${attempts + 1})...\x07`);
+        // }
         try {
             if (!(await checkQuota('background', settings))) {
                 return;
@@ -1205,9 +1209,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         } catch (err) {
             attempts++;
             const date = new Date().toLocaleString();
-            if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
-            }
+            // if (process.stdout.isTTY) {
+            //     process.stdout.write(`\u001b]0;Finalizing Error\u0007`);
+            // }
             const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
             await new Promise(resolve => setTimeout(resolve, 1000));
             const janitorErrDir = path.join(LOGS_DIR, 'janitor');
@@ -1224,12 +1228,12 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         const janitorErrDir = path.join(LOGS_DIR, 'janitor');
         fs.appendFileSync(path.join(janitorErrDir, 'error.log'), `-----------------------------------------------------------------------------\n\n`)
 
-        if (attempts >= MAX_JANITOR_RETRIES) {
-            if (process.stdout.isTTY) {
-                process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
-            }
-            await new Promise(resolve => setTimeout(resolve, 3000));
-        }
+        // if (attempts >= MAX_JANITOR_RETRIES) {
+        //     if (process.stdout.isTTY) {
+        //         process.stdout.write(`\u001b]0;${isMemoryEnabled ? 'Finalizing Error' : 'Finalizing Skipped'}\u0007`);
+        //     }
+        //     await new Promise(resolve => setTimeout(resolve, 3000));
+        // }
     }
 
     // Restore title based on chat name when janitor finishes
@@ -4253,7 +4257,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             (isFirst ? '\n' : '') +
                                             boxMid +
                                             (isLast && !/(Created|Edited)/.test(boxMid) ? '\n' : '')
-                                    ) };
+                                        )
+                                    };
                                 }
 
                                 // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions

@@ -11677,8 +11677,8 @@ var init_ai = __esm({
     };
     runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
       if (process.stdout.isTTY) {
-        process.stdout.write(`\x1B]0;Finalizing...\x07`);
-        process.stdout.write(`\x1B]633;P;TerminalTitle=Finalizing...\x07`);
+        process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
+        process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow | Idle\x07");
       }
       const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
       const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
@@ -11726,10 +11726,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       let attempts = 0;
       const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
       while (attempts <= MAX_JANITOR_RETRIES) {
-        if (process.stdout.isTTY) {
-          process.stdout.write(`\x1B]0;Retrying Finalizing... (${attempts + 1})...\x07`);
-          process.stdout.write(`\x1B]633;P;TerminalTitle=Retrying Finalizing... (${attempts + 1})...\x07`);
-        }
         try {
           if (!await checkQuota("background", settings)) {
             return;
@@ -11900,9 +11896,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         } catch (err) {
           attempts++;
           const date = (/* @__PURE__ */ new Date()).toLocaleString();
-          if (process.stdout.isTTY) {
-            process.stdout.write(`\x1B]0;Finalizing Error\x07`);
-          }
           const errLog = err instanceof Error ? (() => {
             try {
               return JSON.parse(JSON.parse(err.message).error.message).error.message;
@@ -11926,12 +11919,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         fs23.appendFileSync(path22.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
-        if (attempts >= MAX_JANITOR_RETRIES) {
-          if (process.stdout.isTTY) {
-            process.stdout.write(`\x1B]0;${isMemoryEnabled ? "Finalizing Error" : "Finalizing Skipped"}\x07`);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 3e3));
-        }
       }
       if (process.stdout.isTTY) {
         try {
