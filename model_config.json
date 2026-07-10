@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "release": 20260711,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -281,6 +281,16 @@
                     },
                     {
                         "cmd": "mistralai/mistral-medium-3.5-128b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "mistralai/mistral-large-3-675b-instruct-2512",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "mistralai/mistral-small-4-119b-2603",
                         "multimodal": true,
                         "desc": "Multimodal"
                     },
