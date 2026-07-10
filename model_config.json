@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260711,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -340,6 +340,11 @@
                         "desc": "Text Only [EXPERIMENTAL]"
                     },
                     {
+                        "cmd": "nvidia/nemotron-3-super-120b-a12b",
+                        "multimodal": false,
+                        "desc": "Text Only [EXPERIMENTAL]"
+                    },
+                    {
                         "cmd": "\n--- Meta Models ---",
                         "desc": ""
                     },
@@ -402,6 +407,16 @@
                         "desc": "Multimodal"
                     },
                     {
+                        "cmd": "mistralai/mistral-large-3-675b-instruct-2512",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "mistralai/mistral-small-4-119b-2603",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
                         "cmd": "\n--- OpenAI Models ---",
                         "desc": ""
                     },
@@ -453,6 +468,11 @@
                     },
                     {
                         "cmd": "nvidia/nemotron-3-ultra-550b-a55b",
+                        "multimodal": false,
+                        "desc": "Text Only [EXPERIMENTAL]"
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-super-120b-a12b",
                         "multimodal": false,
                         "desc": "Text Only [EXPERIMENTAL]"
                     },
