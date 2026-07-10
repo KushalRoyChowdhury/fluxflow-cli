@@ -925,10 +925,6 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     //     process.stdout.write(`\x1b]0;Finalizing...\x07`);
     //     process.stdout.write(`\x1b]633;P;TerminalTitle=Finalizing...\x07`);
     // }
-    if (process.stdout.isTTY) {
-        process.stdout.write('\x1b]0;FluxFlow | Idle\x07');
-        process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow | Idle\x07');
-    }
 
     const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
     const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
@@ -1096,6 +1092,15 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         return { iterator, firstResult };
                     }
                 })();
+
+                if (process.stdout.isTTY) {
+                    const historyIndex = await loadHistory();
+                    const chatData = historyIndex[chatId];
+                    const chatName = chatData?.name || '';
+                    const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Idle';
+                    process.stdout.write(`\x1b]0;${title}\x07`);
+                    process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+                }
 
                 const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
                 let { value: firstChunk, done: firstDone } = firstResult;

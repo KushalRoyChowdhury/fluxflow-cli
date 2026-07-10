@@ -11676,10 +11676,6 @@ var init_ai = __esm({
       }
     };
     runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
-      if (process.stdout.isTTY) {
-        process.stdout.write("\x1B]0;FluxFlow | Idle\x07");
-        process.stdout.write("\x1B]633;P;TerminalTitle=FluxFlow | Idle\x07");
-      }
       const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
       const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
       const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
@@ -11809,6 +11805,14 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 return { iterator: iterator2, firstResult: firstResult2 };
               }
             })();
+            if (process.stdout.isTTY) {
+              const historyIndex = await loadHistory();
+              const chatData = historyIndex[chatId];
+              const chatName = chatData?.name || "";
+              const title = chatName && !chatName.startsWith("flow-") && !chatName.startsWith("Session ") ? chatName : "FluxFlow | Idle";
+              process.stdout.write(`\x1B]0;${title}\x07`);
+              process.stdout.write(`\x1B]633;P;TerminalTitle=${title}\x07`);
+            }
             const { iterator, firstResult } = await Promise.race([streamPromise, timeoutPromise]);
             let { value: firstChunk, done: firstDone } = firstResult;
             if (!firstDone && firstChunk) {
@@ -19232,10 +19236,10 @@ Selection: ${val}`,
               const parts = chunkText.split(/<\/(think|thought)>/gi);
               const thinkPart = parts[0] || "";
               const agentPart = parts.slice(2).join("").replace(/<\/?(think|thought)>/gi, "");
+              flushTypewriterNow();
               activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + thinkPart);
               const startTime = activeStreamingMsgRef.current.startTime || Date.now();
               activeStreamingMsgRef.current.duration = Date.now() - startTime;
-              flushTypewriterNow();
               commitActiveStreamingMessage();
               inThinkMode = false;
               currentAgentId = "agent-" + Date.now();
@@ -19244,6 +19248,7 @@ Selection: ${val}`,
               continue;
             }
             if (inThinkMode && activeStreamingMsgRef.current?.role === "think") {
+              flushTypewriterNow();
               const newText = activeStreamingMsgRef.current.text + chunkText;
               if (newText.toLowerCase().includes("</think>")) {
                 const parts = newText.split(/<\/think>/gi);
@@ -19252,7 +19257,6 @@ Selection: ${val}`,
                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                 activeStreamingMsgRef.current.duration = Date.now() - startTime;
-                flushTypewriterNow();
                 commitActiveStreamingMessage();
                 inThinkMode = false;
                 currentAgentId = "agent-" + Date.now();

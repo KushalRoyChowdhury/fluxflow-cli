@@ -3664,11 +3664,12 @@ export default function App({ args = [] }) {
                             const thinkPart = parts[0] || '';
                             const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
+                            // Flush queue FIRST so queued tokens appear before this chunk's tail text
+                            flushTypewriterNow();
                             activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + thinkPart);
                             const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                             activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
-                            flushTypewriterNow();
                             commitActiveStreamingMessage();
 
                             inThinkMode = false;
@@ -3680,6 +3681,8 @@ export default function App({ args = [] }) {
 
                         // 3. Append to target role with Leak Protection
                         if (inThinkMode && activeStreamingMsgRef.current?.role === 'think') {
+                            // Flush queue FIRST so ref.text is complete before deriving thinkPart
+                            flushTypewriterNow();
                             const newText = activeStreamingMsgRef.current.text + chunkText;
                             if (newText.toLowerCase().includes('</think>')) {
                                 const parts = newText.split(/<\/think>/gi);
@@ -3690,7 +3693,6 @@ export default function App({ args = [] }) {
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                                 activeStreamingMsgRef.current.duration = Date.now() - startTime;
 
-                                flushTypewriterNow();
                                 commitActiveStreamingMessage();
 
                                 inThinkMode = false;
