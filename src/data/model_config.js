@@ -108,7 +108,7 @@ export const getModelConfig = () => activeConfig;
 
 export const loadRemoteModelConfig = async () => {
     try {
-        const url = 'https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/src/data/model_config.json';
+        const url = 'https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/model_config.json';
         const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
         if (res.ok) {
             const data = await res.json();

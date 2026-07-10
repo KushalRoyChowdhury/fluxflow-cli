@@ -274,7 +274,7 @@ var init_model_config = __esm({
     rebuildMultimodalSet();
     loadRemoteModelConfig = async () => {
       try {
-        const url = "https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/src/data/model_config.json";
+        const url = "https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/model_config.json";
         const res = await fetch(url, { signal: AbortSignal.timeout(3e3) });
         if (res.ok) {
           const data = await res.json();

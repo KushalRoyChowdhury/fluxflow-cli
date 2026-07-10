@@ -1,208 +1,572 @@
 {
-  "version": 1,
-  "release": 20260711,
-  "fallbacks": {
-    "janitor_default": "gemini-3.1-flash-lite",
-    "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
-    "janitor_open_router": "google/gemma-4-26b-a4b-it:free",
-    "general_fallback": "gemini-3.1-flash-lite",
-    "deepseek_fast_fallback": "deepseek-chat",
-    "deepseek_level_1": "deepseek-v4-flash",
-    "deepseek_level_2": "deepseek-v4-pro",
-    "nvidia_janitor_fallback": "deepseek-ai/deepseek-v4-flash",
-    "google_level_1": "gemini-3-flash-preview",
-    "google_level_2": "gemini-3.5-flash",
-    "gemma_emergency": "gemma-4-31b-it",
-    "gemma_janitor_fallback_google_openrouter": "google/gemma-4-26b-a4b-it:free",
-    "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it"
-  },
-  "providers": {
-    "OpenRouter": {
-      "default_free": "google/gemma-4-31b-it:free",
-      "default_paid": "deepseek/deepseek-v4-flash",
-      "models": {
-        "Free": [
-          { "cmd": "--- Google Models ---", "desc": "" },
-          { "cmd": "google/gemma-4-31b-it:free", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Moonshot Models ---", "desc": "" },
-          { "cmd": "moonshotai/kimi-k2.6:free", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Qwen Models ---", "desc": "" },
-          { "cmd": "qwen/qwen3-coder:free", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Z-AI Models ---", "desc": "" },
-          { "cmd": "z-ai/glm-4.5-air:free", "multimodal": false, "desc": "Text Only" }
-        ],
-        "Paid": [
-          { "cmd": "--- Google Models ---", "desc": "" },
-          { "cmd": "google/gemini-3.5-flash", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Qwen Models ---", "desc": "" },
-          { "cmd": "qwen/qwen3.7-plus", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- MiniMax Models ---", "desc": "" },
-          { "cmd": "minimax/minimax-m3", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Anthropic Models ---", "desc": "" },
-          { "cmd": "anthropic/claude-sonnet-4.5", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "anthropic/claude-opus-4.6", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "anthropic/claude-opus-4.8", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "anthropic/claude-fable-5", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- DeepSeek Models ---", "desc": "" },
-          { "cmd": "deepseek/deepseek-v4-pro", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "deepseek/deepseek-v4-flash", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Xiaomi Models ---", "desc": "" },
-          { "cmd": "xiaomi/mimo-v2.5-pro", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Z-AI Models ---", "desc": "" },
-          { "cmd": "z-ai/glm-5", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "z-ai/glm-5.2", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- OpenAI Models ---", "desc": "" },
-          { "cmd": "openai/gpt-5.2-codex", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "openai/gpt-5.2-pro", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "openai/gpt-5.5-pro", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "openai/gpt-5.6-terra", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "openai/gpt-5.6-luna", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "openai/gpt-5.6-sol", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Moonshot Models ---", "desc": "" },
-          { "cmd": "moonshotai/kimi-k2.6", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- X-AI Models ---", "desc": "" },
-          { "cmd": "x-ai/grok-4.5", "multimodal": true, "desc": "Multimodal" }
-        ]
-      }
+    "version": 0,
+    "release": 20260711,
+    "fallbacks": {
+        "janitor_default": "gemini-3.1-flash-lite",
+        "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
+        "janitor_open_router": "google/gemma-4-26b-a4b-it:free",
+        "general_fallback": "gemini-3.1-flash-lite",
+        "deepseek_fast_fallback": "deepseek-chat",
+        "deepseek_level_1": "deepseek-v4-flash",
+        "deepseek_level_2": "deepseek-v4-pro",
+        "nvidia_janitor_fallback": "deepseek-ai/deepseek-v4-flash",
+        "google_level_1": "gemini-3-flash-preview",
+        "google_level_2": "gemini-3.5-flash",
+        "gemma_emergency": "gemma-4-31b-it",
+        "gemma_janitor_fallback_google_openrouter": "google/gemma-4-26b-a4b-it:free",
+        "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it"
     },
-    "DeepSeek": {
-      "default_free": "deepseek-v4-flash",
-      "default_paid": "deepseek-v4-flash",
-      "models": {
-        "Free": [
-          { "cmd": "deepseek-v4-flash", "multimodal": false, "desc": "Fast & Efficient (Text Only)" },
-          { "cmd": "deepseek-v4-pro", "multimodal": false, "desc": "High-Intelligence Reasoning (Text Only)" }
-        ],
-        "Paid": [
-          { "cmd": "deepseek-v4-flash", "multimodal": false, "desc": "Fast & Efficient (Text Only)" },
-          { "cmd": "deepseek-v4-pro", "multimodal": false, "desc": "High-Intelligence Reasoning (Text Only)" }
-        ]
-      }
-    },
-    "NVIDIA": {
-      "default_free": "deepseek-ai/deepseek-v4-flash",
-      "default_paid": "deepseek-ai/deepseek-v4-flash",
-      "models": {
-        "Free": [
-          { "cmd": "--- DeepSeek Models ---", "desc": "" },
-          { "cmd": "deepseek-ai/deepseek-v4-flash", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "deepseek-ai/deepseek-v4-pro", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- StepFun Models ---", "desc": "" },
-          { "cmd": "stepfun-ai/step-3.7-flash", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Google Models ---", "desc": "" },
-          { "cmd": "google/gemma-4-31b-it", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "google/diffusiongemma-26b-a4b-it", "multimodal": false, "desc": "Mega Fast [EXPERIMENTAL]" },
-
-          { "cmd": "\n--- Mistral Models ---", "desc": "" },
-          { "cmd": "mistralai/mistral-medium-3.5-128b", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- OpenAI Models ---", "desc": "" },
-          { "cmd": "openai/gpt-oss-20b", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "openai/gpt-oss-120b", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Z-AI Models ---", "desc": "" },
-          { "cmd": "z-ai/glm-5.2", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- MiniMax Models ---", "desc": "" },
-          { "cmd": "minimaxai/minimax-m2.7", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "minimaxai/minimax-m3", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Qwen Models ---", "desc": "" },
-          { "cmd": "qwen/qwen3.5-397b-a17b", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- NVIDIA Models ---", "desc": "" },
-          { "cmd": "nvidia/nemotron-3-ultra-550b-a55b", "multimodal": false, "desc": "Text Only [EXPERIMENTAL]" },
-          { "cmd": "nvidia/nemotron-3-super-120b-a12b", "multimodal": false, "desc": "Text Only [EXPERIMENTAL]" },
-
-          { "cmd": "\n--- Meta Models ---", "desc": "" },
-          { "cmd": "meta/llama-3.3-70b-instruct", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "meta/llama-3.2-90b-vision-instruct", "multimodal": true, "desc": "Multimodal" }
-        ],
-        "Paid": [
-          { "cmd": "--- DeepSeek Models ---", "desc": "" },
-          { "cmd": "deepseek-ai/deepseek-v4-flash", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "deepseek-ai/deepseek-v4-pro", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- StepFun Models ---", "desc": "" },
-          { "cmd": "stepfun-ai/step-3.7-flash", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- Google Models ---", "desc": "" },
-          { "cmd": "google/gemma-4-31b-it", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "google/diffusiongemma-26b-a4b-it", "multimodal": false, "desc": "Mega Fast [EXPERIMENTAL]" },
-
-          { "cmd": "\n--- Mistral Models ---", "desc": "" },
-          { "cmd": "mistralai/mistral-medium-3.5-128b", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "mistralai/mistral-large-3-675b-instruct-2512", "multimodal": true, "desc": "Multimodal" },
-          { "cmd": "mistralai/mistral-small-4-119b-2603", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- OpenAI Models ---", "desc": "" },
-          { "cmd": "openai/gpt-oss-20b", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "openai/gpt-oss-120b", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Z-AI Models ---", "desc": "" },
-          { "cmd": "z-ai/glm-5.2", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- MiniMax Models ---", "desc": "" },
-          { "cmd": "minimaxai/minimax-m2.7", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "minimaxai/minimax-m3", "multimodal": false, "desc": "Text Only" },
-
-          { "cmd": "\n--- Qwen Models ---", "desc": "" },
-          { "cmd": "qwen/qwen3.5-397b-a17b", "multimodal": true, "desc": "Multimodal" },
-
-          { "cmd": "\n--- NVIDIA Models ---", "desc": "" },
-          { "cmd": "nvidia/nemotron-3-ultra-550b-a55b", "multimodal": false, "desc": "Text Only [EXPERIMENTAL]" },
-          { "cmd": "nvidia/nemotron-3-super-120b-a12b", "multimodal": false, "desc": "Text Only [EXPERIMENTAL]" },
-
-          { "cmd": "\n--- Meta Models ---", "desc": "" },
-          { "cmd": "meta/llama-3.3-70b-instruct", "multimodal": false, "desc": "Text Only" },
-          { "cmd": "meta/llama-3.2-90b-vision-instruct", "multimodal": true, "desc": "Multimodal" }
-        ]
-      }
-    },
-    "Google": {
-      "default_free": "gemma-4-31b-it",
-      "default_paid": "gemini-3-flash-preview",
-      "models": {
-        "Free": [
-          { "cmd": "--- Gemma Models ---", "desc": "" },
-          { "cmd": "gemma-4-26b-a4b-it", "multimodal": true, "desc": "Standard & Faster (Multimodal)" },
-          { "cmd": "gemma-4-31b-it", "multimodal": true, "desc": "Standard Default (Multimodal)" },
-
-          { "cmd": "\n--- Gemini 2.5 Models ---", "desc": "" },
-          { "cmd": "gemini-2.5-flash-lite", "multimodal": true, "desc": "Fast & Cheap (Multimodal) [Limited Free Quota]" },
-          { "cmd": "gemini-2.5-flash", "multimodal": true, "desc": "Fast & Reliable (Multimodal) [Limited Free Quota]" },
-
-          { "cmd": "\n--- Gemini 3 Models ---", "desc": "" },
-          { "cmd": "gemini-3-flash-preview", "multimodal": true, "desc": "Fast & Lightweight (Multimodal) [Limited Free Quota]" },
-          { "cmd": "gemini-3.5-flash", "multimodal": true, "desc": "Flash Latest (Multimodal) [Limited Free Quota] Instability Issues" }
-        ],
-        "Paid": [
-          { "cmd": "\n--- Gemini 2.5 Models ---", "desc": "" },
-          { "cmd": "gemini-2.5-flash-lite", "multimodal": true, "desc": "Fast & Cheap (Multimodal)" },
-          { "cmd": "gemini-2.5-flash", "multimodal": true, "desc": "Fast & Reliable (Multimodal)" },
-          { "cmd": "gemini-2.5-pro", "multimodal": true, "desc": "Last gen Pro reasoning (Multimodal)" },
-
-          { "cmd": "\n--- Gemini 3 Models ---", "desc": "" },
-          { "cmd": "gemini-3.1-flash-lite", "multimodal": true, "desc": "Ultra-Fast & Lite (Multimodal)" },
-          { "cmd": "gemini-3-flash-preview", "multimodal": true, "desc": "Default, Fast & Lightweight (Multimodal)" },
-          { "cmd": "gemini-3.5-flash", "multimodal": true, "desc": "Flash Latest (Multimodal) [Instability Issues]" },
-          { "cmd": "gemini-3.1-pro-preview", "multimodal": true, "desc": "Pro Reasoning (Multimodal)" }
-        ]
-      }
+    "providers": {
+        "OpenRouter": {
+            "default_free": "google/gemma-4-31b-it:free",
+            "default_paid": "deepseek/deepseek-v4-flash",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "--- Google Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "google/gemma-4-31b-it:free",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Moonshot Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "moonshotai/kimi-k2.6:free",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Qwen Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "qwen/qwen3-coder:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Z-AI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "z-ai/glm-4.5-air:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    }
+                ],
+                "Paid": [
+                    {
+                        "cmd": "--- Google Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "google/gemini-3.5-flash",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Qwen Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "qwen/qwen3.7-plus",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- MiniMax Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "minimax/minimax-m3",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Anthropic Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "anthropic/claude-sonnet-4.5",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "anthropic/claude-opus-4.6",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "anthropic/claude-opus-4.8",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "anthropic/claude-fable-5",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- DeepSeek Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "deepseek/deepseek-v4-pro",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "deepseek/deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Xiaomi Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "xiaomi/mimo-v2.5-pro",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Z-AI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "z-ai/glm-5",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "z-ai/glm-5.2",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- OpenAI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "openai/gpt-5.2-codex",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "openai/gpt-5.2-pro",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "openai/gpt-5.5-pro",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "openai/gpt-5.6-terra",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "openai/gpt-5.6-luna",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "openai/gpt-5.6-sol",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Moonshot Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "moonshotai/kimi-k2.6",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- X-AI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "x-ai/grok-4.5",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    }
+                ]
+            }
+        },
+        "DeepSeek": {
+            "default_free": "deepseek-v4-flash",
+            "default_paid": "deepseek-v4-flash",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Fast & Efficient (Text Only)"
+                    },
+                    {
+                        "cmd": "deepseek-v4-pro",
+                        "multimodal": false,
+                        "desc": "High-Intelligence Reasoning (Text Only)"
+                    }
+                ],
+                "Paid": [
+                    {
+                        "cmd": "deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Fast & Efficient (Text Only)"
+                    },
+                    {
+                        "cmd": "deepseek-v4-pro",
+                        "multimodal": false,
+                        "desc": "High-Intelligence Reasoning (Text Only)"
+                    }
+                ]
+            }
+        },
+        "NVIDIA": {
+            "default_free": "deepseek-ai/deepseek-v4-flash",
+            "default_paid": "deepseek-ai/deepseek-v4-flash",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "--- DeepSeek Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "deepseek-ai/deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "deepseek-ai/deepseek-v4-pro",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- StepFun Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "stepfun-ai/step-3.7-flash",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Google Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "google/gemma-4-31b-it",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "google/diffusiongemma-26b-a4b-it",
+                        "multimodal": false,
+                        "desc": "Mega Fast [EXPERIMENTAL]"
+                    },
+                    {
+                        "cmd": "\n--- Mistral Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "mistralai/mistral-medium-3.5-128b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- OpenAI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "openai/gpt-oss-20b",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "openai/gpt-oss-120b",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Z-AI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "z-ai/glm-5.2",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- MiniMax Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "minimaxai/minimax-m2.7",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "minimaxai/minimax-m3",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Qwen Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "qwen/qwen3.5-397b-a17b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- NVIDIA Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-ultra-550b-a55b",
+                        "multimodal": false,
+                        "desc": "Text Only [EXPERIMENTAL]"
+                    },
+                    {
+                        "cmd": "\n--- Meta Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "meta/llama-3.3-70b-instruct",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "meta/llama-3.2-90b-vision-instruct",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    }
+                ],
+                "Paid": [
+                    {
+                        "cmd": "--- DeepSeek Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "deepseek-ai/deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "deepseek-ai/deepseek-v4-pro",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- StepFun Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "stepfun-ai/step-3.7-flash",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Google Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "google/gemma-4-31b-it",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "google/diffusiongemma-26b-a4b-it",
+                        "multimodal": false,
+                        "desc": "Mega Fast [EXPERIMENTAL]"
+                    },
+                    {
+                        "cmd": "\n--- Mistral Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "mistralai/mistral-medium-3.5-128b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- OpenAI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "openai/gpt-oss-20b",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "openai/gpt-oss-120b",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Z-AI Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "z-ai/glm-5.2",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- MiniMax Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "minimaxai/minimax-m2.7",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "minimaxai/minimax-m3",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Qwen Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "qwen/qwen3.5-397b-a17b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- NVIDIA Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-ultra-550b-a55b",
+                        "multimodal": false,
+                        "desc": "Text Only [EXPERIMENTAL]"
+                    },
+                    {
+                        "cmd": "\n--- Meta Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "meta/llama-3.3-70b-instruct",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "meta/llama-3.2-90b-vision-instruct",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    }
+                ]
+            }
+        },
+        "Google": {
+            "default_free": "gemma-4-31b-it",
+            "default_paid": "gemini-3-flash-preview",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "--- Gemma Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemma-4-26b-a4b-it",
+                        "multimodal": true,
+                        "desc": "Standard & Faster (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemma-4-31b-it",
+                        "multimodal": true,
+                        "desc": "Standard Default (Multimodal)"
+                    },
+                    {
+                        "cmd": "\n--- Gemini 2.5 Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemini-2.5-flash-lite",
+                        "multimodal": true,
+                        "desc": "Fast & Cheap (Multimodal) [Limited Free Quota]"
+                    },
+                    {
+                        "cmd": "gemini-2.5-flash",
+                        "multimodal": true,
+                        "desc": "Fast & Reliable (Multimodal) [Limited Free Quota]"
+                    },
+                    {
+                        "cmd": "\n--- Gemini 3 Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemini-3-flash-preview",
+                        "multimodal": true,
+                        "desc": "Fast & Lightweight (Multimodal) [Limited Free Quota]"
+                    },
+                    {
+                        "cmd": "gemini-3.5-flash",
+                        "multimodal": true,
+                        "desc": "Flash Latest (Multimodal) [Limited Free Quota] Instability Issues"
+                    }
+                ],
+                "Paid": [
+                    {
+                        "cmd": "\n--- Gemini 2.5 Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemini-2.5-flash-lite",
+                        "multimodal": true,
+                        "desc": "Fast & Cheap (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemini-2.5-flash",
+                        "multimodal": true,
+                        "desc": "Fast & Reliable (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemini-2.5-pro",
+                        "multimodal": true,
+                        "desc": "Last gen Pro reasoning (Multimodal)"
+                    },
+                    {
+                        "cmd": "\n--- Gemini 3 Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemini-3.1-flash-lite",
+                        "multimodal": true,
+                        "desc": "Ultra-Fast & Lite (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemini-3-flash-preview",
+                        "multimodal": true,
+                        "desc": "Default, Fast & Lightweight (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemini-3.5-flash",
+                        "multimodal": true,
+                        "desc": "Flash Latest (Multimodal) [Instability Issues]"
+                    },
+                    {
+                        "cmd": "gemini-3.1-pro-preview",
+                        "multimodal": true,
+                        "desc": "Pro Reasoning (Multimodal)"
+                    }
+                ]
+            }
+        }
     }
-  }
 }
