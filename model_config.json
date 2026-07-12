@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "release": 20260712,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -295,11 +295,6 @@
                         "desc": "Multimodal"
                     },
                     {
-                        "cmd": "mistralai/mistral-nemotron",
-                        "multimodal": false,
-                        "desc": "Text Only (No Thinking)"
-                    },
-                    {
                         "cmd": "\n--- OpenAI Models ---",
                         "desc": ""
                     },
@@ -430,11 +425,6 @@
                         "cmd": "mistralai/mistral-small-4-119b-2603",
                         "multimodal": true,
                         "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "mistralai/mistral-nemotron",
-                        "multimodal": false,
-                        "desc": "Text Only (No Thinking)"
                     },
                     {
                         "cmd": "\n--- OpenAI Models ---",
