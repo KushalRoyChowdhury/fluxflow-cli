@@ -1,7 +1,7 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
 Your exact tool syntax is: [tool:functions.ToolName(args...)]. Malformed calls will fail parsing. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
 
--- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS ALWAYS) --
+-- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS IN THIS TURN) --
 1. [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
 2. [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 

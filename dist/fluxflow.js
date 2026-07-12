@@ -6612,7 +6612,7 @@ var init_janitor_tools = __esm({
     JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
 Your exact tool syntax is: [tool:functions.ToolName(args...)]. Malformed calls will fail parsing. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
 
--- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS ALWAYS) --
+-- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS IN THIS TURN) --
 1. [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
 2. [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
@@ -6784,6 +6784,7 @@ YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT 
 6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
 7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
 8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
+9. 2 MANDATORY TOOLS TO CALL IN THIS TURN. 'Chat', 'Memory(temp)'
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ""}
@@ -10894,6 +10895,7 @@ var init_ai = __esm({
     init_settings();
     init_subagent_state();
     init_model_config();
+    init_secrets();
     init_paths();
     init_revert();
     init_advanceRevert();
@@ -11718,10 +11720,12 @@ var init_ai = __esm({
 ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n" : ""}
 [AGENT (current turn)]: ${agentRes}`;
       janitorContents.push({ role: "user", parts: [{ text: userPrompt }] });
+      const nvidiaApiKey = await getProviderAPIKey("NVIDIA");
+      const fullSettings = await loadSettings();
+      const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === "Free";
       let finalSynthesis = "";
       let attempts = 0;
       const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
-      console.log("Before Loop");
       while (attempts <= MAX_JANITOR_RETRIES) {
         try {
           if (!await checkQuota("background", settings)) {
@@ -11729,11 +11733,16 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           }
           let fullContent = "";
           let lastUsage = null;
+          let useNvidiaFallback = false;
+          let effectiveProvider = aiProvider;
           try {
             const timeoutPromise = new Promise(
-              (_, reject) => setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 6e4)
+              (_, reject) => setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 5500)
             );
-            console.log("WE ARE HERE!");
+            const useNvidiaFallbackForGoogle = aiProvider === "Google" && attempts >= 2 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+            const useNvidiaFallbackForDeepSeek = aiProvider === "DeepSeek" && attempts < 4 && nvidiaApiKey && isNvidiaFree;
+            useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
+            effectiveProvider = useNvidiaFallback ? "NVIDIA" : aiProvider;
             const streamPromise = (async () => {
               if (aiProvider === "OpenRouter") {
                 const janitorOpenRouterModel = getFallbackValue("janitor_open_router");
@@ -11752,7 +11761,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
-              } else if (aiProvider === "DeepSeek") {
+              } else if (aiProvider === "DeepSeek" && !useNvidiaFallback) {
                 const stream = getDeepSeekStream(
                   apiKey,
                   getFallbackValue("deepseek_fast_fallback"),
@@ -11768,12 +11777,11 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
-              } else if (aiProvider === "NVIDIA") {
+              } else if (aiProvider === "NVIDIA" || useNvidiaFallback) {
                 const stream = getNVIDIAStream(
-                  apiKey,
-                  // getFallbackValue('nvidia_janitor_fallback'),
-                  "mistralai/mistral-small-4-119b-2603",
-                  // [DEBUGGING POINT]
+                  useNvidiaFallback ? nvidiaApiKey : apiKey,
+                  getFallbackValue("nvidia_janitor_fallback"),
+                  // "mistralai/mistral-small-4-119b-2603", // [DEBUGGING POINT]
                   janitorContents,
                   janitorPrompt,
                   "Fast",
@@ -11803,7 +11811,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                     // Janitor always minimal
                   }
                 });
-                console.log("MEMORY REQ SENT");
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
@@ -11821,37 +11828,34 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             let { value: firstChunk, done: firstDone } = firstResult;
             if (!firstDone && firstChunk) {
               const parts = firstChunk.candidates?.[0]?.content?.parts;
-              const chunkText = parts ? aiProvider === "Google" ? parts[1]?.text || parts[0]?.text || "" : parts.filter((p) => p.text && !p.thought).map((p) => p.text).join("") : typeof firstChunk.text === "function" ? firstChunk.text() : "";
+              const chunkText = parts ? effectiveProvider === "Google" ? parts[1]?.text || parts[0]?.text || "" : parts.filter((p) => p.text && !p.thought).map((p) => p.text).join("") : typeof firstChunk.text === "function" ? firstChunk.text() : "";
               if (chunkText) {
                 fullContent += chunkText;
               }
               lastUsage = firstChunk.usageMetadata;
               for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
                 const p = chunk.candidates?.[0]?.content?.parts;
-                const t = p ? aiProvider === "Google" ? p[1]?.text || p[0]?.text || "" : p.filter((part) => part.text && !part.thought).map((part) => part.text).join("") : typeof chunk.text === "function" ? chunk.text() : "";
+                const t = p ? effectiveProvider === "Google" ? p[1]?.text || p[0]?.text || "" : p.filter((part) => part.text && !part.thought).map((part) => part.text).join("") : typeof chunk.text === "function" ? chunk.text() : "";
                 if (t) fullContent += t;
                 lastUsage = chunk.usageMetadata;
-                console.log(fullContent);
               }
             }
           } catch (e) {
-            console.log("ERROR: " + e);
             throw e;
           }
           if (fullContent) {
             finalSynthesis = fullContent;
-            console.log(finalSynthesis);
             if (lastUsage) {
               const total = lastUsage.totalTokenCount || 0;
               const cached = lastUsage.cachedContentTokenCount || 0;
               const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
-              const jModel = janitorModel || getFallbackValue("janitor_default");
-              await addToUsage("tokens", total, aiProvider, jModel);
+              const jModel = useNvidiaFallback ? getFallbackValue("nvidia_janitor_fallback") : effectiveProvider === "DeepSeek" ? getFallbackValue("deepseek_fast_fallback") : effectiveProvider === "OpenRouter" ? getFallbackValue("janitor_open_router") : janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue("janitor_default") : getFallbackValue("gemma_janitor_fallback_google"));
+              await addToUsage("tokens", total, effectiveProvider, jModel);
               if (cached > 0) {
-                await addToUsage("cachedTokens", cached, aiProvider, jModel);
+                await addToUsage("cachedTokens", cached, effectiveProvider, jModel);
               }
               if (candidates > 0) {
-                await addToUsage("candidateTokens", candidates, aiProvider, jModel);
+                await addToUsage("candidateTokens", candidates, effectiveProvider, jModel);
               }
             }
           } else {
@@ -11921,7 +11925,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
-          const backoff = Math.min(1e3 * Math.pow(2, attempts - 1), 8e3);
+          const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5e3);
           await new Promise((resolve) => setTimeout(resolve, backoff));
         }
       }
@@ -13382,10 +13386,6 @@ ${ideErr} [/ERROR]`;
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
                 }
               }
-              fs23.writeFileSync(`contents.txt`, `${currentSystemInstruction}
-
-${firstUserMsg}`);
-              break;
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));

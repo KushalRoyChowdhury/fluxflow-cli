@@ -14,6 +14,7 @@ import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from './text.
 import { loadSettings } from './settings.js';
 import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue } from '../data/model_config.js';
+import { getProviderAPIKey } from './secrets.js';
 
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
@@ -1002,6 +1003,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     // fs.writeFileSync('janitorContents.txt', `${janitorPrompt}\n\n${userPrompt}`);
 
+    const nvidiaApiKey = await getProviderAPIKey('NVIDIA');
+    const fullSettings = await loadSettings();
+    const isNvidiaFree = fullSettings.quotas?.providerTiers?.NVIDIA === 'Free';
+
     let finalSynthesis = '';
     let attempts = 0;
     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
@@ -1020,13 +1025,21 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             let fullContent = '';
             let lastUsage = null;
+            let useNvidiaFallback = false;
+            let effectiveProvider = aiProvider;
 
             try {
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 60000)
+                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 5500)
                 );
 
                 // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
+
+                const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 2 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+                const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
+                useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
+                effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
+                // console.log(effectiveProvider); // [DEBUGGING POINT]
 
                 const streamPromise = (async () => {
                     if (aiProvider === 'OpenRouter') {
@@ -1045,7 +1058,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
-                    } else if (aiProvider === 'DeepSeek') {
+                    } else if (aiProvider === 'DeepSeek' && !useNvidiaFallback) {
                         const stream = getDeepSeekStream(
                             apiKey,
                             getFallbackValue('deepseek_fast_fallback'),
@@ -1060,9 +1073,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
-                    } else if (aiProvider === 'NVIDIA') {
+                    } else if (aiProvider === 'NVIDIA' || useNvidiaFallback) {
                         const stream = getNVIDIAStream(
-                            apiKey,
+                            useNvidiaFallback ? nvidiaApiKey : apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
                             // "mistralai/mistral-small-4-119b-2603", // [DEBUGGING POINT]
                             janitorContents,
@@ -1092,7 +1105,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL } // Janitor always minimal
                             }
                         });
-                        console.log("MEMORY REQ SENT");
+                        // console.log("MEMORY REQ SENT"); // [DEBUGGING POINT]
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
@@ -1113,7 +1126,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
                 if (!firstDone && firstChunk) {
                     const parts = firstChunk.candidates?.[0]?.content?.parts;
-                    const chunkText = parts ? (aiProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
+                    const chunkText = parts ? (effectiveProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
                     if (chunkText) {
                         fullContent += chunkText;
                     }
@@ -1121,10 +1134,10 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
                     for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
                         const p = chunk.candidates?.[0]?.content?.parts;
-                        const t = p ? (aiProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
+                        const t = p ? (effectiveProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
                         if (t) fullContent += t;
                         lastUsage = chunk.usageMetadata;
-                        // console.log(fullContent); // [DEBUGGING POINT]
+                        // console.log(useNvidiaFallback, " : ", fullContent); // [DEBUGGING POINT]
                     }
                 }
             } catch (e) {
@@ -1134,18 +1147,24 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             if (fullContent) {
                 finalSynthesis = fullContent;
-                // console.log(finalSynthesis); // [DEBUGGING POINT]
+                // console.log(`Fallback: ${useNvidiaFallback};  Provider: ${effectiveProvider}; Final Synthesis: ${finalSynthesis}`); // [DEBUGGING POINT]
                 if (lastUsage) {
                     const total = lastUsage.totalTokenCount || 0;
                     const cached = lastUsage.cachedContentTokenCount || 0;
                     const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
-                    const jModel = janitorModel || getFallbackValue('janitor_default');
-                    await addToUsage('tokens', total, aiProvider, jModel);
+                    const jModel = useNvidiaFallback
+                        ? getFallbackValue('nvidia_janitor_fallback')
+                        : (effectiveProvider === 'DeepSeek'
+                            ? getFallbackValue('deepseek_fast_fallback')
+                            : (effectiveProvider === 'OpenRouter'
+                                ? getFallbackValue('janitor_open_router')
+                                : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')))));
+                    await addToUsage('tokens', total, effectiveProvider, jModel);
                     if (cached > 0) {
-                        await addToUsage('cachedTokens', cached, aiProvider, jModel);
+                        await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
                     }
                     if (candidates > 0) {
-                        await addToUsage('candidateTokens', candidates, aiProvider, jModel);
+                        await addToUsage('candidateTokens', candidates, effectiveProvider, jModel);
                     }
                 }
 
@@ -1234,7 +1253,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             if (attempts > MAX_JANITOR_RETRIES) break;
 
-            const backoff = Math.min(1000 * Math.pow(2, attempts - 1), 8000);
+            const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5000);
             await new Promise(resolve => setTimeout(resolve, backoff));
         }
     }
@@ -2860,6 +2879,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`); break;
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    // break;
 
                     const abortPromise = new Promise((_, reject) => {
                         if (abortController.signal.aborted) {
