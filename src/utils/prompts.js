@@ -101,7 +101,7 @@ ${thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh' && !isGemini ? `\nCRITIC
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
 -- MEMORY RULES --
-- Memory: ${isMemoryEnabled ? 'Subtly Personalize. Auto Saves' : 'OFF. Decline Remembering Memories'}
+- ${isMemoryEnabled ? 'Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves' : 'OFF. Decline Saving Memories'}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}
@@ -136,7 +136,8 @@ YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT 
 6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
 7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
 8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
-9. 2 MANDATORY TOOLS TO CALL IN THIS TURN. 'Chat', 'Memory(temp)'
+9. 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
+10. CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ''}

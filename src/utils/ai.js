@@ -1014,10 +1014,6 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // console.log("Before Loop"); // [DEBUGGING POINT]
 
     while (attempts <= MAX_JANITOR_RETRIES) {
-        // if (process.stdout.isTTY) {
-        //     process.stdout.write(`\x1b]0;Retrying Finalizing... (${attempts + 1})...\x07`);
-        //     process.stdout.write(`\x1b]633;P;TerminalTitle=Retrying Finalizing... (${attempts + 1})...\x07`);
-        // }
         try {
             if (!(await checkQuota('background', settings))) {
                 return;
@@ -1030,12 +1026,12 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
             try {
                 const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 5500)
+                    setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 10000)
                 );
 
                 // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
 
-                const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 2 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+                const useNvidiaFallbackForGoogle = aiProvider === 'Google' && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
                 const useNvidiaFallbackForDeepSeek = aiProvider === 'DeepSeek' && attempts < 4 && nvidiaApiKey && isNvidiaFree;
                 useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
                 effectiveProvider = useNvidiaFallback ? 'NVIDIA' : aiProvider;
@@ -1077,7 +1073,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const stream = getNVIDIAStream(
                             useNvidiaFallback ? nvidiaApiKey : apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
-                            // "mistralai/mistral-small-4-119b-2603", // [DEBUGGING POINT]
+                            // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -2889,6 +2885,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             reject(new DOMException('The user aborted a request.', 'AbortError'));
                         });
                     });
+                    abortPromise.catch(() => {});
 
                     let activeContents = contents;
 

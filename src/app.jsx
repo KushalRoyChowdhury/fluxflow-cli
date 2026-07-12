@@ -2202,6 +2202,12 @@ export default function App({ args = [] }) {
 
                             if (target) {
                                 stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
+                                if (process.stdout.isTTY) {
+                                    const chatName = target?.name || '';
+                                    const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Resumed';
+                                    process.stdout.write(`\x1b]0;${title}\x07`);
+                                    process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+                                }
                                 clearBlocksCache();
                                 chatLoadingRef.current = true;
                                 setChatId(targetId);
@@ -2291,6 +2297,8 @@ export default function App({ args = [] }) {
                         stdout.write('\x1b[2J\x1b[3J\x1b[H');
                         if (stdout.isTTY) {
                             stdout.write('\x1b[?2004h');
+                            process.stdout.write(`\x1b]0;FluxFlow\x07`);
+                            process.stdout.write(`\x1b]633;P;TerminalTitle=FluxFlow\x07`);
                         }
                     }
                     // Soft clear by resetting message state (Ink handles the visual refresh)
@@ -5059,6 +5067,12 @@ export default function App({ args = [] }) {
                                 const h = await loadHistory();
                                 if (h[id]) {
                                     stdout.write('\x1b[2J\x1b[3J\x1b[H'); // Thorough clear for fresh context
+                                    if (process.stdout.isTTY) {
+                                        const chatName = h[id]?.name || '';
+                                        const title = (chatName && !chatName.startsWith('flow-') && !chatName.startsWith('Session ')) ? chatName : 'FluxFlow | Resumed';
+                                        process.stdout.write(`\x1b]0;${title}\x07`);
+                                        process.stdout.write(`\x1b]633;P;TerminalTitle=${title}\x07`);
+                                    }
                                     clearBlocksCache();
                                     chatLoadingRef.current = true;
                                     setChatId(id);

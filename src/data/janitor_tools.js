@@ -22,4 +22,10 @@ Explicit Triggers for permanent memory:
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
-- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD` : ''}`.trim();
+- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD
+
+Usage Rules:
+- Chat Title is MANDATORY
+- TEMPORARY Memory is MANDATORY
+- WHEN Called User Memory, STILL use Temporary Memory
+- MUST NOT IGNORE ANY TOOL CALLS IN GIVEN CONTEXT OF CHAT BETWEEN USER & AGENT` : ''}`.trim();

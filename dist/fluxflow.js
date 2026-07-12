@@ -6633,7 +6633,13 @@ Explicit Triggers for permanent memory:
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
-- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD` : ""}`.trim();
+- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD
+
+Usage Rules:
+- Chat Title is MANDATORY
+- TEMPORARY Memory is MANDATORY
+- WHEN Called User Memory, STILL use Temporary Memory
+- MUST NOT IGNORE ANY TOOL CALLS IN GIVEN CONTEXT OF CHAT BETWEEN USER & AGENT` : ""}`.trim();
   }
 });
 
@@ -6753,7 +6759,7 @@ CRITICAL THINKING POLICY
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
 -- MEMORY RULES --
-- Memory: ${isMemoryEnabled ? "Subtly Personalize. Auto Saves" : "OFF. Decline Remembering Memories"}
+- ${isMemoryEnabled ? "Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves" : "OFF. Decline Saving Memories"}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? "" : "\n- ACCESS CONTROL: CWD only"}
@@ -6784,7 +6790,8 @@ YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT 
 6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
 7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
 8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
-9. 2 MANDATORY TOOLS TO CALL IN THIS TURN. 'Chat', 'Memory(temp)'
+9. 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
+10. CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ""}
@@ -11737,9 +11744,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           let effectiveProvider = aiProvider;
           try {
             const timeoutPromise = new Promise(
-              (_, reject) => setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 5500)
+              (_, reject) => setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 1e4)
             );
-            const useNvidiaFallbackForGoogle = aiProvider === "Google" && attempts >= 2 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
+            const useNvidiaFallbackForGoogle = aiProvider === "Google" && attempts >= 0 && attempts < 6 && nvidiaApiKey && isNvidiaFree;
             const useNvidiaFallbackForDeepSeek = aiProvider === "DeepSeek" && attempts < 4 && nvidiaApiKey && isNvidiaFree;
             useNvidiaFallback = useNvidiaFallbackForGoogle || useNvidiaFallbackForDeepSeek;
             effectiveProvider = useNvidiaFallback ? "NVIDIA" : aiProvider;
@@ -11781,7 +11788,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 const stream = getNVIDIAStream(
                   useNvidiaFallback ? nvidiaApiKey : apiKey,
                   getFallbackValue("nvidia_janitor_fallback"),
-                  // "mistralai/mistral-small-4-119b-2603", // [DEBUGGING POINT]
+                  // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
                   janitorContents,
                   janitorPrompt,
                   "Fast",
@@ -13393,6 +13400,8 @@ ${ideErr} [/ERROR]`;
                 abortController.signal.addEventListener("abort", () => {
                   reject(new DOMException("The user aborted a request.", "AbortError"));
                 });
+              });
+              abortPromise.catch(() => {
               });
               let activeContents = contents;
               if (aiProvider === "OpenRouter") {
@@ -17870,6 +17879,12 @@ ${cleanText}`, color: "magenta" }];
               const target = h[targetId] || Object.values(h).find((h2) => h2.name.toLowerCase() === targetId.toLowerCase());
               if (target) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                if (process.stdout.isTTY) {
+                  const chatName = target?.name || "";
+                  const title = chatName && !chatName.startsWith("flow-") && !chatName.startsWith("Session ") ? chatName : "FluxFlow | Resumed";
+                  process.stdout.write(`\x1B]0;${title}\x07`);
+                  process.stdout.write(`\x1B]633;P;TerminalTitle=${title}\x07`);
+                }
                 clearBlocksCache();
                 chatLoadingRef.current = true;
                 setChatId(targetId);
@@ -17949,6 +17964,8 @@ ${cleanText}`, color: "magenta" }];
             stdout.write("\x1B[2J\x1B[3J\x1B[H");
             if (stdout.isTTY) {
               stdout.write("\x1B[?2004h");
+              process.stdout.write(`\x1B]0;FluxFlow\x07`);
+              process.stdout.write(`\x1B]633;P;TerminalTitle=FluxFlow\x07`);
             }
           }
           setMessages([
@@ -20182,6 +20199,12 @@ Selection: ${val}`,
               const h = await loadHistory();
               if (h[id]) {
                 stdout.write("\x1B[2J\x1B[3J\x1B[H");
+                if (process.stdout.isTTY) {
+                  const chatName = h[id]?.name || "";
+                  const title = chatName && !chatName.startsWith("flow-") && !chatName.startsWith("Session ") ? chatName : "FluxFlow | Resumed";
+                  process.stdout.write(`\x1B]0;${title}\x07`);
+                  process.stdout.write(`\x1B]633;P;TerminalTitle=${title}\x07`);
+                }
                 clearBlocksCache();
                 chatLoadingRef.current = true;
                 setChatId(id);
