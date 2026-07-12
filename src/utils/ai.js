@@ -515,6 +515,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
             let hasNewData = false;
 
             while (true) {
+                // console.log(buffer); // [DEBUGGING POINT]
                 const { done, value } = await reader.read();
                 if (done) {
                     if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
@@ -1005,6 +1006,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     let attempts = 0;
     const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
 
+    // console.log("Before Loop"); // [DEBUGGING POINT]
+
     while (attempts <= MAX_JANITOR_RETRIES) {
         // if (process.stdout.isTTY) {
         //     process.stdout.write(`\x1b]0;Retrying Finalizing... (${attempts + 1})...\x07`);
@@ -1023,6 +1026,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                     setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 60000)
                 );
 
+                // console.log("WE ARE HERE!"); // [DEBUGGING POINT]
+
                 const streamPromise = (async () => {
                     if (aiProvider === 'OpenRouter') {
                         const janitorOpenRouterModel = getFallbackValue('janitor_open_router');
@@ -1035,7 +1040,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             mode,
                             false,
                             null,
-                            0.75
+                            0.6
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -1050,7 +1055,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             mode,
                             false,
                             null,
-                            0.75
+                            0.6
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -1059,13 +1064,14 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const stream = getNVIDIAStream(
                             apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
+                            // "mistralai/mistral-small-4-119b-2603", // [DEBUGGING POINT]
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
                             mode,
                             false,
                             null,
-                            0.75
+                            0.6
                         );
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
@@ -1076,8 +1082,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             contents: janitorContents,
                             config: {
                                 systemInstruction: janitorPrompt,
-                                maxOutputTokens: 512,
-                                temperature: 0.75,
+                                temperature: 0.7,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -1087,6 +1092,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                                 thinkingConfig: { includeThoughts: false, thinkingLevel: ThinkingLevel.MINIMAL } // Janitor always minimal
                             }
                         });
+                        console.log("MEMORY REQ SENT");
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
@@ -1107,7 +1113,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
                 if (!firstDone && firstChunk) {
                     const parts = firstChunk.candidates?.[0]?.content?.parts;
-                    const chunkText = (parts?.[1]?.text || parts?.[0]?.text || (typeof firstChunk.text === 'function' ? firstChunk.text() : ''));
+                    const chunkText = parts ? (aiProvider === 'Google' ? (parts[1]?.text || parts[0]?.text || '') : parts.filter(p => p.text && !p.thought).map(p => p.text).join('')) : (typeof firstChunk.text === 'function' ? firstChunk.text() : '');
                     if (chunkText) {
                         fullContent += chunkText;
                     }
@@ -1115,17 +1121,20 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
                     for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
                         const p = chunk.candidates?.[0]?.content?.parts;
-                        const t = (p?.[1]?.text || p?.[0]?.text || (typeof chunk.text === 'function' ? chunk.text() : ''));
+                        const t = p ? (aiProvider === 'Google' ? (p[1]?.text || p[0]?.text || '') : p.filter(part => part.text && !part.thought).map(part => part.text).join('')) : (typeof chunk.text === 'function' ? chunk.text() : '');
                         if (t) fullContent += t;
                         lastUsage = chunk.usageMetadata;
+                        // console.log(fullContent); // [DEBUGGING POINT]
                     }
                 }
             } catch (e) {
+                // console.log("ERROR: " + e); // [DEBUGGING POINT]
                 throw e;
             }
 
             if (fullContent) {
                 finalSynthesis = fullContent;
+                // console.log(finalSynthesis); // [DEBUGGING POINT]
                 if (lastUsage) {
                     const total = lastUsage.totalTokenCount || 0;
                     const cached = lastUsage.cachedContentTokenCount || 0;
@@ -2849,7 +2858,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
 
-                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
+                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`); break;
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
 
                     const abortPromise = new Promise((_, reject) => {

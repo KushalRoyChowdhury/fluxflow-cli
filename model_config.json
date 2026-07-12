@@ -1,6 +1,6 @@
 {
-    "version": 5,
-    "release": 20260711,
+    "version": 0,
+    "release": 20260712,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -9,7 +9,7 @@
         "deepseek_fast_fallback": "deepseek-chat",
         "deepseek_level_1": "deepseek-v4-flash",
         "deepseek_level_2": "deepseek-v4-pro",
-        "nvidia_janitor_fallback": "deepseek-ai/deepseek-v4-flash",
+        "nvidia_janitor_fallback": "mistralai/mistral-small-4-119b-2603",
         "google_level_1": "gemini-3-flash-preview",
         "google_level_2": "gemini-3.5-flash",
         "gemma_emergency": "gemma-4-31b-it",

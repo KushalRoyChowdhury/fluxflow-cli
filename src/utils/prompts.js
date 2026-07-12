@@ -14,7 +14,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, USER PREFERENCES) ---\n${userMemories}` : '';
 
     const parts = [userMemoriesStr, tempMemoriesStr].filter(p => p.length > 0);
-    return parts.length > 0 ? `[SYSTEM CONTEXT]\n${parts.join('\n\n')}\n` : '';
+    return parts.length > 0 ? `[MEMORY CONTEXT]\n${parts.join('\n')}\n` : '';
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini) => {
@@ -128,17 +128,17 @@ export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true,
     return `${userMemories ? `-- CURRENT SAVED USER MEMORIES --\n${userMemories}\n-------------------------------------------------\n\n` : ''}=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
-1. OUTPUT ONLY '[tool:functions.xxx(args)]' CALLS (BRACKET WRAP IS MANDATORY).
-2. DO NOT EXPLAIN. DO NOT TALK TO THE USER.
-3. NON-TOOL TEXT WILL BREAK THE SYSTEM.
-4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE.
-5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT.
-6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE.
-7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments (like 'memory'), you MUST escape all double quotes using '\"' to prevent parsing errors.
-8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS.
+1. OUTPUT EXACTLY '[tool:functions.xxx(args)]' CALLS. NO EXTRA WORDS OUTSIDE
+2. DO NOT EXPLAIN. DO NOT TALK TO THE USER
+3. NON-TOOL TEXT WILL BREAK THE SYSTEM
+4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
+5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
+6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
+7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
+8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
 
-YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks.
-${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools.` : ''}
+YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
+${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ''}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 

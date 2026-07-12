@@ -6610,26 +6610,26 @@ var JANITOR_TOOLS_PROTOCOL;
 var init_janitor_tools = __esm({
   "src/data/janitor_tools.js"() {
     JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
-Your tool syntax is: '[tool:functions.ToolName(args...)]'
+Your exact tool syntax is: [tool:functions.ToolName(args...)]. Malformed calls will fail parsing. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
 
 -- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS ALWAYS) --
-[tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message.
-[tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
+1. [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
+2. [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
 ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
-- Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
-- Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
-- Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
+1. Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
+2. Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
+3. Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
 
 -- Memory Relevance Decay Tool --
-- Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
-  You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was relevant, referenced, or helpful in the agent's response or user prompt IN CURRENT MESSAGE. You can stack multiple calls.
+1. Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
+  You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was relevant, referenced, or helpful in the agent's response or user prompt IN CURRENT MESSAGE. You can stack multiple calls
 
 Explicit Triggers for permanent memory:
-- User explicitly asks to 'remember' something.
-- User mentions something important long-term that should be remembered.
-- User provides information that could be useful for long-term reference.
-- User shares personal information or preferences.
+- User explicitly asks to 'remember' something
+- User mentions something important long-term that should be remembered
+- User provides information that could be useful for long-term reference
+- User shares personal information or preferences
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
@@ -6667,8 +6667,8 @@ ${tempMemories}` : "";
       const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, USER PREFERENCES) ---
 ${userMemories}` : "";
       const parts = [userMemoriesStr, tempMemoriesStr].filter((p) => p.length > 0);
-      return parts.length > 0 ? `[SYSTEM CONTEXT]
-${parts.join("\n\n")}
+      return parts.length > 0 ? `[MEMORY CONTEXT]
+${parts.join("\n")}
 ` : "";
     };
     getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini) => {
@@ -6776,17 +6776,17 @@ ${userMemories}
 ` : ""}=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
-1. OUTPUT ONLY '[tool:functions.xxx(args)]' CALLS (BRACKET WRAP IS MANDATORY).
-2. DO NOT EXPLAIN. DO NOT TALK TO THE USER.
-3. NON-TOOL TEXT WILL BREAK THE SYSTEM.
-4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE.
-5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT.
-6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE.
-7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments (like 'memory'), you MUST escape all double quotes using '"' to prevent parsing errors.
-8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS.
+1. OUTPUT EXACTLY '[tool:functions.xxx(args)]' CALLS. NO EXTRA WORDS OUTSIDE
+2. DO NOT EXPLAIN. DO NOT TALK TO THE USER
+3. NON-TOOL TEXT WILL BREAK THE SYSTEM
+4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
+5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
+6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
+7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
+8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
 
-YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks.
-${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools.` : ""}
+YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
+${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ""}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 
@@ -11721,6 +11721,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       let finalSynthesis = "";
       let attempts = 0;
       const MAX_JANITOR_RETRIES = isMemoryEnabled ? 12 : -1;
+      console.log("Before Loop");
       while (attempts <= MAX_JANITOR_RETRIES) {
         try {
           if (!await checkQuota("background", settings)) {
@@ -11732,6 +11733,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             const timeoutPromise = new Promise(
               (_, reject) => setTimeout(() => reject(new Error("JANITOR_TIMEOUT")), 6e4)
             );
+            console.log("WE ARE HERE!");
             const streamPromise = (async () => {
               if (aiProvider === "OpenRouter") {
                 const janitorOpenRouterModel = getFallbackValue("janitor_open_router");
@@ -11745,7 +11747,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.75
+                  0.6
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -11761,7 +11763,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.75
+                  0.6
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -11769,7 +11771,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
               } else if (aiProvider === "NVIDIA") {
                 const stream = getNVIDIAStream(
                   apiKey,
-                  getFallbackValue("nvidia_janitor_fallback"),
+                  // getFallbackValue('nvidia_janitor_fallback'),
+                  "mistralai/mistral-small-4-119b-2603",
+                  // [DEBUGGING POINT]
                   janitorContents,
                   janitorPrompt,
                   "Fast",
@@ -11777,7 +11781,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   mode,
                   false,
                   null,
-                  0.75
+                  0.6
                 );
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
@@ -11788,8 +11792,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   contents: janitorContents,
                   config: {
                     systemInstruction: janitorPrompt,
-                    maxOutputTokens: 512,
-                    temperature: 0.75,
+                    temperature: 0.7,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -11800,6 +11803,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                     // Janitor always minimal
                   }
                 });
+                console.log("MEMORY REQ SENT");
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
@@ -11817,23 +11821,26 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             let { value: firstChunk, done: firstDone } = firstResult;
             if (!firstDone && firstChunk) {
               const parts = firstChunk.candidates?.[0]?.content?.parts;
-              const chunkText = parts?.[1]?.text || parts?.[0]?.text || (typeof firstChunk.text === "function" ? firstChunk.text() : "");
+              const chunkText = parts ? aiProvider === "Google" ? parts[1]?.text || parts[0]?.text || "" : parts.filter((p) => p.text && !p.thought).map((p) => p.text).join("") : typeof firstChunk.text === "function" ? firstChunk.text() : "";
               if (chunkText) {
                 fullContent += chunkText;
               }
               lastUsage = firstChunk.usageMetadata;
               for await (const chunk of { [Symbol.asyncIterator]: () => iterator }) {
                 const p = chunk.candidates?.[0]?.content?.parts;
-                const t = p?.[1]?.text || p?.[0]?.text || (typeof chunk.text === "function" ? chunk.text() : "");
+                const t = p ? aiProvider === "Google" ? p[1]?.text || p[0]?.text || "" : p.filter((part) => part.text && !part.thought).map((part) => part.text).join("") : typeof chunk.text === "function" ? chunk.text() : "";
                 if (t) fullContent += t;
                 lastUsage = chunk.usageMetadata;
+                console.log(fullContent);
               }
             }
           } catch (e) {
+            console.log("ERROR: " + e);
             throw e;
           }
           if (fullContent) {
             finalSynthesis = fullContent;
+            console.log(finalSynthesis);
             if (lastUsage) {
               const total = lastUsage.totalTokenCount || 0;
               const cached = lastUsage.cachedContentTokenCount || 0;
@@ -13375,6 +13382,10 @@ ${ideErr} [/ERROR]`;
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
                 }
               }
+              fs23.writeFileSync(`contents.txt`, `${currentSystemInstruction}
+
+${firstUserMsg}`);
+              break;
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));
