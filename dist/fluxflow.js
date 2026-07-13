@@ -5019,7 +5019,7 @@ var init_StatusBar = __esm({
       }
       return "#ff0000";
     };
-    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel: activeModel2 = "", isProcessing = false, lastChunkTime = 0 }) => {
+    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0 }) => {
       const modeIcon = mode === "Flux" ? "" : "";
       const [memoryUsage, setMemoryUsage] = useState5(0);
       const [memoryLimit, setMemoryLimit] = useState5(0);
@@ -5094,9 +5094,9 @@ var init_StatusBar = __esm({
         };
       }, []);
       let maxLimit = 262144;
-      if (aiProvider === "NVIDIA" && (activeModel2?.includes("glm") || activeModel2?.includes("gpt") || activeModel2?.includes("qwen"))) {
+      if (aiProvider === "NVIDIA" && (activeModel?.includes("glm") || activeModel?.includes("gpt") || activeModel?.includes("qwen"))) {
         maxLimit = 128e3;
-      } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (activeModel2.includes("deepseek") || activeModel2.includes("seed"))) {
+      } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (activeModel.includes("deepseek") || activeModel.includes("seed"))) {
         maxLimit = 409600;
       }
       return /* @__PURE__ */ React5.createElement(
@@ -12638,7 +12638,7 @@ Provide a consolidated summary of the entire session.`;
         if (aiProvider === "NVIDIA" && (modelName?.includes("glm") || modelName?.includes("gpt") || modelName?.includes("qwen"))) {
           contextCompressionCount = 122e3;
           contextTruncationCount = 126e3;
-        } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (activeModel.includes("deepseek") || activeModel.includes("seed"))) {
+        } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (modelName.includes("deepseek") || modelName.includes("seed"))) {
           contextCompressionCount = 403e3;
           contextTruncationCount = 408e3;
         }
@@ -16711,7 +16711,7 @@ function App({ args = [] }) {
   const [setupStep, setSetupStep] = useState15(0);
   const [latestVer, setLatestVer] = useState15(null);
   const [showFullThinking, setShowFullThinking] = useState15(false);
-  const [activeModel2, setActiveModel] = useState15(getDefaultModel("Google", "Free") || "gemma-4-31b-it");
+  const [activeModel, setActiveModel] = useState15(getDefaultModel("Google", "Free") || "gemma-4-31b-it");
   const [janitorModel, setJanitorModel] = useState15(getFallbackValue("gemma_janitor_fallback_google") || "gemma-4-26b-a4b-it");
   const [isInitializing, setIsInitializing] = useState15(true);
   const [isAppFocused, setIsAppFocused] = useState15(true);
@@ -16842,12 +16842,12 @@ function App({ args = [] }) {
       setThinkingLevel(hasStandard ? "Standard" : "Medium");
     } else {
       if (aiProvider === "Google" && thinkingLevel === "xHigh") {
-        if (activeModel2 && activeModel2.toLowerCase().startsWith("gemini-3")) {
+        if (activeModel && activeModel.toLowerCase().startsWith("gemini-3")) {
           setThinkingLevel("High");
         }
       }
     }
-  }, [aiProvider, activeModel2, thinkingLevel]);
+  }, [aiProvider, activeModel, thinkingLevel]);
   useEffect12(() => {
     if (!apiKey) return;
     if (isFirstRender.current) {
@@ -17648,7 +17648,7 @@ function App({ args = [] }) {
   }, [confirmExit]);
   useEffect12(() => {
     if (!isInitializing) {
-      const modelToSave = parsedArgs.model && activeModel2 === parsedArgs.model ? persistedModelRef.current : activeModel2;
+      const modelToSave = parsedArgs.model && activeModel === parsedArgs.model ? persistedModelRef.current : activeModel;
       let settingsToSave = systemSettings;
       if (parsedArgs.playground) {
         settingsToSave = {
@@ -17661,7 +17661,7 @@ function App({ args = [] }) {
         mode,
         thinkingLevel,
         aiProvider,
-        activeModel: modelToSave || activeModel2,
+        activeModel: modelToSave || activeModel,
         showFullThinking,
         systemSettings: settingsToSave,
         profileData,
@@ -17669,7 +17669,7 @@ function App({ args = [] }) {
         apiTier
       });
     }
-  }, [mode, thinkingLevel, aiProvider, activeModel2, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
+  }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
   const handleSetup = async (val) => {
     const key = val.trim();
     let minLength = 38;
@@ -17757,7 +17757,7 @@ function App({ args = [] }) {
         { cmd: "Medium", desc: "Balanced Reasoning" },
         { cmd: "High", desc: "Deep Reasoning" },
         { cmd: "xHigh", desc: "Extended Reasoning" }
-      ] : activeModel2 && activeModel2.toLowerCase().startsWith("gemini-3") ? [
+      ] : activeModel && activeModel.toLowerCase().startsWith("gemini-3") ? [
         { cmd: "Fast", desc: "Fastest" },
         { cmd: "Low", desc: "Quick Reasoning" },
         { cmd: "Medium", desc: "Balanced Reasoning" },
@@ -18805,7 +18805,7 @@ ${timestamp}` };
             }
           }
           const stream = getAIStream(
-            activeModel2,
+            activeModel,
             cleanHistoryForAI,
             {
               profile: profileData,
@@ -20448,7 +20448,7 @@ Selection: ${val}`,
             glintWidth: 2,
             typeSpeed: 10
           }
-        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: "Waiting for API", baseColor: "white", glintColor: "gray", glintWidth: 4, speed: 80 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: wittyPhrase, italic: true, speed: 80, typeSpeed: 15 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: tempModelOverride || activeModel2.split("/")[1] || activeModel2, baseColor: "white", glintColor: "gray", glintWidth: 3 }))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, isProcessing && Date.now() - lastChunkTime > 15e3 && !activeSubagents.some((sa) => sa.status === "running" && !statusText.toLowerCase().includes("waiting")) ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: "Waiting for API", baseColor: "white", glintColor: "gray", glintWidth: 4, speed: 80 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : wittyPhrase ? /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: wittyPhrase, italic: true, speed: 80, typeSpeed: 15 }), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 ")) : null, /* @__PURE__ */ React16.createElement(GlintText_default, { text: tempModelOverride || activeModel.split("/")[1] || activeModel, baseColor: "white", glintColor: "gray", glintWidth: 3 }))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: "#555555",
@@ -20615,7 +20615,7 @@ Selection: ${val}`,
       isMemoryEnabled: systemSettings.memory,
       apiTier,
       aiProvider,
-      activeModel: activeModel2,
+      activeModel,
       isProcessing,
       lastChunkTime
     }

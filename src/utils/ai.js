@@ -2083,7 +2083,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (aiProvider === 'NVIDIA' && (modelName?.includes('glm') || modelName?.includes('gpt') || modelName?.includes('qwen'))) {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
-        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (activeModel.includes('deepseek') || activeModel.includes('seed')))) {
+        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (modelName.includes('deepseek') || modelName.includes('seed')))) {
             contextCompressionCount = 403000;
             contextTruncationCount = 408000;
         }
