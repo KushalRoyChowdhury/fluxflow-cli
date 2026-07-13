@@ -10,7 +10,7 @@
         "deepseek_level_1": "deepseek-v4-flash",
         "deepseek_level_2": "deepseek-v4-pro",
         "nvidia_janitor_fallback": "mistralai/mistral-nemotron",
-        "nvidia_chat_summarizer_fallback": "bytedance/seed-oss-36b-instruct",
+        "nvidia_chat_summarizer_fallback": "deepseek-ai/deepseek-v4-flash",
         "google_level_1": "gemini-3-flash-preview",
         "google_level_2": "gemini-3.5-flash",
         "gemma_emergency": "gemma-4-31b-it",
