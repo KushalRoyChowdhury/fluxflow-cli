@@ -426,6 +426,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isQwen = model.includes('qwen');
     const isNemotron = model.includes('nemotron');
     const isLlama3 = model.includes('llama-3');
+    const isBytedance = model.includes('seed');
 
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
@@ -434,6 +435,15 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         'Standard': 'medium',
         'High': 'high',
         'xHigh': 'high'
+    };
+
+    const BYTEDANCE_THINKING_LEVELS = {
+        'Fast': '64',
+        'Low': '64',
+        'Medium': '4096',
+        'Standard': '4096',
+        'High': '16384',
+        'xHigh': '16384'
     };
 
     const maxTokens = (isMinimax || isDeepSeek) ? 16384 : 32768;
@@ -478,6 +488,12 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
             body.chat_template_kwargs = { enable_thinking: true, medium_effort: true };
         } else {
             body.chat_template_kwargs = { enable_thinking: false };
+        }
+    } else if (isBytedance) {
+        if (isThinking) {
+            body.extra_body = {
+                thinking_budget: parseInt(BYTEDANCE_THINKING_LEVELS[apiLevel] ?? '4096')
+            };
         }
     }
 
@@ -1912,7 +1928,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         let targetModel = getFallbackValue('gemma_janitor_fallback_google');
         if (aiProvider === 'OpenRouter') targetModel = getFallbackValue('janitor_open_router');
         if (aiProvider === 'DeepSeek') targetModel = getFallbackValue('deepseek_level_1');
-        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_janitor_fallback');
+        if (aiProvider === 'NVIDIA') targetModel = getFallbackValue('nvidia_chat_summarizer_fallback');
 
         let attempts = 0;
         let success = false;
@@ -2067,9 +2083,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (aiProvider === 'NVIDIA' && (modelName?.includes('glm') || modelName?.includes('gpt') || modelName?.includes('qwen'))) {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
-        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid')) {
-            contextCompressionCount = 400000;
-            contextTruncationCount = 405000;
+        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (activeModel.includes('deepseek') || activeModel.includes('seed')))) {
+            contextCompressionCount = 403000;
+            contextTruncationCount = 408000;
         }
 
         if ((sessionStats?.tokens || 0) > contextCompressionCount) {

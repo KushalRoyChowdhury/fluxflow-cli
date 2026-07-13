@@ -1,6 +1,6 @@
 {
-    "version": 2,
-    "release": 20260712,
+    "version": 0,
+    "release": 20260714,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -10,6 +10,7 @@
         "deepseek_level_1": "deepseek-v4-flash",
         "deepseek_level_2": "deepseek-v4-pro",
         "nvidia_janitor_fallback": "mistralai/mistral-nemotron",
+        "nvidia_chat_summarizer_fallback": "bytedance/seed-oss-36b-instruct",
         "google_level_1": "gemini-3-flash-preview",
         "google_level_2": "gemini-3.5-flash",
         "gemma_emergency": "gemma-4-31b-it",
@@ -341,6 +342,11 @@
                         "desc": "Multimodal"
                     },
                     {
+                        "cmd": "qwen/qwen3.5-122b-a10b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
                         "cmd": "\n--- NVIDIA Models ---",
                         "desc": ""
                     },
@@ -367,6 +373,15 @@
                         "cmd": "meta/llama-3.2-90b-vision-instruct",
                         "multimodal": true,
                         "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- ByteDance Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "bytedance/seed-oss-36b-instruct",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     }
                 ],
                 "Paid": [
@@ -473,6 +488,11 @@
                         "desc": "Multimodal"
                     },
                     {
+                        "cmd": "qwen/qwen3.5-122b-a10b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
                         "cmd": "\n--- NVIDIA Models ---",
                         "desc": ""
                     },
@@ -499,6 +519,15 @@
                         "cmd": "meta/llama-3.2-90b-vision-instruct",
                         "multimodal": true,
                         "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- ByteDance Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "bytedance/seed-oss-36b-instruct",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     }
                 ]
             }

@@ -2936,7 +2936,7 @@ export default function App({ args = [] }) {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Compressing session history...`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Compacting session history...`, isMeta: true }];
                         });
 
                         try {
@@ -2957,7 +2957,7 @@ export default function App({ args = [] }) {
                                     const finalMsgs = [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `[SYSTEM] Chat History compressed saving tokens.`,
+                                        text: `[SYSTEM] Chat History compacted saving tokens.`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(finalMsgs.length);
@@ -2966,13 +2966,13 @@ export default function App({ args = [] }) {
                             } else {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: '[SYSTEM] Compression failed (no summary returned).', isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: '[SYSTEM] Compaction failed.', isMeta: true }];
                                 });
                             }
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Error during compression: ${err.message}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Error during compaction: ${err.message}`, isMeta: true }];
                             });
                         } finally {
                             setIsCompressing(false);
@@ -5446,7 +5446,7 @@ export default function App({ args = [] }) {
                                                         ) : escPressCount === 1 ? (
                                                             <Text color="white" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
-                                                            <Text color="#cccccc">{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compressing session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                            <Text color="#cccccc">{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}
