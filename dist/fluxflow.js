@@ -2843,6 +2843,11 @@ var init_text = __esm({
           active: []
         };
       }
+      if (!text && !msg.isStreaming) {
+        const emptyResult = { completed: [], active: [] };
+        blocksCache.set(cacheKey, emptyResult);
+        return emptyResult;
+      }
       const completedBlocks = [];
       let activeBlock = null;
       let pendingChunk = [];
@@ -13133,9 +13138,8 @@ ${ideCtx.warnings}
                   const maxLen = Math.max(...boxLines.map((l) => l.length));
                   const boxWidth = Math.min(maxLen + 4, terminalWidth);
                   const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
-                  const isFirst = tIdx === 0;
-                  const isLast = tIdx === tagsFound.length - 1;
-                  yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
+                  yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
+`) };
                   continue;
                 }
                 const finalStart = startLine !== null ? startLine : 1;
@@ -13179,7 +13183,7 @@ ${ideCtx.warnings}
                       totalLines = content.split("\n").length;
                     } catch (e) {
                     }
-                    label = `\u2714  Auto-Read: ${filePath} \u2192 Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                    label = `\u2714  Auto-Read: ${filePath}`;
                     taggedContextBlocks.push(textResult);
                   }
                   if (label) {
@@ -13191,9 +13195,8 @@ ${ideCtx.warnings}
                     const maxLen = Math.max(...boxLines.map((l) => l.length));
                     const boxWidth = Math.min(maxLen + 4, terminalWidth);
                     const boxMid = boxLines.map((line) => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join("\n");
-                    const isFirst = tIdx === 0;
-                    const isLast = tIdx === tagsFound.length - 1;
-                    yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
+                    yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
+`) };
                   }
                 }
               }
@@ -13292,6 +13295,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
           let dedupeBuffer = "";
           let isDedupeActive = false;
           let detectedAnyToolCalls = false;
+          let thisIsFirstToolFeedback = true;
           let targetModel = modelName;
           let currentSystemInstruction = "";
           while (retryCount <= MAX_RETRIES && inStreamRetryCount <= MAX_RETRIES && !success && !TERMINATION_SIGNAL) {
@@ -13303,7 +13307,6 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
                   process.stdout.write(`\x1B]0;Working...\x07`);
                 }
                 yield { type: "turn_reset", content: true };
-                yield { type: "spinner", content: true };
                 isInitialAttempt = false;
                 if (inStreamRetryCount === 1) {
                   accumulatedContext = "";
@@ -14296,9 +14299,9 @@ ${ideErr} [/ERROR]`;
                           }
                           const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                           const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                          const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                          yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}`) };
+                          yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                          thisIsFirstToolFeedback = false;
                         }
                         toolResults.push({ role: "user", text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                         yield { type: "tool_result", content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -14520,9 +14523,9 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                                       }
                                       const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                       const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                      const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                                      yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}}`) };
+                                      yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                                      thisIsFirstToolFeedback = false;
                                       toolResults.push({ role: "user", text: errorMsg });
                                       await incrementUsage("toolFailure");
                                       if (settings.onToolResult) settings.onToolResult("failure", normToolName);
@@ -14672,9 +14675,9 @@ ${snippet2}
                           }
                           const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                           const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                          const isFirst = toolCallPointer === 0;
-                          const isLast = toolCallPointer === allToolsFound.length - 1;
-                          yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
+                          yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                          thisIsFirstToolFeedback = false;
                           const toolEnd2 = Date.now();
                           lastToolFinishedAt = toolEnd2;
                           yield { type: "tool_time", content: toolEnd2 - executionStart };
@@ -14708,8 +14711,9 @@ ${snippet2}
                             const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                             const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                             const boxBottom = ` ${" ".repeat(boxWidth)} `;
-                            yield { type: "visual_feedback", content: colorMainWords(`${boxBottom}
-${boxMid}`) };
+                            yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                            thisIsFirstToolFeedback = false;
                           }
                           if (normToolName === "exec_command") {
                             await new Promise((resolve) => setTimeout(resolve, 50));
@@ -14733,22 +14737,15 @@ ${boxMid}`) };
                       }
                       const boxWidth = Math.min(label.length + 4, terminalWidth);
                       const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                      const isFirst = toolCallPointer === 0;
-                      const isLast = toolCallPointer === allToolsFound.length - 1;
-                      yield {
-                        type: "visual_feedback",
-                        content: colorMainWords(
-                          (isFirst ? "\n" : "") + boxMid + (isLast && !/(Created|Edited)/.test(boxMid) ? "\n" : "")
-                        )
-                      };
+                      yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}${label.includes("\u2714") && (label.includes("Created") || label.includes("Edited")) ? "" : "\n"}`) };
+                      thisIsFirstToolFeedback = false;
                     }
                     if (lastToolFinishedAt > 0) {
                       const timeSinceLastTool = Date.now() - lastToolFinishedAt;
-                      if (timeSinceLastTool < 1e3) {
+                      if (timeSinceLastTool < 1500) {
                         await new Promise((resolve) => setTimeout(resolve, 1e3 - timeSinceLastTool));
                       }
                     }
-                    yield { type: "spinner", content: false };
                     let execToolContext = {
                       chatId,
                       history,
@@ -14780,7 +14777,6 @@ ${boxMid}`) };
                     }
                     currentTurnTools.push(normToolName);
                     let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
-                    yield { type: "spinner", content: true };
                     if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
@@ -14816,9 +14812,9 @@ ${boxMid}`) };
                       }
                       const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                       const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                      const isFirst = toolCallPointer === 0;
-                      const isLast = toolCallPointer === allToolsFound.length - 1;
-                      yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
+                      yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                      thisIsFirstToolFeedback = false;
                     }
                     if (normToolName === "EmergencyRollback") {
                       const { method } = parseArgs(toolCall.args);
@@ -14836,9 +14832,9 @@ ${boxMid}`) };
                         }
                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                        const isFirst = toolCallPointer === 0;
-                        const isLast = toolCallPointer === allToolsFound.length - 1;
-                        yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + boxMid + (isLast ? "\n" : "")) };
+                        yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
+`) };
+                        thisIsFirstToolFeedback = false;
                       }
                     }
                     if (normToolName === "todo") {
@@ -14890,9 +14886,9 @@ ${boxMid}`) };
                           ...listItems.map((item) => `    ${item}`)
                           // Sub-indented items for that premium look
                         ].join("\n");
-                        const isFirst = toolCallPointer === 0;
-                        const isLast = toolCallPointer === allToolsFound.length - 1;
-                        yield { type: "visual_feedback", content: colorMainWords((isFirst ? "\n" : "") + output + (isLast ? "\n" : "")) };
+                        yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${output}
+`) };
+                        thisIsFirstToolFeedback = false;
                       }
                     }
                     if (normToolName === "exec_command" && settings.onExecEnd) {
@@ -15209,7 +15205,10 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
 `, "").replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
 **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
 `, "").replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
-`, "");
+`, "").replaceAll(
+              /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
+              ""
+            );
             if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
               const jitInstructionFast = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;

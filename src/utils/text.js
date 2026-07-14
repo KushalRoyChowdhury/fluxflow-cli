@@ -740,6 +740,14 @@ export const parseMessageToBlocks = (msg, columns) => {
     }
 
     // It is a think or agent message (either streaming or completed)
+    // Early exit: if cleanSignals stripped everything (e.g. tool-call-only messages), don't emit any blocks.
+    // Without this, "".split('\n') produces [''], which enqueues one empty agent-line → a blank rendered line.
+    if (!text && !msg.isStreaming) {
+        const emptyResult = { completed: [], active: [] };
+        blocksCache.set(cacheKey, emptyResult);
+        return emptyResult;
+    }
+
     const completedBlocks = [];
     let activeBlock = null;
 

@@ -2545,10 +2545,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             const maxLen = Math.max(...boxLines.map(l => l.length));
                             const boxWidth = Math.min(maxLen + 4, terminalWidth);
                             const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
-                            const isFirst = tIdx === 0;
-                            const isLast = tIdx === tagsFound.length - 1;
-                            yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
-                            // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                            yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n`) };
                             continue;
                         }
 
@@ -2596,7 +2593,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const content = fs.readFileSync(absPath, 'utf8');
                                     totalLines = content.split('\n').length;
                                 } catch (e) { }
-                                label = `✔  Auto-Read: ${filePath} → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                                label = `✔  Auto-Read: ${filePath}` // → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
                                 taggedContextBlocks.push(textResult);
                             }
 
@@ -2609,14 +2606,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const maxLen = Math.max(...boxLines.map(l => l.length));
                                 const boxWidth = Math.min(maxLen + 4, terminalWidth);
                                 const boxMid = boxLines.map(line => `${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`).join('\n');
-                                const isFirst = tIdx === 0;
-                                const isLast = tIdx === tagsFound.length - 1;
-                                yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
-                                // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
-                                // const boxTop = `╭${'─'.repeat(boxWidth)}╮`;
-                                // const boxMid = boxLines.map(line => `│ ${line.padEnd(boxWidth - 2).substring(0, boxWidth - 2)} │`).join('\n');
-                                // const boxBottom = `╰${'─'.repeat(boxWidth)}╯`;
-                                // yield { type: 'visual_feedback', content: `${boxTop}\n${boxMid}\n${boxBottom}` };
+                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n`) };
                             }
                         }
                     }
@@ -2729,6 +2719,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             let isDedupeActive = false;
 
             let detectedAnyToolCalls = false;
+            let thisIsFirstToolFeedback = true;
 
             let targetModel = modelName;
             let currentSystemInstruction = '';
@@ -2742,7 +2733,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             process.stdout.write(`\u001b]0;Working...\u0007`);
                         }
                         yield { type: 'turn_reset', content: true };
-                        yield { type: 'spinner', content: true };
+                        // yield { type: 'spinner', content: true }; // [Obsolete]
                         isInitialAttempt = false;
                         if (inStreamRetryCount === 1) {
                             accumulatedContext = '';
@@ -3853,8 +3844,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                             const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                                             const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                            const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                            yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                            thisIsFirstToolFeedback = false;
                                         }
                                         toolResults.push({ role: 'user', text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                                         yield { type: 'tool_result', content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -4072,8 +4063,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     }
                                                                     const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                                                     const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                                                    const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}}`) };
+                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                                                    thisIsFirstToolFeedback = false;
 
                                                                     toolResults.push({ role: 'user', text: errorMsg });
                                                                     await incrementUsage('toolFailure');
@@ -4229,9 +4220,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                             const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                                             const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                            const isFirst = toolCallPointer === 0;
-                                            const isLast = toolCallPointer === allToolsFound.length - 1;
-                                            yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                            thisIsFirstToolFeedback = false;
 
                                             const toolEnd = Date.now();
                                             lastToolFinishedAt = toolEnd;
@@ -4271,7 +4261,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 const boxWidth = Math.min(deniedLabel.length + 4, terminalWidth);
                                                 const boxMid = `${deniedLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
                                                 const boxBottom = ` ${' '.repeat(boxWidth)} `;
-                                                yield { type: 'visual_feedback', content: colorMainWords(`${boxBottom}\n${boxMid}`) };
+                                                yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                                thisIsFirstToolFeedback = false;
                                             }
                                             if (normToolName === 'exec_command') {
                                                 await new Promise(resolve => setTimeout(resolve, 50));
@@ -4297,26 +4288,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    const isFirst = toolCallPointer === 0;
-                                    const isLast = toolCallPointer === allToolsFound.length - 1;
-                                    yield {
-                                        type: 'visual_feedback', content: colorMainWords(
-                                            (isFirst ? '\n' : '') +
-                                            boxMid +
-                                            (isLast && !/(Created|Edited)/.test(boxMid) ? '\n' : '')
-                                        )
-                                    };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : '\n'}`) };
+                                    thisIsFirstToolFeedback = false;
                                 }
 
-                                // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
+                                // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1.5s gap between tool executions
                                 if (lastToolFinishedAt > 0) {
                                     const timeSinceLastTool = Date.now() - lastToolFinishedAt;
-                                    if (timeSinceLastTool < 1000) {
+                                    if (timeSinceLastTool < 1500) {
                                         await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastTool));
                                     }
                                 }
 
-                                yield { type: 'spinner', content: false };
+                                // yield { type: 'spinner', content: false }; // [Obsolete]
 
                                 let execToolContext = {
                                     chatId, history, onChunk: (chunk) => settings.onExecChunk ? settings.onExecChunk(chunk) : null, onAskUser: settings.onAskUser,
@@ -4347,7 +4331,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 currentTurnTools.push(normToolName);
                                 let result = await dispatchTool(normToolName, toolCall.args, execToolContext);
-                                yield { type: 'spinner', content: true };
+                                // yield { type: 'spinner', content: true }; // [Obsolete]
 
                                 if ((normToolName === 'write_file' || normToolName === 'update_file') && result.startsWith('SUCCESS')) {
                                     const { path: filePath } = parseArgs(toolCall.args);
@@ -4390,9 +4374,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                     const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    const isFirst = toolCallPointer === 0;
-                                    const isLast = toolCallPointer === allToolsFound.length - 1;
-                                    yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                    thisIsFirstToolFeedback = false;
                                 }
 
                                 if (normToolName === 'EmergencyRollback') {
@@ -4413,9 +4396,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                        const isFirst = toolCallPointer === 0;
-                                        const isLast = toolCallPointer === allToolsFound.length - 1;
-                                        yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + boxMid + (isLast ? '\n' : '')) };
+                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                        thisIsFirstToolFeedback = false;
                                     }
                                 }
 
@@ -4475,9 +4457,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             `${uiTitle}`, // Clean title with a slight indent aligned with other feedbacks
                                             ...listItems.map(item => `    ${item}`) // Sub-indented items for that premium look
                                         ].join('\n');
-                                        const isFirst = toolCallPointer === 0;
-                                        const isLast = toolCallPointer === allToolsFound.length - 1;
-                                        yield { type: 'visual_feedback', content: colorMainWords((isFirst ? '\n' : '') + output + (isLast ? '\n' : '')) };
+                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${output}\n`) };
+                                        thisIsFirstToolFeedback = false;
                                     }
                                 }
 
@@ -4874,7 +4855,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 msg.text = msg.text
                     .replace(`\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n`, '')
                     .replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
-                    .replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '');
+                    .replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
+                    .replaceAll(
+                        /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
+                        ''
+                );
 
                 if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google" && msg.text.startsWith('[TOOL RESULT]')) {
                     const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
