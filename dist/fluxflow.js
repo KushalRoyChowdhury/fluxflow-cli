@@ -11261,6 +11261,8 @@ var init_ai = __esm({
       const isNemotron = model.includes("nemotron");
       const isLlama3 = model.includes("llama-3");
       const isBytedance = model.includes("seed");
+      const isPoolside = model.includes("poolside");
+      const isThinkingmachines = model.includes("thinkingmachines");
       const GPT_THINKING_LEVELS = {
         "Fast": "low",
         "Low": "low",
@@ -11287,7 +11289,7 @@ var init_ai = __esm({
         temperature,
         ...isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || "high" }
       };
-      if (isLlama3) {
+      if (isLlama3 || isThinkingmachines) {
       } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
       } else if (isGemma) {
@@ -11323,6 +11325,8 @@ var init_ai = __esm({
             thinking_budget: parseInt(BYTEDANCE_THINKING_LEVELS[apiLevel] ?? "4096")
           };
         }
+      } else if (isPoolside) {
+        body.chat_template_kwargs = { enable_thinking: isThinking };
       }
       let attempts = 0;
       const maxAttempts = 6;

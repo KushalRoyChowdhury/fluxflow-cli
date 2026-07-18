@@ -427,6 +427,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const isNemotron = model.includes('nemotron');
     const isLlama3 = model.includes('llama-3');
     const isBytedance = model.includes('seed');
+    const isPoolside = model.includes('poolside');
+    const isThinkingmachines = model.includes('thinkingmachines');
 
     const GPT_THINKING_LEVELS = {
         'Fast': 'low',
@@ -458,8 +460,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 
-    if (isLlama3) {
-        // Llama-3 does not support thinking parameters
+    if (isLlama3 || isThinkingmachines) {
+        // Llama-3 and thinkingmachines do not support thinking parameters
     } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
     } else if (isGemma) {
@@ -495,6 +497,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                 thinking_budget: parseInt(BYTEDANCE_THINKING_LEVELS[apiLevel] ?? '4096')
             };
         }
+    } else if (isPoolside) {
+        body.chat_template_kwargs = { enable_thinking: isThinking };
     }
 
     let attempts = 0;
