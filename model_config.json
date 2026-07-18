@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260719,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -382,24 +382,6 @@
                         "cmd": "bytedance/seed-oss-36b-instruct",
                         "multimodal": false,
                         "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Poolside Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "poolside/laguna-xs-2.1",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Thinking Machines Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "thinkingmachines/inkling",
-                        "multimodal": false,
-                        "desc": "Text Only (Reasoning Model)"
                     }
                 ],
                 "Paid": [
@@ -546,24 +528,6 @@
                         "cmd": "bytedance/seed-oss-36b-instruct",
                         "multimodal": false,
                         "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Poolside Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "poolside/laguna-xs-2.1",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Thinking Machines Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "thinkingmachines/inkling",
-                        "multimodal": false,
-                        "desc": "Text Only (Reasoning Model)"
                     }
                 ]
             }

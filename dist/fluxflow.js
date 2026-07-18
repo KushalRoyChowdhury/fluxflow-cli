@@ -6750,6 +6750,7 @@ Check these first; These Files > Training Data. Safety rules apply
       return `${nameStr}${nicknameStr}${userInstrStr}=== SYSTEM PROMPT ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
 Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
+- ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT
 
 -- MARKERS --
 - TOOL SYSTEM: [TOOL RESULT]
@@ -6764,7 +6765,7 @@ CRITICAL THINKING POLICY
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
 -- MEMORY RULES --
-- ${isMemoryEnabled ? "Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves" : "OFF. Decline Saving Memories"}
+- ${isMemoryEnabled ? "Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves" : "DISABLED. Decline Remembering Memories"}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? "" : "\n- ACCESS CONTROL: CWD only"}
@@ -11271,7 +11272,7 @@ var init_ai = __esm({
         "High": "high",
         "xHigh": "high"
       };
-      const BYTEDANCE_THINKING_LEVELS = {
+      const BYTEDANCE_THINKING_BUDGETS = {
         "Fast": "64",
         "Low": "64",
         "Medium": "4096",
@@ -11279,7 +11280,7 @@ var init_ai = __esm({
         "High": "16384",
         "xHigh": "16384"
       };
-      const maxTokens = isMinimax || isDeepSeek ? 16384 : 32768;
+      const maxTokens = isMinimax || isDeepSeek || isPoolside || isThinkingmachines ? 16384 : 32768;
       const body = {
         model,
         messages,
@@ -11322,7 +11323,7 @@ var init_ai = __esm({
       } else if (isBytedance) {
         if (isThinking) {
           body.extra_body = {
-            thinking_budget: parseInt(BYTEDANCE_THINKING_LEVELS[apiLevel] ?? "4096")
+            thinking_budget: parseInt(BYTEDANCE_THINKING_BUDGETS[apiLevel] ?? "4096")
           };
         }
       } else if (isPoolside) {
@@ -15275,7 +15276,7 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT**
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
 - USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 HIGHLY RECOMMENDED

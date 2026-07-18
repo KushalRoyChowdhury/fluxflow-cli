@@ -439,7 +439,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         'xHigh': 'high'
     };
 
-    const BYTEDANCE_THINKING_LEVELS = {
+    const BYTEDANCE_THINKING_BUDGETS = {
         'Fast': '64',
         'Low': '64',
         'Medium': '4096',
@@ -448,7 +448,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         'xHigh': '16384'
     };
 
-    const maxTokens = (isMinimax || isDeepSeek) ? 16384 : 32768;
+    const maxTokens = (isMinimax || isDeepSeek || isPoolside || isThinkingmachines) ? 16384 : 32768;
 
     const body = {
         model: model,
@@ -494,7 +494,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     } else if (isBytedance) {
         if (isThinking) {
             body.extra_body = {
-                thinking_budget: parseInt(BYTEDANCE_THINKING_LEVELS[apiLevel] ?? '4096')
+                thinking_budget: parseInt(BYTEDANCE_THINKING_BUDGETS[apiLevel] ?? '4096')
             };
         }
     } else if (isPoolside) {
@@ -4924,7 +4924,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT**
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
 - USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
