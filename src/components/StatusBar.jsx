@@ -175,12 +175,15 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                     <Text color="white" bold>{thinkingLevel.toUpperCase()}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃</Text>
-
-                <Box marginX={1}>
-                    <Text color="gray" bold>MEM: </Text>
-                    <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text>
-                </Box>
+               {isMemoryEnabled && (
+                     <Box>
+                        <Text color="gray" dimColor>┃</Text>
+                        <Box marginX={1}>
+                            <Text color="gray" bold>MEM: </Text>
+                            <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text>
+                        </Box>
+                     </Box>
+                )}
             </Box>
 
             {/* 📁 WORKSPACE TELEMETRY */}
