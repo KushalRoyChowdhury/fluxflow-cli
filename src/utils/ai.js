@@ -2634,7 +2634,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : '\n'}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\nSTRICTLY FOLLOW VALID TOOL CALLING SCHEMA [/SYSTEM]\n" : ""}` : '[SYSTEM Priority : HIGH] STRICTLY FOLLOW VALID TOOL CALLING SCHEMA eg. `[tool:functions.ReadFolder(path=".")]` NO OTHER FORMAT/TOKEN IS ALLOWED [/SYSTEM]\n'}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -2882,6 +2882,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // [FILE CHANGES INJECTION] - Show file changes from previous turn when advance rollback is active
+                    // Persists across agentic loops by writing to both contents (for current API call) and modifiedHistory (for durability)
                     if (systemSettings?.advanceRollback && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                         try {
                             const fileChanges = await AdvanceRevertManager.getLatestFileChanges(chatId);
@@ -2891,7 +2892,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 for (const f of fileChanges.modifiedFiles) changesStr += `* ${f} (modified)\n`;
                                 for (const f of fileChanges.deletedFiles) changesStr += `* ${f} (deleted)\n`;
                                 changesStr += '[/SYSTEM]';
+                                // Inject into transient contents for the imminent API call
                                 lastUserMsg.parts[0].text += changesStr;
+                                // Also persist into modifiedHistory so it survives across agentic loops
+                                // Find the last user entry in modifiedHistory that corresponds to this tool result
+                                let lastHistIdx = -1;
+                                for (let hi = modifiedHistory.length - 1; hi >= 0; hi--) {
+                                    if (modifiedHistory[hi].role === 'user' && modifiedHistory[hi].text?.startsWith('[TOOL RESULT]')) {
+                                        lastHistIdx = hi;
+                                        break;
+                                    }
+                                }
+                                if (lastHistIdx !== -1) {
+                                    modifiedHistory[lastHistIdx].text += changesStr;
+                                }
                             }
                         } catch (err) {
                             // silently ignore errors in file changes injection
@@ -2934,7 +2948,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.95
+                            1.0
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -2946,7 +2960,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.99
+                            1.05
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         const rawStream = getNVIDIAStream(
@@ -2958,7 +2972,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            0.99
+                            1.05
                         );
                         stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
                     } else {
@@ -2968,7 +2982,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             config: {
                                 systemInstruction: currentSystemInstruction,
                                 mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
-                                temperature: 1.0,
+                                temperature: 1.05,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
@@ -4952,7 +4966,8 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT**
+To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **CRITICAL: NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT. NO OTHER XML OR MARKERS WILL BE ALLOWED**
+**
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
 - USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED

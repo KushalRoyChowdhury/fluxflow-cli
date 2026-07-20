@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.6.0", "3.5.0"]
+export const stableVersions = ["3.6.1"]
 
 export const changelogData = {
+    "3.6.1": {
+        "note": "JULY 21.",
+        "added": [],
+        "changed": [],
+        "fixes": [
+            "Improved Tool Calling on Rubbish models."
+        ]
+    },
     "3.6.0": {
         "note": "JULY 21.",
         "added": [],
