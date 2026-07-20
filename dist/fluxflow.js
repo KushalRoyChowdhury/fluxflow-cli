@@ -12435,13 +12435,13 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       });
     };
     consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
+      tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
       try {
         const { aiProvider = "Google" } = settings;
-        const tempStorage2 = tempStorage2 || readEncryptedJson(TEMP_MEM_FILE, {});
-        const totalMemoriesCount = Object.values(tempStorage2).flat().length;
+        const totalMemoriesCount = Object.values(tempStorage).flat().length;
         if (totalMemoriesCount <= 5) return;
-        const chatsToSummarize = Object.keys(tempStorage2).filter((id) => {
-          return id !== currentChatId && Array.isArray(tempStorage2[id]) && tempStorage2[id].length > 2;
+        const chatsToSummarize = Object.keys(tempStorage).filter((id) => {
+          return id !== currentChatId && Array.isArray(tempStorage[id]) && tempStorage[id].length > 2;
         });
         if (chatsToSummarize.length === 0) return;
         let prompt = `You are a silent background process for the FluxFlow CLI Agent.
@@ -12462,7 +12462,7 @@ Chats to process:
 `;
         const cacheStorage = readEncryptedJson(TEMP_MEM_CHAT_FILE, {});
         for (const id of chatsToSummarize) {
-          const rawMemories = tempStorage2[id];
+          const rawMemories = tempStorage[id];
           const newMemoryListStr = rawMemories.map((m) => `- ${m}`).join("\n");
           const oldSummary = cacheStorage[id];
           prompt += `[Chat ID: ${id}]

@@ -1801,9 +1801,9 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
  * into an on-device L2 cache file using stacked tool calls, and purges them from L1.
  */
 const consolidatePastMemories = async (currentChatId, settings, tempStorage = null) => {
+    tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
     try {
         const { aiProvider = 'Google' } = settings;
-        const tempStorage = tempStorage || readEncryptedJson(TEMP_MEM_FILE, {});
 
         // 1. Calculate total memories across all chats in L1
         const totalMemoriesCount = Object.values(tempStorage).flat().length;
