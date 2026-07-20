@@ -7,7 +7,6 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
     const [history, setHistory] = useState({});
     const [keys, setKeys] = useState([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
-
     useEffect(() => {
         const fetchHistory = async () => {
             const h = await loadHistory();
@@ -83,7 +82,13 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
                             >
                                 <Box flexGrow={1}>
                                     <Text color={isSelected ? 'while' : 'grey'} bold={isSelected}>
-                                        {isSelected ? '❯ ' : '  '}{chat?.name || id}
+                                        {isSelected ? '❯ ' : '  '}
+                                        {(() => {
+                                            // Real title (not 'Session...') > prompt > fallback
+                                            if (chat?.name && !chat.name.startsWith('Session')) return chat.name;
+                                            if (chat?.prompt) return chat.prompt;
+                                            return chat?.name || id;
+                                        })()}
                                         <Text color={`${!isSelected ? 'grey' : 'grey'}`}> [{dateStr} • {id}]</Text>
                                     </Text>
                                 </Box>

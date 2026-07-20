@@ -2627,7 +2627,23 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/save': {
-                    const name = parts.slice(1).join(' ') || `Session ${new Date().toLocaleTimeString()}`;
+                    // Use first user prompt as default title instead of time-based session name
+                    let promptDefault = undefined;
+                    const firstUserMsg = messages.find(m => m.role === 'user');
+                    if (firstUserMsg && firstUserMsg.text) {
+                        const text = firstUserMsg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, '').trim();
+                        const words = text.split(/\s+/);
+                        let truncatedPrompt = undefined;
+                        if (words.length > 7) {
+                            truncatedPrompt = words.slice(0, 7).join(' ') + '...';
+                        } else if (text.length > 45) {
+                            truncatedPrompt = text.substring(0, 45).trimEnd() + '...';
+                        } else {
+                            truncatedPrompt = text;
+                        }
+                        promptDefault = truncatedPrompt;
+                    }
+                    const name = parts.slice(1).join(' ') || promptDefault || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
                     setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
                     break;
@@ -3083,13 +3099,9 @@ export default function App({ args = [] }) {
                                 i++;
                             }
 
-                            const toolCalls = [];
-                            const toolResults = [];
-                            const finalResponses = [];
-
+                            // Emit messages in natural order — no classification or reordering.
+                            // Only merge adjacent same-role messages (required for API strict-alternation).
                             turnMessages.forEach(tm => {
-                                const textLower = (tm.text || '').toLowerCase();
-                                const hasTool = textLower.includes('tool:functions.') || textLower.includes('agent:generalist.');
                                 const isResult = tm.role === 'system' && (
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
@@ -3098,40 +3110,21 @@ export default function App({ args = [] }) {
                                     tm.isTerminalRecord
                                 );
 
-                                if (tm.role === 'agent') {
-                                    if (hasTool) {
-                                        toolCalls.push(tm.text);
-                                    } else {
-                                        finalResponses.push(tm.text);
-                                    }
-                                } else if (isResult) {
-                                    toolResults.push(tm.text);
+                                const emitRole = isResult ? 'system' : 'agent';
+                                const rawText = (tm.text || '').trim();
+                                if (!rawText) return;
+
+                                const emitText = isResult && !rawText.startsWith('[TOOL RESULT]')
+                                    ? `[TOOL RESULT]: ${rawText}`
+                                    : rawText;
+
+                                const last = cleanHistoryForAI[cleanHistoryForAI.length - 1];
+                                if (last && last.role === emitRole) {
+                                    last.text = last.text + '\n\n' + emitText;
                                 } else {
-                                    finalResponses.push(tm.text);
+                                    cleanHistoryForAI.push({ role: emitRole, text: emitText });
                                 }
                             });
-
-                            if (toolCalls.length > 0) {
-                                cleanHistoryForAI.push({
-                                    role: 'agent',
-                                    text: toolCalls.map(tc => tc.trim()).filter(Boolean).join('\n')
-                                });
-                            }
-                            if (toolResults.length > 0) {
-                                cleanHistoryForAI.push({
-                                    role: 'system',
-                                    text: toolResults.map(tr => {
-                                        const trimmed = tr.trim();
-                                        return trimmed.startsWith('[TOOL RESULT]') ? trimmed : `[TOOL RESULT]: ${trimmed}`;
-                                    }).filter(Boolean).join('\n\n')
-                                });
-                            }
-                            if (finalResponses.length > 0) {
-                                cleanHistoryForAI.push({
-                                    role: 'agent',
-                                    text: finalResponses.map(fr => fr.trim()).filter(Boolean).join('\n\n')
-                                });
-                            }
                         }
                     }
                     const stream = getAIStream(
@@ -3870,10 +3863,15 @@ export default function App({ args = [] }) {
         // File Autocomplete Support
         const parts = input.split(' ');
         const lastPart = parts[parts.length - 1];
-        if (lastPart && lastPart.startsWith('@') && !isFilePickerDismissed) {
+        // Also trigger on escaped @ (\@) while keeping the escape character preserved
+        const isEscapedAt = lastPart && lastPart.startsWith('\\@');
+        const isPlainAt = lastPart && lastPart.startsWith('@');
+        if ((isPlainAt || isEscapedAt) && !isFilePickerDismissed) {
             const hashIndex = lastPart.indexOf('#');
             const hasHash = hashIndex !== -1;
-            const query = hasHash ? lastPart.substring(1, hashIndex).toLowerCase() : lastPart.slice(1).toLowerCase();
+            // Determine prefix length: 2 for escaped (\@), 1 for plain (@)
+            const prefixLen = isEscapedAt ? 2 : 1;
+            const query = hasHash ? lastPart.substring(prefixLen, hashIndex).toLowerCase() : lastPart.slice(prefixLen).toLowerCase();
             const suffix = hasHash ? lastPart.substring(hashIndex) : '';
             const projectFiles = getProjectFiles(process.cwd());
 
@@ -3882,7 +3880,7 @@ export default function App({ args = [] }) {
                 const relPath = f.relativePath.replace(/\\/g, '/');
                 const formattedPath = relPath.startsWith('.') ? relPath : './' + relPath;
                 return {
-                    cmd: '@[' + formattedPath + suffix + ']',
+                    cmd: (isEscapedAt ? '\\@' : '@') + '[' + formattedPath + suffix + ']',
                     desc: f.relativePath
                 };
             });
@@ -5636,9 +5634,9 @@ export default function App({ args = [] }) {
                                 >
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                                         <Text color="white" bold>
-                                            {suggestions[0]?.cmd?.startsWith('@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
+                                {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
                                         </Text>
-                                        {suggestions[0]?.cmd?.startsWith('@') ? (
+                                        {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? (
                                             <Text color="gray" italic>
                                                 (Use \'#Lstart-Lend\' to specify line numbers)
                                             </Text>
@@ -5685,8 +5683,9 @@ export default function App({ args = [] }) {
                                                         bold={false}
                                                     // dimColor={isGemmaDisabled && !isActive}
                                                     >
-                                                        {s.cmd?.startsWith('@[') && s.cmd?.endsWith(']') ? (() => {
-                                                            const pathPart = s.cmd.slice(2, -1);
+                                                        {s.cmd && (s.cmd.startsWith('@[') || s.cmd.startsWith('\\@[')) && s.cmd.endsWith(']') ? (() => {
+                                                            // Handle both @[...] and \@[...]
+                                                            const pathPart = s.cmd.startsWith('\\@[') ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
                                                             const parts = pathPart.split(/[/\\]/);
                                                             return parts[parts.length - 1];
                                                         })() : (s.cmd && s.cmd.includes('/') ? s.cmd.split('/').pop() : s.cmd)}

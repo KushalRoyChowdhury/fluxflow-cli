@@ -179,8 +179,8 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                      <Box>
                         <Text color="gray" dimColor>┃</Text>
                         <Box marginX={1}>
-                            <Text color="gray" bold>MEM: </Text>
-                            <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text>
+                            <Text color="white" dimColor bold>MEMORY</Text>
+                            {/* <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text> */}
                         </Box>
                      </Box>
                 )}

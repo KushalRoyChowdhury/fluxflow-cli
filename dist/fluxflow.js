@@ -5112,7 +5112,7 @@ var init_StatusBar = __esm({
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "MEM: "), /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, isMemoryEnabled ? "ON" : "OFF")))),
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", dimColor: true, bold: true }, "MEMORY")))),
         /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", italic: true }, truncatePath(process.cwd(), 35))),
         /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", (() => {
           const pct = tokens / maxLimit * 100;
@@ -5356,7 +5356,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST A
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed. **EVERY TURN UPDATE POLICY**
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed OR markDone with 'create' to create completed tasks. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
@@ -7097,17 +7097,46 @@ var init_history = __esm({
           }
         } catch (e) {
         }
-        const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
+        const extractPrompt = (msg) => {
+          if (!msg || !msg.text) return void 0;
+          const text = msg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, "").trim();
+          const words = text.split(/\s+/);
+          let prompt2 = void 0;
+          if (words.length > 7) {
+            prompt2 = words.slice(0, 7).join(" ") + "...";
+          } else if (text.length > 45) {
+            prompt2 = text.substring(0, 45).trimEnd() + "...";
+          } else {
+            prompt2 = text;
+          }
+          return prompt2;
+        };
+        let prompt = void 0;
+        const userMessages = persistentMessages.filter((m) => m.role === "user");
+        const firstUserMsg = userMessages[0];
+        const latestUserMsg = userMessages[userMessages.length - 1];
+        if (existingChat && existingChat.prompt) {
+          if (Math.random() < 0.5) {
+            prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
+          } else {
+            prompt = existingChat.prompt;
+          }
+        } else {
+          prompt = extractPrompt(firstUserMsg);
+        }
+        const finalName = name || (existingChat ? existingChat.name : prompt || `Session ${id.slice(-6)}`);
         const chatFile = path7.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
         history[id] = {
           name: finalName,
+          prompt: prompt || void 0,
           updatedAt: Date.now()
         };
         const indexHistory = {};
         for (const chatId in history) {
           indexHistory[chatId] = {
             name: history[chatId].name,
+            prompt: history[chatId].prompt || void 0,
             updatedAt: history[chatId].updatedAt
           };
         }
@@ -7127,6 +7156,7 @@ var init_history = __esm({
         for (const chatId in history) {
           indexHistory[chatId] = {
             name: history[chatId].name,
+            prompt: history[chatId].prompt || void 0,
             updatedAt: history[chatId].updatedAt
           };
         }
@@ -7141,6 +7171,7 @@ var init_history = __esm({
         for (const chatId in history) {
           indexHistory[chatId] = {
             name: history[chatId].name,
+            prompt: history[chatId].prompt || void 0,
             updatedAt: history[chatId].updatedAt
           };
         }
@@ -13100,17 +13131,19 @@ ${ideCtx.warnings}
           }
         }
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
-        const tagRegex = /@\[([^\]]+)\]/g;
+        const tagRegex = /(?:\\)?@\[([^\]]+)\]/g;
         let match;
         const tagsFound = [];
         tagRegex.lastIndex = 0;
         while ((match = tagRegex.exec(cleanAgentText)) !== null) {
-          tagsFound.push(match[1]);
+          const isEscaped = match[0].startsWith("\\");
+          tagsFound.push({ tag: match[1], isEscaped });
         }
         let taggedContextBlocks = [];
         let attachedBinaryPart = null;
         for (let tIdx = 0; tIdx < tagsFound.length; tIdx++) {
-          const tag = tagsFound[tIdx];
+          const { tag, isEscaped } = tagsFound[tIdx];
+          if (isEscaped) continue;
           try {
             let tagClean = tag.trim().replace(/^["']|["']$/g, "");
             const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
@@ -13132,7 +13165,7 @@ ${ideCtx.warnings}
                 const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                 const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
-                const isSupported = aiProvider === "Google" || MULTIMODAL_MODELS.includes(modelName);
+                const isSupported = aiProvider === "Google" || isModelMultimodal(modelName);
                 if (isMultimodalFile && !isSupported) {
                   const label = `\u2718 Unsupported Modality: ${path22.basename(filePath)}`;
                   let terminalWidth = 115;
@@ -13211,15 +13244,16 @@ ${ideCtx.warnings}
         }
         let taggedContextStr = "";
         if (taggedContextBlocks.length > 0) {
-          taggedContextStr = "[TAGGED FILE CONTENTS] Auto Read, System Provided Context\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED FILE CONTENTS]\n";
+          taggedContextStr = "[TAGGED FILE CONTENTS] Auto Read, System Provided Context for User Tagged Files\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED FILE CONTENTS]\n";
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
+        const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
         const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
 OS: ${osDetected}
 CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : "\n"}${taggedContextStr}[USER PROMPT] ${cleanAgentText.trim()} [/USER PROMPT]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : "\n"}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
@@ -14087,7 +14121,8 @@ ${ideErr} [/ERROR]`;
                       label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "file_map") {
-                      label = `\u2714  Indexed: ${parseArgs(toolCall.args).path || "..."}`;
+                      const path24 = parseArgs(toolCall.args).path;
+                      label = `${path24 ? "\u2714" : "\u2718"}  Indexed${path24 ? ": " + path24 : " File Not Found"}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
@@ -15546,7 +15581,11 @@ function ResumeModal({ onSelect, onDelete, onClose }) {
         backgroundColor: isSelected ? "#2a2a2a" : void 0,
         width: "100%"
       },
-      /* @__PURE__ */ React10.createElement(Box9, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "while" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", chat2?.name || id, /* @__PURE__ */ React10.createElement(Text10, { color: `${!isSelected ? "grey" : "grey"}` }, " [", dateStr, " \u2022 ", id, "]"))),
+      /* @__PURE__ */ React10.createElement(Box9, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "while" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", (() => {
+        if (chat2?.name && !chat2.name.startsWith("Session")) return chat2.name;
+        if (chat2?.prompt) return chat2.prompt;
+        return chat2?.name || id;
+      })(), /* @__PURE__ */ React10.createElement(Text10, { color: `${!isSelected ? "grey" : "grey"}` }, " [", dateStr, " \u2022 ", id, "]"))),
       isSelected && /* @__PURE__ */ React10.createElement(Box9, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, "[X] DELETE "))
     );
   }), startIndex + MAX_VISIBLE < keys.length && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginTop: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: "gray" }, "\u25BC (+", keys.length - (startIndex + MAX_VISIBLE), " more chats below)"))), /* @__PURE__ */ React10.createElement(
@@ -15760,7 +15799,7 @@ var init_UpdateProcessor = __esm({
                       lines[lines.length - 1] = cleanStr;
                       return lines.slice(-5).join("\n");
                     }
-                    return (prev + "\n" + cleanStr).split("\n").slice(-5).join("\n");
+                    return (prev + "\n" + cleanStr).split("\n").slice(-10).join("\n");
                   });
                 }
               };
@@ -18317,7 +18356,22 @@ ${cleanText}`, color: "magenta" }];
           break;
         }
         case "/save": {
-          const name = parts.slice(1).join(" ") || `Session ${(/* @__PURE__ */ new Date()).toLocaleTimeString()}`;
+          let promptDefault = void 0;
+          const firstUserMsg = messages.find((m) => m.role === "user");
+          if (firstUserMsg && firstUserMsg.text) {
+            const text = firstUserMsg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, "").trim();
+            const words = text.split(/\s+/);
+            let truncatedPrompt = void 0;
+            if (words.length > 7) {
+              truncatedPrompt = words.slice(0, 7).join(" ") + "...";
+            } else if (text.length > 45) {
+              truncatedPrompt = text.substring(0, 45).trimEnd() + "...";
+            } else {
+              truncatedPrompt = text;
+            }
+            promptDefault = truncatedPrompt;
+          }
+          const name = parts.slice(1).join(" ") || promptDefault || `Session ${(/* @__PURE__ */ new Date()).toLocaleTimeString()}`;
           saveChat(chatId, name, messages);
           setMessages((prev) => {
             setCompletedIndex(prev.length + 1);
@@ -18766,46 +18820,19 @@ ${timestamp}` };
                 turnMessages.push(preprocessed[i]);
                 i++;
               }
-              const toolCalls = [];
-              const toolResults = [];
-              const finalResponses = [];
               turnMessages.forEach((tm) => {
-                const textLower = (tm.text || "").toLowerCase();
-                const hasTool = textLower.includes("tool:functions.") || textLower.includes("agent:generalist.");
                 const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:") || tm.text?.startsWith("[TERMINAL_RECORD]") || tm.isTerminalRecord);
-                if (tm.role === "agent") {
-                  if (hasTool) {
-                    toolCalls.push(tm.text);
-                  } else {
-                    finalResponses.push(tm.text);
-                  }
-                } else if (isResult) {
-                  toolResults.push(tm.text);
+                const emitRole = isResult ? "system" : "agent";
+                const rawText = (tm.text || "").trim();
+                if (!rawText) return;
+                const emitText = isResult && !rawText.startsWith("[TOOL RESULT]") ? `[TOOL RESULT]: ${rawText}` : rawText;
+                const last = cleanHistoryForAI[cleanHistoryForAI.length - 1];
+                if (last && last.role === emitRole) {
+                  last.text = last.text + "\n\n" + emitText;
                 } else {
-                  finalResponses.push(tm.text);
+                  cleanHistoryForAI.push({ role: emitRole, text: emitText });
                 }
               });
-              if (toolCalls.length > 0) {
-                cleanHistoryForAI.push({
-                  role: "agent",
-                  text: toolCalls.map((tc) => tc.trim()).filter(Boolean).join("\n")
-                });
-              }
-              if (toolResults.length > 0) {
-                cleanHistoryForAI.push({
-                  role: "system",
-                  text: toolResults.map((tr) => {
-                    const trimmed = tr.trim();
-                    return trimmed.startsWith("[TOOL RESULT]") ? trimmed : `[TOOL RESULT]: ${trimmed}`;
-                  }).filter(Boolean).join("\n\n")
-                });
-              }
-              if (finalResponses.length > 0) {
-                cleanHistoryForAI.push({
-                  role: "agent",
-                  text: finalResponses.map((fr) => fr.trim()).filter(Boolean).join("\n\n")
-                });
-              }
             }
           }
           const stream = getAIStream(
@@ -19438,10 +19465,13 @@ Selection: ${val}`,
     }
     const parts = input.split(" ");
     const lastPart = parts[parts.length - 1];
-    if (lastPart && lastPart.startsWith("@") && !isFilePickerDismissed) {
+    const isEscapedAt = lastPart && lastPart.startsWith("\\@");
+    const isPlainAt = lastPart && lastPart.startsWith("@");
+    if ((isPlainAt || isEscapedAt) && !isFilePickerDismissed) {
       const hashIndex = lastPart.indexOf("#");
       const hasHash = hashIndex !== -1;
-      const query = hasHash ? lastPart.substring(1, hashIndex).toLowerCase() : lastPart.slice(1).toLowerCase();
+      const prefixLen = isEscapedAt ? 2 : 1;
+      const query = hasHash ? lastPart.substring(prefixLen, hashIndex).toLowerCase() : lastPart.slice(prefixLen).toLowerCase();
       const suffix = hasHash ? lastPart.substring(hashIndex) : "";
       const projectFiles = getProjectFiles(process.cwd());
       const matches = projectFiles.filter((f) => f.name.toLowerCase().includes(query));
@@ -19449,7 +19479,7 @@ Selection: ${val}`,
         const relPath = f.relativePath.replace(/\\/g, "/");
         const formattedPath = relPath.startsWith(".") ? relPath : "./" + relPath;
         return {
-          cmd: "@[" + formattedPath + suffix + "]",
+          cmd: (isEscapedAt ? "\\@" : "@") + "[" + formattedPath + suffix + "]",
           desc: f.relativePath
         };
       });
@@ -20562,7 +20592,7 @@ Selection: ${val}`,
         width: "100%",
         marginBottom: 1
       },
-      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use \\'#Lstart-Lend\\' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
+      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use \\'#Lstart-Lend\\' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
         let url = "https://aistudio.google.com/billing";
         let label = "billing";
         if (aiProvider === "DeepSeek") {
@@ -20597,8 +20627,8 @@ Selection: ${val}`,
               color: isDivider ? "#D0CCD8" : isGemmaDisabled ? "gray" : isActive ? "white" : "grey",
               bold: false
             },
-            s.cmd?.startsWith("@[") && s.cmd?.endsWith("]") ? (() => {
-              const pathPart = s.cmd.slice(2, -1);
+            s.cmd && (s.cmd.startsWith("@[") || s.cmd.startsWith("\\@[")) && s.cmd.endsWith("]") ? (() => {
+              const pathPart = s.cmd.startsWith("\\@[") ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
               const parts = pathPart.split(/[/\\]/);
               return parts[parts.length - 1];
             })() : s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd

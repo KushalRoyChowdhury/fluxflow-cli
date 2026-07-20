@@ -89,11 +89,45 @@ export const saveChat = async (id, name, messages) => {
             }
         } catch (e) { }
 
+        // Compute prompt from user messages, stripping timestamp metadata
+        const extractPrompt = (msg) => {
+            if (!msg || !msg.text) return undefined;
+            const text = msg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, '').trim();
+            const words = text.split(/\s+/);
+            let prompt = undefined;
+            if (words.length > 7) {
+                prompt = words.slice(0, 7).join(' ') + '...';
+            } else if (text.length > 45) {
+                prompt = text.substring(0, 45).trimEnd() + '...';
+            } else {
+                prompt = text;
+            }
+            return prompt;
+        };
+
+        let prompt = undefined;
+        const userMessages = persistentMessages.filter(m => m.role === 'user');
+        const firstUserMsg = userMessages[0];
+        const latestUserMsg = userMessages[userMessages.length - 1];
+
+        if (existingChat && existingChat.prompt) {
+            // Gacha: 50% chance to update prompt with latest user prompt
+            if (Math.random() < 0.5) {
+                prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
+            } else {
+                prompt = existingChat.prompt;
+            }
+        } else {
+            // First save: lock onto the very first user prompt
+            prompt = extractPrompt(firstUserMsg);
+        }
+
         // Defensive name selection:
         // 1. Provided name
         // 2. Existing name on disk
-        // 3. Fallback to unique ID suffix
-        const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
+        // 3. First user prompt as auto-title
+        // 4. Fallback to unique ID suffix
+        const finalName = name || (existingChat ? existingChat.name : prompt || `Session ${id.slice(-6)}`);
 
         // Save the messages to the separate chat file
         const chatFile = path.join(HISTORY_DIR, `${id}.json`);
@@ -102,6 +136,7 @@ export const saveChat = async (id, name, messages) => {
         // Keep index clean (no inline messages stored in index)
         history[id] = {
             name: finalName,
+            prompt: prompt || undefined,
             updatedAt: Date.now()
         };
 
@@ -110,6 +145,7 @@ export const saveChat = async (id, name, messages) => {
         for (const chatId in history) {
             indexHistory[chatId] = {
                 name: history[chatId].name,
+                prompt: history[chatId].prompt || undefined,
                 updatedAt: history[chatId].updatedAt
             };
         }
@@ -131,11 +167,12 @@ export const saveChatTitle = async (id, title) => {
             history[id] = { name: title, updatedAt: Date.now() };
         }
 
-        // Write index only
+        // Write index only (preserve any existing prompt)
         const indexHistory = {};
         for (const chatId in history) {
             indexHistory[chatId] = {
                 name: history[chatId].name,
+                prompt: history[chatId].prompt || undefined,
                 updatedAt: history[chatId].updatedAt
             };
         }
@@ -148,11 +185,12 @@ export const deleteChat = async (id) => {
         const history = await loadHistory();
         delete history[id];
 
-        // Write index only
+        // Write index only (preserve prompt)
         const indexHistory = {};
         for (const chatId in history) {
             indexHistory[chatId] = {
                 name: history[chatId].name,
+                prompt: history[chatId].prompt || undefined,
                 updatedAt: history[chatId].updatedAt
             };
         }

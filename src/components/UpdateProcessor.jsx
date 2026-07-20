@@ -68,7 +68,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                                     return lines.slice(-5).join('\n');
                                 }
 
-                                return (prev + '\n' + cleanStr).split('\n').slice(-5).join('\n');
+                                return (prev + '\n' + cleanStr).split('\n').slice(-10).join('\n');
                             });
                         }
                     };

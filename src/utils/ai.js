@@ -2501,19 +2501,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
 
         // Tagged files parsing and attaching
-        const tagRegex = /@\[([^\]]+)\]/g;
+        const tagRegex = /(?:\\)?@\[([^\]]+)\]/g;
         let match;
         const tagsFound = [];
         tagRegex.lastIndex = 0;
         while ((match = tagRegex.exec(cleanAgentText)) !== null) {
-            tagsFound.push(match[1]);
+            const isEscaped = match[0].startsWith('\\');
+            tagsFound.push({ tag: match[1], isEscaped });
         }
 
         let taggedContextBlocks = [];
         let attachedBinaryPart = null;
 
         for (let tIdx = 0; tIdx < tagsFound.length; tIdx++) {
-            const tag = tagsFound[tIdx];
+            const { tag, isEscaped } = tagsFound[tIdx];
+            if (isEscaped) continue;
             try {
                 let tagClean = tag.trim().replace(/^["']|["']$/g, '');
                 const lineRangeRegex = /[:#]L?(\d+)(?:-L?(\d+))?$/i;
@@ -2536,7 +2538,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                         const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                         const isMultimodalFile = isImage || isPdf || isOfficeFile;
-                        const isSupported = aiProvider === 'Google' || MULTIMODAL_MODELS.includes(modelName);
+                        const isSupported = aiProvider === 'Google' || isModelMultimodal(modelName);
 
                         if (isMultimodalFile && !isSupported) {
                             // console.log(isMultimodalFile, isSupported); // This executing
@@ -2616,18 +2618,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                 }
             } catch (e) {
-                // Ignore errors, keep silent
+                // console.error("[ERROR AUTO-READING TAG]", e);
             }
         }
 
         let taggedContextStr = '';
         if (taggedContextBlocks.length > 0) {
-            taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read, System Provided Context\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
+            taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read, System Provided Context for User Tagged Files\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
         }
 
         const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : '\n'}${taggedContextStr}[USER PROMPT] ${cleanAgentText.trim()} [/USER PROMPT]`.trim();
+        // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
+        const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `${modelName.toLowerCase().startsWith('gemma') ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : '\n'}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -3599,7 +3603,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'write_docx') {
                                     label = `✔  Generated: ${parseArgs(toolCall.args).path || '...'}\n`;
                                 } else if (normToolName === 'file_map') {
-                                    label = `✔  Indexed: ${parseArgs(toolCall.args).path || '...'}`;
+                                    const path = parseArgs(toolCall.args).path;
+                                    label = `${path ? '✔' : '✘'}  Indexed${path ? ': ' + path : ' File Not Found'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
