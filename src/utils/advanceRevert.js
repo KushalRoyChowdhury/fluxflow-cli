@@ -226,6 +226,24 @@ export const AdvanceRevertManager = {
         }
     },
 
+    async getLatestFileChanges(chatId) {
+        try {
+            const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+            const session = ledger[chatId];
+            if (!session || !session.checkpoints || session.checkpoints.length === 0) {
+                return { newFiles: [], modifiedFiles: [], deletedFiles: [] };
+            }
+            const lastCp = session.checkpoints[session.checkpoints.length - 1];
+            return {
+                newFiles: lastCp.newFiles || [],
+                modifiedFiles: lastCp.modifiedFiles || [],
+                deletedFiles: lastCp.deletedFiles || []
+            };
+        } catch (err) {
+            return { newFiles: [], modifiedFiles: [], deletedFiles: [] };
+        }
+    },
+
     async cleanup(chatId) {
         try {
             const snapshotsDir = path.join(DATA_DIR, 'snapshots', chatId);

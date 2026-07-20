@@ -5638,7 +5638,7 @@ export default function App({ args = [] }) {
                                         </Text>
                                         {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? (
                                             <Text color="gray" italic>
-                                                (Use \'#Lstart-Lend\' to specify line numbers)
+                                                (Use #Lstart-Lend to specify line numbers)
                                             </Text>
                                         ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
                                             let url = "https://aistudio.google.com/billing";

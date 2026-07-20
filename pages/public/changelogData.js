@@ -3,9 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.5.0"]
+export const stableVersions = ["3.6.0", "3.5.0"]
 
 export const changelogData = {
+    "3.6.0": {
+        "note": "JULY 21.",
+        "added": [],
+        "changed": [
+            "Improvements in Advance Recovery & Change Context for faster auto-detection in case of Disaster Recovery."
+        ],
+        "fixes": [
+            "Improved regex search in agent's grep tool."
+        ]
+    },
     "3.5.0": {
         "note": "JULY 20.",
         "added": [
@@ -92,7 +102,7 @@ export const changelogData = {
             "cat.txt - A File Containing a lore. Can be found in the official [GitHub Repository](https://github.com/KushalRoyChowdhury/fluxflow-cli) & NPM Package installed in your device (just 237B)."
         ],
         "changed": [
-            "Improved Emergency Rollback [EXPERIMENTAL].",
+            "Improved Emergency Recovery [EXPERIMENTAL].",
             "Improved Tracking with Sub-Agents."
         ],
         "fixes": [
@@ -102,7 +112,7 @@ export const changelogData = {
     "3.1.0": {
         "note": "JULY 5.",
         "added": [
-            "Added Emergency Rollback System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.** This feature is currently *EXPERIMENTAL*, can be turned on in /settings → Security. Will use more disk space."
+            "Added Emergency Recovery System for the Agent if something goes wrong inside codebase.\n\n**NOTE:**\n**AVOID STOPPING THE AGENT ABRUPTLY IN CASE OF DISASTERS, IF NEEDED STEER IT FOR DAMAGE RECOVERY WITHOUT FORCING TO END ITS TURN OR ABORTING THE RESPONSE.** This feature is currently *EXPERIMENTAL*, can be turned on in /settings → Security. Will use more disk space."
         ],
         "changed": [],
         "fixes": []

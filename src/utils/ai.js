@@ -2025,6 +2025,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     let agentText = originalText.replace(/\[TITLE-UPDATE\]/g, '').trim();
     agentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
 
+    yield { type: 'status', content: '[start]' };
+    yield { type: 'status', content: 'Gathering Context' };
+
     await RevertManager.startTransaction(chatId, agentText);
     if (systemSettings?.advanceRollback) {
         await AdvanceRevertManager.takeInitialSnapshot(chatId);
@@ -2287,8 +2290,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             return result;
         };
 
-        yield { type: 'status', content: '[start]' };
-        yield { type: 'status', content: 'Gathering Context' };
+        // yield { type: 'status', content: '[start]' };
+        // yield { type: 'status', content: 'Gathering Context' };
         // Add a 300ms sleep for something
         // await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
@@ -2875,6 +2878,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${(thinkingLevel !== 'Fast' && thinkingLevel !== 'xHigh') && aiProvider === 'Google' ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ''} [/SYSTEM]`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
+                        }
+                    }
+
+                    // [FILE CHANGES INJECTION] - Show file changes from previous turn when advance rollback is active
+                    if (systemSettings?.advanceRollback && lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
+                        try {
+                            const fileChanges = await AdvanceRevertManager.getLatestFileChanges(chatId);
+                            if (fileChanges && (fileChanges.newFiles.length > 0 || fileChanges.modifiedFiles.length > 0 || fileChanges.deletedFiles.length > 0)) {
+                                let changesStr = '\n[SYSTEM] File Changes:\n';
+                                for (const f of fileChanges.newFiles) changesStr += `* ${f} (created)\n`;
+                                for (const f of fileChanges.modifiedFiles) changesStr += `* ${f} (modified)\n`;
+                                for (const f of fileChanges.deletedFiles) changesStr += `* ${f} (deleted)\n`;
+                                changesStr += '[/SYSTEM]';
+                                lastUserMsg.parts[0].text += changesStr;
+                            }
+                        } catch (err) {
+                            // silently ignore errors in file changes injection
                         }
                     }
 
@@ -4816,6 +4836,32 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     modifiedHistory.push({ role: 'agent', text: cleanedFullResponse });
                 }
 
+                // [JIT CLEANUP] - Clean up JIT instruction injection markers and compile errors from the persistent history
+                modifiedHistory.forEach(msg => {
+                    if (msg.role === 'user' && msg.text) {
+                        msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, '');
+
+                        // Clean up JIT question injection markers
+                        msg.text = msg.text
+                            .replaceAll(`\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n`, '')
+                            .replaceAll(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
+                            .replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
+                            .replaceAll(
+                                /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
+                                ''
+                            );
+
+                        // Clean up JIT file changes injection markers
+                        msg.text = msg.text.replaceAll(/\n\[SYSTEM\] File Changes:\n(?:\* .+ \(created|modified|deleted\)\n)*\[\/SYSTEM\]/g, '');
+
+                        if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google" && msg.text.startsWith('[TOOL RESULT]')) {
+                            const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
+                            const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
+                            msg.text = msg.text.replaceAll(jitInstructionThinking, '').replaceAll(jitInstructionFast, '').trim();
+                        }
+                    }
+                });
+
                 yield { type: 'status', content: '[end]' };
 
                 // History baselines are updated directly during compression events; no end-of-turn overrides are needed.
@@ -4854,29 +4900,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
             wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
-
-        // [JIT CLEANUP] - Clean up JIT instruction injection markers and compile errors from the persistent history
-        modifiedHistory.forEach(msg => {
-            if (msg.role === 'user' && msg.text) {
-                msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, '');
-
-                // Clean up JIT question injection markers
-                msg.text = msg.text
-                    .replace(`\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n`, '')
-                    .replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
-                    .replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
-                    .replaceAll(
-                        /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
-                        ''
-                );
-
-                if (modelName && modelName.toLowerCase().startsWith('gemma') && aiProvider === "Google" && msg.text.startsWith('[TOOL RESULT]')) {
-                    const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
-                    const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
-                    msg.text = msg.text.replace(jitInstructionThinking, '').replace(jitInstructionFast, '').trim();
-                }
-            }
-        });
 
     } catch (err) {
         const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);

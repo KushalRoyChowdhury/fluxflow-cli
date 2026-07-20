@@ -6118,7 +6118,7 @@ function SettingsMenu({
           { label: "Auto Approve Commands", value: "autoApprove", status: truncateCSV(systemSettings.autoApproveCommands), section: "Sandbox" },
           { label: "Auto Disapprove Commands", value: "autoDisallow", status: truncateCSV(systemSettings.autoDisallowCommands), section: "Sandbox" },
           { label: "Auto Approve Git Commits", value: "autoApproveGit", status: systemSettings.autoApproveGit ? "ON" : "OFF", section: "Sandbox" },
-          { label: "Advanced Rollback [EXPERIMENTAL]", value: "advanceRollback", status: systemSettings.advanceRollback ? "ON" : "OFF", section: "Other" },
+          { label: "Advanced Recovery [EXPERIMENTAL]", value: "advanceRollback", status: systemSettings.advanceRollback ? "ON" : "OFF", section: "Other" },
           { label: "Auto-Delete History", value: "autoDelete", status: systemSettings.autoDeleteHistory || "30d", section: "Other" },
           { label: "Save AppData Externally", value: "externalData", status: systemSettings.useExternalData ? "ON" : "OFF", section: "Other" }
         ];
@@ -9122,11 +9122,18 @@ var init_search_keyword = __esm({
       const regexExplicitlyFalse = regex === false || regex === "false" || regex === 0 || regex === "0" || regex === "no";
       let matchRegex = toBool(regex);
       let matchSubstring = !matchRegex && toBool(subString);
-      const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword);
-      let isAutoRegex = false;
+      const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword) || (() => {
+        const stripped = keyword.replace(/\\./g, "");
+        return /[*+?{}()|]/.test(stripped) || /\[.*?\]/.test(stripped) || /^\^/.test(stripped) || /\$/.test(stripped);
+      })();
+      let isAutoRegex = true;
       if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
         matchRegex = true;
         isAutoRegex = true;
+      }
+      if (regexExplicitlyFalse) {
+        matchRegex = false;
+        isAutoRegex = false;
       }
       let regexPattern;
       let wordRegex;
@@ -10563,6 +10570,23 @@ var init_advanceRevert = __esm({
           return { checkpointId, stats };
         } catch (err) {
           throw new Error(`Rollback failed: ${err.message}`);
+        }
+      },
+      async getLatestFileChanges(chatId) {
+        try {
+          const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
+          const session = ledger[chatId];
+          if (!session || !session.checkpoints || session.checkpoints.length === 0) {
+            return { newFiles: [], modifiedFiles: [], deletedFiles: [] };
+          }
+          const lastCp = session.checkpoints[session.checkpoints.length - 1];
+          return {
+            newFiles: lastCp.newFiles || [],
+            modifiedFiles: lastCp.modifiedFiles || [],
+            deletedFiles: lastCp.deletedFiles || []
+          };
+        } catch (err) {
+          return { newFiles: [], modifiedFiles: [], deletedFiles: [] };
         }
       },
       async cleanup(chatId) {
@@ -12628,6 +12652,8 @@ Provide a consolidated summary of the entire session.`;
       const needTitle = isFirstPrompt || hasTitleSignal;
       let agentText = originalText.replace(/\[TITLE-UPDATE\]/g, "").trim();
       agentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
+      yield { type: "status", content: "[start]" };
+      yield { type: "status", content: "Gathering Context" };
       await RevertManager.startTransaction(chatId, agentText);
       if (systemSettings?.advanceRollback) {
         await AdvanceRevertManager.takeInitialSnapshot(chatId);
@@ -12935,8 +12961,6 @@ Provide a consolidated summary of the entire session.`;
           });
           return result;
         };
-        yield { type: "status", content: "[start]" };
-        yield { type: "status", content: "Gathering Context" };
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
         if (totalFolders > 4096) dynamicMaxDepth = 1;
@@ -13440,6 +13464,23 @@ ${ideErr} [/ERROR]`;
 [SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""} [/SYSTEM]`;
                 if (lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
                   lastUserMsg.parts[0].text += jitInstruction;
+                }
+              }
+              if (systemSettings?.advanceRollback && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
+                try {
+                  const fileChanges = await AdvanceRevertManager.getLatestFileChanges(chatId);
+                  if (fileChanges && (fileChanges.newFiles.length > 0 || fileChanges.modifiedFiles.length > 0 || fileChanges.deletedFiles.length > 0)) {
+                    let changesStr = "\n[SYSTEM] File Changes:\n";
+                    for (const f of fileChanges.newFiles) changesStr += `* ${f} (created)
+`;
+                    for (const f of fileChanges.modifiedFiles) changesStr += `* ${f} (modified)
+`;
+                    for (const f of fileChanges.deletedFiles) changesStr += `* ${f} (deleted)
+`;
+                    changesStr += "[/SYSTEM]";
+                    lastUserMsg.parts[0].text += changesStr;
+                  }
+                } catch (err) {
                 }
               }
               if (isGemma) {
@@ -15203,6 +15244,29 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
             } else {
               modifiedHistory.push({ role: "agent", text: cleanedFullResponse });
             }
+            modifiedHistory.forEach((msg) => {
+              if (msg.role === "user" && msg.text) {
+                msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, "");
+                msg.text = msg.text.replaceAll(`
+
+[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
+`, "").replaceAll(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
+**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+`, "").replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+`, "").replaceAll(
+                  /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
+                  ""
+                );
+                msg.text = msg.text.replaceAll(/\n\[SYSTEM\] File Changes:\n(?:\* .+ \(created|modified|deleted\)\n)*\[\/SYSTEM\]/g, "");
+                if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
+                  const jitInstructionFast = `
+[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
+                  const jitInstructionThinking = `
+[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
+                  msg.text = msg.text.replaceAll(jitInstructionThinking, "").replaceAll(jitInstructionFast, "").trim();
+                }
+              }
+            });
             yield { type: "status", content: "[end]" };
           }
           if (isActuallyFinished) break;
@@ -15236,28 +15300,6 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
           }
           wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
-        modifiedHistory.forEach((msg) => {
-          if (msg.role === "user" && msg.text) {
-            msg.text = msg.text.replace(/\n\[COMPILE ERROR\][\s\S]*?\[\/ERROR\]/g, "");
-            msg.text = msg.text.replace(`
-
-[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
-`, "").replace(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
-**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
-`, "").replace(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
-`, "").replaceAll(
-              /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
-              ""
-            );
-            if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
-              const jitInstructionFast = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
-              const jitInstructionThinking = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
-              msg.text = msg.text.replace(jitInstructionThinking, "").replace(jitInstructionFast, "").trim();
-            }
-          }
-        });
       } catch (err) {
         const errLog = err instanceof Error ? (() => {
           try {
@@ -20592,7 +20634,7 @@ Selection: ${val}`,
         width: "100%",
         marginBottom: 1
       },
-      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use \\'#Lstart-Lend\\' to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
+      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use #Lstart-Lend to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
         let url = "https://aistudio.google.com/billing";
         let label = "billing";
         if (aiProvider === "DeepSeek") {

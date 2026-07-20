@@ -110,12 +110,23 @@ export const search_keyword = async (args) => {
     let matchRegex     = toBool(regex);
     let matchSubstring = !matchRegex && toBool(subString);
 
-    // Auto-detect regex if not explicitly true/false but contains pipe or regex escape sequences
-    const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword);
-    let isAutoRegex = false;
+    const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword) || (() => {
+        // Detect raw regex metacharacters (not backslash-escaped) that are strongly indicative of regex intent.
+        // Avoid common false-positives like a standalone dot in file paths or simple punctuation.
+        // Strip backslash-escaped sequences first
+        const stripped = keyword.replace(/\\./g, '');
+        // Quantifiers: * + ? { }  Alternation: |  Groups: ( )  Char classes: [ ]  Anchors: ^$
+        // Require at least one strong indicator (excludes standalone dots which are too common)
+        return /[*+?{}()|]/.test(stripped) || /\[.*?\]/.test(stripped) || /^\^/.test(stripped) || /\$/.test(stripped);
+       })()
+    let isAutoRegex = true; // true, default
     if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
         matchRegex = true;
         isAutoRegex = true;
+    }
+    if (regexExplicitlyFalse) {
+        matchRegex = false;
+        isAutoRegex = false;
     }
 
     // Build search matcher

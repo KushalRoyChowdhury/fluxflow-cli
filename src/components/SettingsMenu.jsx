@@ -134,7 +134,7 @@ export default function SettingsMenu({
                     { label: 'Auto Approve Commands', value: 'autoApprove', status: truncateCSV(systemSettings.autoApproveCommands), section: 'Sandbox' },
                     { label: 'Auto Disapprove Commands', value: 'autoDisallow', status: truncateCSV(systemSettings.autoDisallowCommands), section: 'Sandbox' },
                     { label: 'Auto Approve Git Commits', value: 'autoApproveGit', status: systemSettings.autoApproveGit ? 'ON' : 'OFF', section: 'Sandbox' },
-                    { label: 'Advanced Rollback [EXPERIMENTAL]', value: 'advanceRollback', status: systemSettings.advanceRollback ? 'ON' : 'OFF', section: 'Other' },
+                    { label: 'Advanced Recovery [EXPERIMENTAL]', value: 'advanceRollback', status: systemSettings.advanceRollback ? 'ON' : 'OFF', section: 'Other' },
                     { label: 'Auto-Delete History', value: 'autoDelete', status: systemSettings.autoDeleteHistory || '30d', section: 'Other' },
                     { label: 'Save AppData Externally', value: 'externalData', status: systemSettings.useExternalData ? 'ON' : 'OFF', section: 'Other' }
                 ];

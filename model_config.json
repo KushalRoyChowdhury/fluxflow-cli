@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260720,
+    "release": 20260721,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
