@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260721,
+    "release": 20260722,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -570,12 +570,17 @@
                         "desc": ""
                     },
                     {
+                        "cmd": "gemini-3.1-flash-lite",
+                        "multimodal": true,
+                        "desc": "Ultra-Fast & Lite (Multimodal)"
+                    },
+                    {
                         "cmd": "gemini-3-flash-preview",
                         "multimodal": true,
                         "desc": "Fast & Lightweight (Multimodal) [Limited Free Quota]"
                     },
                     {
-                        "cmd": "gemini-3.5-flash",
+                        "cmd": "gemini-3.6-flash",
                         "multimodal": true,
                         "desc": "Flash Latest (Multimodal) [Limited Free Quota] Instability Issues"
                     }
@@ -615,7 +620,7 @@
                         "desc": "Default, Fast & Lightweight (Multimodal)"
                     },
                     {
-                        "cmd": "gemini-3.5-flash",
+                        "cmd": "gemini-3.6-flash",
                         "multimodal": true,
                         "desc": "Flash Latest (Multimodal) [Instability Issues]"
                     },

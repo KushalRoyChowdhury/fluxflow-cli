@@ -4867,7 +4867,7 @@ var init_ChatLayout = __esm({
           paddingLeft: 2,
           width: "100%"
         };
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", (text || "CODE").toUpperCase())));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", ...borderProps }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", (text || "CODE").toUpperCase())));
       }
       if (type === "code-line") {
         const { lineNum, lang } = block;
@@ -5336,7 +5336,8 @@ var init_main_tools = __esm({
     };
     TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
 -- TOOL DEFINITIONS --
-Access Tools. **STRICTLY use the EXACT syntax** [tool:functions.ToolName(args)]. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
+**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 **TOOL USAGE POLICY:**
 - **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)" : ""}. Next Turn, verify tool results, plan next**
@@ -11337,7 +11338,16 @@ var init_ai = __esm({
         "High": "16384",
         "xHigh": "16384"
       };
-      const maxTokens = isMinimax || isDeepSeek || isPoolside || isThinkingmachines ? 16384 : 32768;
+      const THINKINGMACHINES_REASONING_VALUES = {
+        "Fast": "none",
+        "Low": "minimal",
+        "Medium": "medium",
+        "Standard": "medium",
+        "High": "max",
+        "xHigh": "max"
+      };
+      let maxTokens = isMinimax || isDeepSeek || isPoolside || isThinkingmachines ? 16384 : 32768;
+      maxTokens = process.env.NVIDIA_BASE_URL ? 1024 : maxTokens;
       const body = {
         model,
         messages,
@@ -11347,7 +11357,8 @@ var init_ai = __esm({
         temperature,
         ...isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || "high" }
       };
-      if (isLlama3 || isThinkingmachines) {
+      if (process.env.NVIDIA_BASE_URL) {
+      } else if (isLlama3) {
       } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
       } else if (isGemma) {
@@ -11385,14 +11396,20 @@ var init_ai = __esm({
         }
       } else if (isPoolside) {
         body.chat_template_kwargs = { enable_thinking: isThinking };
+      } else if (isThinkingmachines) {
+        body.reasoning_effort = THINKINGMACHINES_REASONING_VALUES[apiLevel] || "0.7";
       }
       let attempts = 0;
       const maxAttempts = 6;
       let hasYielded = false;
+      let baseUrl = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1/chat/completions";
+      if (!baseUrl.endsWith("/chat/completions")) {
+        baseUrl = baseUrl.replace(/\/+$/, "") + "/chat/completions";
+      }
       while (attempts < maxAttempts) {
         attempts++;
         try {
-          const response = await fetchWithBackoff("https://integrate.api.nvidia.com/v1/chat/completions", {
+          const response = await fetchWithBackoff(baseUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -11449,6 +11466,7 @@ var init_ai = __esm({
                       totalTokenCount: usage.total_tokens || usage.prompt_tokens + usage.completion_tokens,
                       promptTokenCount: usage.prompt_tokens || 0,
                       candidatesTokenCount: usage.completion_tokens || 0,
+                      cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
                       thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
                     };
                     hasNewData = true;
@@ -11517,13 +11535,15 @@ var init_ai = __esm({
               }
             }
           } else if (!isStreamingStarted) {
-            push({ value: { type: "status", content: `Queue '${res.status}'` }, done: false });
+            push({ value: { type: "status", content: `Queue ${res.status}` }, done: false });
           }
         } catch (e) {
         }
       };
-      poll();
-      pollInterval = setInterval(poll, 5e3);
+      if (!process.env.NVIDIA_BASE_URL) {
+        poll();
+        pollInterval = setInterval(poll, 5e3);
+      }
       (async () => {
         try {
           const iterator = stream[Symbol.asyncIterator]();
@@ -15346,6 +15366,7 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
         if (systemSettings?.advanceRollback) {
           await AdvanceRevertManager.cleanup(chatId);
         }
+        await getIDEContext();
       }
       yield { type: "status", content: null };
     };
@@ -15365,8 +15386,9 @@ Error Log can be found in ${path22.join(LOGS_DIR, "agent", "error.log")}`);
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **CRITICAL: NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT. NO OTHER XML OR MARKERS WILL BE ALLOWED**
-**
+TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
+**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
 - USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 HIGHLY RECOMMENDED

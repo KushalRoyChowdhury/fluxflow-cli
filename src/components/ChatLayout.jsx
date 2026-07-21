@@ -1296,7 +1296,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             borderTop: false, borderBottom: false, borderColor: '#444444', paddingLeft: 2, width: '100%'
         };
         return (
-            <Box flexDirection="column" marginTop={1} width="100%">
+            <Box flexDirection="column" marginTop={0} marginBottom={0} width="100%">
                 {/* Empty pad row with left border — sits above the ▶_ header */}
                 <Box flexDirection="row" {...borderProps}>
                     <Text> </Text>

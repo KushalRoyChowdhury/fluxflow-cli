@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.6.1"]
+export const stableVersions = ["3.7.0"]
 
 export const changelogData = {
+    "3.7.0": {
+        "note": "JULY 22.",
+        "added": [
+            "Added Token Caching support for NVIDIA API",
+            "Added support for custom endpoint for NVIDIA API (OpenAI Compatible) to host local models in NIM and use in FluxFlow. Use via ENV: `NVIDIA_BASE_URL`."
+        ],
+        "changed": [
+            "**Note:**\nNo ThinkingMachine's or PoolSide's models will be added for now."
+        ],
+        "fixes": []
+    },
     "3.6.1": {
         "note": "JULY 21.",
         "added": [],

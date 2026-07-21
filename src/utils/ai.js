@@ -448,7 +448,17 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         'xHigh': '16384'
     };
 
-    const maxTokens = (isMinimax || isDeepSeek || isPoolside || isThinkingmachines) ? 16384 : 32768;
+    const THINKINGMACHINES_REASONING_VALUES = {
+        'Fast': 'none',
+        'Low': 'minimal',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'max',
+        'xHigh': 'max'
+    };
+
+    let maxTokens = (isMinimax || isDeepSeek || isPoolside || isThinkingmachines) ? 16384 : 32768;
+    maxTokens = process.env.NVIDIA_BASE_URL ? 1024 : maxTokens;
 
     const body = {
         model: model,
@@ -460,7 +470,9 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         ...(isGPT && { thinking: GPT_THINKING_LEVELS[thinkingLevel] || 'high' })
     };
 
-    if (isLlama3 || isThinkingmachines) {
+    if (process.env.NVIDIA_BASE_URL) {
+        // Skip extra reasoning/thinking parameters for custom NVIDIA endpoints
+    } else if (isLlama3) {
         // Llama-3 and thinkingmachines do not support thinking parameters
     } else if (isKimi) {
         body.chat_template_kwargs = { thinking: isThinking };
@@ -499,16 +511,23 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         }
     } else if (isPoolside) {
         body.chat_template_kwargs = { enable_thinking: isThinking };
+    } else if (isThinkingmachines) {
+        body.reasoning_effort = THINKINGMACHINES_REASONING_VALUES[apiLevel] || '0.7';
     }
 
     let attempts = 0;
     const maxAttempts = 6;
     let hasYielded = false;
 
+    let baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1/chat/completions';
+    if (!baseUrl.endsWith('/chat/completions')) {
+        baseUrl = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    }
+
     while (attempts < maxAttempts) {
         attempts++;
         try {
-            const response = await fetchWithBackoff('https://integrate.api.nvidia.com/v1/chat/completions', {
+            const response = await fetchWithBackoff(baseUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -536,7 +555,6 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
             let hasNewData = false;
 
             while (true) {
-                // console.log(buffer); // [DEBUGGING POINT]
                 const { done, value } = await reader.read();
                 if (done) {
                     if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
@@ -551,6 +569,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
+                // console.log(lines); // [DEBUGGING POINT]
                 buffer = lines.pop();
 
                 for (const line of lines) {
@@ -575,6 +594,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                                     totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
                                     promptTokenCount: usage.prompt_tokens || 0,
                                     candidatesTokenCount: usage.completion_tokens || 0,
+                                    cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
                                     thoughtsTokenCount: (usage.completion_tokens_details?.reasoning_tokens || 0) + (usage.completion_tokens_details?.thoughts_tokens || 0)
                                 };
                                 hasNewData = true;
@@ -659,7 +679,7 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
                     }
                 }
             } else if (!isStreamingStarted) {
-                push({ value: { type: 'status', content: `Queue '${res.status}'` }, done: false });
+                push({ value: { type: 'status', content: `Queue ${res.status}` }, done: false });
             }
         } catch (e) {
             // Network-level error — no status code available, stay silent
@@ -667,9 +687,11 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
 
     };
 
-    // Run first poll immediately
-    poll();
-    pollInterval = setInterval(poll, 5000);
+    // Run first poll immediately unless custom NVIDIA_BASE_URL is set
+    if (!process.env.NVIDIA_BASE_URL) {
+        poll();
+        pollInterval = setInterval(poll, 5000);
+    }
 
     // Consume the raw stream in the background
     (async () => {
@@ -4942,6 +4964,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (systemSettings?.advanceRollback) {
             await AdvanceRevertManager.cleanup(chatId);
         }
+        // Clear IDE Context
+        await getIDEContext();
     }
     yield { type: 'status', content: null };
 };
@@ -4966,8 +4990,9 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-To call tools USE THIS EXACT SYNTAX: [tool:functions.ToolName(args)]. **CRITICAL: NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED, ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT. NO OTHER XML OR MARKERS WILL BE ALLOWED**
-**
+TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
+**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
 - USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
