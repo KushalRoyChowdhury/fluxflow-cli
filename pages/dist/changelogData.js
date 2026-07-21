@@ -10,7 +10,7 @@ export const changelogData = {
         "note": "JULY 22.",
         "added": [
             "Added Token Caching support for NVIDIA API",
-            "Added support for custom endpoint for NVIDIA API (OpenAI Compatible) to host local models in NIM and use in FluxFlow. Use via ENV: `NVIDIA_BASE_URL`."
+            "Added support for custom endpoint for NVIDIA API (OpenAI Compatible URL, eg. https://nim.api.nvidia.com/v1) to host local models in NIM and use in FluxFlow. Use via ENV: `NVIDIA_BASE_URL`."
         ],
         "changed": [
             "**Note:**\nNo ThinkingMachine's or PoolSide's models will be added for now."
