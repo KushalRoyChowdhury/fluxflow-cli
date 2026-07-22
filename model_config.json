@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260722,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -56,6 +56,15 @@
                     },
                     {
                         "cmd": "z-ai/glm-4.5-air:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- PoolSide Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "poolside/laguna-s-2.1:free",
                         "multimodal": false,
                         "desc": "Text Only"
                     }
