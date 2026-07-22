@@ -756,7 +756,16 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
 const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.95) {
     const messages = [];
     if (systemInstruction) {
-        messages.push({ role: 'system', content: systemInstruction });
+        messages.push({
+            role: 'system',
+            content: [
+                {
+                    type: 'text',
+                    text: systemInstruction,
+                    cache_control: { type: 'ephemeral' }
+                }
+            ]
+        });
     }
 
     for (const content of contents) {
@@ -815,6 +824,8 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         messages: messages,
         stream: true,
         temperature: temperature,
+        cache_control: { type: 'ephemeral' },
+        session_id: 'flux-flow-session'
     };
 
     const effort = reasoningEffortMap[thinkingLevel];
@@ -829,6 +840,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
             'Content-Type': 'application/json',
             'X-Title': 'FluxFlow CLI',
             'X-Cache': 'true',
+            'X-OpenRouter-Cache': 'true'
         },
         body: JSON.stringify(requestPayload),
         signal: signal
@@ -876,10 +888,10 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
 
                 if (usage) {
                     latestUsageMetadata = {
-                        totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                        totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
                         promptTokenCount: usage.prompt_tokens || 0,
                         candidatesTokenCount: usage.completion_tokens || 0,
-                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || usage.prompt_tokens_details?.cache_read_input_tokens || usage.cache_read_input_tokens || 0,
                         thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
                     };
                     hasNewData = true;
@@ -2879,7 +2891,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false);
+                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false, chatId);
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {

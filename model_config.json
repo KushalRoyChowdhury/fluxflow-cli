@@ -1,6 +1,6 @@
 {
-    "version": 2,
-    "release": 20260722,
+    "version": 0,
+    "release": 20260723,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -200,6 +200,15 @@
                         "cmd": "x-ai/grok-4.5",
                         "multimodal": true,
                         "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "\n--- Tencent Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "tencent/hy3",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     }
                 ]
             }

@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.7.0"]
+export const stableVersions = ["3.8.0"]
 
 export const changelogData = {
+    "3.8.0": {
+        "note": "JULY 23.",
+        "added": [
+            "Added Prompt Caching on OpenRouter API"
+        ],
+        "changed": [
+            "Improved Prompt Caching for all providers.",
+            
+        ],
+        "fixes": []
+    },
     "3.7.0": {
         "note": "JULY 22.",
         "added": [
