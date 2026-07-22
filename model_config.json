@@ -579,7 +579,7 @@
                         "desc": ""
                     },
                     {
-                        "cmd": "gemini-3.1-flash-lite",
+                        "cmd": "gemini-3.5-flash-lite",
                         "multimodal": true,
                         "desc": "Ultra-Fast & Lite (Multimodal)"
                     },
@@ -591,7 +591,7 @@
                     {
                         "cmd": "gemini-3.6-flash",
                         "multimodal": true,
-                        "desc": "Flash Latest (Multimodal) [Limited Free Quota] Instability Issues"
+                        "desc": "Flash Latest (Multimodal) [Limited Free Quota]"
                     }
                 ],
                 "Paid": [
@@ -622,6 +622,11 @@
                         "cmd": "gemini-3.1-flash-lite",
                         "multimodal": true,
                         "desc": "Ultra-Fast & Lite (Multimodal)"
+                    },
+                    {
+                        "cmd": "gemini-3.5-flash-lite",
+                        "multimodal": true,
+                        "desc": "Latest Flash Lite (Multimodal)"
                     },
                     {
                         "cmd": "gemini-3-flash-preview",
