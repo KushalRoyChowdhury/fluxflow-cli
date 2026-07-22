@@ -987,7 +987,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = systemSettings?.memory !== false;
+    const isMemoryEnabled = process.env.NVIDIA_BASE_URL ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -4996,7 +4996,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
         'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
         'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect',
-        'websearch': '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
+        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON\'T hallucinate. aiMode for LLM based search results and richer data, default: false',
         'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape',
         'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
     };

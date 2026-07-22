@@ -1740,6 +1740,18 @@ export default function App({ args = [] }) {
                 freshSettings.memory = false;
             }
 
+            if (startupProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) {
+                freshSettings.memory = false;
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        role: 'system',
+                        text: '[SYSTEM] Memory is not available with Custom Endpoints',
+                        isMeta: true
+                    }
+                ]);
+            }
+
             if (parsedArgs.package) {
                 freshSettings.updateManager = parsedArgs.package;
             }
@@ -2561,7 +2573,7 @@ export default function App({ args = [] }) {
                         }
 
                         // Strict Mode Validation
-                        if (!isBypass && mode === 'Flow' && (formattedLevel === 'High' || formattedLevel === 'xHigh')) {
+                        if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
@@ -4116,12 +4128,17 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
+                                if (selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) {
+                                    setSystemSettings(s => ({ ...s, memory: false }));
+                                    saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
+                                } else {
+                                    saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
+                                }
                                 setMessages(prev => [
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.`,
+                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`,
                                         isMeta: true
                                     }
                                 ]);
@@ -4563,9 +4580,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
+                                        if (prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) {
+                                            setSystemSettings(s => ({ ...s, memory: false }));
+                                            newSettings.systemSettings = { ...systemSettings, memory: false };
+                                        }
+
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✅ ${prov} API Key saved successfully! Model set to ${defaultModel}.`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✅ ${prov} API Key saved successfully! Model set to ${defaultModel}.${prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`, isMeta: true }];
                                         });
                                     }
 

@@ -11989,7 +11989,7 @@ var init_ai = __esm({
       const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
       const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
       const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = "Google", apiKey } = settings;
-      const isMemoryEnabled = systemSettings?.memory !== false;
+      const isMemoryEnabled = process.env.NVIDIA_BASE_URL ? false : systemSettings?.memory !== false;
       const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
       const janitorUserMemories = persistentStorage.map((m) => `- [${m.id}]: ${m.memory}`).join("\n");
       const janitorContents = history.slice(0, -1).filter((msg) => msg.text && !msg.text.includes("[TOOL RESULT]") && !msg.text.includes("OBSERVATION:") && !msg.text.startsWith("[TERMINAL_RECORD]") && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith("welcome") && !String(msg.id).startsWith("logo")).slice(-14).map((msg) => {
@@ -15579,7 +15579,7 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
         "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
         "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect`,
-        "websearch": '- [tool:functions.WebSearch(query="...", limit=number)]. Web Search',
+        "websearch": `- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate. aiMode for LLM based search results and richer data, default: false`,
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
@@ -17812,6 +17812,17 @@ function App({ args = [] }) {
       } else if (parsedArgs.memory === "off") {
         freshSettings.memory = false;
       }
+      if (startupProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL) {
+        freshSettings.memory = false;
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            text: "[SYSTEM] Memory is not available with Custom Endpoints",
+            isMeta: true
+          }
+        ]);
+      }
       if (parsedArgs.package) {
         freshSettings.updateManager = parsedArgs.package;
       }
@@ -18559,7 +18570,7 @@ ${cleanText}`, color: "magenta" }];
             if (val === "xhigh") {
               formattedLevel = "xHigh";
             }
-            if (!isBypass && mode === "Flow" && (formattedLevel === "High" || formattedLevel === "xHigh")) {
+            if (!isBypass && mode === "Flow" && formattedLevel === "xHigh") {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
@@ -19952,12 +19963,17 @@ Selection: ${val}`,
                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                 setActiveModel(defaultModel);
                 setApiTier(targetTier);
-                saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
+                if (selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL) {
+                  setSystemSettings((s) => ({ ...s, memory: false }));
+                  saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
+                } else {
+                  saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
+                }
                 setMessages((prev) => [
                   ...prev,
                   {
                     role: "system",
-                    text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.`,
+                    text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.${selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available with Custom Endpoints" : ""}`,
                     isMeta: true
                   }
                 ]);
@@ -20276,9 +20292,13 @@ Selection: ${val}`,
                 newSettings.aiProvider = prov;
                 newSettings.activeModel = defaultModel;
                 newSettings.apiTier = targetTier;
+                if (prov === "NVIDIA" && process.env.NVIDIA_BASE_URL) {
+                  setSystemSettings((s) => ({ ...s, memory: false }));
+                  newSettings.systemSettings = { ...systemSettings, memory: false };
+                }
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
-                  return [...prev, { id: Date.now(), role: "system", text: `\u2705 ${prov} API Key saved successfully! Model set to ${defaultModel}.`, isMeta: true }];
+                  return [...prev, { id: Date.now(), role: "system", text: `\u2705 ${prov} API Key saved successfully! Model set to ${defaultModel}.${prov === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available with Custom Endpoints" : ""}`, isMeta: true }];
                 });
               }
               if (next) {
