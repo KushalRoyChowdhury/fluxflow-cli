@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "release": 20260722,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -24,6 +24,15 @@
             "models": {
                 "Free": [
                     {
+                        "cmd": "--- Auto Routed ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "openrouter/free",
+                        "multimodal": false,
+                        "desc": "OpenRouter Free (Auto Router)"
+                    },
+                    {
                         "cmd": "--- Google Models ---",
                         "desc": ""
                     },
@@ -33,38 +42,20 @@
                         "desc": "Multimodal"
                     },
                     {
-                        "cmd": "\n--- Moonshot Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "moonshotai/kimi-k2.6:free",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "\n--- Qwen Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "qwen/qwen3-coder:free",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Z-AI Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "z-ai/glm-4.5-air:free",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
                         "cmd": "\n--- PoolSide Models ---",
                         "desc": ""
                     },
                     {
                         "cmd": "poolside/laguna-s-2.1:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- NVIDIA Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-ultra-550b-a55b:free",
                         "multimodal": false,
                         "desc": "Text Only"
                     }
