@@ -26,7 +26,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -3623,8 +3623,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 // START VISUAL FEEDBACK FOR TOOLS
                                 let label = '';
                                 if (normToolName === 'web_search') {
-                                    const { query, limit = 10 } = parseArgs(toolCall.args);
-                                    label = `✔  Searched: ${query} → ${limit}`;
+                                    const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args);
+                                    label = `✔  ${aiMode ? 'AI Search' : 'Searched'}: ${query}${aiMode === false ? ` → ${limit}` : ''}`;
                                 } else if (normToolName === 'web_scrape') {
                                     const url = parseArgs(toolCall.args).url || '...';
                                     label = `✔  Visited: ${url}`;

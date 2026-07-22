@@ -118,7 +118,7 @@ export const web_scrape = async (args) => {
         } catch (err) {
             lastError = err;
             if (browser) await browser.close();
-
+            fs.writeFileSync(path.join(LOGS_DIR, "web_tools", "scrape", "standard_mode", "ERROR.txt"), err.message);
             if (attempt < maxRetries) {
                 const backoff = Math.pow(2, attempt) * 1000;
                 await new Promise(r => setTimeout(r, backoff));

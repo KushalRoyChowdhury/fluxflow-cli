@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.8.0"]
+export const stableVersions = ["3.9.0"]
 
 export const changelogData = {
+    "3.9.0": {
+        "note": "JULY 23.",
+        "added": [
+            "Added \"AI Mode\" search support for Agent's Web Tool."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "3.8.0": {
         "note": "JULY 23.",
         "added": [
@@ -13,7 +21,7 @@ export const changelogData = {
         ],
         "changed": [
             "Improved Prompt Caching for all providers.",
-            
+
         ],
         "fixes": []
     },

@@ -27,7 +27,7 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", limit=number)]. Limit 3-10. Proactive use for unknown info/docs
+1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate. aiMode for LLM based search results and richer data, default: false
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -

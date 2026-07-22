@@ -5405,14 +5405,52 @@ export default function App({ args = [] }) {
                                 )}
                             </Box>
                             <Box>
-                                {isProcessing && (Date.now() - lastChunkTime > 15000) && !activeSubagents.some(sa => sa.status === 'running' && !statusText.toLowerCase().includes('waiting')) ? (
-                                    <Box><GlintText text="Waiting for API" baseColor="white" glintColor="gray" glintWidth={4} speed={80} /><Text color="gray" dimColor> ┃ </Text></Box>
-                                ) : wittyPhrase ? (
-                                    <Box><GlintText text={wittyPhrase} italic={true} speed={80} typeSpeed={15} /><Text color="gray" dimColor> ┃ </Text></Box>
-                                ) : null}
-                                {/* <Text color="gray" bold>[ </Text> */}
-                                <GlintText text={tempModelOverride || activeModel.split('/')[1] || activeModel} baseColor="white" glintColor="gray" glintWidth={3} />
-                                {/* <Text color="gray" bold> ]</Text> */}
+                                {(() => {
+                                    const status = statusText?.toLowerCase() ?? "";
+                                    const showWaiting =
+                                        isProcessing &&
+                                        Date.now() - lastChunkTime > 15000 &&
+                                        activeSubagents.length === 0 &&
+                                        (status.includes("connecting") || status.includes("working"));
+
+                                    if (showWaiting) {
+                                        return (
+                                            <Box>
+                                                <GlintText
+                                                    text="Waiting for API"
+                                                    baseColor="white"
+                                                    glintColor="gray"
+                                                    glintWidth={4}
+                                                    speed={80}
+                                                />
+                                                <Text color="gray" dimColor> ┃ </Text>
+                                            </Box>
+                                        );
+                                    }
+
+                                    if (wittyPhrase) {
+                                        return (
+                                            <Box>
+                                                <GlintText
+                                                    text={wittyPhrase}
+                                                    italic
+                                                    speed={80}
+                                                    typeSpeed={15}
+                                                />
+                                                <Text color="gray" dimColor> ┃ </Text>
+                                            </Box>
+                                        );
+                                    }
+
+                                    return null;
+                                })()}
+
+                                <GlintText
+                                    text={tempModelOverride || activeModel.split('/')[1] || activeModel}
+                                    baseColor="white"
+                                    glintColor="gray"
+                                    glintWidth={3}
+                                />
                             </Box>
                         </Box>
 
