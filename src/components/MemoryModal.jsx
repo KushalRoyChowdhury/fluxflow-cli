@@ -3,8 +3,10 @@ import { Box, Text, useInput, useStdout } from 'ink';
 import { readEncryptedJson, writeEncryptedJson, readAesEncryptedJson } from '../utils/crypto.js';
 import { MEMORIES_FILE, SETTINGS_FILE } from '../utils/paths.js';
 import { emojiSpace } from '../utils/terminal.js';
+import { getThemeColors } from '../utils/theme.js';
 
-export default function MemoryModal({ onClose }) {
+export default function MemoryModal({ onClose, theme = 'Dark' }) {
+    const colors = getThemeColors(theme);
     const { stdout } = useStdout();
     const columns = stdout?.columns || 80;
     const [memories, setMemories] = useState([]);
@@ -95,31 +97,31 @@ export default function MemoryModal({ onClose }) {
     const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
 
     const getBarColor = () => {
-        if (usagePercent < 50) return "grey";
-        if (usagePercent < 90) return "yellow";
-        return "red";
+        if (usagePercent < 50) return colors.textMuted;
+        if (usagePercent < 90) return colors.warning;
+        return colors.danger;
     };
 
     const s = emojiSpace(2);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
             <Box paddingX={1} marginBottom={1} justifyContent="space-between">
-                <Text color="white" bold>SAVED MEMORIES</Text>
+                <Text color={colors.text} bold>SAVED MEMORIES</Text>
                 <Box>
-                    <Text color="gray">Vault: </Text>
+                    <Text color={colors.textMuted}>Vault: </Text>
                     <Text color={getBarColor()}>{barStr}</Text>
-                    <Text color="white" bold> {usagePercent}%</Text>
+                    <Text color={colors.text} bold> {usagePercent}%</Text>
                 </Box>
             </Box>
 
             {!isMemoryOn && memories.length > 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                    <Text italic color="gray">Memory is currently Off...</Text>
+                    <Text italic color={colors.textMuted}>Memory is currently Off...</Text>
                 </Box>
             ) : memories.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                    <Text italic color="gray">{isMemoryOn ? "Learning..." : "Memory not available..."}</Text>
+                    <Text italic color={colors.textMuted}>{isMemoryOn ? "Learning..." : "Memory not available..."}</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column">
@@ -129,18 +131,18 @@ export default function MemoryModal({ onClose }) {
                             <Box
                                 key={mem.id}
                                 paddingX={1}
-                                backgroundColor={isSelected ? "#2a2a2a" : undefined}
+                                backgroundColor={isSelected ? colors.highlightBg : undefined}
                                 width="100%"
                             >
                                 <Box flexGrow={1}>
-                                    <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
+                                    <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}{idx + 1}. {formatMemory(mem.memory, idx, isSelected)}
                                     </Text>
                                 </Box>
                                 {isSelected && (
                                     <Box flexShrink={0}>
-                                        <Text color="grey" dimColor> [<Text italic>{mem.score}</Text>] </Text>
-                                        <Text color="grey" bold>[X] WIPE </Text>
+                                        <Text color={colors.textMuted} dimColor> [<Text italic>{mem.score}</Text>] </Text>
+                                        <Text color={colors.danger} bold>[X] WIPE </Text>
                                     </Box>
                                 )}
                             </Box>
@@ -156,9 +158,9 @@ export default function MemoryModal({ onClose }) {
                 borderLeft={false}
                 borderRight={false}
                 borderBottom={false}
-                borderColor="gray"
+                borderColor={colors.borderMuted}
             >
-                <Text color={'grey'} italic>↑↓ navigate • x wipe memory • Esc close</Text>
+                <Text color={colors.textMuted} italic>↑↓ navigate • x wipe memory • Esc close</Text>
             </Box>
         </Box>
     );

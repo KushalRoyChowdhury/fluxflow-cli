@@ -1,42 +1,46 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
+import { getThemeColors } from '../utils/theme.js';
 
-const CustomItem = ({ label, isSelected }) => {
+const CustomItem = ({ label, isSelected, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const isCancel = label === 'Cancel' || label === 'Back' || label.toLowerCase().includes('exit') || label.toLowerCase().includes('back');
 
     return (
         <Box
             marginTop={isCancel ? 1 : 0}
-            backgroundColor={isSelected ? "#2a2a2a" : undefined}
+            backgroundColor={isSelected ? colors.highlightBg : undefined}
             paddingX={1}
             width="100%"
         >
-            <Text color={isSelected ? 'white' : 'gray'} bold={isSelected}>
+            <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                 {isSelected ? '❯ ' : '  '}{label}
             </Text>
         </Box>
     );
 };
 
-export default function CommandMenu({ title, subtitle, items, onSelect }) {
+export default function CommandMenu({ title, subtitle, items, onSelect, theme = 'Dark' }) {
+    const colors = getThemeColors(theme);
+
     return (
         <Box
             flexDirection="column"
             borderStyle="round"
-            borderColor="white"
+            borderColor={colors.borderMuted}
             padding={0}
             marginTop={0}
             flexShrink={0}
             width="100%"
         >
             {title && <Box paddingX={1} paddingY={0} marginBottom={subtitle ? 0 : 1}>
-                <Text color="gray" bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
+                <Text color={colors.text} bold>{typeof title === 'string' ? title.toUpperCase() : title}</Text>
             </Box>}
 
             {subtitle && (
                 <Box paddingX={1} marginBottom={1}>
-                    <Text color="gray" italic>   {subtitle}</Text>
+                    <Text color={colors.textMuted} italic>   {subtitle}</Text>
                 </Box>
             )}
 
@@ -44,13 +48,13 @@ export default function CommandMenu({ title, subtitle, items, onSelect }) {
                 <SelectInput
                     items={items}
                     onSelect={onSelect}
-                    itemComponent={CustomItem}
+                    itemComponent={(props) => <CustomItem {...props} theme={theme} />}
                     indicatorComponent={() => null}
                 />
             </Box>
 
             <Box paddingX={1} marginTop={1}>
-                <Text color="gray" italic>(Arrows to select • Enter to confirm)</Text>
+                <Text color={colors.textMuted} italic>(Arrows to select • Enter to confirm)</Text>
             </Box>
         </Box>
     );

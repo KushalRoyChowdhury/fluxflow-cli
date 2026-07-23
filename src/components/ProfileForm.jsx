@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import TextInput from 'ink-text-input';
+import { getThemeColors } from '../utils/theme.js';
 
-export default function ProfileForm({ initialData, onSave, onCancel }) {
+export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Dark' }) {
+    const colors = getThemeColors(theme);
     const [step, setStep] = useState(0);
     const [currentInput, setCurrentInput] = useState('');
     const [profile, setProfile] = useState(() => ({
@@ -43,7 +45,7 @@ export default function ProfileForm({ initialData, onSave, onCancel }) {
     return (
         <Box
             borderStyle="round"
-            borderColor="gray"
+            borderColor={colors.borderMuted}
             padding={0}
             marginTop={1}
             flexShrink={0}
@@ -51,12 +53,12 @@ export default function ProfileForm({ initialData, onSave, onCancel }) {
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white" bold>DEVELOPER PROFILE CONFIGURATION</Text>
+                <Text color={colors.text} bold>DEVELOPER PROFILE CONFIGURATION</Text>
             </Box>
 
             <Box paddingX={1} flexDirection="column">
                 <Box>
-                    <Text color="white" bold>{steps[step].label}</Text>
+                    <Text color={colors.text} bold>{steps[step].label}</Text>
                     <TextInput
                         value={currentInput}
                         onChange={setCurrentInput}
@@ -65,12 +67,12 @@ export default function ProfileForm({ initialData, onSave, onCancel }) {
                 </Box>
 
                 <Box marginTop={1}>
-                    <Text color="gray" italic>Step {step + 1} of {steps.length}</Text>
+                    <Text color={colors.textMuted} italic>Step {step + 1} of {steps.length}</Text>
                 </Box>
             </Box>
 
             <Box paddingX={1} marginTop={1}>
-                <Text color="gray" italic>(Enter to submit • Type /cancel to abort)</Text>
+                <Text color={colors.textMuted} italic>(Enter to submit • Type /cancel to abort)</Text>
             </Box>
         </Box>
     );

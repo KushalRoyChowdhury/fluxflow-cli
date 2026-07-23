@@ -6,6 +6,7 @@ import { wrapText, cleanSignals, parseLineInfo, getSimilarity, alignChangeGroup,
 import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
 import { isAbsolute } from 'path';
+import { getThemeColors } from '../utils/theme.js';
 
 const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
     return targetText;
@@ -209,14 +210,16 @@ const renderLatexText = (content, key) => {
     );
 };
 
-const InlineMarkdown = React.memo(({ text, color, italic }) => {
+const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
     if (!text) return null;
+    const colors = getThemeColors(theme);
+    const textColor = color || colors.text;
 
     // Use cached regex to prevent GC thrashing during stream renders
     const parts = text.split(REGEX_MD_TOKENS);
 
     return (
-        <Text color={color} wrap="anywhere" italic={italic}>
+        <Text color={textColor} wrap="anywhere" italic={italic}>
             {parts.map((part, j) => {
                 if (!part) return null;
 
@@ -229,12 +232,12 @@ const InlineMarkdown = React.memo(({ text, color, italic }) => {
 
                 // 🏷️ Recursive Bold
                 if (part.startsWith('**') && part.endsWith('**')) {
-                    return <Text key={j} bold color="white"><InlineMarkdown text={part.slice(2, -2)} color="white" /></Text>;
+                    return <Text key={j} bold color={textColor}><InlineMarkdown text={part.slice(2, -2)} color={textColor} theme={theme} /></Text>;
                 }
 
                 // 🏷️ Recursive Italic
                 if (part.startsWith('*') && part.endsWith('*')) {
-                    return <Text key={j} italic color="white"><InlineMarkdown text={part.slice(1, -1)} color="white" italic={italic} /></Text>;
+                    return <Text key={j} italic color={textColor}><InlineMarkdown text={part.slice(1, -1)} color={textColor} italic={italic} theme={theme} /></Text>;
                 }
 
                 if (part.startsWith('`') && part.endsWith('`')) {
@@ -293,8 +296,9 @@ const InlineMarkdown = React.memo(({ text, color, italic }) => {
 
 // Helper: Wrap text to a specific width without breaking words
 
-const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
+const TableRenderer = React.memo(({ buffer, terminalWidth = 80, theme = 'Dark' }) => {
     if (buffer.length < 2) return null;
+    const colors = getThemeColors(theme);
 
     const rows = buffer.map(line => {
         const parts = line.split('|');
@@ -313,12 +317,12 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
 
     return (
         // Table MarginY here
-        <Box flexDirection="column" borderStyle="round" borderColor="#454545ff" paddingX={1} marginY={0} width={terminalWidth - 2}>
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={1} marginY={0} width={terminalWidth - 2}>
             {/* Header with Integrated Divider */}
-            <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor="#444" marginBottom={1} paddingBottom={0} width="100%">
+            <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor={colors.borderMuted} marginBottom={1} paddingBottom={0} width="100%">
                 {header.map((cell, i) => (
                     <Box key={i} flexBasis={`${colPercentage}%`} flexGrow={1} flexShrink={0} paddingRight={2}>
-                        <InlineMarkdown text={wrapText(cell, colChars)} color="cyan" />
+                        <InlineMarkdown text={wrapText(cell, colChars)} color="cyan" theme={theme} />
                     </Box>
                 ))}
             </Box>
@@ -328,7 +332,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
                 <Box key={ri} flexDirection="row" marginBottom={ri === data.length - 1 ? 0 : 1} width="100%">
                     {row.map((cell, ci) => (
                         <Box key={ci} flexBasis={`${colPercentage}%`} flexGrow={1} flexShrink={0} paddingRight={2} flexDirection="column">
-                            <InlineMarkdown text={wrapText(cell, colChars)} color="white" />
+                            <InlineMarkdown text={wrapText(cell, colChars)} color={colors.text} theme={theme} />
                         </Box>
                     ))}
                 </Box>
@@ -337,8 +341,10 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80 }) => {
     );
 });
 
-const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic = false }) => {
+const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, theme = 'Dark' }) => {
     if (!text) return null;
+    const colors = getThemeColors(theme);
+    const textColor = color || colors.text;
 
     const lines = text.split('\n');
     const result = [];
@@ -347,14 +353,14 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
 
     const flushBuffers = (key) => {
         if (tableBuffer.length > 0) {
-            result.push(<TableRenderer key={`table-${key}`} buffer={[...tableBuffer]} terminalWidth={columns} />);
+            result.push(<TableRenderer key={`table-${key}`} buffer={[...tableBuffer]} terminalWidth={columns} theme={theme} />);
             tableBuffer = [];
         }
         if (quoteBuffer.length > 0) {
             result.push(
-                <Box key={`quote-${key}`} borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor="gray" paddingLeft={1} marginY={1} flexDirection="column">
+                <Box key={`quote-${key}`} borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={1} marginY={1} flexDirection="column">
                     {quoteBuffer.map((line, qi) => (
-                        <InlineMarkdown key={qi} text={line} color="gray" italic={italic} />
+                        <InlineMarkdown key={qi} text={line} color={colors.textMuted} italic={italic} theme={theme} />
                     ))}
                 </Box>
             );
@@ -382,7 +388,7 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
             }
             // Horizontal Rule
             if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
-                result.push(<Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor="#333" />);
+                result.push(<Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor={colors.borderMuted} />);
                 return;
             }
 
@@ -393,7 +399,7 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
                 const hText = headingMatch[2];
                 result.push(
                     <Box key={i} marginTop={1} marginBottom={0} width="100%">
-                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'purple' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : 'white'} underline>
+                        <Text bold color={level === 1 ? 'cyan' : level === 2 ? 'magenta' : level === 3 ? 'yellow' : level === 4 ? 'green' : level === 5 ? 'blue' : colors.text} underline>
                             {hText}
                         </Text>
                     </Box>
@@ -419,7 +425,7 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
 
             result.push(
                 <Box key={i} flexDirection="column" width="100%">
-                    <InlineMarkdown text={content} color={color} italic={italic} />
+                    <InlineMarkdown text={content} color={textColor} italic={italic} theme={theme} />
                 </Box>
             );
         }
@@ -429,14 +435,15 @@ const MarkdownText = React.memo(({ text, color = '#D6DAE3', columns = 80, italic
     return <Box flexDirection="column" width={columns - 2}>{result}</Box>;
 });
 
-const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
+const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, extension, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const isContext = line.includes('[UI_CONTEXT]');
     const cleanLine = line.replace('[UI_CONTEXT]', '');
 
     // Handle high-fidelity multi-patch separator
     if (isContext && cleanLine.includes('═')) {
         return (
-            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
+            <Box backgroundColor={colors.codeBg} paddingX={1} width={columns}>
                 <Text color="gray">{'═'.repeat(Math.max(10, columns - 4))}</Text>
             </Box>
         );
@@ -445,7 +452,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     const parsedCurrent = parseLineInfo(line);
     if (!parsedCurrent) {
         return (
-            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
+            <Box backgroundColor={colors.codeBg} paddingX={1} width={columns}>
                 <Box width={3} flexShrink={0} />
                 <Box width={1} flexShrink={0} marginLeft={1} />
                 <Box flexGrow={1} marginLeft={1}>
@@ -476,18 +483,18 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     const isPureUnpairedBlock = (!finalPairContent && (isRemoval || isAddition));
 
     // 🎨 Unified solid block backgrounds for the inner text container
-    const innerBgColor = isRemoval ? '#3a0c0c' : (isAddition ? '#0c3a1a' : undefined);
+    const innerBgColor = isRemoval ? colors.diffRemovalBg : (isAddition ? colors.diffAdditionBg : undefined);
 
     // Row indicator colors
-    const finalNumColor = (isRemoval || isAddition) ? (isRemoval ? '#d96868' : '#68d98c') : 'gray';
-    const finalPrefixColor = isRemoval ? '#ff4d4d' : '#4dff88';
+    const finalNumColor = (isRemoval || isAddition) ? (isRemoval ? colors.diffRemovalNum : colors.diffAdditionNum) : colors.textMuted;
+    const finalPrefixColor = isRemoval ? colors.diffRemovalPrefix : colors.diffAdditionPrefix;
     const displayPrefix = isRemoval ? '-' : (isAddition ? '+' : ' ');
 
     const renderInlineDiff = () => {
         // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
-            const blockColor = isRemoval ? '#ff3333' : '#33ff66';
-            const textBgColor = isRemoval ? '#5a1818' : '#185a25';
+            const blockColor = isRemoval ? colors.diffRemovalHighlightColor : colors.diffAdditionHighlightColor;
+            const textBgColor = isRemoval ? colors.diffRemovalHighlightBg : colors.diffAdditionHighlightBg;
             const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
@@ -502,7 +509,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
 
         // Case B: Truly unchanged boilerplate context lines get full soft tint
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
-            const textColor = isRemoval ? '#885555' : (isAddition ? '#558866' : 'gray');
+            const textColor = isRemoval ? colors.diffRemovalText : (isAddition ? colors.diffAdditionText : colors.textMuted);
             const textBgColor = undefined;
             const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
@@ -526,46 +533,42 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
                     if (isRemoval) {
                         const isSurroundedByRemoval = (words[idx - 1]?.removed) || (words[idx + 1]?.removed);
 
-                        // NO bold! High-contrast neon red pops out changes instead
                         if (part.removed || (isWhitespace && isSurroundedByRemoval)) {
                             return (
-                                <Text key={idx} color="#ff3333" backgroundColor="#5a1818">
+                                <Text key={idx} color={colors.diffRemovalHighlightColor} backgroundColor={colors.diffRemovalHighlightBg}>
                                     {part.value}
                                 </Text>
                             );
                         }
                         if (part.added) return null;
 
-                        // Unchanged syntax components stay muted darker red
-                        return <Text key={idx} color="#885555">{part.value}</Text>;
+                        return <Text key={idx} color={colors.diffRemovalText}>{part.value}</Text>;
                     }
 
                     // 🟢 ADDITION ROW TREATMENT
                     if (isAddition) {
                         const isSurroundedByAddition = (words[idx - 1]?.added) || (words[idx + 1]?.added);
 
-                        // NO bold! High-contrast neon green pops out changes instead
                         if (part.added || (isWhitespace && isSurroundedByAddition)) {
                             return (
-                                <Text key={idx} color="#33ff66" backgroundColor="#185a25">
+                                <Text key={idx} color={colors.diffAdditionHighlightColor} backgroundColor={colors.diffAdditionHighlightBg}>
                                     {part.value}
                                 </Text>
                             );
                         }
                         if (part.removed) return null;
 
-                        // Unchanged syntax components stay muted darker green
-                        return <Text key={idx} color="#558866">{part.value}</Text>;
+                        return <Text key={idx} color={colors.diffAdditionText}>{part.value}</Text>;
                     }
 
-                    return <Text key={idx} color="gray">{part.value}</Text>;
+                    return <Text key={idx} color={colors.textMuted}>{part.value}</Text>;
                 })}
             </Text>
         );
     };
 
     return (
-        <Box backgroundColor="#1a1a1a" paddingX={1} width={columns}>
+        <Box backgroundColor={colors.codeBg} paddingX={1} width={columns}>
             {/* Gutter Line Number */}
             <Box width={4} flexShrink={0} justifyContent="flex-end">
                 <Text color={finalNumColor}>{lineNum}</Text>
@@ -586,7 +589,8 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     );
 });
 
-const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
+const DiffBlock = React.memo(({ text, columns = 80, extension, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
     const diffBody = match ? match[1].trim() : '';
     const diffLines = diffBody.split('\n');
@@ -620,7 +624,7 @@ const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
     return (
         <Box flexDirection="column" width={columns - 3} marginBottom={1}>
             <Box flexDirection="column" paddingY={0} width="100%">
-                <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+                <Box backgroundColor={colors.codeBg} paddingX={1} width="100%">
                     <Box width={3} flexShrink={0} />
                     <Box width={1} flexShrink={0} marginLeft={1} />
                     <Box flexGrow={1} marginLeft={1}>
@@ -634,9 +638,10 @@ const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
                         pairContent={item.pairContent}
                         columns={columns - 3}
                         extension={extension}
+                        theme={theme}
                     />
                 ))}
-                <Box backgroundColor="#1a1a1a" paddingX={1} width="100%">
+                <Box backgroundColor={colors.codeBg} paddingX={1} width="100%">
                     <Box width={3} flexShrink={0} />
                     <Box width={1} flexShrink={0} marginLeft={1} />
                     <Box flexGrow={1} marginLeft={1}>
@@ -648,8 +653,9 @@ const DiffBlock = React.memo(({ text, columns = 80, extension }) => {
     );
 });
 
-export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
+export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) => {
     if (!text) return null;
+    const colors = getThemeColors(theme);
 
     let extension = '';
     const fileMatch = text.match(/File\s+\[(.*?)\]/i);
@@ -659,7 +665,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
 
     // SCENARIO 1: Surgical Diff [DIFF_START]
     if (text.includes('[DIFF_START]')) {
-        return <DiffBlock text={text} columns={columns} extension={extension} />;
+        return <DiffBlock text={text} columns={columns} extension={extension} theme={theme} />;
     }
 
     // SCENARIO 2: Write File Content Preview
@@ -686,12 +692,12 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                     borderRight={false}
                     borderTop={false}
                     borderBottom={false}
-                    borderColor="#444444"
+                    borderColor={colors.codeBorder}
                     paddingLeft={2}
                     paddingRight={0}
                     width="100%"
                     marginBottom={1}
-                    backgroundColor={'#1a1a1a'}
+                    backgroundColor={colors.codeBg}
                 >
                     <Box flexDirection="column" width="100%">
                         <Box width="100%">
@@ -708,7 +714,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                     <Text color="gray" dimColor>{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                 </Box>
                                 <Box flexGrow={1}>
-                                    {renderHighlightedLine(line, extension, 'white')}
+                                    {renderHighlightedLine(line, extension, colors.text)}
                                 </Box>
                             </Box>
                         ))}
@@ -749,7 +755,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                 borderRight={false}
                                 borderTop={false}
                                 borderBottom={false}
-                                borderColor="#444444"
+                                borderColor={colors.codeBorder}
                                 paddingLeft={2}
                                 paddingRight={0}
                                 width="100%"
@@ -764,7 +770,7 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                                                 <Text color="gray">{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
                                             </Box>
                                             <Box flexGrow={1}>
-                                                {renderHighlightedLine(line, lang, '#e1e4e8')}
+                                                {renderHighlightedLine(line, lang, colors.text)}
                                             </Box>
                                         </Box>
                                     ))}
@@ -780,14 +786,14 @@ export const CodeRenderer = React.memo(({ text, columns = 80 }) => {
                         cleanPart = cleanPart.replace(/[\r\n]+$/, '');
                     }
                     if (!cleanPart) return null;
-                    return <MarkdownText key={i} text={cleanPart} columns={columns - 3} />;
+                    return <MarkdownText key={i} text={cleanPart} columns={columns - 3} theme={theme} />;
                 })}
             </Box>
         );
     }
 
     // SCENARIO 4: Standard Markdown
-    return <MarkdownText text={text} columns={columns - 3} />;
+    return <MarkdownText text={text} columns={columns - 3} theme={theme} />;
 });
 
 const formatThinkingDuration = (ms) => {
@@ -801,7 +807,8 @@ const formatThinkingDuration = (ms) => {
     return `${totalSecs}s`;
 };
 
-export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, aiProvider, version }) => {
+export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, aiProvider, version, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     // Show tool results ONLY if they contain high-fidelity markers like [DIFF_START] or Content Preview
     const isDiffResult = msg.role === 'system' && (msg.text?.includes('[DIFF_START]') || msg.text?.includes('- Content Preview:'));
     const isPatchError = msg.role === 'system' && msg.text?.includes('[TOOL RESULT]: ERROR:') &&
@@ -813,12 +820,12 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (isHomeWarning) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="white" dimColor padding={0} width="100%">
+                <Box flexDirection="column" borderStyle="round" borderColor={colors.border} dimColor padding={0} width="100%">
                     <Box paddingX={1}>
-                        <Text color="white" bold>{msg.text}</Text>
+                        <Text color={colors.text} bold>{msg.text}</Text>
                     </Box>
                     <Box paddingX={1} marginTop={0} marginBottom={0}>
-                        <Text color="white">{msg.subText}</Text>
+                        <Text color={colors.text}>{msg.subText}</Text>
                     </Box>
                 </Box>
             </Box>
@@ -828,7 +835,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isLogo) {
         return (
             <Box flexDirection="column" alignItems="flex-start" width="100%" marginY={1}>
-                <Text>{getFluxLogo(version, aiProvider)}</Text>
+                <Text>{getFluxLogo(version, aiProvider, theme)}</Text>
             </Box>
         );
     }
@@ -836,8 +843,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.id && String(msg.id).startsWith('welcome')) {
         return (
             <Box flexDirection="column" alignItems="center" width="100%" marginY={1}>
-                <Box borderStyle="round" borderColor="grey" paddingX={3} paddingY={0}>
-                    <Text color="white" bold>{msg.text.trim()}</Text>
+                <Box borderStyle="round" borderColor={colors.borderMuted} paddingX={3} paddingY={0}>
+                    <Text color={colors.text} bold>{msg.text.trim()}</Text>
                 </Box>
             </Box>
         );
@@ -847,7 +854,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         return (
             // [SPACE POINT]
             <Box marginBottom={0} marginTop={0} paddingX={0} width="100%">
-                <Text color="white">{msg.text}</Text>
+                <Text color={colors.text}>{msg.text}</Text>
             </Box>
         );
     }
@@ -855,10 +862,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (isPatchError) {
         return (
             <Box marginBottom={1}>
-                <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={1} paddingY={0}>
-                    <Text color="white" bold underline>✗ PATCH FAILED</Text>
+                <Box flexDirection="column" borderStyle="round" borderColor={colors.border} paddingX={1} paddingY={0}>
+                    <Text color={colors.text} bold underline>✗ PATCH FAILED</Text>
                     <Box marginTop={1}>
-                        <Text color="grey" bold>Model generated malformed edit.</Text>
+                        <Text color={colors.textMuted} bold>Model generated malformed edit.</Text>
                     </Box>
                 </Box>
             </Box>
@@ -870,13 +877,13 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isImageStats) {
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="grey" padding={0} width="100%">
-                    <Box paddingX={1} backgroundColor="#0e1b21">
-                        <Text color="white" bold>IMAGE STATS</Text>
+                <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
+                    <Box paddingX={1} backgroundColor={colors.codeBg}>
+                        <Text color={colors.text} bold>IMAGE STATS</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1} flexDirection="column">
                         {msg.text.split('\n').map((line, i) => (
-                            <Text key={i} color="grey">{line}</Text>
+                            <Text key={i} color={colors.textMuted}>{line}</Text>
                         ))}
                     </Box>
                 </Box>
@@ -889,7 +896,6 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         const selection = selectionMatch ? selectionMatch[1] : 'No selection';
         const questionMatch = msg.text.match(/Question: (.*)/);
         const question = questionMatch ? questionMatch[1] : null;
-        const s = emojiSpace(2);
 
         return (
             <Box marginBottom={0} paddingX={1} width="100%">
@@ -900,25 +906,24 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                     borderRight={false}
                     borderTop={true}
                     borderBottom={true}
-                    borderColor="#444444"
+                    borderColor={colors.codeBorder}
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}
                     paddingBottom={1}
                     marginY={1}
-                    // backgroundColor="#1a1a1a"
                     width={columns - 2}
                 >
                     <Box paddingX={1}>
-                        <Text color="green" bold>AGENT REQUEST: RESOLVED</Text>
+                        <Text color={colors.success} bold>AGENT REQUEST: RESOLVED</Text>
                     </Box>
                     {question && (
                         <Box paddingX={1} marginTop={1}>
-                            <Text color="cyan">{question}</Text>
+                            <Text color={colors.secondary}>{question}</Text>
                         </Box>
                     )}
                     <Box paddingX={1} marginTop={1} marginBottom={0}>
-                        <Text color="white">Selection: <Text color="grey" bold>{selection}</Text></Text>
+                        <Text color={colors.text}>Selection: <Text color={colors.textMuted} bold>{selection}</Text></Text>
                     </Box>
                 </Box>
             </Box>
@@ -932,19 +937,18 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                     flexDirection="column"
                     borderStyle="round"
                     border={true}
-                    // borderColor="#444444"
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}
                     paddingBottom={1}
-                    backgroundColor="#1a1a1a"
+                    backgroundColor={colors.codeBg}
                     width="100%"
                 >
                     <Box paddingX={1}>
-                        <Text color="white" bold>ABOUT FLUX FLOW</Text>
+                        <Text color={colors.text} bold>ABOUT FLUX FLOW</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
-                        <Text>{msg.text}</Text>
+                        <Text color={colors.text}>{msg.text}</Text>
                     </Box>
                 </Box>
             </Box>
@@ -958,19 +962,18 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                     flexDirection="column"
                     borderStyle="round"
                     border={true}
-                    // borderColor="#444444"
                     paddingLeft={2}
                     paddingRight={0}
                     paddingTop={1}
                     paddingBottom={1}
-                    backgroundColor="#1a1a1a"
+                    backgroundColor={colors.codeBg}
                     width="100%"
                 >
                     <Box paddingX={1}>
-                        <Text color="white" bold>UPDATE AVAILABLE</Text>
+                        <Text color={colors.text} bold>UPDATE AVAILABLE</Text>
                     </Box>
                     <Box paddingX={1} marginTop={1} marginBottom={1}>
-                        <CodeRenderer text={msg.text} columns={columns} />
+                        <CodeRenderer text={msg.text} columns={columns} theme={theme} />
                     </Box>
                 </Box>
             </Box>
@@ -1007,18 +1010,17 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/update', desc: 'Check/Install updates' }
         ];
 
-
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
-                <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
-                    <Text color="white" bold underline>COMMAND REFERENCE</Text>
+                <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                    <Text color={colors.text} bold underline>COMMAND REFERENCE</Text>
                     <Box flexDirection="column" marginTop={1}>
                         {commandList.map((c, i) => (
                             <Box key={i} flexDirection="row">
                                 <Box width={15}>
-                                    <Text color="white" bold>{c.cmd}</Text>
+                                    <Text color={colors.text} bold>{c.cmd}</Text>
                                 </Box>
-                                <Text color="gray"> - {c.desc}</Text>
+                                <Text color={colors.textMuted}> - {c.desc}</Text>
                             </Box>
                         ))}
                     </Box>
@@ -1037,11 +1039,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 
         return (
             <Box marginBottom={0} paddingX={1} width="100%">
-                <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} isPty={isPty} />
+                <TerminalBox command={cmd} output={outputList} completed={true} columns={columns} isPty={isPty} theme={theme} />
             </Box>
         );
     }
-
 
     const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
     const content = React.useMemo(() => cleanSignals(msg.text), [msg.text]);
@@ -1063,15 +1064,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     }
 
     return (
-        // [SPACE POINT]
         <Box marginBottom={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} marginTop={msg.role === 'think' ? 0 : msg.role === 'user' ? 0 : msg.role === 'agent' ? 0 : 0} flexDirection="column" flexShrink={0} width="100%" flexGrow={1}>
             {msg.role === 'user' ? (
                 <Box flexDirection="column" width={columns - 1}>
                     <Box width={columns - 1} height={1} overflow="hidden">
-                        <Text color="#444444">{'▄'.repeat(Math.max(1, columns - 1))}</Text>
+                        <Text color={colors.userMsgBorder}>{'▄'.repeat(Math.max(1, columns - 1))}</Text>
                     </Box>
                     <Box
-                        backgroundColor="#444444"
+                        backgroundColor={colors.userMsgBg}
                         paddingX={1}
                         paddingY={0}
                         width={columns - 1}
@@ -1089,48 +1089,47 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                             .map((line, lineIdx) => (
                                 <Box key={lineIdx} flexDirection="row" width="100%">
                                     <Box flexShrink={0} width={2}>
-                                        <Text bold color="white">{lineIdx === 0 ? '>' : ' '}</Text>
+                                        <Text bold color={colors.userMsgText}>{lineIdx === 0 ? '>' : ' '}</Text>
                                     </Box>
                                     <Box flexGrow={1} marginLeft={1}>
-                                        <InlineMarkdown text={line} color={msg.color || "white"} />
+                                        <InlineMarkdown text={line} color={msg.color || colors.userMsgText} theme={theme} />
                                     </Box>
                                 </Box>
                             ))}
                     </Box>
                     <Box width={columns - 1} height={1} overflow="hidden">
-                        <Text color="#444444">{'▀'.repeat(Math.max(1, columns - 1))}</Text>
+                        <Text color={colors.userMsgBorder}>{'▀'.repeat(Math.max(1, columns - 1))}</Text>
                     </Box>
                 </Box>
 
             ) : msg.role === 'think' ? (
                 <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
                     {msg.isStreaming && !msg.duration ? (
-                        <Text bold color="#F2F2F2">✧ Thinking...</Text>
+                        <Text bold color={colors.text}>✧ Thinking...</Text>
                     ) : (
-                        <Text bold color="#F2F2F2">
+                        <Text bold color={colors.text}>
                             ✦ Thought{msg.duration ? (
-                                <Text color="gray"> for <Text bold color="white">{formatThinkingDuration(msg.duration)}</Text></Text>
+                                <Text color={colors.textMuted}> for <Text bold color={colors.text}>{formatThinkingDuration(msg.duration)}</Text></Text>
                             ) : '...'}
                         </Text>
                     )}
-                    {/* [SPACE POINT] */}
-                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
+                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
                         {formatThinkText(finalContent, columns)}
                     </Box>
                 </Box>
             ) : (
                 <Box flexDirection="column" paddingX={1} marginTop={0} width="100%">
-                    <CodeRenderer text={finalContent.replace(/ \|\n\n/g, ' |\n')} columns={columns} />
+                    <CodeRenderer text={finalContent.replace(/ \|\n\n/g, ' |\n')} columns={columns} theme={theme} />
                     {msg.memoryUpdated && (
                         <Box marginTop={1} width="100%">
-                            <Text color="white" italic>[Memory Updated]</Text>
+                            <Text color={colors.text} italic>[Memory Updated]</Text>
                         </Box>
                     )}
                     {msg.role === 'agent' && msg.workedDuration ? (
                         <Box marginTop={1} marginBottom={2} width="100%">
-                            <Text>[</Text><Text color="gray">
-                                Worked for <Text bold color="white">{formatThinkingDuration(msg.workedDuration)}</Text>
-                            </Text><Text>]</Text>
+                            <Text color={colors.textMuted}>[</Text><Text color={colors.textMuted}>
+                                Worked for <Text bold color={colors.text}>{formatThinkingDuration(msg.workedDuration)}</Text>
+                            </Text><Text color={colors.textMuted}>]</Text>
                         </Box>
                     ) : null}
                 </Box>
@@ -1139,7 +1138,8 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     );
 });
 
-export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
+export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const { msg, type, text, isStreamingMsg, workedDuration } = block;
 
     // Batch chunk — renders up to CHUNK_SIZE sub-blocks committed together to <Static>
@@ -1154,6 +1154,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                         showFullThinking={showFullThinking}
                         aiProvider={aiProvider}
                         version={version}
+                        theme={theme}
                     />
                 ))}
             </Box>
@@ -1168,6 +1169,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 columns={columns}
                 aiProvider={aiProvider}
                 version={version}
+                theme={theme}
             />
         );
     }
@@ -1176,13 +1178,13 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         return (
             <Box flexDirection="column" paddingX={1} width="100%" marginTop={0} marginBottom={0}>
                 {isStreamingMsg ? (
-                    <Text bold color="#F2F2F2">✧ Thinking...</Text>
+                    <Text bold color={colors.text}>✧ Thinking...</Text>
                 ) : (
-                    <Text bold color="#F2F2F2">✦ Thought...</Text>
+                    <Text bold color={colors.text}>✦ Thought...</Text>
                 )}
                 {showFullThinking && (
                     <Box flexDirection="row" width="100%">
-                        <Text color="gray">│ </Text>
+                        <Text color={colors.textMuted}>│ </Text>
                     </Box>
                 )}
             </Box>
@@ -1194,7 +1196,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         if (!text || text.trim() === '') {
             return (
                 <Box flexDirection="row" width="100%" paddingX={1}>
-                    <Text color="gray">│ </Text>
+                    <Text color={colors.textMuted}>│ </Text>
                 </Box>
             );
         }
@@ -1219,9 +1221,9 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             <Box flexDirection="column" paddingX={1} width="100%">
                 {wrappedLines.map((wLine, idx) => (
                     <Box key={idx} flexDirection="row" width="100%">
-                        <Text color="gray">│ </Text>
+                        <Text color={colors.textMuted}>│ </Text>
                         <Box flexGrow={1} marginLeft={1}>
-                            <InlineMarkdown text={wLine} color="gray" italic />
+                            <InlineMarkdown text={wLine} color={colors.textMuted} italic theme={theme} />
                         </Box>
                     </Box>
                 ))}
@@ -1233,7 +1235,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         if (!showFullThinking) return null;
         return (
             <Box flexDirection="row" width="100%" paddingX={1}>
-                <Text color="gray">│ </Text>
+                <Text color={colors.textMuted}>│ </Text>
             </Box>
         );
     }
@@ -1245,7 +1247,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
-                <CodeRenderer text={animatedText} columns={columns} />
+                <CodeRenderer text={animatedText} columns={columns} theme={theme} />
             </Box>
         );
     }
@@ -1253,7 +1255,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'table') {
         return (
             <Box flexDirection="column" paddingX={1} width="100%">
-                <TableRenderer buffer={text.split('\n')} terminalWidth={columns} />
+                <TableRenderer buffer={text.split('\n')} terminalWidth={columns} theme={theme} />
             </Box>
         );
     }
@@ -1262,7 +1264,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         const { isFirstLine, isLastLine } = block;
 
         const renderPaddingLine = (isEnd = false) => (
-            <Box backgroundColor="#1a1a1a" paddingX={1} width={columns} marginBottom={isEnd ? 1 : 0}>
+            <Box backgroundColor={colors.codeBg} paddingX={1} width={columns} marginBottom={isEnd ? 1 : 0}>
                 <Box width={3} flexShrink={0} />
                 <Box width={1} flexShrink={0} marginLeft={1} />
                 <Box flexGrow={1} marginLeft={1}>
@@ -1277,27 +1279,22 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 <DiffLine
                     line={text}
                     pairContent={block.pairContent}
-                    parentText={undefined} // No longer needed
+                    parentText={undefined}
                     columns={columns}
+                    theme={theme}
                 />
                 {isLastLine && renderPaddingLine(true)}
             </Box>
         );
     }
 
-    // ── Streaming code-block lines ────────────────────────────────────────────
-    // Each of these types maps to one row of a fenced code block so that every
-    // completed line is immediately committed to <Static> scrollback.
-
     if (type === 'code-fence-open') {
-        // Empty border row (top padding) + header row — mirrors write-line's renderPaddingLine pattern.
         const borderProps = {
             borderStyle: 'single', borderLeft: true, borderRight: false,
-            borderTop: false, borderBottom: false, borderColor: '#444444', paddingLeft: 2, width: '100%'
+            borderTop: false, borderBottom: false, borderColor: colors.codeBorder, paddingLeft: 2, width: '100%'
         };
         return (
             <Box flexDirection="column" marginTop={0} marginBottom={0} width="100%">
-                {/* Empty pad row with left border — sits above the ▶_ header */}
                 <Box flexDirection="row" {...borderProps}>
                     <Text> </Text>
                 </Box>
@@ -1309,15 +1306,13 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     }
 
     if (type === 'code-line') {
-        // Renders one source line with a 3-char gutter. Fixed width avoids
-        // needing to know the total line count up-front during streaming.
         const { lineNum, lang } = block;
         return (
             <Box
                 flexDirection="row"
                 borderStyle="single"
                 borderLeft borderRight={false} borderTop={false} borderBottom={false}
-                borderColor="#444444"
+                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 width="100%"
             >
@@ -1325,20 +1320,19 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Text color="gray" dimColor>{String(lineNum).padStart(4, ' ')} </Text>
                 </Box>
                 <Box flexGrow={1}>
-                    {renderHighlightedLine(text, lang, '#e1e4e8')}
+                    {renderHighlightedLine(text, lang, colors.text)}
                 </Box>
             </Box>
         );
     }
 
     if (type === 'code-fence-close') {
-        // Renders the closing spacer row that gives the block bottom breathing room.
         return (
             <Box
                 flexDirection="row"
                 borderStyle="single"
                 borderLeft borderRight={false} borderTop={false} borderBottom={false}
-                borderColor="#444444"
+                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 marginBottom={1}
                 width="100%"
@@ -1347,12 +1341,11 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
             </Box>
         );
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     if (type === 'write-header') {
         return (
             <Box flexDirection="column" paddingX={1} width={columns}>
-                <MarkdownText text={text} columns={columns} />
+                <MarkdownText text={text} columns={columns} theme={theme} />
             </Box>
         );
     }
@@ -1369,10 +1362,10 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 borderRight={false}
                 borderTop={false}
                 borderBottom={false}
-                borderColor="#444444"
+                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 paddingRight={0}
-                backgroundColor={'#1a1a1a'}
+                backgroundColor={colors.codeBg}
                 marginBottom={isEnd ? 1 : 0}
             >
                 <Box width={gutterWidth + 2} flexShrink={0}>
@@ -1395,10 +1388,10 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     borderRight={false}
                     borderTop={false}
                     borderBottom={false}
-                    borderColor="#444444"
+                    borderColor={colors.codeBorder}
                     paddingLeft={2}
                     paddingRight={0}
-                    backgroundColor={'#1a1a1a'}
+                    backgroundColor={colors.codeBg}
                 >
                     <Box width={gutterWidth + 2} flexShrink={0}>
                         <Text color="gray" dimColor>{String(lineNum).padStart(gutterWidth, ' ')} </Text>
@@ -1406,7 +1399,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Box flexGrow={1} flexDirection="column">
                         {(wrappedLines || [text]).map((wl, idx) => (
                             <Box key={idx}>
-                                {renderHighlightedLine(wl, extension, 'white')}
+                                {renderHighlightedLine(wl, extension, colors.text)}
                             </Box>
                         ))}
                     </Box>
@@ -1419,7 +1412,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'write-footer') {
         return (
             <Box flexDirection="column" paddingX={1} width={columns} marginTop={1} marginBottom={1}>
-                <MarkdownText text={text} columns={columns} />
+                <MarkdownText text={text} columns={columns} theme={theme} />
             </Box>
         );
     }
@@ -1427,9 +1420,9 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     if (type === 'worked-duration') {
         return (
             <Box marginTop={1} marginBottom={2} paddingX={1} width="100%">
-                <Text>[</Text><Text color="gray">
-                    Worked for <Text bold color="white">{formatThinkingDuration(workedDuration)}</Text>
-                </Text><Text>]</Text>
+                <Text color={colors.textMuted}>[</Text><Text color={colors.textMuted}>
+                    Worked for <Text bold color={colors.text}>{formatThinkingDuration(workedDuration)}</Text>
+                </Text><Text color={colors.textMuted}>]</Text>
             </Box>
         );
     }
@@ -1437,7 +1430,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
     return null;
 });
 
-const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80, aiProvider, version }) => {
+const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80, aiProvider, version, theme = 'Dark' }) => {
     return (
         <Box flexDirection="column" width="100%">
             {messages.map((msg, idx) => (
@@ -1448,6 +1441,7 @@ const ChatLayout = React.memo(({ messages, showFullThinking, columns = 80, aiPro
                     columns={columns}
                     aiProvider={aiProvider}
                     version={version}
+                    theme={theme}
                 />
             ))}
         </Box>

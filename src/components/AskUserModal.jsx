@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { emojiSpace } from '../utils/terminal.js';
+import { getThemeColors } from '../utils/theme.js';
 
-const AskUserModal = ({ question, options, onResolve }) => {
+const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const [isSuggestingElse, setIsSuggestingElse] = useState(false);
     const [customInput, setCustomInput] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -47,19 +49,19 @@ const AskUserModal = ({ question, options, onResolve }) => {
                 borderRight={false}
                 borderTop={false}
                 borderBottom={false}
-                borderColor="#444444"
+                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 paddingRight={0}
                 paddingTop={1}
                 paddingBottom={1}
-                backgroundColor="#1a1a1a"
+                backgroundColor={colors.codeBg}
                 width="100%"
             >
                 <Box paddingX={1}>
-                    <Text color="white" bold>SUGGEST SOMETHING ELSE</Text>
+                    <Text color={colors.text} bold>SUGGEST SOMETHING ELSE</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1}>
-                    <Text italic color="gray">Replying to: {question}</Text>
+                    <Text italic color={colors.textMuted}>Replying to: {question}</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1} flexDirection="row">
                     <TextInput
@@ -69,7 +71,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
                     />
                 </Box>
                 <Box marginTop={1} paddingX={1} marginBottom={1}>
-                    <Text color="gray" italic>(Press Enter to send)</Text>
+                    <Text color={colors.textMuted} italic>(Press Enter to send)</Text>
                 </Box>
             </Box>
         );
@@ -80,14 +82,13 @@ const AskUserModal = ({ question, options, onResolve }) => {
             flexDirection="column"
             border={true}
             borderStyle={'round'}
-            borderColor="#444444"
+            borderColor={colors.codeBorder}
             paddingLeft={2}
             paddingRight={0}
             paddingTop={1}
             paddingBottom={1}
             marginY={1}
             marginRight={1}
-            // backgroundColor="#1a1a1a"
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
@@ -95,7 +96,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
             </Box>
 
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white">{question}</Text>
+                <Text color={colors.text}>{question}</Text>
             </Box>
 
             {/* Vertical Options for better scannability */}
@@ -107,16 +108,16 @@ const AskUserModal = ({ question, options, onResolve }) => {
                             key={opt.id}
                             flexDirection="column"
                             width="100%"
-                            backgroundColor={isSelected ? "#2a2a2a" : undefined}
+                            backgroundColor={isSelected ? colors.highlightBg : undefined}
                             paddingX={1}
                             marginBottom={idx === allOptions.length - 1 ? 0 : 1}
                         >
-                            <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
+                            <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                 {isSelected ? '❯ ' : '  '}{opt.label}
                             </Text>
                             {opt.description && (
                                 <Box marginLeft={4}>
-                                    <Text color="gray" italic>{opt.description}</Text>
+                                    <Text color={colors.textMuted} italic>{opt.description}</Text>
                                 </Box>
                             )}
                         </Box>
@@ -125,7 +126,7 @@ const AskUserModal = ({ question, options, onResolve }) => {
             </Box>
 
             <Box paddingX={1} marginTop={1} marginBottom={1}>
-                <Text color="gray" italic>(Use Arrows to navigate, Enter to confirm)</Text>
+                <Text color={colors.textMuted} italic>(Use Arrows to navigate, Enter to confirm)</Text>
             </Box>
         </Box>
     );

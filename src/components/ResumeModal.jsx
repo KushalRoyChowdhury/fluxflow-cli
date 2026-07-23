@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { loadHistory } from '../utils/history.js';
 import { emojiSpace } from '../utils/terminal.js';
+import { getThemeColors } from '../utils/theme.js';
 
-export default function ResumeModal({ onSelect, onDelete, onClose }) {
+export default function ResumeModal({ onSelect, onDelete, onClose, theme = 'Dark' }) {
+    const colors = getThemeColors(theme);
     const [history, setHistory] = useState({});
     const [keys, setKeys] = useState([]);
     const [selectedIndex, setSelectedIndex] = useState(0);
+
     useEffect(() => {
         const fetchHistory = async () => {
             const h = await loadHistory();
@@ -50,20 +53,20 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
     const visibleKeys = keys.slice(startIndex, startIndex + MAX_VISIBLE);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="gray" padding={0} width="100%">
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white" bold>CHAT HISTORY: RESUME CONVERSATION</Text>
+                <Text color={colors.text} bold>CHAT HISTORY: RESUME CONVERSATION</Text>
             </Box>
 
             {keys.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                    <Text italic color="gray">No saved chats found.</Text>
+                    <Text italic color={colors.textMuted}>No saved chats found.</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column" width="100%">
                     {startIndex > 0 && (
                         <Box paddingX={2} marginBottom={1}>
-                            <Text color="gray">▲ (+{startIndex} more chats above)</Text>
+                            <Text color={colors.textMuted}>▲ (+{startIndex} more chats above)</Text>
                         </Box>
                     )}
 
@@ -77,24 +80,23 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
                             <Box
                                 key={id}
                                 paddingX={1}
-                                backgroundColor={isSelected ? "#2a2a2a" : undefined}
+                                backgroundColor={isSelected ? colors.highlightBg : undefined}
                                 width="100%"
                             >
                                 <Box flexGrow={1}>
-                                    <Text color={isSelected ? 'while' : 'grey'} bold={isSelected}>
+                                    <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}
                                         {(() => {
-                                            // Real title (not 'Session...') > prompt > fallback
                                             if (chat?.name && !chat.name.startsWith('Session')) return chat.name;
                                             if (chat?.prompt) return chat.prompt;
                                             return chat?.name || id;
                                         })()}
-                                        <Text color={`${!isSelected ? 'grey' : 'grey'}`}> [{dateStr} • {id}]</Text>
+                                        <Text color={colors.textMuted}> [{dateStr} • {id}]</Text>
                                     </Text>
                                 </Box>
                                 {isSelected && (
                                     <Box flexShrink={0}>
-                                        <Text color="white" bold>[X] DELETE </Text>
+                                        <Text color={colors.danger} bold>[X] DELETE </Text>
                                     </Box>
                                 )}
                             </Box>
@@ -103,7 +105,7 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
 
                     {startIndex + MAX_VISIBLE < keys.length && (
                         <Box paddingX={2} marginTop={1}>
-                            <Text color="gray">▼ (+{keys.length - (startIndex + MAX_VISIBLE)} more chats below)</Text>
+                            <Text color={colors.textMuted}>▼ (+{keys.length - (startIndex + MAX_VISIBLE)} more chats below)</Text>
                         </Box>
                     )}
                 </Box>
@@ -116,9 +118,9 @@ export default function ResumeModal({ onSelect, onDelete, onClose }) {
                 borderLeft={false}
                 borderRight={false}
                 borderBottom={false}
-                borderColor="gray"
+                borderColor={colors.borderMuted}
             >
-                <Text italic>↑↓ navigate • Enter select • x delete • Esc close</Text>
+                <Text color={colors.textMuted} italic>↑↓ navigate • Enter select • x delete • Esc close</Text>
             </Box>
         </Box>
     );

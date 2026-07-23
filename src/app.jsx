@@ -20,6 +20,7 @@ import { getAPIKey, saveAPIKey, removeAPIKey, getProviderAPIKey, saveProviderAPI
 import { initAI, getAIStream, signalTermination, runJanitorTask, compressHistory, deleteChatSummary } from './utils/ai.js';
 import { subagentProgress } from './utils/subagent_state.js';
 import { loadSettings, saveSettings } from './utils/settings.js';
+import { getThemeColors } from './utils/theme.js';
 import { loadHistory, saveChat, deleteChat, generateChatId, cleanupOldHistory, cleanupOldLogs, saveChatContext, loadChatContext } from './utils/history.js';
 import ResumeModal from './components/ResumeModal.jsx';
 import MemoryModal from './components/MemoryModal.jsx';
@@ -145,7 +146,7 @@ const getPromoOptions = (ideName) => {
     return options;
 };
 
-const BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
+const BridgePromo = ({ width, height, selectedIndex, aiProvider, theme = 'Dark' }) => {
     const ideName = getIDEName();
     const options = getPromoOptions(ideName);
 
@@ -158,7 +159,7 @@ const BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
             height={height}
         >
             <Box marginBottom={1} width={Math.min(80, width - 4)} justifyContent="flex-start">
-                <Text>{getFluxLogo(versionFluxflow, aiProvider)}</Text>
+                <Text>{getFluxLogo(versionFluxflow, aiProvider, theme)}</Text>
             </Box>
             <Box flexDirection="column" borderStyle="double" borderColor="grey" paddingX={3} paddingY={1} width={Math.min(80, width - 4)}>
                 <Text bold color="white" textAlign="center">🚀 UPGRADE YOUR WORKFLOW</Text>
@@ -894,7 +895,8 @@ export default function App({ args = [] }) {
     const [providerBudgetCursor, setProviderBudgetCursor] = useState(0); // which provider in the queue we're on
     const [pbsCursor, setPbsCursor] = useState(0); // providerBudgetSelect list cursor
     const [pbsSelected, setPbsSelected] = useState({}); // providerBudgetSelect checkbox state
-    const [systemSettings, setSystemSettings] = useState({ memory: true, compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
+    const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
+    const colors = useMemo(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
@@ -1202,7 +1204,8 @@ export default function App({ args = [] }) {
         historicalBlocks: [],
         seenSelections: new Set(),
         chatId: '',
-        clearKey: 0
+        clearKey: 0,
+        theme: ''
     });
 
     const parsedBlocks = useMemo(() => {
@@ -1212,14 +1215,15 @@ export default function App({ args = [] }) {
         let historicalBlocks = [];
         let seenAskSelections = new Set();
 
-        // Check if terminal resized, chat was cleared, session switched, or cleared manually
+        // Check if terminal resized, chat was cleared, session switched, theme changed, or cleared manually
         const isResize = cachedHistoryRef.current.columns !== columns;
         const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
         const isChatChanged = cachedHistoryRef.current.chatId !== chatId;
         const isClearKeyChanged = cachedHistoryRef.current.clearKey !== clearKey;
+        const isThemeChanged = cachedHistoryRef.current.theme !== systemSettings.theme;
 
-        if (isResize || isClear || isChatChanged || isClearKeyChanged) {
-            // SLOW PATH: User resized terminal, cleared chat, reverted, or switched sessions. Re-parse history once.
+        if (isResize || isClear || isChatChanged || isClearKeyChanged || isThemeChanged) {
+            // SLOW PATH: User resized terminal, cleared chat, reverted, switched sessions or theme. Re-parse history once.
             const completedMsgs = messages.slice(0, completedIndex);
             for (let i = 0; i < completedMsgs.length; i++) {
                 const msg = completedMsgs[i];
@@ -1243,7 +1247,8 @@ export default function App({ args = [] }) {
                 historicalBlocks,
                 seenSelections: new Set(seenAskSelections),
                 chatId,
-                clearKey
+                clearKey,
+                theme: systemSettings.theme
             };
         } else {
             // FAST PATH: We are chatting or streaming.
@@ -1657,6 +1662,23 @@ export default function App({ args = [] }) {
         };
     }, []);
 
+    const prevThemeRef = useRef(systemSettings.theme);
+    useEffect(() => {
+        if (prevThemeRef.current && prevThemeRef.current !== systemSettings.theme) {
+            prevThemeRef.current = systemSettings.theme;
+            if (stdout) {
+                stdout.write('\x1b[2J\x1b[3J\x1b[H');
+                if (stdout.isTTY) {
+                    stdout.write('\x1b[?2004h');
+                }
+            }
+            setClearKey(prev => prev + 1);
+            clearBlocksCache();
+        } else {
+            prevThemeRef.current = systemSettings.theme;
+        }
+    }, [systemSettings.theme, stdout]);
+
     useEffect(() => {
         async function init() {
             // 0. Initialize IDE Bridge with dynamic version
@@ -2027,8 +2049,8 @@ export default function App({ args = [] }) {
         { cmd: '/help', desc: 'Show all available commands' },
         ...(parsedArgs.playground ? [{ cmd: '/move', desc: 'Move playground directory to original CWD/playground-export' }] : []),
         { cmd: '/resume', desc: 'Load previous session' },
-        { cmd: '/compress', desc: 'Summarize and compress chat history' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
+        { cmd: '/compress', desc: 'Summarize and compress chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/save', desc: 'Force save current chat' },
@@ -4111,6 +4133,7 @@ export default function App({ args = [] }) {
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
                             { label: 'Back', value: 'settings' }
                         ]}
+                        theme={systemSettings.theme}
                         onSelect={async (item) => {
                             if (item.value === 'settings' || item.value === 'Back') {
                                 setActiveView('settings');
@@ -4974,6 +4997,7 @@ export default function App({ args = [] }) {
                                         setActiveView('key');
                                     }
                                 }}
+                                theme={systemSettings.theme}
                             />
                         </Box>
                     </Box>
@@ -4993,6 +5017,7 @@ export default function App({ args = [] }) {
                                 setPendingAsk(null);
                                 setActiveView('chat');
                             }}
+                            theme={systemSettings.theme}
                         />
                     </Box>
                 );
@@ -5124,6 +5149,7 @@ export default function App({ args = [] }) {
                                 return newHistory;
                             }}
                             onClose={() => setActiveView('chat')}
+                            theme={systemSettings.theme}
                         />
                     </Box>
                 );
@@ -5152,6 +5178,7 @@ export default function App({ args = [] }) {
                                     }
                                     setActiveView('chat');
                                 }}
+                                theme={systemSettings.theme}
                             />
                         </Box>
                     </Box>
@@ -5159,7 +5186,7 @@ export default function App({ args = [] }) {
             case 'memory':
                 return (
                     <Box width="100%" alignItems="center" justifyContent="center">
-                        <MemoryModal onClose={() => setActiveView('chat')} />
+                        <MemoryModal onClose={() => setActiveView('chat')} theme={systemSettings.theme} />
                     </Box>
                 );
             case 'parserDownload':
@@ -5178,6 +5205,7 @@ export default function App({ args = [] }) {
                             setActiveView('chat');
                         }}
                         onCancel={() => setActiveView('chat')}
+                        theme={systemSettings.theme}
                     />
                 );
             case 'resolution':
@@ -5283,6 +5311,7 @@ export default function App({ args = [] }) {
                                     setPendingApproval(null);
                                     setActiveView('chat');
                                 }}
+                                theme={systemSettings.theme}
                             />
                         </Box>
                     </Box>
@@ -5322,6 +5351,7 @@ export default function App({ args = [] }) {
                                 setActiveView('settings');
                             }
                         }}
+                        theme={systemSettings.theme}
                     />
                 );
             case 'update':
@@ -5368,6 +5398,7 @@ export default function App({ args = [] }) {
                                     setPendingApproval(null);
                                     setActiveView('chat');
                                 }}
+                                theme={systemSettings.theme}
                             />
                         </Box>
                     </Box>
@@ -5376,21 +5407,21 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" marginTop={1} flexShrink={0} width="100%">
                         {showBtwBox && btwResponse && (
-                            <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%" marginBottom={1}>
+                            <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%" marginBottom={1}>
                                 <Box justifyContent="space-between" width="100%">
-                                    <Text color="white" bold underline>INQUIRY RESPONSE</Text>
-                                    <Text color="gray">[ ESC to Close ]</Text>
+                                    <Text color={colors.text} bold underline>INQUIRY RESPONSE</Text>
+                                    <Text color={colors.textMuted}>[ ESC to Close ]</Text>
                                 </Box>
                                 <Box marginTop={1} width="100%">
-                                    <CodeRenderer text={btwResponse} columns={terminalSize.columns - 6} />
+                                    <CodeRenderer text={btwResponse} columns={terminalSize.columns - 6} theme={systemSettings.theme} />
                                 </Box>
                             </Box>
                         )}
                         {/* 🤖 ACTIVE SUBAGENTS BOX */}
                         {activeSubagents.filter(sa => sa.status === 'running').length > 0 && (
-                            <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={2} paddingY={0} width="100%" marginBottom={1}>
+                            <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={0} width="100%" marginBottom={1}>
                                 <Box justifyContent="space-between" width="100%">
-                                    <Text color="white" bold>ACTIVE SUBAGENTS</Text>
+                                    <Text color={colors.text} bold>ACTIVE SUBAGENTS</Text>
                                 </Box>
                                 <Box flexDirection="column" marginTop={1} width="100%">
                                     {activeSubagents.filter(sa => sa.status === 'running').map(sa => (
@@ -5409,21 +5440,20 @@ export default function App({ args = [] }) {
                                         {/* Look at the shine! (≧∇≦)/ */}
                                         <GlintText
                                             text={statusText.trimEnd()}
-                                            baseColor="#B5B8D9"
-                                            glintColor="#D4DEE7"
-                                            // glintColor="#D7D1E6"
+                                            baseColor={colors.text}
+                                            glintColor={colors.textMuted}
                                             speed={60}
                                             italic={true}
                                             glintWidth={2}
                                             typeSpeed={10}
                                         />
 
-                                        <Text color={'gray'}>
+                                        <Text color={colors.textMuted}>
                                             {activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : ""}
                                         </Text>
                                     </Box>
                                 ) : (
-                                    <Text color="grey" italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
+                                    <Text color={colors.textMuted} italic>{input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? 'Press CTRL + O to expand' : "Waiting for input..."}</Text>
                                 )}
                             </Box>
                             <Box>
@@ -5433,19 +5463,19 @@ export default function App({ args = [] }) {
                                         isProcessing &&
                                         Date.now() - lastChunkTime > 15000 &&
                                         activeSubagents.length === 0 &&
-                                        (status.includes("connecting") || status.includes("working"));
+                                        (status.includes("connecting") || status.includes("working") || status.includes("queue"));
 
                                     if (showWaiting) {
                                         return (
                                             <Box>
                                                 <GlintText
                                                     text="Waiting for API"
-                                                    baseColor="white"
-                                                    glintColor="gray"
+                                                    baseColor={colors.text}
+                                                    glintColor={colors.textMuted}
                                                     glintWidth={4}
                                                     speed={80}
                                                 />
-                                                <Text color="gray" dimColor> ┃ </Text>
+                                                <Text color={colors.textMuted} dimColor> ┃ </Text>
                                             </Box>
                                         );
                                     }
@@ -5455,11 +5485,13 @@ export default function App({ args = [] }) {
                                             <Box>
                                                 <GlintText
                                                     text={wittyPhrase}
+                                                    baseColor={colors.text}
+                                                    glintColor={colors.textMuted}
                                                     italic
                                                     speed={80}
                                                     typeSpeed={15}
                                                 />
-                                                <Text color="gray" dimColor> ┃ </Text>
+                                                <Text color={colors.textMuted} dimColor> ┃ </Text>
                                             </Box>
                                         );
                                     }
@@ -5469,8 +5501,8 @@ export default function App({ args = [] }) {
 
                                 <GlintText
                                     text={tempModelOverride || activeModel.split('/')[1] || activeModel}
-                                    baseColor="white"
-                                    glintColor="gray"
+                                    baseColor={colors.text}
+                                    glintColor={colors.textMuted}
                                     glintWidth={3}
                                 />
                             </Box>
@@ -5479,10 +5511,10 @@ export default function App({ args = [] }) {
                         {/* 🌊 MAIN COMMAND CONSOLE */}
                         <Box flexDirection="column" width="100%">
                             <Box width="100%" height={1} overflow="hidden">
-                                <Text color="#555555">{'▄'.repeat(Math.max(1, terminalSize.columns))}</Text>
+                                <Text color={colors.inputBorder}>{'▄'.repeat(Math.max(1, terminalSize.columns))}</Text>
                             </Box>
                             <Box
-                                backgroundColor="#555555"
+                                backgroundColor={colors.inputBg}
                                 paddingX={1}
                                 paddingY={0}
                                 width="100%"
@@ -5491,7 +5523,7 @@ export default function App({ args = [] }) {
                                 <Box flexDirection="column" width="100%">
                                     <Box flexDirection="row" width="100%" paddingY={0}>
                                         <Box flexShrink={0} width={4}>
-                                            <Text color="white" bold>{(isProcessing || isCompressing) ? "✦  " : " ❯  "}</Text>
+                                            <Text color={colors.inputPrompt} bold>{(isProcessing || isCompressing) ? "✦  " : " ❯  "}</Text>
                                         </Box>
                                         <Box flexGrow={1}>
                                             <Box flexGrow={1} position="relative">
@@ -5502,9 +5534,9 @@ export default function App({ args = [] }) {
                                                         ) : activeCommand && isTerminalFocused ? (
                                                             <Text color="yellow" bold>  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...</Text>
                                                         ) : escPressCount === 1 ? (
-                                                            <Text color="white" bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
+                                                            <Text color={colors.inputPrompt} bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
-                                                            <Text color="#cccccc">{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                            <Text color={colors.inputPlaceholder}>{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}
@@ -5513,9 +5545,10 @@ export default function App({ args = [] }) {
                                                     onPasteStateChange={setHasPasteBlock}
                                                     focus={!isTerminalFocused && !isCompressing}
                                                     showCursor={isAppFocused && !isCompressing}
+                                                    cursorColor={colors.inputText}
                                                     lastFocusEventTime={lastFocusEventTime.current}
                                                     value={input}
-                                                    textStyle={{ bold: true }}
+                                                    textStyle={{ bold: true, color: colors.inputText }}
                                                     columns={terminalSize.columns}
                                                     onChange={(val) => {
                                                         const cleanVal = val.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\s*\n/g, '\n');
@@ -5536,7 +5569,7 @@ export default function App({ args = [] }) {
                                 </Box>
                             </Box>
                             <Box width="100%" height={1} overflow="hidden">
-                                <Text color="#555555">{'▀'.repeat(Math.max(1, terminalSize.columns))}</Text>
+                                <Text color={colors.inputBorder}>{'▀'.repeat(Math.max(1, terminalSize.columns))}</Text>
                             </Box>
                         </Box>
                     </Box>
@@ -5547,11 +5580,11 @@ export default function App({ args = [] }) {
     return (
         <Box flexDirection="column" width="100%">
             {isInitializing ? null : showBridgePromo ? (
-                <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} aiProvider={aiProvider} />
+                <BridgePromo width={stdout?.columns || 80} height={stdout?.rows || 24} selectedIndex={promoSelectedIndex} aiProvider={aiProvider} theme={systemSettings.theme} />
             ) : (
                 <>
                     <Box paddingX={1} flexDirection="column" width="100%">
-                        <Static key={`static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`} items={parsedBlocks.completed}>
+                        <Static key={`static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}-${systemSettings.theme}`} items={parsedBlocks.completed}>
                             {(block) => (
                                 <BlockItem
                                     key={block.key}
@@ -5560,6 +5593,7 @@ export default function App({ args = [] }) {
                                     showFullThinking={showFullThinking}
                                     aiProvider={aiProvider}
                                     version={versionFluxflow}
+                                    theme={systemSettings.theme}
                                 />
                             )}
                         </Static>
@@ -5576,6 +5610,7 @@ export default function App({ args = [] }) {
                                         showFullThinking={showFullThinking}
                                         aiProvider={aiProvider}
                                         version={versionFluxflow}
+                                        theme={systemSettings.theme}
                                     />
                                 ))}
                                 {activeCommand && (
@@ -5643,13 +5678,13 @@ export default function App({ args = [] }) {
                         )}
 
                         {confirmExit && (
-                            <Box borderStyle="round" borderColor="white" paddingX={2} marginY={0} width="100%">
-                                <Text color="white" bold>🔴 EXIT CONFIRMATION: </Text>
-                                <Text color="white">Press </Text>
-                                <Text color="white" bold>CTRL + C</Text>
-                                <Text color="white"> again to exit ({exitCountdown}s). Press </Text>
-                                <Text color="gray" bold>ESC</Text>
-                                <Text color="white"> to cancel.</Text>
+                            <Box borderStyle="round" borderColor={colors.borderMuted} paddingX={2} marginY={0} width="100%">
+                                <Text color="red" bold>🔴 EXIT CONFIRMATION: </Text>
+                                <Text color={colors.text}>Press </Text>
+                                <Text color={colors.text} bold>CTRL + C</Text>
+                                <Text color={colors.text}> again to exit ({exitCountdown}s). Press </Text>
+                                <Text color={colors.textMuted} bold>ESC</Text>
+                                <Text color={colors.text}> to cancel.</Text>
                             </Box>
                         )}
 
@@ -5693,11 +5728,11 @@ export default function App({ args = [] }) {
                                     marginBottom={1}
                                 >
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
-                                        <Text color="white" bold>
+                                        <Text color={colors.text} bold>
                                 {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
                                         </Text>
                                         {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? (
-                                            <Text color="gray" italic>
+                                            <Text color={colors.textMuted} italic>
                                                 (Use #Lstart-Lend to specify line numbers)
                                             </Text>
                                         ) : (input.startsWith('/model') && apiTier === 'Free') ? (() => {
@@ -5714,8 +5749,8 @@ export default function App({ args = [] }) {
                                                 label = "billing";
                                             }
                                             return (
-                                                <Text color="gray" dimColor italic>
-                                                    Paid API Strategy has more models. Configure <Text color="cyan" underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
+                                                <Text color={colors.textMuted} dimColor italic>
+                                                    Paid API Strategy has more models. Configure <Text color={colors.secondary} underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
                                                 </Text>
                                             );
                                         })() : null}
@@ -5731,17 +5766,16 @@ export default function App({ args = [] }) {
                                             <Box
                                                 key={s.cmd}
                                                 flexDirection="row"
-                                                backgroundColor={isActive ? "#2a2a2a" : undefined}
+                                                backgroundColor={isActive ? colors.highlightBg : undefined}
                                                 paddingX={1}
                                             >
                                                 <Box width={3}>
-                                                    <Text color={isActive ? "#B8BDC9" : "gray"} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
+                                                    <Text color={isActive ? colors.text : colors.textMuted} bold={isActive}>{isActive ? " ❯" : "  "}</Text>
                                                 </Box>
                                                 <Box width={55}>
                                                     <Text
-                                                        color={isDivider ? "#D0CCD8" : (isGemmaDisabled ? "gray" : (isActive ? "white" : "grey"))}
+                                                        color={isDivider ? colors.textDim : (isGemmaDisabled ? colors.textMuted : (isActive ? colors.text : colors.textDim))}
                                                         bold={false}
-                                                    // dimColor={isGemmaDisabled && !isActive}
                                                     >
                                                         {s.cmd && (s.cmd.startsWith('@[') || s.cmd.startsWith('\\@[')) && s.cmd.endsWith(']') ? (() => {
                                                             // Handle both @[...] and \@[...]
@@ -5752,7 +5786,7 @@ export default function App({ args = [] }) {
                                                     </Text>
                                                 </Box>
                                                 <Box flexGrow={1}>
-                                                    <Text color={`${!isActive ? "gray" : "white"}`} italic>{s.desc}</Text>
+                                                    <Text color={!isActive ? colors.textMuted : colors.text} italic>{s.desc}</Text>
                                                 </Box>
                                             </Box>
                                         );
@@ -5762,9 +5796,9 @@ export default function App({ args = [] }) {
                                     {suggestions.length > 5 && (
                                         <Box paddingX={1} height={1}>
                                             {remaining > 0 ? (
-                                                <Text color="gray" dimColor italic>   ... ({remaining} more commands available)</Text>
+                                                <Text color={colors.textMuted} dimColor italic>   ... ({remaining} more commands available)</Text>
                                             ) : (
-                                                <Text color="gray" dimColor italic>   (End of list)</Text>
+                                                <Text color={colors.textMuted} dimColor italic>   (End of list)</Text>
                                             )}
                                         </Box>
                                     )}
@@ -5785,6 +5819,7 @@ export default function App({ args = [] }) {
                                 activeModel={activeModel}
                                 isProcessing={isProcessing}
                                 lastChunkTime={lastChunkTime}
+                                theme={systemSettings.theme}
                             />
                         </Box>
 
@@ -5799,48 +5834,48 @@ export default function App({ args = [] }) {
                             const toolPercent = agentActiveMs > 0 ? ((sessionToolTime / agentActiveMs) * 100).toFixed(1) : '0.0';
 
                             return (
-                                <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor="grey" width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
+                                <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor={colors.borderMuted} width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
                                     <Box marginBottom={1}>
                                         <Text bold>{gradient(['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
                                     </Box>
                                     <Box flexDirection="column">
-                                        <Text color="white" bold underline>Interaction Summary</Text>
+                                        <Text color={colors.text} bold underline>Interaction Summary</Text>
                                         <Box marginTop={1}>
-                                            <Box width={20}><Text color="blue">Session ID:</Text></Box>
-                                            <Text color="white">{chatId}</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Session ID:</Text></Box>
+                                            <Text color={colors.text}>{chatId}</Text>
                                         </Box>
                                         <Box>
-                                            <Box width={20}><Text color="blue">Tool Calls:</Text></Box>
-                                            <Text color="white">{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( <Text color="green">✔ {runtimeSession.toolSuccess}</Text> <Text color="yellow">🛇 {runtimeSession.toolDenied}</Text> <Text color="red">✘ {runtimeSession.toolFailure}</Text> )</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Tool Calls:</Text></Box>
+                                            <Text color={colors.text}>{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( <Text color="green">✔ {runtimeSession.toolSuccess}</Text> <Text color="yellow">🛇 {runtimeSession.toolDenied}</Text> <Text color="red">✘ {runtimeSession.toolFailure}</Text> )</Text>
                                         </Box>
                                         <Box>
-                                            <Box width={20}><Text color="blue">Success Rate:</Text></Box>
-                                            <Text color="white">{successRate}%</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Success Rate:</Text></Box>
+                                            <Text color={colors.text}>{successRate}%</Text>
                                         </Box>
                                         <Box>
-                                            <Box width={20}><Text color="blue">Code Changes:</Text></Box>
-                                            <Text color="white"><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
+                                            <Box width={20}><Text color={colors.secondary}>Code Changes:</Text></Box>
+                                            <Text color={colors.text}><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
                                         </Box>
                                         <Box>
-                                            <Box width={20}><Text color="blue">Tokens Consumed:</Text></Box>
-                                            <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
+                                            <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
                                         </Box>
                                         {sessionTotalTokens > 0 && (
                                             <>
                                                 <Box marginLeft={2}>
-                                                    <Box width={18}><Text color="grey">» Input Tokens:</Text></Box>
-                                                    <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                                    <Box width={18}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
                                                 </Box>
                                                 {sessionTotalCachedTokens > 0 && (
                                                     <Box marginLeft={4}>
-                                                        <Box width={16}><Text color="grey">» Cached:</Text></Box>
-                                                        <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                                        <Box width={16}><Text color={colors.textMuted}>» Cached:</Text></Box>
+                                                        <Text color={colors.text}>{formatTokens(sessionTotalCachedTokens)}</Text>
                                                     </Box>
                                                 )}
                                                 {sessionTotalCandidateTokens > 0 && (
                                                     <Box marginLeft={2}>
-                                                        <Box width={18}><Text color="grey">» Output Tokens:</Text></Box>
-                                                        <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                                        <Box width={18}><Text color={colors.textMuted}>» Output Tokens:</Text></Box>
+                                                        <Text color={colors.text}>{formatTokens(sessionTotalCandidateTokens)}</Text>
                                                     </Box>
                                                 )}
                                             </>
@@ -5848,34 +5883,34 @@ export default function App({ args = [] }) {
                                         {sessionImageCount > 0 && (
                                             <>
                                                 <Box>
-                                                    <Box width={20}><Text color="blue">Images Made:</Text></Box>
-                                                    <Text color="white">{sessionImageCount}</Text>
+                                                    <Box width={20}><Text color={colors.secondary}>Images Made:</Text></Box>
+                                                    <Text color={colors.text}>{sessionImageCount}</Text>
                                                 </Box>
                                                 <Box>
-                                                    <Box width={20}><Text color="blue">Image Credits:</Text></Box>
-                                                    <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                                    <Box width={20}><Text color={colors.secondary}>Image Credits:</Text></Box>
+                                                    <Text color={colors.text}>{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
                                                 </Box>
                                             </>
                                         )}
                                     </Box>
 
                                     <Box flexDirection="column" marginTop={1}>
-                                        <Text color="white" bold underline>Performance</Text>
+                                        <Text color={colors.text} bold underline>Performance</Text>
                                         <Box marginTop={1}>
-                                            <Box width={20}><Text color="blue">Wall Time:</Text></Box>
-                                            <Text color="white">{formatMsDuration(wallTimeMs)}</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Wall Time:</Text></Box>
+                                            <Text color={colors.text}>{formatMsDuration(wallTimeMs)}</Text>
                                         </Box>
                                         <Box>
-                                            <Box width={20}><Text color="blue">Agent Active:</Text></Box>
-                                            <Text color="white">{formatMsDuration(agentActiveMs)}</Text>
+                                            <Box width={20}><Text color={colors.secondary}>Agent Active:</Text></Box>
+                                            <Text color={colors.text}>{formatMsDuration(agentActiveMs)}</Text>
                                         </Box>
                                         <Box marginLeft={2}>
-                                            <Box width={18}><Text color="grey">» API Time:</Text></Box>
-                                            <Text color="white">{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
+                                            <Box width={18}><Text color={colors.textMuted}>» API Time:</Text></Box>
+                                            <Text color={colors.text}>{formatMsDuration(sessionApiTime)} ({apiPercent}%)</Text>
                                         </Box>
                                         <Box marginLeft={2}>
-                                            <Box width={18}><Text color="grey">» Tool Time:</Text></Box>
-                                            <Text color="white">{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
+                                            <Box width={18}><Text color={colors.textMuted}>» Tool Time:</Text></Box>
+                                            <Text color={colors.text}>{formatMsDuration(sessionToolTime)} ({toolPercent}%)</Text>
                                         </Box>
                                     </Box>
                                 </Box>

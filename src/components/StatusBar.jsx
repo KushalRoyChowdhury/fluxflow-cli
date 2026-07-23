@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { formatTokens, truncatePath } from '../utils/text.js';
 import { useState, useEffect, useRef } from 'react';
+import { getThemeColors } from '../utils/theme.js';
 
 let activeGetMemoryInfo = null;
 
@@ -44,8 +45,8 @@ const getLatencyColor = (delay) => {
     return '#ff0000';
 };
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0 }) => {
-    // const modeIcon = mode === 'Flux' ? '⚡' : '🌊';
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     const modeIcon = mode === 'Flux' ? '' : '';
     const [memoryUsage, setMemoryUsage] = useState(0);
     const [memoryLimit, setMemoryLimit] = useState(0);
@@ -87,11 +88,6 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             }
             const timeSinceLast = Date.now() - lastChunkTime;
 
-            // Two-zone logic:
-            // • Brief pause  (<2.5s): cap at 3× avg so tool calls / context pauses
-            //   don't catastrophize the color.
-            // • Genuine stall (≥2.5s): bypass cap entirely so the dot turns red,
-            //   signalling the model is dead — not just thinking.
             const STALL_THRESHOLD = 2500;
             const isStalled = timeSinceLast >= STALL_THRESHOLD;
             const cappedTimeSinceLast = (!isStalled && averageInterval > 0)
@@ -99,8 +95,6 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 : timeSinceLast;
             const rawDelay = Math.max(averageInterval, cappedTimeSinceLast);
 
-            // EMA: react faster (α=0.4) during a stall so red arrives in ~3 ticks,
-            // stay slow (α=0.2) during normal streaming to absorb spikes.
             const alpha = isStalled ? 0.4 : 0.2;
             smoothedDelayRef.current = smoothedDelayRef.current * (1 - alpha) + rawDelay * alpha;
             setDotColor(getLatencyColor(smoothedDelayRef.current));
@@ -114,18 +108,14 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     const updateMemory = () => {
         const usage = process.memoryUsage();
 
-        // 1. Determine the unit based on heapTotal (if >= 1GB, use GB)
         const isGB = usage.heapTotal / (1024 * 1024) >= 1024;
         const currentUnit = isGB ? 'GB' : 'MB';
 
-        // 2. Helper function to turn bytes into a clean, parsed number
         const formatToNumber = (bytes, toGB) => {
             const converted = bytes / (1024 * 1024 * (toGB ? 1024 : 1));
-            // Keep 2 decimal places for GB, or round to whole numbers for MB
             return toGB ? parseFloat(converted.toFixed(2)) : Math.round(converted);
         };
 
-        // 3. Update all three states!
         setMemoryUnit(currentUnit);
         setMemoryLimit(formatToNumber(usage.heapTotal, isGB));
         setMemoryUsage(formatToNumber(usage.heapUsed, isGB));
@@ -138,7 +128,6 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             updateMemory();
         }, 30000);
 
-        // Keep it clean! 🧹
         return () => {
             clearInterval(interval);
             if (activeGetMemoryInfo === updateMemory) {
@@ -146,8 +135,6 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             }
         };
     }, []);
-
-
 
     let maxLimit = 262144;
     if (aiProvider === 'NVIDIA' && (activeModel?.includes('glm') || activeModel?.includes('gpt') || activeModel?.includes('qwen'))) {
@@ -166,21 +153,20 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             {/* 🛠️ MODE & THINKING ZONE */}
             <Box>
                 <Box marginRight={1}>
-                    <Text color="white" bold>{mode.toUpperCase()}</Text>
+                    <Text color={colors.text} bold>{mode.toUpperCase()}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃</Text>
+                <Text color={colors.textMuted} dimColor>┃</Text>
 
                 <Box marginX={1}>
-                    <Text color="white" bold>{thinkingLevel.toUpperCase()}</Text>
+                    <Text color={colors.text} bold>{thinkingLevel.toUpperCase()}</Text>
                 </Box>
 
                {isMemoryEnabled && (
                      <Box>
-                        <Text color="gray" dimColor>┃</Text>
+                        <Text color={colors.textMuted} dimColor>┃</Text>
                         <Box marginX={1}>
-                            <Text color="white" dimColor bold>MEMORY</Text>
-                            {/* <Text color="white" bold>{isMemoryEnabled ? 'ON' : 'OFF'}</Text> */}
+                            <Text color={colors.text} dimColor bold>MEMORY</Text>
                         </Box>
                      </Box>
                 )}
@@ -188,7 +174,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
             {/* 📁 WORKSPACE TELEMETRY */}
             <Box flexGrow={1} justifyContent="center" paddingX={2}>
-                <Text color="white" italic>{truncatePath(process.cwd(), 35)}</Text>
+                <Text color={colors.text} italic>{truncatePath(process.cwd(), 35)}</Text>
             </Box>
 
             {/* 🔋 PERFORMANCE & ID ZONE */}
@@ -199,28 +185,28 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                     </Box>
                 ) : <Text> </Text>}
                 <Box marginX={1}>
-                    <Text color="white">
+                    <Text color={colors.text}>
                         {formatTokens(tokensTotal)}{' '}
                         {(() => {
                             const pct = (tokens / maxLimit) * 100;
-                            const color = pct < 60 ? 'white' : pct < 80 ? 'yellow' : 'red';
+                            const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
                             return <Text color={color} dimColor>{pct.toFixed(0)}%</Text>;
                         })()}
                     </Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃</Text>
+                <Text color={colors.textMuted} dimColor>┃</Text>
 
                 <Box marginX={1}>
-                    <Text color="grey" bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
+                    <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
                 </Box>
 
-                <Text color="gray" dimColor>┃</Text>
+                <Text color={colors.textMuted} dimColor>┃</Text>
 
                 <Box marginLeft={1}>
-                    <Text color="gray" bold>{chatId}</Text>
+                    <Text color={colors.textMuted} bold>{chatId}</Text>
                     {(apiTier === 'Custom' || apiTier === 'Paid') && (
-                        <Box><Text color="gray" dimColor> ┃ </Text><Text color="gray" bold>PAID</Text></Box>
+                        <Box><Text color={colors.textMuted} dimColor> ┃ </Text><Text color={colors.textMuted} bold>PAID</Text></Box>
                     )}
                 </Box>
             </Box>

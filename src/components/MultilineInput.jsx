@@ -190,7 +190,8 @@ export const ControlledMultilineInput = ({
     cursorIndex = 0,
     highlight,
     columns = 80,
-    pasteBlocks = []
+    pasteBlocks = [],
+    cursorColor
 }) => {
     const scrollOffsetRef = useRef(0);
     const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
@@ -276,10 +277,10 @@ export const ControlledMultilineInput = ({
 
     const cursorStyle = useMemo(() => ({
         ...textStyle,
-        color: (showCursor && focus && blink) ? 'white' : undefined,
+        color: (showCursor && focus && blink) ? (cursorColor || 'white') : undefined,
         bold: showCursor && focus && blink,
         inverse: showCursor && focus && blink
-    }), [textStyle, showCursor, focus, blink]);
+    }), [textStyle, showCursor, focus, blink, cursorColor]);
 
     const renderLineText = (text, isCursor, col, cStyle) => {
         if (!text) {
@@ -369,6 +370,7 @@ export const MultilineInput = ({
     columns = 80,
     useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
     onPasteStateChange,
+    cursorColor,
     ...controlledProps
 }) => {
     const [cursorIndex, setCursorIndex] = useState(value.length);
@@ -746,6 +748,7 @@ export const MultilineInput = ({
             focus={focus}
             columns={columns}
             pasteBlocks={pasteBlocks}
+            cursorColor={cursorColor}
         />
     );
 };

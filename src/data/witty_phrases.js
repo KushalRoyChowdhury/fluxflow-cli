@@ -2,6 +2,8 @@
  * @description Gemini CLI witty phrases. Preservation.
  */
 export const WITTY_LOADING_PHRASES = [
+    // === ORIGINALS ===
+
     "I'm Feeling Lucky",
     'Shipping awesomeness',
     'Painting the serifs back on',
@@ -133,4 +135,81 @@ export const WITTY_LOADING_PHRASES = [
     'New line? That’s Ctrl+J.',
     'Releasing the HypnoDrones',
     'Pushing the button, Frank.',
+
+    // === NEW ===
+    "Consulting with the Companion Cube",
+
+    // --- Portal / Portal 2 ---
+    'Testing for science. You monster.',
+    'Dispensing deadly neurotoxin just kidding, compiling.',
+    'Now thinking with portals',
+    'Wheatley is currently attempting to hack this prompt',
+    'Developing combustible lemons',
+    'Aperture Science Enrichment Center is processing your request.',
+    'SPAAAACE! Space! SPAAAACE!',
+    'The cake is not a lie, it just needs a few more seconds.',
+
+    // --- Other Classic Games ---
+    'Praise the Sun! ☀️',
+    "Hey you, you're finally awake.",
+    'Stay a while and listen.',
+    'All your base are belong to us.',
+    "It's dangerous to go alone! Take this code.",
+    'Protocol 3: Protect the Pilot.',
+    'Finish Him! (The loading bar, that is)',
+    'War war never changes. But this prompt will.',
+    'Snake? Snake?! SNAAAAKE!',
+    'Got a selection of good things on sale, stranger!',
+    'Boy! Read the documentation.',
+    'Reticulating Minecraft splines',
+
+    // --- Few More ---
+    'Feed the loading bar a quick snack',
+    'Converting dark mode to dark magic',
+    'Asking the rubber duck for advice',
+    'Dividing by zero wait, NO NO NO—',
+    'Herding the 1s and 0s back into line',
+    'Bribing the server with cookies',
+
+    // --- Pragmata ---
+    'Establishing contact with the Moon base',
+    'Calibrating astronaut suit thrusters',
+    'Drawing doodle on space helmet',
+    'Synthesizing Lunafilament',
+    'Deactivating runaway lunar defense bots',
+    'Calculating gravity offset watch your step!',
+    'Hacking the Delphi Corporation mainframe',
+    'What comes after dreaming? Loading screen, apparently.',
+    'Petting the holographic giant cat',
+    'Securing payload for Earth re-entry',
+
+    // --- Halo --- 'Launching Halo ring just kidding, still loading.',
+    'Wort wort wort!',
+    'Did you touch my Warthog?',
+    'One small step for man, one giant leap for the loading bar.',
+    'The Halo array is charging or maybe just a fan.',
+    'Deploying Pelican dropship eventually.',
+    'Just cleaning my plasma pistol BRB.',
+    'Checking Master Chief\'s helmet for scratches.',
+    'Counting sheep wait, wrong game.',
+    'S-Tier loading screen incoming.',
+
+    // --- GTA --- 'Traffic jam in the information highway.',
+    'Alarm blaring it\'s just your internet connection.',
+    'Looking for a helicopter or just your patience.',
+    'Need a taxi? Just kidding, I\'m loading.',
+    'This loading time is criminal.',
+    'Wish I had a cheat code for fast loading.',
+
+    // --- Other Fun Lines ---
+    'Polishing the loading bar until it shines',
+    'Training the server hamsters',
+    'Baking a fresh batch of witty comments',
+    'Aligning my existential dread with your request',
+    'Just doodling on the terminal',
+    'Searching for the wifi password in the cosmos',
+    'Trying to remember my CAPTCHA training',
+    'Deciphering ancient scrolls (aka documentation)',
+    'Brewing a perfect cup of code',
+    'Petting the cat that photobombed my code'
 ];

@@ -452,6 +452,7 @@ var init_settings = __esm({
       },
       systemSettings: {
         memory: true,
+        theme: "Dark",
         compression: 0,
         autoExec: false,
         allowExternalAccess: false,
@@ -3252,7 +3253,8 @@ var init_MultilineInput = __esm({
       cursorIndex = 0,
       highlight,
       columns = 80,
-      pasteBlocks = []
+      pasteBlocks = [],
+      cursorColor
     }) => {
       const scrollOffsetRef = useRef(0);
       const wrapWidth = useMemo(() => Math.max(20, columns - 10), [columns]);
@@ -3326,10 +3328,10 @@ var init_MultilineInput = __esm({
       }, [focus, showCursor, value, cursorIndex]);
       const cursorStyle = useMemo(() => ({
         ...textStyle,
-        color: showCursor && focus && blink ? "white" : void 0,
+        color: showCursor && focus && blink ? cursorColor || "white" : void 0,
         bold: showCursor && focus && blink,
         inverse: showCursor && focus && blink
-      }), [textStyle, showCursor, focus, blink]);
+      }), [textStyle, showCursor, focus, blink, cursorColor]);
       const renderLineText = (text, isCursor, col, cStyle) => {
         if (!text) {
           const emptyText = placeholder && value.length === 0 ? formatText(placeholder, true) : "";
@@ -3389,6 +3391,7 @@ var init_MultilineInput = __esm({
       columns = 80,
       useCustomInput = (inputHandler, isActive) => useInput(inputHandler, { isActive }),
       onPasteStateChange,
+      cursorColor,
       ...controlledProps
     }) => {
       const [cursorIndex, setCursorIndex] = useState2(value.length);
@@ -3714,9 +3717,630 @@ var init_MultilineInput = __esm({
           showCursor,
           focus,
           columns,
-          pasteBlocks
+          pasteBlocks,
+          cursorColor
         }
       );
+    };
+  }
+});
+
+// src/utils/theme.js
+var CHAOS_PRESETS, THEMES, getThemeColors;
+var init_theme = __esm({
+  "src/utils/theme.js"() {
+    CHAOS_PRESETS = [
+      {
+        name: "Cyan Cyberpunk",
+        text: "cyan",
+        textMuted: "#4da6b8",
+        textDim: "#2d6d7a",
+        textInverted: "black",
+        border: "cyan",
+        borderMuted: "#1a5966",
+        borderDim: "#0f3840",
+        bg: void 0,
+        cardBg: "#061e24",
+        highlightBg: "#092b33",
+        activeBg: "#0e3e4a",
+        inputBg: "#092b33",
+        inputBorder: "#092b33",
+        inputText: "cyan",
+        inputPlaceholder: "#2d6d7a",
+        inputPrompt: "cyan",
+        codeBg: "#020d10",
+        codeBorder: "#1a5966",
+        userMsgBg: "#092b33",
+        userMsgBorder: "#092b33",
+        userMsgText: "cyan",
+        diffRemovalBg: "#3a0c1a",
+        diffAdditionBg: "#0c3a32",
+        diffRemovalText: "#ff4d88",
+        diffAdditionText: "#00ffaa",
+        diffRemovalHighlightColor: "#ff1a66",
+        diffRemovalHighlightBg: "#590022",
+        diffAdditionHighlightColor: "#00ffcc",
+        diffAdditionHighlightBg: "#00593b",
+        diffRemovalNum: "#ff4d88",
+        diffAdditionNum: "#00ffaa",
+        diffRemovalPrefix: "#ff1a66",
+        diffAdditionPrefix: "#00ffcc",
+        primary: "cyan",
+        secondary: "blue",
+        accent: "magenta",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        statusOn: "cyan",
+        statusOff: "#2d6d7a",
+        logoTextAnsi: "\x1B[1;36m",
+        logoBodyAnsi: "\x1B[36m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#00ffff", "#0088ff"]
+      },
+      {
+        name: "Magenta Vaporwave",
+        text: "magenta",
+        textMuted: "#c451d6",
+        textDim: "#7d2b8a",
+        textInverted: "black",
+        border: "magenta",
+        borderMuted: "#5e1b69",
+        borderDim: "#3b0f42",
+        bg: void 0,
+        cardBg: "#240729",
+        highlightBg: "#310938",
+        activeBg: "#470e52",
+        inputBg: "#310938",
+        inputBorder: "#310938",
+        inputText: "magenta",
+        inputPlaceholder: "#7d2b8a",
+        inputPrompt: "magenta",
+        codeBg: "#100312",
+        codeBorder: "#5e1b69",
+        userMsgBg: "#310938",
+        userMsgBorder: "#310938",
+        userMsgText: "magenta",
+        diffRemovalBg: "#3a0c20",
+        diffAdditionBg: "#200c3a",
+        diffRemovalText: "#ff4d94",
+        diffAdditionText: "#aa4dff",
+        diffRemovalHighlightColor: "#ff1a75",
+        diffRemovalHighlightBg: "#59002b",
+        diffAdditionHighlightColor: "#bb66ff",
+        diffAdditionHighlightBg: "#3b0059",
+        diffRemovalNum: "#ff4d94",
+        diffAdditionNum: "#aa4dff",
+        diffRemovalPrefix: "#ff1a75",
+        diffAdditionPrefix: "#bb66ff",
+        primary: "magenta",
+        secondary: "cyan",
+        accent: "purple",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        statusOn: "magenta",
+        statusOff: "#7d2b8a",
+        logoTextAnsi: "\x1B[1;35m",
+        logoBodyAnsi: "\x1B[35m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#ff00ff", "#8800ff"]
+      },
+      {
+        name: "Glitch Matrix",
+        text: "#00ff41",
+        textMuted: "#00b32d",
+        textDim: "#00661a",
+        textInverted: "black",
+        border: "#00ff41",
+        borderMuted: "#008020",
+        borderDim: "#004d13",
+        bg: void 0,
+        cardBg: "#0d1f0d",
+        highlightBg: "#122912",
+        activeBg: "#1c3e1c",
+        inputBg: "#122912",
+        inputBorder: "#122912",
+        inputText: "#00ff41",
+        inputPlaceholder: "#00b32d",
+        inputPrompt: "#ffff00",
+        codeBg: "#040a04",
+        codeBorder: "#008020",
+        userMsgBg: "#122912",
+        userMsgBorder: "#122912",
+        userMsgText: "#00ff41",
+        diffRemovalBg: "#3a001a",
+        diffAdditionBg: "#003a10",
+        diffRemovalText: "#ff0055",
+        diffAdditionText: "#00ff66",
+        diffRemovalHighlightColor: "#ff0033",
+        diffRemovalHighlightBg: "#59001b",
+        diffAdditionHighlightColor: "#33ff88",
+        diffAdditionHighlightBg: "#005918",
+        diffRemovalNum: "#ff0055",
+        diffAdditionNum: "#00ff66",
+        diffRemovalPrefix: "#ff0033",
+        diffAdditionPrefix: "#33ff88",
+        primary: "#00ff41",
+        secondary: "yellow",
+        accent: "cyan",
+        success: "#00ff41",
+        warning: "yellow",
+        danger: "red",
+        info: "cyan",
+        statusOn: "#00ff41",
+        statusOff: "#00661a",
+        logoTextAnsi: "\x1B[1;32m",
+        logoBodyAnsi: "\x1B[32m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#00ff41", "#ffff00"]
+      },
+      {
+        name: "Warm Sunset",
+        text: "#ffaa55",
+        textMuted: "#cc8844",
+        textDim: "#885522",
+        textInverted: "black",
+        border: "#ff9933",
+        borderMuted: "#aa6622",
+        borderDim: "#663311",
+        bg: void 0,
+        cardBg: "#24180f",
+        highlightBg: "#2e1e12",
+        activeBg: "#422c1b",
+        inputBg: "#2e1e12",
+        inputBorder: "#2e1e12",
+        inputText: "#ffaa55",
+        inputPlaceholder: "#885522",
+        inputPrompt: "#ff7733",
+        codeBg: "#120c08",
+        codeBorder: "#aa6622",
+        userMsgBg: "#2e1e12",
+        userMsgBorder: "#2e1e12",
+        userMsgText: "#ffaa55",
+        diffRemovalBg: "#3d120c",
+        diffAdditionBg: "#3a2e0c",
+        diffRemovalText: "#ff5544",
+        diffAdditionText: "#ffcc33",
+        diffRemovalHighlightColor: "#ff3322",
+        diffRemovalHighlightBg: "#591108",
+        diffAdditionHighlightColor: "#ffee44",
+        diffAdditionHighlightBg: "#594400",
+        diffRemovalNum: "#ff5544",
+        diffAdditionNum: "#ffcc33",
+        diffRemovalPrefix: "#ff3322",
+        diffAdditionPrefix: "#ffee44",
+        primary: "#ffaa55",
+        secondary: "#ff7733",
+        accent: "magenta",
+        success: "#ffcc33",
+        warning: "#ff7733",
+        danger: "#ff3322",
+        info: "#ffaa55",
+        statusOn: "#ffaa55",
+        statusOff: "#885522",
+        logoTextAnsi: "\x1B[1;33m",
+        logoBodyAnsi: "\x1B[33m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#ff9933", "#ff0055"]
+      },
+      {
+        name: "Sakura Blossom",
+        text: "#ffc0e0",
+        textMuted: "#d98cb3",
+        textDim: "#804d66",
+        textInverted: "black",
+        border: "#ff99cc",
+        borderMuted: "#aa4d7a",
+        borderDim: "#662647",
+        bg: void 0,
+        cardBg: "#291320",
+        highlightBg: "#331826",
+        activeBg: "#472235",
+        inputBg: "#331826",
+        inputBorder: "#331826",
+        inputText: "#ffc0e0",
+        inputPlaceholder: "#804d66",
+        inputPrompt: "#ff99cc",
+        codeBg: "#140a10",
+        codeBorder: "#aa4d7a",
+        userMsgBg: "#331826",
+        userMsgBorder: "#331826",
+        userMsgText: "#ffc0e0",
+        diffRemovalBg: "#3e0c1b",
+        diffAdditionBg: "#1b3e2b",
+        diffRemovalText: "#ff6699",
+        diffAdditionText: "#66ffb3",
+        diffRemovalHighlightColor: "#ff3377",
+        diffRemovalHighlightBg: "#590022",
+        diffAdditionHighlightColor: "#33ff99",
+        diffAdditionHighlightBg: "#00592e",
+        diffRemovalNum: "#ff6699",
+        diffAdditionNum: "#66ffb3",
+        diffRemovalPrefix: "#ff3377",
+        diffAdditionPrefix: "#33ff99",
+        primary: "#ffc0e0",
+        secondary: "#ff99cc",
+        accent: "magenta",
+        success: "#66ffb3",
+        warning: "yellow",
+        danger: "#ff3377",
+        info: "#ff99cc",
+        statusOn: "#ffc0e0",
+        statusOff: "#804d66",
+        logoTextAnsi: "\x1B[1;35m",
+        logoBodyAnsi: "\x1B[35m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#ffb3d9", "#ff3399"]
+      }
+    ];
+    THEMES = {
+      Dark: {
+        id: "Dark",
+        name: "Dark (Default)",
+        // Base Colors
+        text: "white",
+        textMuted: "gray",
+        textDim: "grey",
+        textInverted: "black",
+        // Borders
+        border: "white",
+        borderMuted: "gray",
+        borderDim: "grey",
+        // Backgrounds
+        bg: void 0,
+        cardBg: "#1e1e1e",
+        highlightBg: "#2a2a2a",
+        activeBg: "#3a3a3a",
+        // Input Box Colors
+        inputBg: "#555555",
+        inputBorder: "#555555",
+        inputText: "white",
+        inputPlaceholder: "#cccccc",
+        inputPrompt: "white",
+        // Code & Message Component Colors
+        codeBg: "#1a1a1a",
+        codeBorder: "#444444",
+        userMsgBg: "#444444",
+        userMsgBorder: "#444444",
+        userMsgText: "white",
+        // Diff Component Palette
+        diffRemovalBg: "#3a0c0c",
+        diffAdditionBg: "#0c3a1a",
+        diffRemovalText: "#885555",
+        diffAdditionText: "#558866",
+        diffRemovalHighlightColor: "#ff3333",
+        diffRemovalHighlightBg: "#5a1818",
+        diffAdditionHighlightColor: "#33ff66",
+        diffAdditionHighlightBg: "#185a25",
+        diffRemovalNum: "#d96868",
+        diffAdditionNum: "#68d98c",
+        diffRemovalPrefix: "#ff4d4d",
+        diffAdditionPrefix: "#4dff88",
+        // Accents & Indicators
+        primary: "white",
+        secondary: "cyan",
+        accent: "magenta",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        // Status Indicators
+        statusOn: "white",
+        statusOff: "gray",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;37m",
+        logoBodyAnsi: "\x1B[37m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#0077ff", "#ff00ff"]
+      },
+      Light: {
+        id: "Light",
+        name: "Light",
+        // Base Colors
+        text: "black",
+        textMuted: "gray",
+        textDim: "grey",
+        textInverted: "white",
+        // Borders
+        border: "black",
+        borderMuted: "gray",
+        borderDim: "grey",
+        // Backgrounds
+        bg: void 0,
+        cardBg: "#e5e5e5",
+        highlightBg: "#d4d4d4",
+        activeBg: "#c0c0c0",
+        // Input Box Colors
+        inputBg: "#d0d0d0",
+        inputBorder: "#d0d0d0",
+        inputText: "black",
+        inputPlaceholder: "#555555",
+        inputPrompt: "black",
+        // Code & Message Component Colors
+        codeBg: "#e8e8e8",
+        codeBorder: "#b0b0b0",
+        userMsgBg: "#d0d0d0",
+        userMsgBorder: "#d0d0d0",
+        userMsgText: "black",
+        // Diff Component Palette
+        diffRemovalBg: "#fce8e8",
+        diffAdditionBg: "#e6f9e6",
+        diffRemovalText: "#661111",
+        diffAdditionText: "#115511",
+        diffRemovalHighlightColor: "#440000",
+        diffRemovalHighlightBg: "#f8b4b4",
+        diffAdditionHighlightColor: "#003300",
+        diffAdditionHighlightBg: "#a6ebad",
+        diffRemovalNum: "#c02020",
+        diffAdditionNum: "#188028",
+        diffRemovalPrefix: "#d01010",
+        diffAdditionPrefix: "#109020",
+        // Accents & Indicators
+        primary: "black",
+        secondary: "blue",
+        accent: "magenta",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        // Status Indicators
+        statusOn: "black",
+        statusOff: "gray",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;30m",
+        logoBodyAnsi: "\x1B[30m",
+        logoMutedAnsi: "\x1B[38;5;244m",
+        logoGradient: ["#0077ff", "#ff00ff"]
+      },
+      "GitHub Dark": {
+        id: "GitHub Dark",
+        name: "GitHub Dark",
+        // Base Colors
+        text: "#c9d1d9",
+        textMuted: "#8b949e",
+        textDim: "#6e7681",
+        textInverted: "#0d1117",
+        // Borders
+        border: "#30363d",
+        borderMuted: "#30363d",
+        borderDim: "#21262d",
+        // Backgrounds
+        bg: void 0,
+        cardBg: "#161b22",
+        highlightBg: "#21262d",
+        activeBg: "#30363d",
+        // Input Box Colors
+        inputBg: "#21262d",
+        inputBorder: "#21262d",
+        inputText: "#c9d1d9",
+        inputPlaceholder: "#8b949e",
+        inputPrompt: "#58a6ff",
+        // Code & Message Component Colors
+        codeBg: "#0d1117",
+        codeBorder: "#30363d",
+        userMsgBg: "#21262d",
+        userMsgBorder: "#21262d",
+        userMsgText: "#c9d1d9",
+        // Diff Component Palette
+        diffRemovalBg: "#3c1e1e",
+        diffAdditionBg: "#11381e",
+        diffRemovalText: "#f85149",
+        diffAdditionText: "#3fb950",
+        diffRemovalHighlightColor: "#ff7b72",
+        diffRemovalHighlightBg: "#701c1c",
+        diffAdditionHighlightColor: "#56d364",
+        diffAdditionHighlightBg: "#116329",
+        diffRemovalNum: "#f85149",
+        diffAdditionNum: "#3fb950",
+        diffRemovalPrefix: "#f85149",
+        diffAdditionPrefix: "#3fb950",
+        // Accents & Indicators
+        primary: "#c9d1d9",
+        secondary: "#58a6ff",
+        accent: "#bc8cff",
+        success: "#3fb950",
+        warning: "#d29922",
+        danger: "#f85149",
+        info: "#58a6ff",
+        // Status Indicators
+        statusOn: "#58a6ff",
+        statusOff: "#8b949e",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;36m",
+        logoBodyAnsi: "\x1B[37m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#2ea043", "#56d364"]
+      },
+      "GitHub Light": {
+        id: "GitHub Light",
+        name: "GitHub Light",
+        // Base Colors
+        text: "#24292f",
+        textMuted: "#57606a",
+        textDim: "#6e7781",
+        textInverted: "#ffffff",
+        // Borders
+        border: "#d0d7de",
+        borderMuted: "#d0d7de",
+        borderDim: "#e1e4e8",
+        // Backgrounds
+        bg: void 0,
+        cardBg: "#f6f8fa",
+        highlightBg: "#eaeef2",
+        activeBg: "#d0d7de",
+        // Input Box Colors
+        inputBg: "#eaeef2",
+        inputBorder: "#eaeef2",
+        inputText: "#24292f",
+        inputPlaceholder: "#57606a",
+        inputPrompt: "#0969da",
+        // Code & Message Component Colors
+        codeBg: "#ffffff",
+        codeBorder: "#d0d7de",
+        userMsgBg: "#eaeef2",
+        userMsgBorder: "#eaeef2",
+        userMsgText: "#24292f",
+        // Diff Component Palette
+        diffRemovalBg: "#ffebe9",
+        diffAdditionBg: "#e6ffec",
+        diffRemovalText: "#cf222e",
+        diffAdditionText: "#1a7f37",
+        diffRemovalHighlightColor: "#82071e",
+        diffRemovalHighlightBg: "#ffc1c0",
+        diffAdditionHighlightColor: "#116329",
+        diffAdditionHighlightBg: "#acf2bd",
+        diffRemovalNum: "#cf222e",
+        diffAdditionNum: "#1a7f37",
+        diffRemovalPrefix: "#cf222e",
+        diffAdditionPrefix: "#1a7f37",
+        // Accents & Indicators
+        primary: "#24292f",
+        secondary: "#0969da",
+        accent: "#8250df",
+        success: "#1a7f37",
+        warning: "#9a6700",
+        danger: "#cf222e",
+        info: "#0969da",
+        // Status Indicators
+        statusOn: "#0969da",
+        statusOff: "#57606a",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;34m",
+        logoBodyAnsi: "\x1B[30m",
+        logoMutedAnsi: "\x1B[38;5;244m",
+        logoGradient: ["#1a7f37", "#2da44e"]
+      },
+      "Transparent Dark": {
+        id: "Transparent Dark",
+        name: "Transparent Dark",
+        // Base Colors
+        text: "white",
+        textMuted: "gray",
+        textDim: "grey",
+        textInverted: "black",
+        // Borders
+        border: "gray",
+        borderMuted: "gray",
+        borderDim: "grey",
+        // Backgrounds (All transparent / undefined)
+        bg: void 0,
+        cardBg: void 0,
+        highlightBg: "#2a2a2a",
+        activeBg: "#3a3a3a",
+        // Input Box Colors
+        inputBg: "#555555",
+        inputBorder: "#555555",
+        inputText: "white",
+        inputPlaceholder: "#cccccc",
+        inputPrompt: "white",
+        // Code & Message Component Colors
+        codeBg: void 0,
+        codeBorder: "gray",
+        userMsgBg: "#555555",
+        userMsgBorder: "#555555",
+        userMsgText: "white",
+        // Diff Component Palette (Transparent background, colored lines)
+        diffRemovalBg: void 0,
+        diffAdditionBg: void 0,
+        diffRemovalText: "#ff6666",
+        diffAdditionText: "#66ff66",
+        diffRemovalHighlightColor: "#ff3333",
+        diffRemovalHighlightBg: void 0,
+        diffAdditionHighlightColor: "#33ff66",
+        diffAdditionHighlightBg: void 0,
+        diffRemovalNum: "#ff6666",
+        diffAdditionNum: "#66ff66",
+        diffRemovalPrefix: "#ff4d4d",
+        diffAdditionPrefix: "#4dff88",
+        // Accents & Indicators
+        primary: "white",
+        secondary: "cyan",
+        accent: "magenta",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        // Status Indicators
+        statusOn: "white",
+        statusOff: "gray",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;37m",
+        logoBodyAnsi: "\x1B[37m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#0077ff", "#ff00ff"]
+      },
+      "Transparent Light": {
+        id: "Transparent Light",
+        name: "Transparent Light",
+        // Base Colors
+        text: "black",
+        textMuted: "gray",
+        textDim: "grey",
+        textInverted: "white",
+        // Borders
+        border: "gray",
+        borderMuted: "gray",
+        borderDim: "grey",
+        // Backgrounds (All transparent / undefined)
+        bg: void 0,
+        cardBg: void 0,
+        highlightBg: "#d4d4d4",
+        activeBg: "#c0c0c0",
+        // Input Box Colors
+        inputBg: "#d0d0d0",
+        inputBorder: "#d0d0d0",
+        inputText: "black",
+        inputPlaceholder: "#555555",
+        inputPrompt: "black",
+        // Code & Message Component Colors
+        codeBg: void 0,
+        codeBorder: "gray",
+        userMsgBg: "#d0d0d0",
+        userMsgBorder: "#d0d0d0",
+        userMsgText: "black",
+        // Diff Component Palette (Transparent background, colored lines)
+        diffRemovalBg: void 0,
+        diffAdditionBg: void 0,
+        diffRemovalText: "#c02020",
+        diffAdditionText: "#188028",
+        diffRemovalHighlightColor: "#800000",
+        diffRemovalHighlightBg: void 0,
+        diffAdditionHighlightColor: "#004000",
+        diffAdditionHighlightBg: void 0,
+        diffRemovalNum: "#c02020",
+        diffAdditionNum: "#188028",
+        diffRemovalPrefix: "#d01010",
+        diffAdditionPrefix: "#109020",
+        // Accents & Indicators
+        primary: "black",
+        secondary: "blue",
+        accent: "magenta",
+        success: "green",
+        warning: "yellow",
+        danger: "red",
+        info: "blue",
+        // Status Indicators
+        statusOn: "black",
+        statusOff: "gray",
+        // Logo / Terminal ANSI Colors
+        logoTextAnsi: "\x1B[1;30m",
+        logoBodyAnsi: "\x1B[30m",
+        logoMutedAnsi: "\x1B[38;5;244m",
+        logoGradient: ["#0077ff", "#ff00ff"]
+      }
+    };
+    getThemeColors = (themeName = "Dark") => {
+      if (themeName === "Chaos" || themeName === "Mystery") {
+        const randomPreset = CHAOS_PRESETS[Math.floor(Math.random() * CHAOS_PRESETS.length)];
+        return { ...randomPreset, id: "Chaos" };
+      }
+      if (THEMES[themeName]) return THEMES[themeName];
+      if (themeName === "GitHub") return THEMES["GitHub Dark"];
+      if (themeName === "Transparent") return THEMES["Transparent Dark"];
+      return THEMES.Dark;
     };
   }
 });
@@ -3728,7 +4352,9 @@ var TerminalBox;
 var init_TerminalBox = __esm({
   "src/components/TerminalBox.jsx"() {
     init_text();
-    TerminalBox = React3.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24 }) => {
+    init_theme();
+    TerminalBox = React3.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const processPTY = (text) => {
         if (!text) return "";
         const lines = [[]];
@@ -3873,15 +4499,16 @@ var init_TerminalBox = __esm({
           borderRight: false,
           borderTop: true,
           borderBottom: true,
+          borderColor: colors.codeBorder,
           paddingLeft: 2,
           paddingRight: 0,
           paddingY: 1,
           marginY: 1,
           width: columns - 2
         },
-        /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: "white", bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: "white" }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "green", bold: true }, "ADVANCE"))),
-        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { flexDirection: "column", marginTop: 0, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1, width: "100%" }, hasCollapsibleContent && !isExpanded && /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta" }, "...", collapsedCount, " lines collapsed...")), /* @__PURE__ */ React3.createElement(Text3, { color: completed ? void 0 : void 0 }, renderedOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : "#0a0a0a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { color: "white", italic: true }, "Waiting for output...")),
-        /* @__PURE__ */ React3.createElement(Box2, { justifyContent: "space-between", marginTop: 1 }, !completed ? /* @__PURE__ */ React3.createElement(Text3, { color: "gray", italic: true }, isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging.") : /* @__PURE__ */ React3.createElement(Box2, null), /* @__PURE__ */ React3.createElement(Text3, { color: "gray", bold: true }, completed ? "\u25CF ARCHIVED" : isFocused ? "\u25B6 TERMINAL FOCUSED" : "\u25CF LIVE (Press TAB to focus)"))
+        /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 1, paddingRight: 2 }, /* @__PURE__ */ React3.createElement(Text3, null, /* @__PURE__ */ React3.createElement(Text3, { color: colors.text, bold: true }, completed ? "\u{1F3C1} FINISHED:" : "\u26A1 EXECUTING:", " "), /* @__PURE__ */ React3.createElement(Text3, { color: colors.text }, command))), isPty && /* @__PURE__ */ React3.createElement(Box2, { flexShrink: 0, paddingX: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "green", bold: true }, "ADVANCE"))),
+        displayOutput ? /* @__PURE__ */ React3.createElement(Box2, { flexDirection: "column", marginTop: 0, backgroundColor: isPty ? void 0 : colors.codeBg, paddingX: 1, width: "100%" }, hasCollapsibleContent && !isExpanded && /* @__PURE__ */ React3.createElement(Box2, { marginBottom: 1 }, /* @__PURE__ */ React3.createElement(Text3, { color: "magenta" }, "...", collapsedCount, " lines collapsed...")), /* @__PURE__ */ React3.createElement(Text3, { color: completed ? colors.text : colors.text }, renderedOutput)) : !completed && /* @__PURE__ */ React3.createElement(Box2, { marginTop: 1, backgroundColor: isPty ? void 0 : colors.codeBg, paddingX: 1, width: "100%" }, /* @__PURE__ */ React3.createElement(Text3, { color: colors.textMuted, italic: true }, "Waiting for output...")),
+        /* @__PURE__ */ React3.createElement(Box2, { justifyContent: "space-between", marginTop: 1 }, !completed ? /* @__PURE__ */ React3.createElement(Text3, { color: colors.textMuted, italic: true }, isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging.") : /* @__PURE__ */ React3.createElement(Box2, null), /* @__PURE__ */ React3.createElement(Text3, { color: colors.textMuted, bold: true }, completed ? "\u25CF ARCHIVED" : isFocused ? "\u25B6 TERMINAL FOCUSED" : "\u25CF LIVE (Press TAB to focus)"))
       );
     });
   }
@@ -4115,6 +4742,7 @@ var getTerminalEnv, emojiSpace, getFluxLogo;
 var init_terminal = __esm({
   "src/utils/terminal.js"() {
     init_gemini_cli();
+    init_theme();
     getTerminalEnv = () => {
       if (process.env.TERM_PROGRAM === "vscode") return "vscode";
       if (process.env.WT_SESSION) return "wt";
@@ -4130,8 +4758,13 @@ var init_terminal = __esm({
       }
       return " ".repeat(baseSpaces);
     };
-    getFluxLogo = (version = "...", provider = "Loading...") => {
+    getFluxLogo = (version = "...", provider = "Loading...", theme = "Dark") => {
       const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
+      const colors = getThemeColors(theme);
+      const textColor = colors.logoTextAnsi;
+      const bodyColor = colors.logoBodyAnsi;
+      const greyColor = colors.logoMutedAnsi;
+      const reset = "\x1B[0m";
       const art = [
         "  \u2588\u2588\u2588       ",
         " \u2591\u2591\u2591\u2588\u2588\u2588     ",
@@ -4142,14 +4775,15 @@ var init_terminal = __esm({
         "  \u2588\u2588\u2588\u2591      ",
         " \u2591\u2591\u2591        "
       ];
-      const coloredArt = gradient(["#0077ff", "#ff00ff"]).multiline(art.join("\n")).split("\n");
-      const grey = (t) => `\x1B[90m${t}\x1B[0m`;
+      const logoGradient = colors.logoGradient || ["#0077ff", "#ff00ff"];
+      const coloredArt = gradient(logoGradient).multiline(art.join("\n")).split("\n");
+      const grey = (t) => `${greyColor}${t}${reset}`;
       return `${coloredArt[0]}
-${coloredArt[1]}  \x1B[1;37mSelected Provider: ${provider}\x1B[0m
+${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
 ${coloredArt[2]}
-${coloredArt[3]}  \x1B[1;37mFLUX FLOW ${grey("v" + version)}\x1B[0m
+${coloredArt[3]}  ${textColor}FLUX FLOW ${grey("v" + version)}${reset}
 ${coloredArt[4]}
-${coloredArt[5]}  \x1B[37mSee /help for additional commands.\x1B[0m
+${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
 ${coloredArt[7]}`;
     };
@@ -4166,6 +4800,7 @@ var init_ChatLayout = __esm({
     init_TerminalBox();
     init_text();
     init_terminal();
+    init_theme();
     useStreamingText = (targetText, isStreaming, isActiveBlock) => {
       return targetText;
     };
@@ -4290,20 +4925,22 @@ var init_ChatLayout = __esm({
         return p;
       }));
     };
-    InlineMarkdown = React4.memo(({ text, color, italic }) => {
+    InlineMarkdown = React4.memo(({ text, color, italic, theme = "Dark" }) => {
       if (!text) return null;
+      const colors = getThemeColors(theme);
+      const textColor = color || colors.text;
       const parts = text.split(REGEX_MD_TOKENS);
-      return /* @__PURE__ */ React4.createElement(Text4, { color, wrap: "anywhere", italic }, parts.map((part, j) => {
+      return /* @__PURE__ */ React4.createElement(Text4, { color: textColor, wrap: "anywhere", italic }, parts.map((part, j) => {
         if (!part) return null;
         if (part.startsWith("```") && part.endsWith("```")) {
           const content = part.slice(3, -3);
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan" }, content);
         }
         if (part.startsWith("**") && part.endsWith("**")) {
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, bold: true, color: "white" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(2, -2), color: "white" }));
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, bold: true, color: textColor }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(2, -2), color: textColor, theme }));
         }
         if (part.startsWith("*") && part.endsWith("*")) {
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, italic: true, color: "white" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(1, -1), color: "white", italic }));
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, italic: true, color: textColor }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(1, -1), color: textColor, italic, theme }));
         }
         if (part.startsWith("`") && part.endsWith("`")) {
           const content = part.slice(1, -1);
@@ -4336,8 +4973,9 @@ var init_ChatLayout = __esm({
         return renderLatexText(part, j);
       }));
     });
-    TableRenderer = React4.memo(({ buffer, terminalWidth = 80 }) => {
+    TableRenderer = React4.memo(({ buffer, terminalWidth = 80, theme = "Dark" }) => {
       if (buffer.length < 2) return null;
+      const colors = getThemeColors(theme);
       const rows = buffer.map((line) => {
         const parts = line.split("|");
         if (parts[0] !== void 0 && parts[0].trim() === "") parts.shift();
@@ -4351,23 +4989,25 @@ var init_ChatLayout = __esm({
       const colChars = Math.floor(availableWidth / header.length) - 2;
       return (
         // Table MarginY here
-        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "#454545ff", paddingX: 1, marginY: 0, width: terminalWidth - 2 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: "#444", marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan" })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "white" }))))))
+        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 1, marginY: 0, width: terminalWidth - 2 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: colors.borderMuted, marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan", theme })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: colors.text, theme }))))))
       );
     });
-    MarkdownText = React4.memo(({ text, color = "#D6DAE3", columns = 80, italic = false }) => {
+    MarkdownText = React4.memo(({ text, color, columns = 80, italic = false, theme = "Dark" }) => {
       if (!text) return null;
+      const colors = getThemeColors(theme);
+      const textColor = color || colors.text;
       const lines = text.split("\n");
       const result = [];
       let tableBuffer = [];
       let quoteBuffer = [];
       const flushBuffers = (key) => {
         if (tableBuffer.length > 0) {
-          result.push(/* @__PURE__ */ React4.createElement(TableRenderer, { key: `table-${key}`, buffer: [...tableBuffer], terminalWidth: columns }));
+          result.push(/* @__PURE__ */ React4.createElement(TableRenderer, { key: `table-${key}`, buffer: [...tableBuffer], terminalWidth: columns, theme }));
           tableBuffer = [];
         }
         if (quoteBuffer.length > 0) {
           result.push(
-            /* @__PURE__ */ React4.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: "gray", paddingLeft: 1, marginY: 1, flexDirection: "column" }, quoteBuffer.map((line, qi) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: qi, text: line, color: "gray", italic })))
+            /* @__PURE__ */ React4.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 1, marginY: 1, flexDirection: "column" }, quoteBuffer.map((line, qi) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: qi, text: line, color: colors.textMuted, italic, theme })))
           );
           quoteBuffer = [];
         }
@@ -4389,7 +5029,7 @@ var init_ChatLayout = __esm({
             return;
           }
           if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
-            result.push(/* @__PURE__ */ React4.createElement(Box3, { key: i, marginY: 1, borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, width: "100%", borderColor: "#333" }));
+            result.push(/* @__PURE__ */ React4.createElement(Box3, { key: i, marginY: 1, borderStyle: "single", borderTop: true, borderBottom: false, borderLeft: false, borderRight: false, width: "100%", borderColor: colors.borderMuted }));
             return;
           }
           const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
@@ -4397,7 +5037,7 @@ var init_ChatLayout = __esm({
             const level = headingMatch[1].length;
             const hText = headingMatch[2];
             result.push(
-              /* @__PURE__ */ React4.createElement(Box3, { key: i, marginTop: 1, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "purple" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : "white", underline: true }, hText))
+              /* @__PURE__ */ React4.createElement(Box3, { key: i, marginTop: 1, marginBottom: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: level === 1 ? "cyan" : level === 2 ? "magenta" : level === 3 ? "yellow" : level === 4 ? "green" : level === 5 ? "blue" : colors.text, underline: true }, hText))
             );
             return;
           }
@@ -4416,22 +5056,23 @@ var init_ChatLayout = __esm({
             content = wrapText(trimmed, columns - 4);
           }
           result.push(
-            /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: content, color, italic }))
+            /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: content, color: textColor, italic, theme }))
           );
         }
       });
       flushBuffers("final");
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 2 }, result);
     });
-    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80, extension }) => {
+    DiffLine = React4.memo(({ line, pairContent, parentText, columns = 80, extension, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const isContext = line.includes("[UI_CONTEXT]");
       const cleanLine = line.replace("[UI_CONTEXT]", "");
       if (isContext && cleanLine.includes("\u2550")) {
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2550".repeat(Math.max(10, columns - 4))));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2550".repeat(Math.max(10, columns - 4))));
       }
       const parsedCurrent = parseLineInfo(line);
       if (!parsedCurrent) {
-        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
+        return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, wrapText(cleanLine, columns - 14))));
       }
       const { isR: isRemoval, isA: isAddition, num: lineNum, content } = parsedCurrent;
       let finalPairContent = pairContent;
@@ -4447,19 +5088,19 @@ var init_ChatLayout = __esm({
       }
       const hasInlineChange = words.some((part) => isRemoval && part.removed || isAddition && part.added);
       const isPureUnpairedBlock = !finalPairContent && (isRemoval || isAddition);
-      const innerBgColor = isRemoval ? "#3a0c0c" : isAddition ? "#0c3a1a" : void 0;
-      const finalNumColor = isRemoval || isAddition ? isRemoval ? "#d96868" : "#68d98c" : "gray";
-      const finalPrefixColor = isRemoval ? "#ff4d4d" : "#4dff88";
+      const innerBgColor = isRemoval ? colors.diffRemovalBg : isAddition ? colors.diffAdditionBg : void 0;
+      const finalNumColor = isRemoval || isAddition ? isRemoval ? colors.diffRemovalNum : colors.diffAdditionNum : colors.textMuted;
+      const finalPrefixColor = isRemoval ? colors.diffRemovalPrefix : colors.diffAdditionPrefix;
       const displayPrefix = isRemoval ? "-" : isAddition ? "+" : " ";
       const renderInlineDiff = () => {
         if (isPureUnpairedBlock) {
-          const blockColor = isRemoval ? "#ff3333" : "#33ff66";
-          const textBgColor = isRemoval ? "#5a1818" : "#185a25";
+          const blockColor = isRemoval ? colors.diffRemovalHighlightColor : colors.diffAdditionHighlightColor;
+          const textBgColor = isRemoval ? colors.diffRemovalHighlightBg : colors.diffAdditionHighlightBg;
           const wrappedLines = wrapText(content, columns - 15).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, blockColor, textBgColor))));
         }
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
-          const textColor = isRemoval ? "#885555" : isAddition ? "#558866" : "gray";
+          const textColor = isRemoval ? colors.diffRemovalText : isAddition ? colors.diffAdditionText : colors.textMuted;
           const textBgColor = void 0;
           const wrappedLines = wrapText(content, columns - 15).split("\n");
           return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, wrappedLines.map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, textColor, textBgColor))));
@@ -4469,25 +5110,26 @@ var init_ChatLayout = __esm({
           if (isRemoval) {
             const isSurroundedByRemoval = words[idx - 1]?.removed || words[idx + 1]?.removed;
             if (part.removed || isWhitespace && isSurroundedByRemoval) {
-              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#ff3333", backgroundColor: "#5a1818" }, part.value);
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.diffRemovalHighlightColor, backgroundColor: colors.diffRemovalHighlightBg }, part.value);
             }
             if (part.added) return null;
-            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#885555" }, part.value);
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.diffRemovalText }, part.value);
           }
           if (isAddition) {
             const isSurroundedByAddition = words[idx - 1]?.added || words[idx + 1]?.added;
             if (part.added || isWhitespace && isSurroundedByAddition) {
-              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#33ff66", backgroundColor: "#185a25" }, part.value);
+              return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.diffAdditionHighlightColor, backgroundColor: colors.diffAdditionHighlightBg }, part.value);
             }
             if (part.removed) return null;
-            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "#558866" }, part.value);
+            return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.diffAdditionText }, part.value);
           }
-          return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: "gray" }, part.value);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.textMuted }, part.value);
         }));
       };
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
     });
-    DiffBlock = React4.memo(({ text, columns = 80, extension }) => {
+    DiffBlock = React4.memo(({ text, columns = 80, extension, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const match = text.match(/\[DIFF_START\]([\s\S]*?)(?:\[DIFF_END\]|$)/);
       const diffBody = match ? match[1].trim() : "";
       const diffLines = diffBody.split("\n");
@@ -4513,26 +5155,28 @@ var init_ChatLayout = __esm({
       if (currentGroup.length > 0) {
         alignChangeGroup(currentGroup);
       }
-      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), parsedLines.map((item, i) => /* @__PURE__ */ React4.createElement(
+      return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 3, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingY: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), parsedLines.map((item, i) => /* @__PURE__ */ React4.createElement(
         DiffLine,
         {
           key: i,
           line: item.line,
           pairContent: item.pairContent,
           columns: columns - 3,
-          extension
+          extension,
+          theme
         }
-      )), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
+      )), /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")))));
     });
-    CodeRenderer = React4.memo(({ text, columns = 80 }) => {
+    CodeRenderer = React4.memo(({ text, columns = 80, theme = "Dark" }) => {
       if (!text) return null;
+      const colors = getThemeColors(theme);
       let extension = "";
       const fileMatch = text.match(/File\s+\[(.*?)\]/i);
       if (fileMatch) {
         extension = fileMatch[1].split(".").pop().toLowerCase();
       }
       if (text.includes("[DIFF_START]")) {
-        return /* @__PURE__ */ React4.createElement(DiffBlock, { text, columns, extension });
+        return /* @__PURE__ */ React4.createElement(DiffBlock, { text, columns, extension, theme });
       }
       if (text.includes("- Content Preview:")) {
         const mainParts = text.split("- Content Preview:");
@@ -4553,14 +5197,14 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             paddingRight: 0,
             width: "100%",
             marginBottom: 1,
-            backgroundColor: "#1a1a1a"
+            backgroundColor: colors.codeBg
           },
-          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, extension, "white")))), /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))))
+          /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))), codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, extension, colors.text)))), /* @__PURE__ */ React4.createElement(Box3, { width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " "))))
         ));
       }
       if (text.includes("```")) {
@@ -4583,13 +5227,13 @@ var init_ChatLayout = __esm({
                 borderRight: false,
                 borderTop: false,
                 borderBottom: false,
-                borderColor: "#444444",
+                borderColor: colors.codeBorder,
                 paddingLeft: 2,
                 paddingRight: 0,
                 width: "100%"
               },
               /* @__PURE__ */ React4.createElement(Box3, null, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
-              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, lang, "#e1e4e8")))))
+              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, lang, colors.text)))))
             );
           }
           let cleanPart = part;
@@ -4600,10 +5244,10 @@ var init_ChatLayout = __esm({
             cleanPart = cleanPart.replace(/[\r\n]+$/, "");
           }
           if (!cleanPart) return null;
-          return /* @__PURE__ */ React4.createElement(MarkdownText, { key: i, text: cleanPart, columns: columns - 3 });
+          return /* @__PURE__ */ React4.createElement(MarkdownText, { key: i, text: cleanPart, columns: columns - 3, theme });
         }));
       }
-      return /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns: columns - 3 });
+      return /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns: columns - 3, theme });
     });
     formatThinkingDuration = (ms) => {
       const totalSecs = Math.round(ms / 1e3);
@@ -4615,39 +5259,39 @@ var init_ChatLayout = __esm({
       }
       return `${totalSecs}s`;
     };
-    MessageItem = React4.memo(({ msg, showFullThinking, columns = 80, aiProvider, version }) => {
+    MessageItem = React4.memo(({ msg, showFullThinking, columns = 80, aiProvider, version, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const isDiffResult = msg.role === "system" && (msg.text?.includes("[DIFF_START]") || msg.text?.includes("- Content Preview:"));
       const isPatchError = msg.role === "system" && msg.text?.includes("[TOOL RESULT]: ERROR:") && !msg.text?.includes("[DIFF_START]") && (msg.toolName === "update_file" || msg.text?.includes("Could not find exact match"));
       const isTerminalRecord = msg.isTerminalRecord;
       const isHomeWarning = msg.isHomeWarning;
       if (isHomeWarning) {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "white", dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, msg.text)), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, msg.subText))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, msg.text)), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text }, msg.subText))));
       }
       if (msg.isLogo) {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, getFluxLogo(version, aiProvider)));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, getFluxLogo(version, aiProvider, theme)));
       }
       if (msg.id && String(msg.id).startsWith("welcome")) {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "center", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, msg.text.trim())));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "center", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 3, paddingY: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, msg.text.trim())));
       }
       if (msg.isVisualFeedback) {
         return (
           // [SPACE POINT]
-          /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, marginTop: 0, paddingX: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, msg.text))
+          /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, marginTop: 0, paddingX: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text }, msg.text))
         );
       }
       if (isPatchError) {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 1, paddingY: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true, underline: true }, "\u2717 PATCH FAILED"), /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, "Model generated malformed edit."))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, paddingX: 1, paddingY: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true, underline: true }, "\u2717 PATCH FAILED"), /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted, bold: true }, "Model generated malformed edit."))));
       }
       if (msg.role === "system" && msg.text?.includes("[TOOL RESULT]") && !isDiffResult && !isTerminalRecord && !isPatchError) return null;
       if (msg.isImageStats) {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, backgroundColor: "#0e1b21" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "IMAGE STATS")), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1, flexDirection: "column" }, msg.text.split("\n").map((line, i) => /* @__PURE__ */ React4.createElement(Text4, { key: i, color: "grey" }, line)))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, backgroundColor: colors.codeBg }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, "IMAGE STATS")), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1, flexDirection: "column" }, msg.text.split("\n").map((line, i) => /* @__PURE__ */ React4.createElement(Text4, { key: i, color: colors.textMuted }, line)))));
       }
       if (msg.isAskRecord) {
         const selectionMatch = msg.text.match(/Selection: (.*)/);
         const selection = selectionMatch ? selectionMatch[1] : "No selection";
         const questionMatch = msg.text.match(/Question: (.*)/);
         const question = questionMatch ? questionMatch[1] : null;
-        const s = emojiSpace(2);
         return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(
           Box3,
           {
@@ -4657,7 +5301,7 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: true,
             borderBottom: true,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             paddingRight: 0,
             paddingTop: 1,
@@ -4665,9 +5309,9 @@ var init_ChatLayout = __esm({
             marginY: 1,
             width: columns - 2
           },
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "green", bold: true }, "AGENT REQUEST: RESOLVED")),
-          question && /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan" }, question)),
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white" }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: "grey", bold: true }, selection)))
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.success, bold: true }, "AGENT REQUEST: RESOLVED")),
+          question && /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.secondary }, question)),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text }, "Selection: ", /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted, bold: true }, selection)))
         ));
       }
       if (msg.isAboutRecord) {
@@ -4681,11 +5325,11 @@ var init_ChatLayout = __esm({
             paddingRight: 0,
             paddingTop: 1,
             paddingBottom: 1,
-            backgroundColor: "#1a1a1a",
+            backgroundColor: colors.codeBg,
             width: "100%"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "ABOUT FLUX FLOW")),
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, msg.text))
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, "ABOUT FLUX FLOW")),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text }, msg.text))
         ));
       }
       if (msg.isUpdateNotification) {
@@ -4699,11 +5343,11 @@ var init_ChatLayout = __esm({
             paddingRight: 0,
             paddingTop: 1,
             paddingBottom: 1,
-            backgroundColor: "#1a1a1a",
+            backgroundColor: colors.codeBg,
             width: "100%"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, "UPDATE AVAILABLE")),
-          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: msg.text, columns }))
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, "UPDATE AVAILABLE")),
+          /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: msg.text, columns, theme }))
         ));
       }
       if (msg.isHelpRecord) {
@@ -4735,7 +5379,7 @@ var init_ChatLayout = __esm({
           { cmd: "/fluxflow", desc: "Project management" },
           { cmd: "/update", desc: "Check/Install updates" }
         ];
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true, underline: true }, "COMMAND REFERENCE"), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 1 }, commandList.map((c, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "row" }, /* @__PURE__ */ React4.createElement(Box3, { width: 15 }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", bold: true }, c.cmd)), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " - ", c.desc))))));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true, underline: true }, "COMMAND REFERENCE"), /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 1 }, commandList.map((c, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexDirection: "row" }, /* @__PURE__ */ React4.createElement(Box3, { width: 15 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, c.cmd)), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, " - ", c.desc))))));
       }
       if (msg.isTerminalRecord) {
         const cmdMatch = msg.text.match(/COMMAND: (.*)/);
@@ -4744,7 +5388,7 @@ var init_ChatLayout = __esm({
         const cmd = cmdMatch ? cmdMatch[1] : "Unknown";
         const isPty = ptyMatch ? ptyMatch[1] === "true" : false;
         const outputList = outputMatch ? outputMatch[1] : "";
-        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TerminalBox, { command: cmd, output: outputList, completed: true, columns, isPty }));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TerminalBox, { command: cmd, output: outputList, completed: true, columns, isPty, theme }));
       }
       const [animationDone, setAnimationDone] = React4.useState(!msg.isStreaming);
       const content = React4.useMemo(() => cleanSignals(msg.text), [msg.text]);
@@ -4760,25 +5404,23 @@ var init_ChatLayout = __esm({
       if (msg.role === "agent" && finalContent.trim() === "") {
         return null;
       }
-      return (
-        // [SPACE POINT]
-        /* @__PURE__ */ React4.createElement(Box3, { marginBottom: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, marginTop: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, flexDirection: "column", flexShrink: 0, width: "100%", flexGrow: 1 }, msg.role === "user" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 1 }, /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2584".repeat(Math.max(1, columns - 1)))), /* @__PURE__ */ React4.createElement(
-          Box3,
-          {
-            backgroundColor: "#444444",
-            paddingX: 1,
-            paddingY: 0,
-            width: columns - 1,
-            flexDirection: "column"
-          },
-          wrapText(
-            finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
-            columns - 7
-          ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || "white" }))))
-        ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: "#444444" }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "white", italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]")) : null))
-      );
+      return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, marginTop: msg.role === "think" ? 0 : msg.role === "user" ? 0 : msg.role === "agent" ? 0 : 0, flexDirection: "column", flexShrink: 0, width: "100%", flexGrow: 1 }, msg.role === "user" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: columns - 1 }, /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.userMsgBorder }, "\u2584".repeat(Math.max(1, columns - 1)))), /* @__PURE__ */ React4.createElement(
+        Box3,
+        {
+          backgroundColor: colors.userMsgBg,
+          paddingX: 1,
+          paddingY: 0,
+          width: columns - 1,
+          flexDirection: "column"
+        },
+        wrapText(
+          finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
+          columns - 7
+        ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.userMsgText }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || colors.userMsgText, theme }))))
+      ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.userMsgBorder }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns, theme }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "["), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "]")) : null));
     });
-    BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version }) => {
+    BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const { msg, type, text, isStreamingMsg, workedDuration } = block;
       if (type === "chunk") {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, block.blocks.map((b) => /* @__PURE__ */ React4.createElement(
@@ -4789,7 +5431,8 @@ var init_ChatLayout = __esm({
             columns,
             showFullThinking,
             aiProvider,
-            version
+            version,
+            theme
           }
         )));
       }
@@ -4801,17 +5444,18 @@ var init_ChatLayout = __esm({
             showFullThinking,
             columns,
             aiProvider,
-            version
+            version,
+            theme
           }
         );
       }
       if (type === "think-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "#F2F2F2" }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 ")));
       }
       if (type === "think-line") {
         if (!showFullThinking) return null;
         if (!text || text.trim() === "") {
-          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "));
+          return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 "));
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
         const trimmed = animatedText.trim();
@@ -4827,32 +5471,33 @@ var init_ChatLayout = __esm({
           content = wrapText(animatedText, columns - 10);
         }
         const wrappedLines = content.split("\n");
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, wrappedLines.map((wLine, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wLine, color: "gray", italic: true })))));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, wrappedLines.map((wLine, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 "), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wLine, color: colors.textMuted, italic: true, theme })))));
       }
       if (type === "think-footer-padding") {
         if (!showFullThinking) return null;
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "\u2502 "));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%", paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 "));
       }
       if (type === "agent-line") {
         if (!text || text.trim() === "") {
           return /* @__PURE__ */ React4.createElement(Box3, { height: 1 });
         }
         const animatedText = useStreamingText(text, isStreamingMsg, block.isActiveBlock);
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: animatedText, columns, theme }));
       }
       if (type === "table") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TableRenderer, { buffer: text.split("\n"), terminalWidth: columns, theme }));
       }
       if (type === "diff-line") {
         const { isFirstLine, isLastLine } = block;
-        const renderPaddingLine = (isEnd = false) => /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: "#1a1a1a", paddingX: 1, width: columns, marginBottom: isEnd ? 1 : 0 }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")));
+        const renderPaddingLine = (isEnd = false) => /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns, marginBottom: isEnd ? 1 : 0 }, /* @__PURE__ */ React4.createElement(Box3, { width: 3, flexShrink: 0 }), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, " ")));
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column" }, isFirstLine && renderPaddingLine(false), /* @__PURE__ */ React4.createElement(
           DiffLine,
           {
             line: text,
             pairContent: block.pairContent,
             parentText: void 0,
-            columns
+            columns,
+            theme
           }
         ), isLastLine && renderPaddingLine(true));
       }
@@ -4863,7 +5508,7 @@ var init_ChatLayout = __esm({
           borderRight: false,
           borderTop: false,
           borderBottom: false,
-          borderColor: "#444444",
+          borderColor: colors.codeBorder,
           paddingLeft: 2,
           width: "100%"
         };
@@ -4880,12 +5525,12 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             width: "100%"
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(4, " "), " ")),
-          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(text, lang, "#e1e4e8"))
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(text, lang, colors.text))
         );
       }
       if (type === "code-fence-close") {
@@ -4898,7 +5543,7 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             marginBottom: 1,
             width: "100%"
@@ -4907,7 +5552,7 @@ var init_ChatLayout = __esm({
         );
       }
       if (type === "write-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns, theme }));
       }
       if (type === "write-line") {
         const { gutterWidth, lineNum, isFirstLine, isLastLine, extension, wrappedLines } = block;
@@ -4921,10 +5566,10 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             paddingRight: 0,
-            backgroundColor: "#1a1a1a",
+            backgroundColor: colors.codeBg,
             marginBottom: isEnd ? 1 : 0
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, null, " ".repeat(gutterWidth + 2))),
@@ -4940,24 +5585,24 @@ var init_ChatLayout = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             paddingRight: 0,
-            backgroundColor: "#1a1a1a"
+            backgroundColor: colors.codeBg
           },
           /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(gutterWidth, " "), " ")),
-          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, flexDirection: "column" }, (wrappedLines || [text]).map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, "white"))))
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, flexDirection: "column" }, (wrappedLines || [text]).map((wl, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx }, renderHighlightedLine(wl, extension, colors.text))))
         ), isLastLine && renderPaddingLine(true));
       }
       if (type === "write-footer") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns }));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: columns, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React4.createElement(MarkdownText, { text, columns, theme }));
       }
       if (type === "worked-duration") {
-        return /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, null, "["), /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: "white" }, formatThinkingDuration(workedDuration))), /* @__PURE__ */ React4.createElement(Text4, null, "]"));
+        return /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "["), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(workedDuration))), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "]"));
       }
       return null;
     });
-    ChatLayout = React4.memo(({ messages, showFullThinking, columns = 80, aiProvider, version }) => {
+    ChatLayout = React4.memo(({ messages, showFullThinking, columns = 80, aiProvider, version, theme = "Dark" }) => {
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, messages.map((msg, idx) => /* @__PURE__ */ React4.createElement(
         MessageItem,
         {
@@ -4966,7 +5611,8 @@ var init_ChatLayout = __esm({
           showFullThinking,
           columns,
           aiProvider,
-          version
+          version,
+          theme
         }
       )));
     });
@@ -4986,6 +5632,7 @@ var activeGetMemoryInfo, getLatencyColor, StatusBar, StatusBar_default;
 var init_StatusBar = __esm({
   "src/components/StatusBar.jsx"() {
     init_text();
+    init_theme();
     activeGetMemoryInfo = null;
     getLatencyColor = (delay) => {
       if (delay <= 370) return "#00a564";
@@ -5024,7 +5671,8 @@ var init_StatusBar = __esm({
       }
       return "#ff0000";
     };
-    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0 }) => {
+    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const modeIcon = mode === "Flux" ? "" : "";
       const [memoryUsage, setMemoryUsage] = useState5(0);
       const [memoryLimit, setMemoryLimit] = useState5(0);
@@ -5112,13 +5760,13 @@ var init_StatusBar = __esm({
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", bold: true }, thinkingLevel.toUpperCase())), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", dimColor: true, bold: true }, "MEMORY")))),
-        /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white", italic: true }, truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "white" }, formatTokens(tokensTotal), " ", (() => {
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, thinkingLevel.toUpperCase())), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, dimColor: true, bold: true }, "MEMORY")))),
+        /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, italic: true }, truncatePath(process.cwd(), 35))),
+        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text }, formatTokens(tokensTotal), " ", (() => {
           const pct = tokens / maxLimit * 100;
-          const color = pct < 60 ? "white" : pct < 80 ? "yellow" : "red";
+          const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
           return /* @__PURE__ */ React5.createElement(Text5, { color, dimColor: true }, pct.toFixed(0), "%");
-        })())), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "grey", bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: "gray", dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: "gray", bold: true }, "PAID"))))
+        })())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, "PAID"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -5129,46 +5777,49 @@ var init_StatusBar = __esm({
 import React6 from "react";
 import { Box as Box5, Text as Text6 } from "ink";
 import SelectInput from "ink-select-input";
-function CommandMenu({ title, subtitle, items, onSelect }) {
+function CommandMenu({ title, subtitle, items, onSelect, theme = "Dark" }) {
+  const colors = getThemeColors(theme);
   return /* @__PURE__ */ React6.createElement(
     Box5,
     {
       flexDirection: "column",
       borderStyle: "round",
-      borderColor: "white",
+      borderColor: colors.borderMuted,
       padding: 0,
       marginTop: 0,
       flexShrink: 0,
       width: "100%"
     },
-    title && /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, paddingY: 0, marginBottom: subtitle ? 0 : 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: "gray", bold: true }, typeof title === "string" ? title.toUpperCase() : title)),
-    subtitle && /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: "gray", italic: true }, "   ", subtitle)),
+    title && /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, paddingY: 0, marginBottom: subtitle ? 0 : 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: colors.text, bold: true }, typeof title === "string" ? title.toUpperCase() : title)),
+    subtitle && /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: colors.textMuted, italic: true }, "   ", subtitle)),
     /* @__PURE__ */ React6.createElement(Box5, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React6.createElement(
       SelectInput,
       {
         items,
         onSelect,
-        itemComponent: CustomItem,
+        itemComponent: (props) => /* @__PURE__ */ React6.createElement(CustomItem, { ...props, theme }),
         indicatorComponent: () => null
       }
     )),
-    /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: "gray", italic: true }, "(Arrows to select \u2022 Enter to confirm)"))
+    /* @__PURE__ */ React6.createElement(Box5, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React6.createElement(Text6, { color: colors.textMuted, italic: true }, "(Arrows to select \u2022 Enter to confirm)"))
   );
 }
 var CustomItem;
 var init_CommandMenu = __esm({
   "src/components/CommandMenu.jsx"() {
-    CustomItem = ({ label, isSelected }) => {
+    init_theme();
+    CustomItem = ({ label, isSelected, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
       return /* @__PURE__ */ React6.createElement(
         Box5,
         {
           marginTop: isCancel ? 1 : 0,
-          backgroundColor: isSelected ? "#2a2a2a" : void 0,
+          backgroundColor: isSelected ? colors.highlightBg : void 0,
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React6.createElement(Text6, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
+        /* @__PURE__ */ React6.createElement(Text6, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", label)
       );
     };
   }
@@ -5352,17 +6003,18 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
-3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variable
-4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 6)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
+3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
+4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect
+6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed OR markDone with 'create' to create completed tasks. **EVERY TURN UPDATE POLICY**
 9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
 Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
-1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop. Usage: ONLY in catastrophic situations. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop
+Usage: ONLY in catastrophic situations/Codebase Corruption. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
 ` : ""}
 - SUB AGENT TOOLS -
 **PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE EVEN SLIGHTLY BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
@@ -5370,16 +6022,16 @@ Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT WORKING
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT IS WORKING. DO NOT SPAM 'GetProgress'
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT ONLY IF ITS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout
-2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document
+1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
+2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
-- Escape quotes: \\" for code strings
-- Literal escapes: Double-escape sequences (e.g., \\\\n)
-- File structure: Real newlines for code formatting`.trim();
+- **Escape quotes: \\" for code strings**
+- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
+- **File structure: Real newlines for code formatting**`.trim();
   }
 });
 
@@ -6104,6 +6756,17 @@ function SettingsMenu({
   }, []);
   const getCategoryItems = (catId) => {
     switch (catId) {
+      case "providers":
+        return [
+          { label: "Current Provider", value: "aiProvider", status: aiProvider },
+          { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" }
+        ];
+      case "appearance":
+        return [
+          { label: "Theme", value: "theme", status: systemSettings.theme || "Dark" },
+          { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
+          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" }
+        ];
       case "memory":
         return [
           { label: "Toggle Memory", value: "memory", status: systemSettings.memory ? "ON" : "OFF" }
@@ -6126,15 +6789,11 @@ function SettingsMenu({
       case "updater":
         return [
           { label: "Auto-Update", value: "autoUpdate", status: systemSettings.autoUpdate ? "ON" : "OFF" },
-          { label: "Preferred Updater", value: "updateManager", status: (systemSettings.updateManager || "npm") === "custom" ? "Custom" : (systemSettings.updateManager || "npm").toUpperCase() }
+          { label: "Preferred Package Manager", value: "updateManager", status: (systemSettings.updateManager || "npm") === "custom" ? "Custom" : (systemSettings.updateManager || "npm").toUpperCase() }
         ];
       case "other":
         return [
-          { label: "Current Provider", value: "aiProvider", status: aiProvider },
-          { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
-          { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
-          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -6309,30 +6968,41 @@ function SettingsMenu({
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
+    } else if (item.value === "theme") {
+      const options = ["Dark", "Light", "GitHub Dark", "GitHub Light", "Transparent Dark", "Transparent Light", "Chaos"];
+      const activeTheme = systemSettings.theme === "Mystery" ? "Chaos" : systemSettings.theme || "Dark";
+      const currentIndex = options.indexOf(activeTheme);
+      const nextIndex = (currentIndex + 1) % options.length;
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, theme: options[nextIndex] };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     }
   };
-  return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: "gray", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", borderStyle: "round", borderColor: activeColumn === "categories" ? "white" : "grey", padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? "white" : "grey", bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
+  const colors = getThemeColors(systemSettings.theme);
+  return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: colors.borderMuted, width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text, bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", maxWidth: 40, borderStyle: "round", borderColor: activeColumn === "categories" ? colors.border : colors.borderMuted, padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? colors.text : colors.textDim, bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
     const isSelected = selectedCategoryIndex === index;
     const isExit = cat.id === "exit";
     return /* @__PURE__ */ React7.createElement(
       Box6,
       {
         key: cat.id,
-        marginTop: isExit ? 17 : 0,
-        backgroundColor: isSelected ? activeColumn === "categories" ? "#2a2a2a" : "#1e1e1e" : void 0,
+        marginTop: isExit ? 15 : 0,
+        backgroundColor: isSelected ? activeColumn === "categories" ? colors.highlightBg : colors.cardBg : void 0,
         paddingX: 1
       },
       /* @__PURE__ */ React7.createElement(
         Text7,
         {
-          color: isSelected ? activeColumn === "categories" ? "white" : "grey" : "grey",
+          color: isSelected ? activeColumn === "categories" ? colors.text : colors.textDim : colors.textDim,
           bold: isSelected
         },
         isSelected ? "\u276F " : "  ",
         cat.label
       )
     );
-  })), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "70%", borderStyle: "round", borderColor: activeColumn === "items" ? "white" : "grey", paddingX: 1, marginLeft: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "items" ? "white" : "grey", bold: true, underline: true }, CATEGORIES[selectedCategoryIndex].label.toUpperCase(), " SETTINGS")), currentItems.length > 0 ? (() => {
+  })), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", flexGrow: 1, borderStyle: "round", borderColor: activeColumn === "items" ? colors.border : colors.borderMuted, paddingX: 1, marginLeft: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "items" ? colors.text : colors.textDim, bold: true, underline: true }, CATEGORIES[selectedCategoryIndex].label.toUpperCase(), " SETTINGS")), currentItems.length > 0 ? (() => {
     let lastSection = null;
     const elements = [];
     const getListItems = (val) => (val || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -6350,13 +7020,13 @@ function SettingsMenu({
       const getStatusColor = (item2) => {
         if (currentCatId === "security") {
           if ((item2.value === "autoExec" || item2.value === "externalAccess") && item2.status === "ON") {
-            return "white";
+            return colors.statusOn;
           }
-          return "gray";
+          return colors.statusOff;
         }
-        if (item2.status?.startsWith("\u2713")) return "white";
-        if (item2.status?.startsWith("\u26A0")) return "gray";
-        return item2.status === "ON" ? "white" : item2.status === "OFF" ? "gray" : "white";
+        if (item2.status?.startsWith("\u2713")) return colors.statusOn;
+        if (item2.status?.startsWith("\u26A0")) return colors.statusOff;
+        return item2.status === "ON" ? colors.statusOn : item2.status === "OFF" ? colors.statusOff : colors.text;
       };
       if (item.section && item.section !== lastSection) {
         lastSection = item.section;
@@ -6368,10 +7038,10 @@ function SettingsMenu({
       const isCommandListItem = item.value === "alwaysAsk" || item.value === "autoApprove" || item.value === "autoDisallow";
       const isParserDownload = item.value === "parserDownload";
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: item.value, flexDirection: "column" }, /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: isSelected && !isEditingThis ? "#2a2a2a" : void 0, paddingX: 2 }, /* @__PURE__ */ React7.createElement(
+        /* @__PURE__ */ React7.createElement(Box6, { key: item.value, flexDirection: "column" }, /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: isSelected && !isEditingThis ? colors.highlightBg : void 0, paddingX: 2 }, /* @__PURE__ */ React7.createElement(
           Text7,
           {
-            color: isSelected ? "white" : "grey",
+            color: isSelected ? colors.text : colors.textDim,
             bold: isSelected
           },
           isSelected ? "\u276F " : "  ",
@@ -6391,31 +7061,26 @@ function SettingsMenu({
         )), /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, "  Comma separated \u2022 Press Enter to save, Esc to cancel")))
       );
     });
-    if (currentCatId === "other") {
-      elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 14, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white" }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited"))
-      );
-      elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit))
-      );
-    }
     if (hasConflict) {
       elements.push(
-        /* @__PURE__ */ React7.createElement(Box6, { key: "conflict-warning", marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "white", italic: true }, "* Conflicting commands will be ignored and defaulted to highest priority"))
+        /* @__PURE__ */ React7.createElement(Box6, { key: "conflict-warning", marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text, italic: true }, "* Conflicting commands will be ignored and defaulted to highest priority"))
       );
     }
     return elements;
-  })() : /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, CATEGORIES[selectedCategoryIndex].desc)))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 0, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, activeColumn === "categories" ? "\u25B2\u25BC Select Category \u2022 Enter/\u25BA to configure" : "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 \u25C4/ESC to go back"), activeColumn === "categories" && /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, CATEGORIES[selectedCategoryIndex].desc)));
+  })() : /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, CATEGORIES[selectedCategoryIndex].desc), currentCatId === "exit" && /* @__PURE__ */ React7.createElement(React7.Fragment, null, /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 19, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited")), /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit)))))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 0, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, activeColumn === "categories" ? "\u25B2\u25BC Select Category \u2022 Enter/\u25BA to configure" : "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 \u25C4/ESC to go back"), activeColumn === "categories" && /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, CATEGORIES[selectedCategoryIndex].desc)));
 }
 var CATEGORIES, getActivePreset, truncateCSV;
 var init_SettingsMenu = __esm({
   async "src/components/SettingsMenu.jsx"() {
     await init_exec_command();
+    init_theme();
     CATEGORIES = [
+      { id: "appearance", label: "Appearance", desc: "Customize UI theme & rendering options" },
       { id: "memory", label: "Memory", desc: "Manage system context & agent's memory" },
+      { id: "other", label: "Miscellaneous", desc: "Miscellaneous preferences" },
+      { id: "providers", label: "Providers", desc: "Configure AI models & API key strategies" },
       { id: "security", label: "Security", desc: "Configure permissions & data safety" },
       { id: "updater", label: "Updater", desc: "Manage application updates" },
-      { id: "other", label: "Other", desc: "Miscellaneous preferences" },
       { id: "exit", label: "Exit Settings", desc: "Return to chat view" }
     ];
     getActivePreset = (settings) => {
@@ -6442,7 +7107,8 @@ var init_SettingsMenu = __esm({
 import React8, { useState as useState7, useEffect as useEffect6 } from "react";
 import { Box as Box7, Text as Text8 } from "ink";
 import TextInput2 from "ink-text-input";
-function ProfileForm({ initialData, onSave, onCancel }) {
+function ProfileForm({ initialData, onSave, onCancel, theme = "Dark" }) {
+  const colors = getThemeColors(theme);
   const [step, setStep] = useState7(0);
   const [currentInput, setCurrentInput] = useState7("");
   const [profile, setProfile] = useState7(() => ({
@@ -6478,27 +7144,28 @@ function ProfileForm({ initialData, onSave, onCancel }) {
     Box7,
     {
       borderStyle: "round",
-      borderColor: "gray",
+      borderColor: colors.borderMuted,
       padding: 0,
       marginTop: 1,
       flexShrink: 0,
       flexDirection: "column",
       width: "100%"
     },
-    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "white", bold: true }, "DEVELOPER PROFILE CONFIGURATION")),
-    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React8.createElement(Box7, null, /* @__PURE__ */ React8.createElement(Text8, { color: "white", bold: true }, steps[step].label), /* @__PURE__ */ React8.createElement(
+    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.text, bold: true }, "DEVELOPER PROFILE CONFIGURATION")),
+    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React8.createElement(Box7, null, /* @__PURE__ */ React8.createElement(Text8, { color: colors.text, bold: true }, steps[step].label), /* @__PURE__ */ React8.createElement(
       TextInput2,
       {
         value: currentInput,
         onChange: setCurrentInput,
         onSubmit: handleSubmit
       }
-    )), /* @__PURE__ */ React8.createElement(Box7, { marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "gray", italic: true }, "Step ", step + 1, " of ", steps.length))),
-    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: "gray", italic: true }, "(Enter to submit \u2022 Type /cancel to abort)"))
+    )), /* @__PURE__ */ React8.createElement(Box7, { marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.textMuted, italic: true }, "Step ", step + 1, " of ", steps.length))),
+    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.textMuted, italic: true }, "(Enter to submit \u2022 Type /cancel to abort)"))
   );
 }
 var init_ProfileForm = __esm({
   "src/components/ProfileForm.jsx"() {
+    init_theme();
   }
 });
 
@@ -6510,7 +7177,9 @@ var AskUserModal, AskUserModal_default;
 var init_AskUserModal = __esm({
   "src/components/AskUserModal.jsx"() {
     init_terminal();
-    AskUserModal = ({ question, options, onResolve }) => {
+    init_theme();
+    AskUserModal = ({ question, options, onResolve, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
       const [isSuggestingElse, setIsSuggestingElse] = useState8(false);
       const [customInput, setCustomInput] = useState8("");
       const [selectedIndex, setSelectedIndex] = useState8(0);
@@ -6550,16 +7219,16 @@ var init_AskUserModal = __esm({
             borderRight: false,
             borderTop: false,
             borderBottom: false,
-            borderColor: "#444444",
+            borderColor: colors.codeBorder,
             paddingLeft: 2,
             paddingRight: 0,
             paddingTop: 1,
             paddingBottom: 1,
-            backgroundColor: "#1a1a1a",
+            backgroundColor: colors.codeBg,
             width: "100%"
           },
-          /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white", bold: true }, "SUGGEST SOMETHING ELSE")),
-          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { italic: true, color: "gray" }, "Replying to: ", question)),
+          /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: colors.text, bold: true }, "SUGGEST SOMETHING ELSE")),
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React9.createElement(Text9, { italic: true, color: colors.textMuted }, "Replying to: ", question)),
           /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React9.createElement(
             TextInput3,
             {
@@ -6568,7 +7237,7 @@ var init_AskUserModal = __esm({
               onSubmit: () => onResolve(customInput)
             }
           )),
-          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Press Enter to send)"))
+          /* @__PURE__ */ React9.createElement(Box8, { marginTop: 1, paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: colors.textMuted, italic: true }, "(Press Enter to send)"))
         );
       }
       return /* @__PURE__ */ React9.createElement(
@@ -6577,7 +7246,7 @@ var init_AskUserModal = __esm({
           flexDirection: "column",
           border: true,
           borderStyle: "round",
-          borderColor: "#444444",
+          borderColor: colors.codeBorder,
           paddingLeft: 2,
           paddingRight: 0,
           paddingTop: 1,
@@ -6587,7 +7256,7 @@ var init_AskUserModal = __esm({
           width: "100%"
         },
         /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "yellow", bold: true }, "AGENT REQUEST: ACTION REQUIRED")),
-        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "white" }, question)),
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: colors.text }, question)),
         /* @__PURE__ */ React9.createElement(Box8, { flexDirection: "column", width: "100%" }, allOptions.map((opt, idx) => {
           const isSelected = idx === selectedIndex;
           return /* @__PURE__ */ React9.createElement(
@@ -6596,15 +7265,15 @@ var init_AskUserModal = __esm({
               key: opt.id,
               flexDirection: "column",
               width: "100%",
-              backgroundColor: isSelected ? "#2a2a2a" : void 0,
+              backgroundColor: isSelected ? colors.highlightBg : void 0,
               paddingX: 1,
               marginBottom: idx === allOptions.length - 1 ? 0 : 1
             },
-            /* @__PURE__ */ React9.createElement(Text9, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", opt.label),
-            opt.description && /* @__PURE__ */ React9.createElement(Box8, { marginLeft: 4 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, opt.description))
+            /* @__PURE__ */ React9.createElement(Text9, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", opt.label),
+            opt.description && /* @__PURE__ */ React9.createElement(Box8, { marginLeft: 4 }, /* @__PURE__ */ React9.createElement(Text9, { color: colors.textMuted, italic: true }, opt.description))
           );
         })),
-        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: "gray", italic: true }, "(Use Arrows to navigate, Enter to confirm)"))
+        /* @__PURE__ */ React9.createElement(Box8, { paddingX: 1, marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React9.createElement(Text9, { color: colors.textMuted, italic: true }, "(Use Arrows to navigate, Enter to confirm)"))
       );
     };
     AskUserModal_default = AskUserModal;
@@ -7152,7 +7821,7 @@ var init_history = __esm({
         const firstUserMsg = userMessages[0];
         const latestUserMsg = userMessages[userMessages.length - 1];
         if (existingChat && existingChat.prompt) {
-          if (Math.random() < 0.5) {
+          if (Math.random() < 0.8) {
             prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
           } else {
             prompt = existingChat.prompt;
@@ -15573,14 +16242,14 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
       const mergedSettings = { ...savedSettings, ...settings };
       const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const SUBAGENT_TOOL_DEFINITIONS = {
-        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs',
-        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats',
-        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
-        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
-        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
-        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect`,
-        "websearch": `- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate. aiMode for LLM based search results and richer data, default: false`,
-        "webscrape": '- [tool:functions.WebScrape(url="...")]. Web Scrape',
+        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
+        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes',
+        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
+        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**',
+        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
+        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true`,
+        "websearch": `- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate.aiMode for LLM based search results and richer data, default: false`,
+        "webscrape": '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
@@ -15599,16 +16268,16 @@ TOOL POLICY:
 ${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}
 
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
-- Escape quotes: \\" for code strings
-- Literal escapes: Double-escape sequences (e.g., \\\\n)
-- File structure: Real newlines for code formatting`.trim();
+- **Escape quotes: \\" for code strings**
+- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
+- **File structure: Real newlines for code formatting**`.trim();
       const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
 
 ${providedToolsSection.trimEnd()}
 
--- THINKING POLICY --
+-- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
@@ -15802,7 +16471,8 @@ ${result}
 // src/components/ResumeModal.jsx
 import React10, { useState as useState9, useEffect as useEffect7 } from "react";
 import { Box as Box9, Text as Text10, useInput as useInput5 } from "ink";
-function ResumeModal({ onSelect, onDelete, onClose }) {
+function ResumeModal({ onSelect, onDelete, onClose, theme = "Dark" }) {
+  const colors = getThemeColors(theme);
   const [history, setHistory] = useState9({});
   const [keys, setKeys] = useState9([]);
   const [selectedIndex, setSelectedIndex] = useState9(0);
@@ -15843,7 +16513,7 @@ function ResumeModal({ onSelect, onDelete, onClose }) {
     }
   }
   const visibleKeys = keys.slice(startIndex, startIndex + MAX_VISIBLE);
-  return /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box9, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, "CHAT HISTORY: RESUME CONVERSATION")), keys.length === 0 ? /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: "gray" }, "No saved chats found.")) : /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: "gray" }, "\u25B2 (+", startIndex, " more chats above)")), visibleKeys.map((id, index) => {
+  return /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box9, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.text, bold: true }, "CHAT HISTORY: RESUME CONVERSATION")), keys.length === 0 ? /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: colors.textMuted }, "No saved chats found.")) : /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more chats above)")), visibleKeys.map((id, index) => {
     const chat2 = history[id];
     const actualIndex = startIndex + index;
     const isSelected = actualIndex === selectedIndex;
@@ -15853,17 +16523,17 @@ function ResumeModal({ onSelect, onDelete, onClose }) {
       {
         key: id,
         paddingX: 1,
-        backgroundColor: isSelected ? "#2a2a2a" : void 0,
+        backgroundColor: isSelected ? colors.highlightBg : void 0,
         width: "100%"
       },
-      /* @__PURE__ */ React10.createElement(Box9, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? "while" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", (() => {
+      /* @__PURE__ */ React10.createElement(Box9, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", (() => {
         if (chat2?.name && !chat2.name.startsWith("Session")) return chat2.name;
         if (chat2?.prompt) return chat2.prompt;
         return chat2?.name || id;
-      })(), /* @__PURE__ */ React10.createElement(Text10, { color: `${!isSelected ? "grey" : "grey"}` }, " [", dateStr, " \u2022 ", id, "]"))),
-      isSelected && /* @__PURE__ */ React10.createElement(Box9, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: "white", bold: true }, "[X] DELETE "))
+      })(), /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, " [", dateStr, " \u2022 ", id, "]"))),
+      isSelected && /* @__PURE__ */ React10.createElement(Box9, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.danger, bold: true }, "[X] DELETE "))
     );
-  }), startIndex + MAX_VISIBLE < keys.length && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginTop: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: "gray" }, "\u25BC (+", keys.length - (startIndex + MAX_VISIBLE), " more chats below)"))), /* @__PURE__ */ React10.createElement(
+  }), startIndex + MAX_VISIBLE < keys.length && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginTop: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, "\u25BC (+", keys.length - (startIndex + MAX_VISIBLE), " more chats below)"))), /* @__PURE__ */ React10.createElement(
     Box9,
     {
       marginTop: 1,
@@ -15872,9 +16542,9 @@ function ResumeModal({ onSelect, onDelete, onClose }) {
       borderLeft: false,
       borderRight: false,
       borderBottom: false,
-      borderColor: "gray"
+      borderColor: colors.borderMuted
     },
-    /* @__PURE__ */ React10.createElement(Text10, { italic: true }, "\u2191\u2193 navigate \u2022 Enter select \u2022 x delete \u2022 Esc close")
+    /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted, italic: true }, "\u2191\u2193 navigate \u2022 Enter select \u2022 x delete \u2022 Esc close")
   ));
 }
 function formatDate(timestamp) {
@@ -15892,13 +16562,15 @@ var init_ResumeModal = __esm({
   "src/components/ResumeModal.jsx"() {
     init_history();
     init_terminal();
+    init_theme();
   }
 });
 
 // src/components/MemoryModal.jsx
 import React11, { useState as useState10, useEffect as useEffect8 } from "react";
 import { Box as Box10, Text as Text11, useInput as useInput6, useStdout } from "ink";
-function MemoryModal({ onClose }) {
+function MemoryModal({ onClose, theme = "Dark" }) {
+  const colors = getThemeColors(theme);
   const { stdout } = useStdout();
   const columns = stdout?.columns || 80;
   const [memories, setMemories] = useState10([]);
@@ -15976,23 +16648,23 @@ function MemoryModal({ onClose }) {
   const filledCount = Math.round(usagePercent / 100 * barWidth);
   const barStr = "\u2588".repeat(filledCount) + "\u2591".repeat(Math.max(0, barWidth - filledCount));
   const getBarColor = () => {
-    if (usagePercent < 50) return "grey";
-    if (usagePercent < 90) return "yellow";
-    return "red";
+    if (usagePercent < 50) return colors.textMuted;
+    if (usagePercent < 90) return colors.warning;
+    return colors.danger;
   };
   const s = emojiSpace(2);
-  return /* @__PURE__ */ React11.createElement(Box10, { flexDirection: "column", borderStyle: "round", borderColor: "gray", padding: 0, width: "100%" }, /* @__PURE__ */ React11.createElement(Box10, { paddingX: 1, marginBottom: 1, justifyContent: "space-between" }, /* @__PURE__ */ React11.createElement(Text11, { color: "white", bold: true }, "SAVED MEMORIES"), /* @__PURE__ */ React11.createElement(Box10, null, /* @__PURE__ */ React11.createElement(Text11, { color: "gray" }, "Vault: "), /* @__PURE__ */ React11.createElement(Text11, { color: getBarColor() }, barStr), /* @__PURE__ */ React11.createElement(Text11, { color: "white", bold: true }, " ", usagePercent, "%"))), !isMemoryOn && memories.length > 0 ? /* @__PURE__ */ React11.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React11.createElement(Text11, { italic: true, color: "gray" }, "Memory is currently Off...")) : memories.length === 0 ? /* @__PURE__ */ React11.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React11.createElement(Text11, { italic: true, color: "gray" }, isMemoryOn ? "Learning..." : "Memory not available...")) : /* @__PURE__ */ React11.createElement(Box10, { flexDirection: "column" }, memories.map((mem, idx) => {
+  return /* @__PURE__ */ React11.createElement(Box10, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React11.createElement(Box10, { paddingX: 1, marginBottom: 1, justifyContent: "space-between" }, /* @__PURE__ */ React11.createElement(Text11, { color: colors.text, bold: true }, "SAVED MEMORIES"), /* @__PURE__ */ React11.createElement(Box10, null, /* @__PURE__ */ React11.createElement(Text11, { color: colors.textMuted }, "Vault: "), /* @__PURE__ */ React11.createElement(Text11, { color: getBarColor() }, barStr), /* @__PURE__ */ React11.createElement(Text11, { color: colors.text, bold: true }, " ", usagePercent, "%"))), !isMemoryOn && memories.length > 0 ? /* @__PURE__ */ React11.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React11.createElement(Text11, { italic: true, color: colors.textMuted }, "Memory is currently Off...")) : memories.length === 0 ? /* @__PURE__ */ React11.createElement(Box10, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React11.createElement(Text11, { italic: true, color: colors.textMuted }, isMemoryOn ? "Learning..." : "Memory not available...")) : /* @__PURE__ */ React11.createElement(Box10, { flexDirection: "column" }, memories.map((mem, idx) => {
     const isSelected = idx === selectedIndex;
     return /* @__PURE__ */ React11.createElement(
       Box10,
       {
         key: mem.id,
         paddingX: 1,
-        backgroundColor: isSelected ? "#2a2a2a" : void 0,
+        backgroundColor: isSelected ? colors.highlightBg : void 0,
         width: "100%"
       },
-      /* @__PURE__ */ React11.createElement(Box10, { flexGrow: 1 }, /* @__PURE__ */ React11.createElement(Text11, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", idx + 1, ". ", formatMemory(mem.memory, idx, isSelected))),
-      isSelected && /* @__PURE__ */ React11.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React11.createElement(Text11, { color: "grey", dimColor: true }, " [", /* @__PURE__ */ React11.createElement(Text11, { italic: true }, mem.score), "] "), /* @__PURE__ */ React11.createElement(Text11, { color: "grey", bold: true }, "[X] WIPE "))
+      /* @__PURE__ */ React11.createElement(Box10, { flexGrow: 1 }, /* @__PURE__ */ React11.createElement(Text11, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", idx + 1, ". ", formatMemory(mem.memory, idx, isSelected))),
+      isSelected && /* @__PURE__ */ React11.createElement(Box10, { flexShrink: 0 }, /* @__PURE__ */ React11.createElement(Text11, { color: colors.textMuted, dimColor: true }, " [", /* @__PURE__ */ React11.createElement(Text11, { italic: true }, mem.score), "] "), /* @__PURE__ */ React11.createElement(Text11, { color: colors.danger, bold: true }, "[X] WIPE "))
     );
   })), /* @__PURE__ */ React11.createElement(
     Box10,
@@ -16003,9 +16675,9 @@ function MemoryModal({ onClose }) {
       borderLeft: false,
       borderRight: false,
       borderBottom: false,
-      borderColor: "gray"
+      borderColor: colors.borderMuted
     },
-    /* @__PURE__ */ React11.createElement(Text11, { color: "grey", italic: true }, "\u2191\u2193 navigate \u2022 x wipe memory \u2022 Esc close")
+    /* @__PURE__ */ React11.createElement(Text11, { color: colors.textMuted, italic: true }, "\u2191\u2193 navigate \u2022 x wipe memory \u2022 Esc close")
   ));
 }
 var init_MemoryModal = __esm({
@@ -16013,6 +16685,7 @@ var init_MemoryModal = __esm({
     init_crypto();
     init_paths();
     init_terminal();
+    init_theme();
   }
 });
 
@@ -16396,6 +17069,7 @@ var WITTY_LOADING_PHRASES;
 var init_witty_phrases = __esm({
   "src/data/witty_phrases.js"() {
     WITTY_LOADING_PHRASES = [
+      // === ORIGINALS ===
       "I'm Feeling Lucky",
       "Shipping awesomeness",
       "Painting the serifs back on",
@@ -16526,7 +17200,76 @@ var init_witty_phrases = __esm({
       "Constructing additional pylons",
       "New line? That\u2019s Ctrl+J.",
       "Releasing the HypnoDrones",
-      "Pushing the button, Frank."
+      "Pushing the button, Frank.",
+      // === NEW ===
+      "Consulting with the Companion Cube",
+      // --- Portal / Portal 2 ---
+      "Testing for science. You monster.",
+      "Dispensing deadly neurotoxin just kidding, compiling.",
+      "Now thinking with portals",
+      "Wheatley is currently attempting to hack this prompt",
+      "Developing combustible lemons",
+      "Aperture Science Enrichment Center is processing your request.",
+      "SPAAAACE! Space! SPAAAACE!",
+      "The cake is not a lie, it just needs a few more seconds.",
+      // --- Other Classic Games ---
+      "Praise the Sun! \u2600\uFE0F",
+      "Hey you, you're finally awake.",
+      "Stay a while and listen.",
+      "All your base are belong to us.",
+      "It's dangerous to go alone! Take this code.",
+      "Protocol 3: Protect the Pilot.",
+      "Finish Him! (The loading bar, that is)",
+      "War war never changes. But this prompt will.",
+      "Snake? Snake?! SNAAAAKE!",
+      "Got a selection of good things on sale, stranger!",
+      "Boy! Read the documentation.",
+      "Reticulating Minecraft splines",
+      // --- Few More ---
+      "Feed the loading bar a quick snack",
+      "Converting dark mode to dark magic",
+      "Asking the rubber duck for advice",
+      "Dividing by zero wait, NO NO NO\u2014",
+      "Herding the 1s and 0s back into line",
+      "Bribing the server with cookies",
+      // --- Pragmata ---
+      "Establishing contact with the Moon base",
+      "Calibrating astronaut suit thrusters",
+      "Drawing doodle on space helmet",
+      "Synthesizing Lunafilament",
+      "Deactivating runaway lunar defense bots",
+      "Calculating gravity offset watch your step!",
+      "Hacking the Delphi Corporation mainframe",
+      "What comes after dreaming? Loading screen, apparently.",
+      "Petting the holographic giant cat",
+      "Securing payload for Earth re-entry",
+      // --- Halo --- 'Launching Halo ring just kidding, still loading.',
+      "Wort wort wort!",
+      "Did you touch my Warthog?",
+      "One small step for man, one giant leap for the loading bar.",
+      "The Halo array is charging or maybe just a fan.",
+      "Deploying Pelican dropship eventually.",
+      "Just cleaning my plasma pistol BRB.",
+      "Checking Master Chief's helmet for scratches.",
+      "Counting sheep wait, wrong game.",
+      "S-Tier loading screen incoming.",
+      // --- GTA --- 'Traffic jam in the information highway.',
+      "Alarm blaring it's just your internet connection.",
+      "Looking for a helicopter or just your patience.",
+      "Need a taxi? Just kidding, I'm loading.",
+      "This loading time is criminal.",
+      "Wish I had a cheat code for fast loading.",
+      // --- Other Fun Lines ---
+      "Polishing the loading bar until it shines",
+      "Training the server hamsters",
+      "Baking a fresh batch of witty comments",
+      "Aligning my existential dread with your request",
+      "Just doodling on the terminal",
+      "Searching for the wifi password in the cosmos",
+      "Trying to remember my CAPTCHA training",
+      "Deciphering ancient scrolls (aka documentation)",
+      "Brewing a perfect cup of code",
+      "Petting the cat that photobombed my code"
     ];
   }
 });
@@ -17095,7 +17838,8 @@ function App({ args = [] }) {
   const [providerBudgetCursor, setProviderBudgetCursor] = useState15(0);
   const [pbsCursor, setPbsCursor] = useState15(0);
   const [pbsSelected, setPbsSelected] = useState15({});
-  const [systemSettings, setSystemSettings] = useState15({ memory: true, compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const [systemSettings, setSystemSettings] = useState15({ memory: true, theme: "Dark", compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const colors = useMemo2(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
   const [profileData, setProfileData] = useState15({ name: null, nickname: null, instructions: null });
   const [imageSettings, setImageSettings] = useState15({ keyType: "Default", quality: "Low-High", apiKey: "" });
   const [sessionStats, setSessionStats] = useState15({ tokens: 0 });
@@ -17366,7 +18110,8 @@ function App({ args = [] }) {
     historicalBlocks: [],
     seenSelections: /* @__PURE__ */ new Set(),
     chatId: "",
-    clearKey: 0
+    clearKey: 0,
+    theme: ""
   });
   const parsedBlocks = useMemo2(() => {
     const columns = terminalSize.columns || 80;
@@ -17377,7 +18122,8 @@ function App({ args = [] }) {
     const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
     const isChatChanged = cachedHistoryRef.current.chatId !== chatId;
     const isClearKeyChanged = cachedHistoryRef.current.clearKey !== clearKey;
-    if (isResize || isClear || isChatChanged || isClearKeyChanged) {
+    const isThemeChanged = cachedHistoryRef.current.theme !== systemSettings.theme;
+    if (isResize || isClear || isChatChanged || isClearKeyChanged || isThemeChanged) {
       const completedMsgs = messages.slice(0, completedIndex);
       for (let i = 0; i < completedMsgs.length; i++) {
         const msg = completedMsgs[i];
@@ -17399,7 +18145,8 @@ function App({ args = [] }) {
         historicalBlocks,
         seenSelections: new Set(seenAskSelections),
         chatId,
-        clearKey
+        clearKey,
+        theme: systemSettings.theme
       };
     } else {
       historicalBlocks = cachedHistoryRef.current.historicalBlocks;
@@ -17744,6 +18491,22 @@ function App({ args = [] }) {
       process.stdin.off("data", onData);
     };
   }, []);
+  const prevThemeRef = useRef4(systemSettings.theme);
+  useEffect12(() => {
+    if (prevThemeRef.current && prevThemeRef.current !== systemSettings.theme) {
+      prevThemeRef.current = systemSettings.theme;
+      if (stdout) {
+        stdout.write("\x1B[2J\x1B[3J\x1B[H");
+        if (stdout.isTTY) {
+          stdout.write("\x1B[?2004h");
+        }
+      }
+      setClearKey((prev) => prev + 1);
+      clearBlocksCache();
+    } else {
+      prevThemeRef.current = systemSettings.theme;
+    }
+  }, [systemSettings.theme, stdout]);
   useEffect12(() => {
     async function init() {
       try {
@@ -18061,8 +18824,8 @@ function App({ args = [] }) {
     { cmd: "/help", desc: "Show all available commands" },
     ...parsedArgs.playground ? [{ cmd: "/move", desc: "Move playground directory to original CWD/playground-export" }] : [],
     { cmd: "/resume", desc: "Load previous session" },
-    { cmd: "/compress", desc: "Summarize and compress chat history" },
     { cmd: "/clear", desc: "Clear terminal screen" },
+    { cmd: "/compress", desc: "Summarize and compress chat history" },
     { cmd: "/revert", desc: "Revert codebase back to a checkpoint" },
     { cmd: "/gemini", desc: "Get a happy message from Gemini CLI" },
     { cmd: "/save", desc: "Force save current chat" },
@@ -19948,6 +20711,7 @@ Selection: ${val}`,
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
               { label: "Back", value: "settings" }
             ],
+            theme: systemSettings.theme,
             onSelect: async (item) => {
               if (item.value === "settings" || item.value === "Back") {
                 setActiveView("settings");
@@ -20444,7 +21208,8 @@ Selection: ${val}`,
               } else {
                 setActiveView("key");
               }
-            }
+            },
+            theme: systemSettings.theme
           }
         )));
       case "exit":
@@ -20461,7 +21226,8 @@ Selection: ${val}`,
               }
               setPendingAsk(null);
               setActiveView("chat");
-            }
+            },
+            theme: systemSettings.theme
           }
         ));
       case "revert":
@@ -20575,7 +21341,8 @@ Selection: ${val}`,
               const newHistory = await deleteChat(id);
               return newHistory;
             },
-            onClose: () => setActiveView("chat")
+            onClose: () => setActiveView("chat"),
+            theme: systemSettings.theme
           }
         ));
       case "keybindingsPrompt":
@@ -20594,11 +21361,12 @@ Selection: ${val}`,
                 cachedShortcut = "\\ + Enter";
               }
               setActiveView("chat");
-            }
+            },
+            theme: systemSettings.theme
           }
         )));
       case "memory":
-        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(MemoryModal, { onClose: () => setActiveView("chat") }));
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(MemoryModal, { onClose: () => setActiveView("chat"), theme: systemSettings.theme }));
       case "parserDownload":
         return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(ParserDownloadModal, { onClose: () => setActiveView("settings") }));
       case "profile":
@@ -20611,7 +21379,8 @@ Selection: ${val}`,
               setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: `Profile updated: ${profile.name} (${profile.nickname})` }]);
               setActiveView("chat");
             },
-            onCancel: () => setActiveView("chat")
+            onCancel: () => setActiveView("chat"),
+            theme: systemSettings.theme
           }
         );
       case "resolution":
@@ -20683,7 +21452,8 @@ Selection: ${val}`,
               pendingApproval.resolve(decision);
               setPendingApproval(null);
               setActiveView("chat");
-            }
+            },
+            theme: systemSettings.theme
           }
         )));
       case "updateManager":
@@ -20720,7 +21490,8 @@ Selection: ${val}`,
                 setSystemSettings((s) => ({ ...s, updateManager: item.value }));
                 setActiveView("settings");
               }
-            }
+            },
+            theme: systemSettings.theme
           }
         );
       case "update":
@@ -20762,75 +21533,79 @@ Selection: ${val}`,
               pendingApproval.resolve(item.value);
               setPendingApproval(null);
               setActiveView("chat");
-            }
+            },
+            theme: systemSettings.theme
           }
         )));
       default:
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6 }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "gray", paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6, theme: systemSettings.theme }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
             text: statusText.trimEnd(),
-            baseColor: "#B5B8D9",
-            glintColor: "#D4DEE7",
+            baseColor: colors.text,
+            glintColor: colors.textMuted,
             speed: 60,
             italic: true,
             glintWidth: 2,
             typeSpeed: 10
           }
-        ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, (() => {
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, activeTime > 0 ? `(${activeTime.toFixed(0)}s)` : "")) : /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, input.length > 0 && escPressCount ? "Press ESC again to clear input" : hasPasteBlock ? "Press CTRL + O to expand" : "Waiting for input...")), /* @__PURE__ */ React16.createElement(Box14, null, (() => {
           const status = statusText?.toLowerCase() ?? "";
-          const showWaiting = isProcessing && Date.now() - lastChunkTime > 15e3 && activeSubagents.length === 0 && (status.includes("connecting") || status.includes("working"));
+          const showWaiting = isProcessing && Date.now() - lastChunkTime > 15e3 && activeSubagents.length === 0 && (status.includes("connecting") || status.includes("working") || status.includes("queue"));
           if (showWaiting) {
             return /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(
               GlintText_default,
               {
                 text: "Waiting for API",
-                baseColor: "white",
-                glintColor: "gray",
+                baseColor: colors.text,
+                glintColor: colors.textMuted,
                 glintWidth: 4,
                 speed: 80
               }
-            ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 "));
+            ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, " \u2503 "));
           }
           if (wittyPhrase) {
             return /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(
               GlintText_default,
               {
                 text: wittyPhrase,
+                baseColor: colors.text,
+                glintColor: colors.textMuted,
                 italic: true,
                 speed: 80,
                 typeSpeed: 15
               }
-            ), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true }, " \u2503 "));
+            ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, " \u2503 "));
           }
           return null;
         })(), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
             text: tempModelOverride || activeModel.split("/")[1] || activeModel,
-            baseColor: "white",
-            glintColor: "gray",
+            baseColor: colors.text,
+            glintColor: colors.textMuted,
             glintWidth: 3
           }
-        ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
-            backgroundColor: "#555555",
+            backgroundColor: colors.inputBg,
             paddingX: 1,
             paddingY: 0,
             width: "100%",
             flexDirection: "column"
           },
-          /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", width: "100%", paddingY: 0 }, /* @__PURE__ */ React16.createElement(Box14, { flexShrink: 0, width: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, isProcessing || isCompressing ? "\u2726  " : " \u276F  ")), /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1, position: "relative" }, input === "" && /* @__PURE__ */ React16.createElement(Box14, { position: "absolute", paddingLeft: 0 }, activeCommand && !isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal...") : activeCommand && isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", bold: true }, "  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...") : escPressCount === 1 ? /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "  Press ESC again to ", input.length > 0 ? "clear input" : "revert codebase to checkpoint", "...") : /* @__PURE__ */ React16.createElement(Text16, { color: "#cccccc" }, escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent.")), /* @__PURE__ */ React16.createElement(
+          /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", width: "100%", paddingY: 0 }, /* @__PURE__ */ React16.createElement(Box14, { flexShrink: 0, width: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputPrompt, bold: true }, isProcessing || isCompressing ? "\u2726  " : " \u276F  ")), /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1, position: "relative" }, input === "" && /* @__PURE__ */ React16.createElement(Box14, { position: "absolute", paddingLeft: 0 }, activeCommand && !isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, isTerminalWaitingForInput ? "  Terminal is waiting for user input. Press TAB to interact" : "  Press TAB to interact with terminal...") : activeCommand && isTerminalFocused ? /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", bold: true }, "  [ TERMINAL FOCUSED ] Type to interact, press TAB to exit...") : escPressCount === 1 ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputPrompt, bold: true }, "  Press ESC again to ", input.length > 0 ? "clear input" : "revert codebase to checkpoint", "...") : /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputPlaceholder }, escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent.")), /* @__PURE__ */ React16.createElement(
             MultilineInput,
             {
               key: `input-${inputKey}`,
               onPasteStateChange: setHasPasteBlock,
               focus: !isTerminalFocused && !isCompressing,
               showCursor: isAppFocused && !isCompressing,
+              cursorColor: colors.inputText,
               lastFocusEventTime: lastFocusEventTime.current,
               value: input,
-              textStyle: { bold: true },
+              textStyle: { bold: true, color: colors.inputText },
               columns: terminalSize.columns,
               onChange: (val) => {
                 const cleanVal = val.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\s*\n/g, "\n");
@@ -20846,10 +21621,10 @@ Selection: ${val}`,
               }
             }
           )))))
-        ), /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: "#555555" }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
+        ), /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
     }
   };
-  return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React16.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider }) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React16.createElement(
+  return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React16.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider, theme: systemSettings.theme }) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}-${systemSettings.theme}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
     {
       key: block.key,
@@ -20857,7 +21632,8 @@ Selection: ${val}`,
       columns: (stdout?.columns || 80) - 2,
       showFullThinking,
       aiProvider,
-      version: versionFluxflow
+      version: versionFluxflow,
+      theme: systemSettings.theme
     }
   ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 0, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
@@ -20867,7 +21643,8 @@ Selection: ${val}`,
       columns: Math.max(20, (stdout?.columns || 80) - 2),
       showFullThinking,
       aiProvider,
-      version: versionFluxflow
+      version: versionFluxflow,
+      theme: systemSettings.theme
     }
   )), activeCommand && /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty, terminalHeight: terminalSize.rows, columns: terminalSize.columns }))), isInitializing ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
     CommandMenu,
@@ -20891,7 +21668,7 @@ Selection: ${val}`,
       onSubmit: handleSetup,
       mask: "*"
     }
-  )), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Press ESC to go back to provider selection)")))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm)" : "(Press Enter to confirm and initialize)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: "white", paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " to cancel.")), suggestions.length > 0 && (() => {
+  )), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Press ESC to go back to provider selection)")))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm)" : "(Press Enter to confirm and initialize)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "red", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " to cancel.")), suggestions.length > 0 && (() => {
     const windowSize = 5;
     let startIdx = suggestionOffsetRef.current;
     let firstSelectableIndex = 0;
@@ -20922,7 +21699,7 @@ Selection: ${val}`,
         width: "100%",
         marginBottom: 1
       },
-      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Use #Lstart-Lend to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
+      /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"), suggestions[0]?.cmd?.startsWith("@") || suggestions[0]?.cmd?.startsWith("\\@") ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "(Use #Lstart-Lend to specify line numbers)") : input.startsWith("/model") && apiTier === "Free" ? (() => {
         let url = "https://aistudio.google.com/billing";
         let label = "billing";
         if (aiProvider === "DeepSeek") {
@@ -20935,7 +21712,7 @@ Selection: ${val}`,
           url = "https://build.nvidia.com/settings/api-keys";
           label = "billing";
         }
-        return /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
+        return /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary, underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
       })() : null),
       visible.slice(0, suggestionVisibleCount).map((s, i) => {
         const actualIdx = startIdx + i;
@@ -20947,14 +21724,14 @@ Selection: ${val}`,
           {
             key: s.cmd,
             flexDirection: "row",
-            backgroundColor: isActive ? "#2a2a2a" : void 0,
+            backgroundColor: isActive ? colors.highlightBg : void 0,
             paddingX: 1
           },
-          /* @__PURE__ */ React16.createElement(Box14, { width: 3 }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? "#B8BDC9" : "gray", bold: isActive }, isActive ? " \u276F" : "  ")),
+          /* @__PURE__ */ React16.createElement(Box14, { width: 3 }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? colors.text : colors.textMuted, bold: isActive }, isActive ? " \u276F" : "  ")),
           /* @__PURE__ */ React16.createElement(Box14, { width: 55 }, /* @__PURE__ */ React16.createElement(
             Text16,
             {
-              color: isDivider ? "#D0CCD8" : isGemmaDisabled ? "gray" : isActive ? "white" : "grey",
+              color: isDivider ? colors.textDim : isGemmaDisabled ? colors.textMuted : isActive ? colors.text : colors.textDim,
               bold: false
             },
             s.cmd && (s.cmd.startsWith("@[") || s.cmd.startsWith("\\@[")) && s.cmd.endsWith("]") ? (() => {
@@ -20963,10 +21740,10 @@ Selection: ${val}`,
               return parts[parts.length - 1];
             })() : s.cmd && s.cmd.includes("/") ? s.cmd.split("/").pop() : s.cmd
           )),
-          /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: `${!isActive ? "gray" : "white"}`, italic: true }, s.desc))
+          /* @__PURE__ */ React16.createElement(Box14, { flexGrow: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: !isActive ? colors.textMuted : colors.text, italic: true }, s.desc))
         );
       }),
-      suggestions.length > 5 && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, height: 1 }, remaining > 0 ? /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "   ... (", remaining, " more commands available)") : /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "   (End of list)"))
+      suggestions.length > 5 && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, height: 1 }, remaining > 0 ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "   ... (", remaining, " more commands available)") : /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "   (End of list)"))
     );
   })(), /* @__PURE__ */ React16.createElement(Box14, { flexShrink: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(
     StatusBar_default,
@@ -20981,7 +21758,8 @@ Selection: ${val}`,
       aiProvider,
       activeModel,
       isProcessing,
-      lastChunkTime
+      lastChunkTime,
+      theme: systemSettings.theme
     }
   )), activeView === "exit" && (() => {
     const wallTimeMs = Date.now() - SESSION_START_TIME;
@@ -20990,7 +21768,7 @@ Selection: ${val}`,
     const agentActiveMs = sessionApiTime + sessionToolTime;
     const apiPercent = agentActiveMs > 0 ? (sessionApiTime / agentActiveMs * 100).toFixed(1) : "0.0";
     const toolPercent = agentActiveMs > 0 ? (sessionToolTime / agentActiveMs * 100).toFixed(1) : "0.0";
-    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: "grey", width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Session ID:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, chatId)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tool Calls:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Success Rate:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, successRate, "%")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Code Changes:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 16 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "Performance"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Wall Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Agent Active:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: colors.borderMuted, width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { bold: true }, gradient2(["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session ID:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, chatId)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Success Rate:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, successRate, "%")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 16 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "Performance"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Wall Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Agent Active:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
 var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
@@ -21008,6 +21786,7 @@ var init_app = __esm({
     await init_ai();
     init_subagent_state();
     init_settings();
+    init_theme();
     init_history();
     init_ResumeModal();
     init_MemoryModal();
@@ -21107,7 +21886,7 @@ var init_app = __esm({
       options.push({ label: "Continue to CLI only", action: "dismiss" });
       return options;
     };
-    BridgePromo = ({ width, height, selectedIndex, aiProvider }) => {
+    BridgePromo = ({ width, height, selectedIndex, aiProvider, theme = "Dark" }) => {
       const ideName = getIDEName();
       const options = getPromoOptions(ideName);
       return /* @__PURE__ */ React16.createElement(
@@ -21119,7 +21898,7 @@ var init_app = __esm({
           width,
           height
         },
-        /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React16.createElement(Text16, null, getFluxLogo(versionFluxflow, aiProvider))),
+        /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, width: Math.min(80, width - 4), justifyContent: "flex-start" }, /* @__PURE__ */ React16.createElement(Text16, null, getFluxLogo(versionFluxflow, aiProvider, theme))),
         /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "double", borderColor: "grey", paddingX: 3, paddingY: 1, width: Math.min(80, width - 4) }, /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "white", textAlign: "center" }, "\u{1F680} UPGRADE YOUR WORKFLOW"), /* @__PURE__ */ React16.createElement(Box14, { marginY: 1, flexDirection: "column", alignItems: "left" }, /* @__PURE__ */ React16.createElement(Text16, null, "You're in ", /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "cyan" }, ideName), ", but the ", /* @__PURE__ */ React16.createElement(Text16, { bold: true, color: "white" }, "FluxFlow-CLI Companion"), " is not installed."), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginY: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Real-time IDE context & Error Resolution"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Auto-open files created by agent"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Native DIFFing for AI edits"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Direct IDE context sharing"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Surgical Diagnostic Sync"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Native Right-Click \u276F Chat integration"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Live Status in IDE"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "  \u2705 Clickable terminal-to-code links"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, options.map((opt, i) => /* @__PURE__ */ React16.createElement(Box14, { key: i }, /* @__PURE__ */ React16.createElement(Text16, { color: selectedIndex === i ? "yellow" : "white", bold: selectedIndex === i }, selectedIndex === i ? " \u276F " : "   ", opt.label)))), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(Text16, { dimColor: true, italic: true }, "(Use arrows to navigate, Enter to select)")))
       );
     };

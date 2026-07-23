@@ -4990,15 +4990,24 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
 
     const SUBAGENT_TOOL_DEFINITIONS = {
-        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files, supports images/docs',
-        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed folder contents and stats',
-        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, classes, imports/exports',
-        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="...", newContent1="...")]. Surgical block replacement for editing files',
-        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates or overwrites a file',
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: auto-detect',
-        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON\'T hallucinate. aiMode for LLM based search results and richer data, default: false',
-        'webscrape': '- [tool:functions.WebScrape(url="...")]. Web Scrape',
+        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
+
+        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes',
+
+        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
+
+        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**',
+
+        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
+
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true',
+
+        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON\'T hallucinate.aiMode for LLM based search results and richer data, default: false',
+
+        'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
+
         'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
+
     };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
@@ -5013,9 +5022,9 @@ TOOL POLICY:
 - HUGE FILES? SearchKeyword >> FileMap/Full Read
 - NO Terminal Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
-- Escape quotes: \\" for code strings
-- Literal escapes: Double-escape sequences (e.g., \\\\n)
-- File structure: Real newlines for code formatting`.trim();
+- **Escape quotes: \\" for code strings**
+- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
+- **File structure: Real newlines for code formatting**`.trim();
 
     const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
@@ -5023,7 +5032,7 @@ Your task is: "${task}"
 
 ${providedToolsSection.trimEnd()}
 
--- THINKING POLICY --
+-- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
 Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user

@@ -1,5 +1,6 @@
 import gradient from 'gradient-string';
 import { STARTUP_QUOTES } from '../data/gemini_cli.js';
+import { getThemeColors } from './theme.js';
 
 /**
  * Terminal capability detection and normalization.
@@ -34,7 +35,7 @@ export const emojiSpace = (baseSpaces = 2) => {
     return ' '.repeat(baseSpaces);
 };
 
-export const getFluxLogo = (version = '...', provider = 'Loading...') => {
+export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'Dark') => {
     // Pick a random quote
     const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
     // DONT remove this comment
@@ -48,6 +49,13 @@ export const getFluxLogo = (version = '...', provider = 'Loading...') => {
     //     " ███░          █████       ██████████  ░░████████   █████   ██████████       ██████████░░█████████   ░░████ ████ █████",
     //     "░░░            ░░░░░       ░░░░░░░░░░   ░░░░░░░░    ░░░░░   ░░░░░░░░░░       ░░░░░░░░░░  ░░░░░░░░░     ░░░░░ ░░░░░ ░░░░░"
     // ];
+    const colors = getThemeColors(theme);
+
+    const textColor = colors.logoTextAnsi;
+    const bodyColor = colors.logoBodyAnsi;
+    const greyColor = colors.logoMutedAnsi;
+    const reset = '\x1b[0m';
+
     const art = [
         "  ███       ",
         " ░░░███     ",
@@ -59,15 +67,16 @@ export const getFluxLogo = (version = '...', provider = 'Loading...') => {
         " ░░░        "
     ];
 
-    const coloredArt = gradient(['#0077ff', '#ff00ff']).multiline(art.join('\n')).split('\n');
-    const grey = (t) => `\x1b[90m${t}\x1b[0m`;
+    const logoGradient = colors.logoGradient || ['#0077ff', '#ff00ff'];
+    const coloredArt = gradient(logoGradient).multiline(art.join('\n')).split('\n');
+    const grey = (t) => `${greyColor}${t}${reset}`;
 
     return `${coloredArt[0]}
-${coloredArt[1]}  \x1b[1;37mSelected Provider: ${provider}\x1b[0m
+${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
 ${coloredArt[2]}
-${coloredArt[3]}  \x1b[1;37mFLUX FLOW ${grey('v' + version)}\x1b[0m
+${coloredArt[3]}  ${textColor}FLUX FLOW ${grey('v' + version)}${reset}
 ${coloredArt[4]}
-${coloredArt[5]}  \x1b[37mSee /help for additional commands.\x1b[0m
+${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
 ${coloredArt[7]}`;
 };

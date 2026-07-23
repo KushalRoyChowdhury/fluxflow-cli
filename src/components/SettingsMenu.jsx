@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
+import { getThemeColors } from '../utils/theme.js';
 import v8 from 'v8';
 
 const CATEGORIES = [
+    { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
     { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
+    { id: 'other', label: 'Miscellaneous', desc: 'Miscellaneous preferences' },
+    { id: 'providers', label: 'Providers', desc: 'Configure AI models & API key strategies' },
     { id: 'security', label: 'Security', desc: 'Configure permissions & data safety' },
     { id: 'updater', label: 'Updater', desc: 'Manage application updates' },
-    { id: 'other', label: 'Other', desc: 'Miscellaneous preferences' },
     { id: 'exit', label: 'Exit Settings', desc: 'Return to chat view' }
 ];
 
@@ -119,6 +122,17 @@ export default function SettingsMenu({
     // Get items for current category
     const getCategoryItems = (catId) => {
         switch (catId) {
+            case 'providers':
+                return [
+                    { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
+                    { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') }
+                ];
+            case 'appearance':
+                return [
+                    { label: 'Theme', value: 'theme', status: systemSettings.theme || 'Dark' },
+                    { label: 'Loading Phrases', value: 'loadingPhrases', status: systemSettings.loadingPhrases !== false ? 'ON' : 'OFF' },
+                    { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' }
+                ];
             case 'memory':
                 return [
                     { label: 'Toggle Memory', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
@@ -141,17 +155,14 @@ export default function SettingsMenu({
             case 'updater':
                 return [
                     { label: 'Auto-Update', value: 'autoUpdate', status: systemSettings.autoUpdate ? 'ON' : 'OFF' },
-                    { label: 'Preferred Updater', value: 'updateManager', status: (systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase() }
+                    { label: 'Preferred Package Manager', value: 'updateManager', status: (systemSettings.updateManager || 'npm') === 'custom' ? 'Custom' : (systemSettings.updateManager || 'npm').toUpperCase() }
                 ];
             case 'other':
                 return [
-                    { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') },
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
-                    { label: 'Loading Phrases', value: 'loadingPhrases', status: systemSettings.loadingPhrases !== false ? 'ON' : 'OFF' },
-                    { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
-                ]; default:
+                ];
+            default:
                 return [];
         }
     };
@@ -328,22 +339,34 @@ export default function SettingsMenu({
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
+        } else if (item.value === 'theme') {
+            const options = ['Dark', 'Light', 'GitHub Dark', 'GitHub Light', 'Transparent Dark', 'Transparent Light', 'Chaos'];
+            const activeTheme = systemSettings.theme === 'Mystery' ? 'Chaos' : (systemSettings.theme || 'Dark');
+            const currentIndex = options.indexOf(activeTheme);
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, theme: options[nextIndex] };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
         }
     };
 
+    const colors = getThemeColors(systemSettings.theme);
+
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%" minHeight={32}>
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.border} padding={0} width="100%" minHeight={32}>
             {/* Title Bar */}
-            <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor="gray" width="100%">
-                <Text color="white" bold>SYSTEM CONFIGURATION</Text>
+            <Box paddingX={1} paddingY={0} marginBottom={0} borderStyle="single" borderColor={colors.borderMuted} width="100%">
+                <Text color={colors.text} bold>SYSTEM CONFIGURATION</Text>
             </Box>
 
             {/* Main Area: 2 Columns */}
             <Box flexDirection="row" width="100%" minHeight={26}>
                 {/* Left Column: Categories */}
-                <Box flexDirection="column" width="30%" borderStyle="round" borderColor={activeColumn === 'categories' ? 'white' : 'grey'} padding={1} paddingY={0}>
+                <Box flexDirection="column" width="30%" maxWidth={40} borderStyle="round" borderColor={activeColumn === 'categories' ? colors.border : colors.borderMuted} padding={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'categories' ? 'white' : 'grey'} bold underline>
+                        <Text color={activeColumn === 'categories' ? colors.text : colors.textDim} bold underline>
                             CATEGORIES
                         </Text>
                     </Box>
@@ -353,12 +376,12 @@ export default function SettingsMenu({
                         return (
                             <Box
                                 key={cat.id}
-                                marginTop={isExit ? 17 : 0}
-                                backgroundColor={isSelected ? (activeColumn === 'categories' ? '#2a2a2a' : '#1e1e1e') : undefined}
+                                marginTop={isExit ? 15 : 0}
+                                backgroundColor={isSelected ? (activeColumn === 'categories' ? colors.highlightBg : colors.cardBg) : undefined}
                                 paddingX={1}
                             >
                                 <Text
-                                    color={isSelected ? (activeColumn === 'categories' ? 'white' : 'grey') : 'grey'}
+                                    color={isSelected ? (activeColumn === 'categories' ? colors.text : colors.textDim) : colors.textDim}
                                     bold={isSelected}
                                 >
                                     {isSelected ? '❯ ' : '  '}{cat.label}
@@ -369,9 +392,9 @@ export default function SettingsMenu({
                 </Box>
 
                 {/* Right Column: Settings */}
-                <Box flexDirection="column" width="70%" borderStyle="round" borderColor={activeColumn === 'items' ? 'white' : 'grey'} paddingX={1} marginLeft={1} paddingY={0}>
+                <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={activeColumn === 'items' ? colors.border : colors.borderMuted} paddingX={1} marginLeft={1} paddingY={0}>
                     <Box marginBottom={1}>
-                        <Text color={activeColumn === 'items' ? 'white' : 'grey'} bold underline>
+                        <Text color={activeColumn === 'items' ? colors.text : colors.textDim} bold underline>
                             {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
                         </Text>
                     </Box>
@@ -399,13 +422,13 @@ export default function SettingsMenu({
                                 const getStatusColor = (item) => {
                                     if (currentCatId === 'security') {
                                         if ((item.value === 'autoExec' || item.value === 'externalAccess') && item.status === 'ON') {
-                                            return 'white';
+                                            return colors.statusOn;
                                         }
-                                        return 'gray';
+                                        return colors.statusOff;
                                     }
-                                    if (item.status?.startsWith('✓')) return 'white';
-                                    if (item.status?.startsWith('⚠')) return 'gray';
-                                    return item.status === 'ON' ? 'white' : (item.status === 'OFF' ? 'gray' : 'white');
+                                    if (item.status?.startsWith('✓')) return colors.statusOn;
+                                    if (item.status?.startsWith('⚠')) return colors.statusOff;
+                                    return item.status === 'ON' ? colors.statusOn : (item.status === 'OFF' ? colors.statusOff : colors.text);
                                 };
 
                                 // Render section header if it changed
@@ -427,9 +450,9 @@ export default function SettingsMenu({
 
                                 elements.push(
                                     <Box key={item.value} flexDirection="column">
-                                        <Box backgroundColor={isSelected && !isEditingThis ? '#2a2a2a' : undefined} paddingX={2}>
+                                        <Box backgroundColor={isSelected && !isEditingThis ? colors.highlightBg : undefined} paddingX={2}>
                                             <Text
-                                                color={isSelected ? 'white' : 'grey'}
+                                                color={isSelected ? colors.text : colors.textDim}
                                                 bold={isSelected}
                                             >
                                                 {isSelected ? '❯ ' : '  '}{item.label}
@@ -470,25 +493,10 @@ export default function SettingsMenu({
                                 );
                             });
 
-                            if (currentCatId === 'other') {
-                                elements.push(
-                                    <Box key="pty-notice" marginTop={14} paddingX={1}>
-                                        <Text color="white">
-                                            {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
-                                        </Text>
-                                    </Box>
-                                );
-                                elements.push(
-                                    <Box key="memory-load-2026" paddingX={1}>
-                                        <Text color="gray">Memory Load: {currentMemory}/{maxMemory} {memoryUnit}</Text>
-                                    </Box>
-                                );
-                            }
-
                             if (hasConflict) {
                                 elements.push(
                                     <Box key="conflict-warning" marginTop={1} paddingX={1}>
-                                        <Text color="white" italic>
+                                        <Text color={colors.text} italic>
                                             * Conflicting commands will be ignored and defaulted to highest priority
                                         </Text>
                                     </Box>
@@ -498,10 +506,22 @@ export default function SettingsMenu({
                             return elements;
                         })()
                     ) : (
-                        <Box paddingX={1}>
+                        <Box paddingX={1} flexDirection="column" width="100%">
                             <Text color="gray" italic>
                                 {CATEGORIES[selectedCategoryIndex].desc}
                             </Text>
+                            {currentCatId === 'exit' && (
+                                <>
+                                    <Box key="pty-notice" marginTop={19} paddingX={0}>
+                                        <Text color={colors.text}>
+                                            {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
+                                        </Text>
+                                    </Box>
+                                    <Box key="memory-load-2026" paddingX={0}>
+                                        <Text color="gray">Memory Load: {currentMemory}/{maxMemory} {memoryUnit}</Text>
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     )}
                 </Box>

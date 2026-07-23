@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { wrapText } from '../utils/text.js';
+import { getThemeColors } from '../utils/theme.js';
 
-export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24 }) => {
+export const TerminalBox = React.memo(({ command, output, completed = false, isFocused = false, columns = 80, isPty = false, terminalHeight = 24, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
     // A smart terminal output resolver that simulates a terminal grid for Ink
     const processPTY = (text) => {
         if (!text) return '';
@@ -172,7 +174,7 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             borderRight={false}
             borderTop={true}
             borderBottom={true}
-            // borderColor="#555555"
+            borderColor={colors.codeBorder}
             paddingLeft={2}
             paddingRight={0}
             paddingY={1}
@@ -182,8 +184,8 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             <Box marginBottom={1} justifyContent="space-between" width="100%">
                 <Box flexShrink={1} paddingRight={2}>
                     <Text>
-                        <Text color="white" bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
-                        <Text color="white">{command}</Text>
+                        <Text color={colors.text} bold>{completed ? "🏁 FINISHED:" : "⚡ EXECUTING:"} </Text>
+                        <Text color={colors.text}>{command}</Text>
                     </Text>
                 </Box>
                 {isPty && (
@@ -194,26 +196,26 @@ export const TerminalBox = React.memo(({ command, output, completed = false, isF
             </Box>
 
             {displayOutput ? (
-                <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1} width="100%">
+                <Box flexDirection="column" marginTop={0} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
                     {hasCollapsibleContent && !isExpanded && (
                         <Box marginBottom={1}>
                             <Text color="magenta">...{collapsedCount} lines collapsed...</Text>
                         </Box>
                     )}
                     {/* Only apply gray color if completed; let ANSI colors show during live execution */}
-                    <Text color={completed ? undefined : undefined}>{renderedOutput}</Text>
+                    <Text color={completed ? colors.text : colors.text}>{renderedOutput}</Text>
                 </Box>
             ) : !completed && (
-                <Box marginTop={1} backgroundColor={isPty ? undefined : "#0a0a0a"} paddingX={1} width="100%">
-                    <Text color="white" italic>Waiting for output...</Text>
+                <Box marginTop={1} backgroundColor={isPty ? undefined : colors.codeBg} paddingX={1} width="100%">
+                    <Text color={colors.textMuted} italic>Waiting for output...</Text>
                 </Box>
             )}
 
             <Box justifyContent="space-between" marginTop={1}>
                 {!completed ? (
-                    <Text color="gray" italic>{isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging."}</Text>
+                    <Text color={colors.textMuted} italic>{isFocused ? "Press TAB to unfocus, then double-press ESC to terminate." : "Double-press ESC to terminate if hanging."}</Text>
                 ) : <Box />}
-                <Text color="gray" bold>
+                <Text color={colors.textMuted} bold>
                     {completed ? "● ARCHIVED" : (isFocused ? "▶ TERMINAL FOCUSED" : "● LIVE (Press TAB to focus)")}
                 </Text>
             </Box>

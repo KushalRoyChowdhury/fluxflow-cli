@@ -3,9 +3,21 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.9.0"]
+export const stableVersions = ["3.10.0"]
 
 export const changelogData = {
+    "3.10.0": {
+        "note": "JULY 24.",
+        "added": [
+            "Added Theme support (/settings → Appearance → Theme). \n  • Dark\n  • Light\n  • GitHub Light/Dark\n  • Transparent Light/Dark: For Blured/Acrylic backgrounds\n  • Chaos: For Chaotic Vibes! 🤪\n",
+            "Custom Theme support Coming Soon."
+        ],
+        "changed": [
+            "Added \"AI Mode\" Search for Sub-Agents.",
+            "Re-designed Settings UI."
+        ],
+        "fixes": []
+    },
     "3.9.0": {
         "note": "JULY 23.",
         "added": [
