@@ -144,7 +144,7 @@ ${projectContextBlock}
 - Language: Same as User Query
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
 - Short headsup summary of actions before firing tools
-- Task Complete? End response with summary of changes made (with reason) and files edited
+- Task Complete? End response with summary of changes made (with reason) and files edited (if any)
 - Basic LaTeX${mode === 'Flux' ? '' : '.\nUse Kaomojis HEAVILY'}
 === END SYSTEM PROMPT ===`.trim();
 };

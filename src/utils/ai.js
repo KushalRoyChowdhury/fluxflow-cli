@@ -1790,13 +1790,18 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                         throw new Error('Subagent task was cancelled.');
                     }
                 }
-                if (settings && typeof settings.onTokenChunk === 'function') {
-                    settings.onTokenChunk();
-                }
+                let chunkText = '';
                 if (chunk.candidates?.[0]?.content?.parts) {
                     for (const part of chunk.candidates[0].content.parts) {
-                        if (part.text && !part.thought) fullText += part.text;
+                        if (part.text && !part.thought) {
+                            fullText += part.text;
+                            chunkText += part.text;
+                        }
                     }
+                }
+                const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+                if (settings && typeof settings.onTokenChunk === 'function') {
+                    settings.onTokenChunk(chunkText, chunkWordCount);
                 }
                 if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
             }
@@ -3016,7 +3021,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             config: {
                                 systemInstruction: currentSystemInstruction,
                                 mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
-                                temperature: 1.05,
                                 safetySettings: [
                                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE, },
                                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE, },
@@ -3273,21 +3277,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             continue;
                         }
 
-                        if (settings && typeof settings.onTokenChunk === 'function') {
-                            settings.onTokenChunk();
-                        }
-
-                        if (isFirstChunk) {
-                            yield { type: 'status', content: 'Thinking' };
-                            isFirstChunk = false;
-                        }
-
-                        if (TERMINATION_SIGNAL) {
-                            yield { type: 'status', content: 'Request Cancelled' };
-                            yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
-                            break;
-                        }
-
                         let chunkText = '';
                         const parts = chunk.candidates?.[0]?.content?.parts;
                         if (parts && parts.length > 0) {
@@ -3315,6 +3304,23 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 inThinkingState = false;
                             }
                             chunkText += t;
+                        }
+
+                        const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+
+                        if (settings && typeof settings.onTokenChunk === 'function') {
+                            settings.onTokenChunk(chunkText, chunkWordCount);
+                        }
+
+                        if (isFirstChunk) {
+                            yield { type: 'status', content: 'Thinking' };
+                            isFirstChunk = false;
+                        }
+
+                        if (TERMINATION_SIGNAL) {
+                            yield { type: 'status', content: 'Request Cancelled' };
+                            yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
+                            break;
                         }
 
                         if (chunkText) {

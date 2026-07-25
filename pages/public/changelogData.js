@@ -3,9 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.10.0"]
+export const stableVersions = ["3.11.0"]
 
 export const changelogData = {
+    "3.11.0": {
+        "note": "JULY 25.",
+        "added": [
+            "Added Model Speed/TPS Estimation (This relies on client side computation, might be inaccurate).\nEnable in /settings → Appearance → Show TPS Estimation."
+        ],
+        "changed": [
+            "Redisigned few UI Components."
+        ],
+        "fixes": []
+    },
     "3.10.0": {
         "note": "JULY 24.",
         "added": [

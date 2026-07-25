@@ -524,6 +524,8 @@ export default function App({ args = [] }) {
             });
             activeStreamingMsgRef.current = null;
         }
+        chunkWordCountRef.current = 0;
+        streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0 };
     };
 
     // ── Typewriter Effect ─────────────────────────────────────────────
@@ -539,12 +541,16 @@ export default function App({ args = [] }) {
             const queue = typewriterQueueRef.current;
             if (queue.length > 0 && activeStreamingMsgRef.current) {
                 // Adaptive batch size: catch up faster when queue grows deep
-                let batchSize = 2;
-                if (queue.length > 65) batchSize = 16;
+                let batchSize = 1;
+                if (queue.length > 85) batchSize = 30;
+                else if (queue.length > 80) batchSize = 25;
+                else if (queue.length > 75) batchSize = 20;
+                else if (queue.length > 65) batchSize = 16;
                 else if (queue.length > 50) batchSize = 12;
                 else if (queue.length > 35) batchSize = 8;
                 else if (queue.length > 15) batchSize = 6;
                 else if (queue.length > 5) batchSize = 4;
+                else if (queue.length > 3) batchSize = 2;
 
                 let batchedText = '';
                 for (let i = 0; i < batchSize && queue.length > 0; i++) {
@@ -553,7 +559,7 @@ export default function App({ args = [] }) {
                 activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
                 forceRender();
             }
-        }, 100); // [ANIMATION TICK]
+        }, 80); // [ANIMATION TICK]
     };
 
     const awaitTypewriter = async () => {
@@ -901,6 +907,8 @@ export default function App({ args = [] }) {
     const [imageSettings, setImageSettings] = useState({ keyType: 'Default', quality: 'Low-High', apiKey: '' });
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
     const [lastChunkTime, setLastChunkTime] = useState(0);
+    const chunkWordCountRef = useRef(0);
+    const streamingWordStatsRef = useRef({ totalWords: 0, startTime: 0, wps: 0 });
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
@@ -3178,8 +3186,22 @@ export default function App({ args = [] }) {
                             apiTier,
                             cols: terminalSize.columns - 6,
                             rows: 30,
-                            onTokenChunk: () => {
-                                setLastChunkTime(Date.now());
+                            onTokenChunk: (chunkText, wordCount) => {
+                                const now = Date.now();
+                                setLastChunkTime(now);
+                                if (typeof wordCount === 'number') {
+                                    chunkWordCountRef.current = wordCount;
+                                    const stats = streamingWordStatsRef.current;
+                                    if (!stats.startTime) {
+                                        stats.startTime = now;
+                                        stats.totalWords = 0;
+                                    }
+                                    stats.totalWords += wordCount;
+                                    const elapsedSec = (now - stats.startTime) / 1000;
+                                    if (elapsedSec > 0) {
+                                        stats.wps = Math.round((stats.totalWords / elapsedSec) * 10) / 10;
+                                    }
+                                }
                             },
                             onVisualFeedback: (content) => {
                                 setMessages(prev => {
@@ -5505,6 +5527,7 @@ export default function App({ args = [] }) {
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
                                 />
+                                <Text color={colors.textMuted} dimColor> ({thinkingLevel})</Text>
                             </Box>
                         </Box>
 
@@ -5820,6 +5843,8 @@ export default function App({ args = [] }) {
                                 isProcessing={isProcessing}
                                 lastChunkTime={lastChunkTime}
                                 theme={systemSettings.theme}
+                                wps={streamingWordStatsRef.current.wps}
+                                showTPMEstimate={systemSettings.showTPMEstimate}
                             />
                         </Box>
 

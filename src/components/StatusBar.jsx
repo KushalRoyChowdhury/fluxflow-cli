@@ -18,15 +18,15 @@ const getLatencyColor = (delay) => {
 
     // More stops = smoother perceptual gradient across the full range
     const points = [
-        { t:  370, r:   0, g: 165, b: 100 }, // deep green
-        { t:  550, r:  40, g: 195, b:  80 }, // green
-        { t:  800, r: 120, g: 220, b:  50 }, // lime-green
-        { t: 1100, r: 190, g: 225, b:  20 }, // yellow-green
-        { t: 1500, r: 250, g: 210, b:  15 }, // yellow
-        { t: 2000, r: 255, g: 170, b:   0 }, // amber
-        { t: 2800, r: 255, g: 110, b:   0 }, // orange
-        { t: 3800, r: 255, g:  50, b:   0 }, // deep orange
-        { t: 5000, r: 255, g:   0, b:   0 }  // red
+        { t: 370, r: 0, g: 165, b: 100 }, // deep green
+        { t: 550, r: 40, g: 195, b: 80 }, // green
+        { t: 800, r: 120, g: 220, b: 50 }, // lime-green
+        { t: 1100, r: 190, g: 225, b: 20 }, // yellow-green
+        { t: 1500, r: 250, g: 210, b: 15 }, // yellow
+        { t: 2000, r: 255, g: 170, b: 0 }, // amber
+        { t: 2800, r: 255, g: 110, b: 0 }, // orange
+        { t: 3800, r: 255, g: 50, b: 0 }, // deep orange
+        { t: 5000, r: 255, g: 0, b: 0 }  // red
     ];
 
     for (let i = 0; i < points.length - 1; i++) {
@@ -45,7 +45,7 @@ const getLatencyColor = (delay) => {
     return '#ff0000';
 };
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0, theme = 'Dark' }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0, theme = 'Dark', wps = 0, showTPMEstimate = false }) => {
     const colors = getThemeColors(theme);
     const modeIcon = mode === 'Flux' ? '' : '';
     const [memoryUsage, setMemoryUsage] = useState(0);
@@ -53,8 +53,58 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     const [memoryUnit, setMemoryUnit] = useState('MB');
 
     const [dotColor, setDotColor] = useState('green');
+    const [displayedWps, setDisplayedWps] = useState(0);
     const chunkTimesRef = useRef([]);
     const smoothedDelayRef = useRef(370); // EMA of delay, starts at fast/green
+    const wpsHistoryRef = useRef([]);
+    const lastChunkTimeRef = useRef(lastChunkTime);
+    useEffect(() => {
+        lastChunkTimeRef.current = lastChunkTime;
+    }, [lastChunkTime]);
+
+    // Collect WPS samples into moving average history ref
+    useEffect(() => {
+        if (!isProcessing) {
+            wpsHistoryRef.current = [];
+            return;
+        }
+        if (wps > 0) {
+            const history = wpsHistoryRef.current;
+            history.push(wps);
+            if (history.length > 3) {
+                history.shift();
+            }
+        }
+    }, [isProcessing, wps, lastChunkTime]);
+
+    // Display update timer (ticks strictly every 1350ms to update displayedWps UI state)
+    useEffect(() => {
+        if (!isProcessing) {
+            setDisplayedWps(0);
+            return;
+        }
+
+        const timer = setInterval(() => {
+            const lastTime = lastChunkTimeRef.current;
+            const timeSinceLast = lastTime > 0 ? (Date.now() - lastTime) : 0;
+            const isStalled = lastTime > 0 && timeSinceLast > 2500;
+
+            if (isStalled) {
+                setDisplayedWps(0);
+            } else {
+                const history = wpsHistoryRef.current;
+                if (history.length > 0) {
+                    const sum = history.reduce((acc, val) => acc + val, 0);
+                    const avg = Math.round((sum / history.length) * 10) / 10;
+                    setDisplayedWps(avg);
+                } else if (wps > 0) {
+                    setDisplayedWps(wps);
+                }
+            }
+        }, 1350);
+
+        return () => clearInterval(timer);
+    }, [isProcessing]);
 
     useEffect(() => {
         if (!isProcessing) {
@@ -150,7 +200,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             paddingX={1}
             width="100%"
         >
-            {/* 🛠️ MODE & THINKING ZONE */}
+            {/* 🛠️ MODE & CWD TELEMETRY ZONE */}
             <Box>
                 <Box marginRight={1}>
                     <Text color={colors.text} bold>{mode.toUpperCase()}</Text>
@@ -159,31 +209,32 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color={colors.textMuted} dimColor>┃</Text>
 
                 <Box marginX={1}>
-                    <Text color={colors.text} bold>{thinkingLevel.toUpperCase()}</Text>
+                    <Text color={colors.text} italic>{truncatePath(process.cwd(), 35)}</Text>
                 </Box>
 
-               {isMemoryEnabled && (
-                     <Box>
+                {isMemoryEnabled && (
+                    <Box flexDirection="row">
                         <Text color={colors.textMuted} dimColor>┃</Text>
                         <Box marginX={1}>
                             <Text color={colors.text} dimColor bold>MEMORY</Text>
                         </Box>
-                     </Box>
+                    </Box>
                 )}
             </Box>
 
-            {/* 📁 WORKSPACE TELEMETRY */}
-            <Box flexGrow={1} justifyContent="center" paddingX={2}>
-                <Text color={colors.text} italic>{truncatePath(process.cwd(), 35)}</Text>
-            </Box>
-
-            {/* 🔋 PERFORMANCE & ID ZONE */}
+            {/* 🔋 PERFORMANCE & TELEMETRY ZONE */}
             <Box>
                 {isProcessing ? (
-                    <Box marginRight={0}>
-                        <Text color={dotColor}>●</Text>
-                    </Box>
-                ) : <Text> </Text>}
+                        <Box>
+                            <Text color={dotColor}>●</Text>
+                        {showTPMEstimate && (
+                            <>
+                                <Text color={colors.textMuted} bold> {displayedWps} tps</Text>
+                                <Text color={colors.textMuted} dimColor> ┃</Text>
+                            </>
+                        )}
+                        </Box>
+                ) : null}
                 <Box marginX={1}>
                     <Text color={colors.text}>
                         {formatTokens(tokensTotal)}{' '}
@@ -197,14 +248,8 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
                 <Text color={colors.textMuted} dimColor>┃</Text>
 
-                <Box marginX={1}>
-                    <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
-                </Box>
-
-                <Text color={colors.textMuted} dimColor>┃</Text>
-
                 <Box marginLeft={1}>
-                    <Text color={colors.textMuted} bold>{chatId}</Text>
+                    <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
                     {(apiTier === 'Custom' || apiTier === 'Paid') && (
                         <Box><Text color={colors.textMuted} dimColor> ┃ </Text><Text color={colors.textMuted} bold>PAID</Text></Box>
                     )}

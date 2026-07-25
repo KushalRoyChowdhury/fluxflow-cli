@@ -462,7 +462,8 @@ var init_settings = __esm({
         externalDataPath: "",
         preserveThinking: true,
         loadingPhrases: true,
-        progressiveRendering: false
+        progressiveRendering: true,
+        showTPMEstimate: false
       },
       profileData: {
         name: null,
@@ -5671,15 +5672,58 @@ var init_StatusBar = __esm({
       }
       return "#ff0000";
     };
-    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0, theme = "Dark" }) => {
+    StatusBar = React5.memo(({ mode, thinkingLevel, tokens = "0.0k", tokensTotal = "0.0k", chatId = "NEW-SESSION", isMemoryEnabled = true, apiTier = "Free", aiProvider = "Google", activeModel = "", isProcessing = false, lastChunkTime = 0, theme = "Dark", wps = 0, showTPMEstimate = false }) => {
       const colors = getThemeColors(theme);
       const modeIcon = mode === "Flux" ? "" : "";
       const [memoryUsage, setMemoryUsage] = useState5(0);
       const [memoryLimit, setMemoryLimit] = useState5(0);
       const [memoryUnit, setMemoryUnit] = useState5("MB");
       const [dotColor, setDotColor] = useState5("green");
+      const [displayedWps, setDisplayedWps] = useState5(0);
       const chunkTimesRef = useRef3([]);
       const smoothedDelayRef = useRef3(370);
+      const wpsHistoryRef = useRef3([]);
+      const lastChunkTimeRef = useRef3(lastChunkTime);
+      useEffect4(() => {
+        lastChunkTimeRef.current = lastChunkTime;
+      }, [lastChunkTime]);
+      useEffect4(() => {
+        if (!isProcessing) {
+          wpsHistoryRef.current = [];
+          return;
+        }
+        if (wps > 0) {
+          const history = wpsHistoryRef.current;
+          history.push(wps);
+          if (history.length > 3) {
+            history.shift();
+          }
+        }
+      }, [isProcessing, wps, lastChunkTime]);
+      useEffect4(() => {
+        if (!isProcessing) {
+          setDisplayedWps(0);
+          return;
+        }
+        const timer = setInterval(() => {
+          const lastTime = lastChunkTimeRef.current;
+          const timeSinceLast = lastTime > 0 ? Date.now() - lastTime : 0;
+          const isStalled = lastTime > 0 && timeSinceLast > 2500;
+          if (isStalled) {
+            setDisplayedWps(0);
+          } else {
+            const history = wpsHistoryRef.current;
+            if (history.length > 0) {
+              const sum = history.reduce((acc, val) => acc + val, 0);
+              const avg = Math.round(sum / history.length * 10) / 10;
+              setDisplayedWps(avg);
+            } else if (wps > 0) {
+              setDisplayedWps(wps);
+            }
+          }
+        }, 1350);
+        return () => clearInterval(timer);
+      }, [isProcessing]);
       useEffect4(() => {
         if (!isProcessing) {
           chunkTimesRef.current = [];
@@ -5760,13 +5804,12 @@ var init_StatusBar = __esm({
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, thinkingLevel.toUpperCase())), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, dimColor: true, bold: true }, "MEMORY")))),
-        /* @__PURE__ */ React5.createElement(Box4, { flexGrow: 1, justifyContent: "center", paddingX: 2 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, italic: true }, truncatePath(process.cwd(), 35))),
-        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, { marginRight: 0 }, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF")) : /* @__PURE__ */ React5.createElement(Text5, null, " "), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text }, formatTokens(tokensTotal), " ", (() => {
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, italic: true }, truncatePath(process.cwd(), 35))), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, { flexDirection: "row" }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, dimColor: true, bold: true }, "MEMORY")))),
+        /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF"), showTPMEstimate && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, " ", displayedWps, " tps"), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503"))) : null, /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text }, formatTokens(tokensTotal), " ", (() => {
           const pct = tokens / maxLimit * 100;
           const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
           return /* @__PURE__ */ React5.createElement(Text5, { color, dimColor: true }, pct.toFixed(0), "%");
-        })())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit)), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, chatId), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, "PAID"))))
+        })())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, "PAID"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -6765,7 +6808,8 @@ function SettingsMenu({
         return [
           { label: "Theme", value: "theme", status: systemSettings.theme || "Dark" },
           { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
-          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" }
+          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" },
+          { label: "Show TPM Estimate", value: "showTPMEstimate", status: systemSettings.showTPMEstimate ? "ON" : "OFF" }
         ];
       case "memory":
         return [
@@ -6965,6 +7009,12 @@ function SettingsMenu({
     } else if (item.value === "progressiveRendering") {
       setSystemSettings((s) => {
         const newSysSettings = { ...s, progressiveRendering: !s.progressiveRendering };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
+    } else if (item.value === "showTPMEstimate") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, showTPMEstimate: !s.showTPMEstimate };
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
@@ -7481,7 +7531,7 @@ ${projectContextBlock}
 - Language: Same as User Query
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
 - Short headsup summary of actions before firing tools
-- Task Complete? End response with summary of changes made (with reason) and files edited
+- Task Complete? End response with summary of changes made (with reason) and files edited (if any)
 - Basic LaTeX${mode === "Flux" ? "" : ".\nUse Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===`.trim();
     };
@@ -13311,13 +13361,18 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 throw new Error("Subagent task was cancelled.");
               }
             }
-            if (settings && typeof settings.onTokenChunk === "function") {
-              settings.onTokenChunk();
-            }
+            let chunkText = "";
             if (chunk.candidates?.[0]?.content?.parts) {
               for (const part of chunk.candidates[0].content.parts) {
-                if (part.text && !part.thought) fullText += part.text;
+                if (part.text && !part.thought) {
+                  fullText += part.text;
+                  chunkText += part.text;
+                }
               }
+            }
+            const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+            if (settings && typeof settings.onTokenChunk === "function") {
+              settings.onTokenChunk(chunkText, chunkWordCount);
             }
             if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
           }
@@ -14445,7 +14500,6 @@ ${ideErr} [/ERROR]`;
                   config: {
                     systemInstruction: currentSystemInstruction,
                     mediaResolution: "MEDIA_RESOLUTION_MEDIUM",
-                    temperature: 1.05,
                     safetySettings: [
                       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
                       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -14669,18 +14723,6 @@ ${ideErr} [/ERROR]`;
                   yield chunk;
                   continue;
                 }
-                if (settings && typeof settings.onTokenChunk === "function") {
-                  settings.onTokenChunk();
-                }
-                if (isFirstChunk) {
-                  yield { type: "status", content: "Thinking" };
-                  isFirstChunk = false;
-                }
-                if (TERMINATION_SIGNAL) {
-                  yield { type: "status", content: "Request Cancelled" };
-                  yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
-                  break;
-                }
                 let chunkText = "";
                 const parts = chunk.candidates?.[0]?.content?.parts;
                 if (parts && parts.length > 0) {
@@ -14708,6 +14750,19 @@ ${ideErr} [/ERROR]`;
                     inThinkingState = false;
                   }
                   chunkText += t;
+                }
+                const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
+                if (settings && typeof settings.onTokenChunk === "function") {
+                  settings.onTokenChunk(chunkText, chunkWordCount);
+                }
+                if (isFirstChunk) {
+                  yield { type: "status", content: "Thinking" };
+                  isFirstChunk = false;
+                }
+                if (TERMINATION_SIGNAL) {
+                  yield { type: "status", content: "Request Cancelled" };
+                  yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
+                  break;
                 }
                 if (chunkText) {
                   if (isDedupeActive) {
@@ -17507,6 +17562,8 @@ function App({ args = [] }) {
       });
       activeStreamingMsgRef.current = null;
     }
+    chunkWordCountRef.current = 0;
+    streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0 };
   };
   const startTypewriter = () => {
     if (typewriterTickRef.current) {
@@ -17516,12 +17573,16 @@ function App({ args = [] }) {
     typewriterTickRef.current = setInterval(() => {
       const queue = typewriterQueueRef.current;
       if (queue.length > 0 && activeStreamingMsgRef.current) {
-        let batchSize = 2;
-        if (queue.length > 65) batchSize = 16;
+        let batchSize = 1;
+        if (queue.length > 85) batchSize = 30;
+        else if (queue.length > 80) batchSize = 25;
+        else if (queue.length > 75) batchSize = 20;
+        else if (queue.length > 65) batchSize = 16;
         else if (queue.length > 50) batchSize = 12;
         else if (queue.length > 35) batchSize = 8;
         else if (queue.length > 15) batchSize = 6;
         else if (queue.length > 5) batchSize = 4;
+        else if (queue.length > 3) batchSize = 2;
         let batchedText = "";
         for (let i = 0; i < batchSize && queue.length > 0; i++) {
           batchedText += queue.shift();
@@ -17529,7 +17590,7 @@ function App({ args = [] }) {
         activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
         forceRender();
       }
-    }, 100);
+    }, 80);
   };
   const awaitTypewriter = async () => {
     while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
@@ -17844,6 +17905,8 @@ function App({ args = [] }) {
   const [imageSettings, setImageSettings] = useState15({ keyType: "Default", quality: "Low-High", apiKey: "" });
   const [sessionStats, setSessionStats] = useState15({ tokens: 0 });
   const [lastChunkTime, setLastChunkTime] = useState15(0);
+  const chunkWordCountRef = useRef4(0);
+  const streamingWordStatsRef = useRef4({ totalWords: 0, startTime: 0, wps: 0 });
   const [sessionAgentCalls, setSessionAgentCalls] = useState15(0);
   const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState15(0);
   const [sessionTotalTokens, setSessionTotalTokens] = useState15(0);
@@ -19901,8 +19964,22 @@ ${timestamp}` };
               apiTier,
               cols: terminalSize.columns - 6,
               rows: 30,
-              onTokenChunk: () => {
-                setLastChunkTime(Date.now());
+              onTokenChunk: (chunkText, wordCount) => {
+                const now = Date.now();
+                setLastChunkTime(now);
+                if (typeof wordCount === "number") {
+                  chunkWordCountRef.current = wordCount;
+                  const stats = streamingWordStatsRef.current;
+                  if (!stats.startTime) {
+                    stats.startTime = now;
+                    stats.totalWords = 0;
+                  }
+                  stats.totalWords += wordCount;
+                  const elapsedSec = (now - stats.startTime) / 1e3;
+                  if (elapsedSec > 0) {
+                    stats.wps = Math.round(stats.totalWords / elapsedSec * 10) / 10;
+                  }
+                }
               },
               onVisualFeedback: (content) => {
                 setMessages((prev) => {
@@ -21586,7 +21663,7 @@ Selection: ${val}`,
             glintColor: colors.textMuted,
             glintWidth: 3
           }
-        ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, " (", thinkingLevel, ")"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: colors.inputBg,
@@ -21759,7 +21836,9 @@ Selection: ${val}`,
       activeModel,
       isProcessing,
       lastChunkTime,
-      theme: systemSettings.theme
+      theme: systemSettings.theme,
+      wps: streamingWordStatsRef.current.wps,
+      showTPMEstimate: systemSettings.showTPMEstimate
     }
   )), activeView === "exit" && (() => {
     const wallTimeMs = Date.now() - SESSION_START_TIME;

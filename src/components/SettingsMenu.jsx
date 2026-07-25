@@ -131,7 +131,8 @@ export default function SettingsMenu({
                 return [
                     { label: 'Theme', value: 'theme', status: systemSettings.theme || 'Dark' },
                     { label: 'Loading Phrases', value: 'loadingPhrases', status: systemSettings.loadingPhrases !== false ? 'ON' : 'OFF' },
-                    { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' }
+                    { label: 'Progressive Rendering [EXPERIMENTAL]', value: 'progressiveRendering', status: systemSettings.progressiveRendering ? 'ON' : 'OFF' },
+                    { label: 'Show TPM Estimate', value: 'showTPMEstimate', status: systemSettings.showTPMEstimate ? 'ON' : 'OFF' }
                 ];
             case 'memory':
                 return [
@@ -336,6 +337,12 @@ export default function SettingsMenu({
         } else if (item.value === 'progressiveRendering') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, progressiveRendering: !s.progressiveRendering };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'showTPMEstimate') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, showTPMEstimate: !s.showTPMEstimate };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
