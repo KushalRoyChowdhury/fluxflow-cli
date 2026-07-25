@@ -21663,7 +21663,7 @@ Selection: ${val}`,
             glintColor: colors.textMuted,
             glintWidth: 3
           }
-        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, " (", thinkingLevel, ")"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " (", thinkingLevel, ")"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: colors.inputBg,

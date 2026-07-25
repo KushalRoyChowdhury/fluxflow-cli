@@ -5527,7 +5527,7 @@ export default function App({ args = [] }) {
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
                                 />
-                                <Text color={colors.textMuted} dimColor> ({thinkingLevel})</Text>
+                                <Text color={colors.textMuted}> ({thinkingLevel})</Text>
                             </Box>
                         </Box>
 
