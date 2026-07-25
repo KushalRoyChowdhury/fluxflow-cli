@@ -215,13 +215,18 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         >
             {/* 🛠️ MODE & CWD TELEMETRY ZONE */}
             <Box>
-                <Box marginRight={1}>
-                    <Text color={colors.text} bold>{mode.toUpperCase()}</Text>
-                </Box>
+                {mode.toLowerCase() === 'flow' && (
+                    <>
+                        <Box marginRight={1}>
+                            <Text color={colors.text} bold>{mode.toUpperCase()}</Text>
+                            <Text color={colors.textMuted}> (Limited Tools)</Text>
+                        </Box>
 
-                <Text color={colors.textMuted} dimColor>┃</Text>
+                        <Text color={colors.textMuted} dimColor>┃ </Text>
+                    </>
+                )}
 
-                <Box marginX={1}>
+                <Box>
                     <Text color={colors.text} italic>{truncatePath(process.cwd(), 35)}</Text>
                 </Box>
 
