@@ -259,6 +259,8 @@ export const THEMES = {
         textMuted: 'gray',
         textDim: 'grey',
         textInverted: 'black',
+        textExclusive: '#B5B8D9',
+        textMutedExclusive: '#D4DEE7',
         
         // Borders
         border: 'white',

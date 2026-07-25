@@ -525,7 +525,7 @@ export default function App({ args = [] }) {
             activeStreamingMsgRef.current = null;
         }
         chunkWordCountRef.current = 0;
-        streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0 };
+        streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0, chunks: [] };
     };
 
     // ── Typewriter Effect ─────────────────────────────────────────────
@@ -908,7 +908,7 @@ export default function App({ args = [] }) {
     const [sessionStats, setSessionStats] = useState({ tokens: 0 });
     const [lastChunkTime, setLastChunkTime] = useState(0);
     const chunkWordCountRef = useRef(0);
-    const streamingWordStatsRef = useRef({ totalWords: 0, startTime: 0, wps: 0 });
+    const streamingWordStatsRef = useRef({ totalWords: 0, startTime: 0, wps: 0, chunks: [] });
     const [sessionAgentCalls, setSessionAgentCalls] = useState(0);
     const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState(0);
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
@@ -3195,11 +3195,22 @@ export default function App({ args = [] }) {
                                     if (!stats.startTime) {
                                         stats.startTime = now;
                                         stats.totalWords = 0;
+                                        stats.chunks = [];
                                     }
                                     stats.totalWords += wordCount;
-                                    const elapsedSec = (now - stats.startTime) / 1000;
-                                    if (elapsedSec > 0) {
-                                        stats.wps = Math.round((stats.totalWords / elapsedSec) * 10) / 10;
+                                    if (!stats.chunks) stats.chunks = [];
+                                    stats.chunks.push({ time: now, words: wordCount });
+
+                                    // Retain only chunks from the last ~400ms (matches 350ms API flush window)
+                                    const windowMs = 400;
+                                    const cutoff = now - windowMs;
+                                    stats.chunks = stats.chunks.filter(c => c.time >= cutoff);
+
+                                    if (stats.chunks.length > 0) {
+                                        const windowWords = stats.chunks.reduce((acc, c) => acc + c.words, 0);
+                                        const oldestTime = stats.chunks[0].time;
+                                        const timeSpanSec = Math.max(0.4, (now - oldestTime) / 1000);
+                                        stats.wps = Math.round((windowWords / timeSpanSec) * 10) / 10;
                                     }
                                 }
                             },
@@ -5462,8 +5473,10 @@ export default function App({ args = [] }) {
                                         {/* Look at the shine! (≧∇≦)/ */}
                                         <GlintText
                                             text={statusText.trimEnd()}
-                                            baseColor={colors.text}
-                                            glintColor={colors.textMuted}
+                                            baseColor={colors.textExclusive || colors.text}
+                                            glintColor={colors.textMutedExclusive || colors.textMuted}
+                                            // baseColor="#B5B8D9"
+                                            // glintColor="#D4DEE7"
                                             speed={60}
                                             italic={true}
                                             glintWidth={2}

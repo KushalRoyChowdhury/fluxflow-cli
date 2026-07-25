@@ -77,7 +77,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         }
     }, [isProcessing, wps, lastChunkTime]);
 
-    // Display update timer (ticks strictly every 1350ms to update displayedWps UI state)
+    // Display update timer (ticks every 250ms for real-time responsive updates)
     useEffect(() => {
         if (!isProcessing) {
             setDisplayedWps(0);
@@ -87,10 +87,23 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         const timer = setInterval(() => {
             const lastTime = lastChunkTimeRef.current;
             const timeSinceLast = lastTime > 0 ? (Date.now() - lastTime) : 0;
-            const isStalled = lastTime > 0 && timeSinceLast > 2500;
 
-            if (isStalled) {
+            if (lastTime > 0 && timeSinceLast > 1500) {
+                wpsHistoryRef.current = [];
                 setDisplayedWps(0);
+            } else if (lastTime > 0 && timeSinceLast > 600) {
+                // If chunks pause for >600ms, start decaying recent WPS history
+                if (wpsHistoryRef.current.length > 0) {
+                    wpsHistoryRef.current.shift();
+                }
+                const history = wpsHistoryRef.current;
+                if (history.length > 0) {
+                    const sum = history.reduce((acc, val) => acc + val, 0);
+                    const avg = Math.round((sum / history.length) * 10) / 10;
+                    setDisplayedWps(avg);
+                } else {
+                    setDisplayedWps(0);
+                }
             } else {
                 const history = wpsHistoryRef.current;
                 if (history.length > 0) {
@@ -212,14 +225,14 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                     <Text color={colors.text} italic>{truncatePath(process.cwd(), 35)}</Text>
                 </Box>
 
-                {isMemoryEnabled && (
+                {/* {isMemoryEnabled && (
                     <Box flexDirection="row">
                         <Text color={colors.textMuted} dimColor>┃</Text>
                         <Box marginX={1}>
                             <Text color={colors.text} dimColor bold>MEMORY</Text>
                         </Box>
                     </Box>
-                )}
+                )} */}
             </Box>
 
             {/* 🔋 PERFORMANCE & TELEMETRY ZONE */}

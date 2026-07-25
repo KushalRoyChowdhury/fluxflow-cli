@@ -3986,6 +3986,8 @@ var init_theme = __esm({
         textMuted: "gray",
         textDim: "grey",
         textInverted: "black",
+        textExclusive: "#B5B8D9",
+        textMutedExclusive: "#D4DEE7",
         // Borders
         border: "white",
         borderMuted: "gray",
@@ -5708,9 +5710,21 @@ var init_StatusBar = __esm({
         const timer = setInterval(() => {
           const lastTime = lastChunkTimeRef.current;
           const timeSinceLast = lastTime > 0 ? Date.now() - lastTime : 0;
-          const isStalled = lastTime > 0 && timeSinceLast > 2500;
-          if (isStalled) {
+          if (lastTime > 0 && timeSinceLast > 1500) {
+            wpsHistoryRef.current = [];
             setDisplayedWps(0);
+          } else if (lastTime > 0 && timeSinceLast > 600) {
+            if (wpsHistoryRef.current.length > 0) {
+              wpsHistoryRef.current.shift();
+            }
+            const history = wpsHistoryRef.current;
+            if (history.length > 0) {
+              const sum = history.reduce((acc, val) => acc + val, 0);
+              const avg = Math.round(sum / history.length * 10) / 10;
+              setDisplayedWps(avg);
+            } else {
+              setDisplayedWps(0);
+            }
           } else {
             const history = wpsHistoryRef.current;
             if (history.length > 0) {
@@ -5804,7 +5818,7 @@ var init_StatusBar = __esm({
           paddingX: 1,
           width: "100%"
         },
-        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, italic: true }, truncatePath(process.cwd(), 35))), isMemoryEnabled && /* @__PURE__ */ React5.createElement(Box4, { flexDirection: "row" }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, dimColor: true, bold: true }, "MEMORY")))),
+        /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Box4, { marginRight: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, bold: true }, mode.toUpperCase())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text, italic: true }, truncatePath(process.cwd(), 35)))),
         /* @__PURE__ */ React5.createElement(Box4, null, isProcessing ? /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: dotColor }, "\u25CF"), showTPMEstimate && /* @__PURE__ */ React5.createElement(React5.Fragment, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, " ", displayedWps, " tps"), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503"))) : null, /* @__PURE__ */ React5.createElement(Box4, { marginX: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.text }, formatTokens(tokensTotal), " ", (() => {
           const pct = tokens / maxLimit * 100;
           const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
@@ -17563,7 +17577,7 @@ function App({ args = [] }) {
       activeStreamingMsgRef.current = null;
     }
     chunkWordCountRef.current = 0;
-    streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0 };
+    streamingWordStatsRef.current = { totalWords: 0, startTime: 0, wps: 0, chunks: [] };
   };
   const startTypewriter = () => {
     if (typewriterTickRef.current) {
@@ -17906,7 +17920,7 @@ function App({ args = [] }) {
   const [sessionStats, setSessionStats] = useState15({ tokens: 0 });
   const [lastChunkTime, setLastChunkTime] = useState15(0);
   const chunkWordCountRef = useRef4(0);
-  const streamingWordStatsRef = useRef4({ totalWords: 0, startTime: 0, wps: 0 });
+  const streamingWordStatsRef = useRef4({ totalWords: 0, startTime: 0, wps: 0, chunks: [] });
   const [sessionAgentCalls, setSessionAgentCalls] = useState15(0);
   const [sessionBackgroundCalls, setSessionBackgroundCalls] = useState15(0);
   const [sessionTotalTokens, setSessionTotalTokens] = useState15(0);
@@ -19973,11 +19987,19 @@ ${timestamp}` };
                   if (!stats.startTime) {
                     stats.startTime = now;
                     stats.totalWords = 0;
+                    stats.chunks = [];
                   }
                   stats.totalWords += wordCount;
-                  const elapsedSec = (now - stats.startTime) / 1e3;
-                  if (elapsedSec > 0) {
-                    stats.wps = Math.round(stats.totalWords / elapsedSec * 10) / 10;
+                  if (!stats.chunks) stats.chunks = [];
+                  stats.chunks.push({ time: now, words: wordCount });
+                  const windowMs = 400;
+                  const cutoff = now - windowMs;
+                  stats.chunks = stats.chunks.filter((c) => c.time >= cutoff);
+                  if (stats.chunks.length > 0) {
+                    const windowWords = stats.chunks.reduce((acc, c) => acc + c.words, 0);
+                    const oldestTime = stats.chunks[0].time;
+                    const timeSpanSec = Math.max(0.4, (now - oldestTime) / 1e3);
+                    stats.wps = Math.round(windowWords / timeSpanSec * 10) / 10;
                   }
                 }
               },
@@ -21619,8 +21641,8 @@ Selection: ${val}`,
           GlintText_default,
           {
             text: statusText.trimEnd(),
-            baseColor: colors.text,
-            glintColor: colors.textMuted,
+            baseColor: colors.textExclusive || colors.text,
+            glintColor: colors.textMutedExclusive || colors.textMuted,
             speed: 60,
             italic: true,
             glintWidth: 2,
