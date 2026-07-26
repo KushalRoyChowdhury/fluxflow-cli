@@ -288,8 +288,8 @@ export const THEMES = {
         userMsgText: 'white',
 
         // Diff Component Palette
-        diffRemovalBg: '#3a0c0c',
-        diffAdditionBg: '#0c3a1a',
+        diffRemovalBg: '#250808',
+        diffAdditionBg: '#072410',
         diffRemovalText: '#885555',
         diffAdditionText: '#558866',
         diffRemovalHighlightColor: '#ff3333',
