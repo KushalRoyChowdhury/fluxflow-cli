@@ -89,7 +89,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
-  --update latest                      Update the app to the latest version`);
+  --update [latest]                    Update the app to the latest version (latest is default)`);
             process.exit(0);
         }
 
@@ -128,7 +128,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         }
 
         if (isUpdate) {
-            const subArg = args[1];
+            const subArg = args[1] || 'latest';
             if (subArg === 'check') {
                 const checkLatest = args[2] === 'latest';
                 try {
@@ -269,7 +269,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                         // settings.js not found or failed to load
                     }
 
-                    if (true) {
+                    if (!manager) {
                         const result = await promptPackageManager();
                         manager = result.manager;
                         customCommand = result.customCommand;
@@ -294,7 +294,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
                 }
                 process.exit(0);
             } else {
-                console.error('Unknown update command. Available options: --update check, --update check latest, --update latest');
+                console.error('Unknown update command. Available options: --update, --update check, --update check latest, --update latest');
                 process.exit(1);
             }
         }

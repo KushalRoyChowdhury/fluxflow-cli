@@ -411,10 +411,75 @@ const getLatencyColor = (delay) => {
     return '#ff0000';
 };
 
-const SubagentRow = React.memo(({ sa }) => {
+const SubagentRow = React.memo(({ sa, showTPMEstimate = false }) => {
     const [dotColor, setDotColor] = useState('green');
+    const [displayedWps, setDisplayedWps] = useState(0);
     const chunkTimesRef = useRef([]);
     const smoothedDelayRef = useRef(370); // EMA of delay, starts at fast/green
+    const wpsHistoryRef = useRef([]);
+    const lastChunkTimeRef = useRef(sa.lastChunkTime);
+
+    // Keep lastChunkTimeRef in sync so the interval can read it without re-subscribing
+    useEffect(() => {
+        lastChunkTimeRef.current = sa.lastChunkTime;
+    }, [sa.lastChunkTime]);
+
+    // Collect WPS samples into moving average history ref (mirrors StatusBar)
+    useEffect(() => {
+        if (sa.status !== 'running') {
+            wpsHistoryRef.current = [];
+            return;
+        }
+        if (sa.wps > 0) {
+            const history = wpsHistoryRef.current;
+            history.push(sa.wps);
+            if (history.length > 3) {
+                history.shift();
+            }
+            // Show immediately — don't wait for the smoothing timer
+            setDisplayedWps(Math.round(sa.wps));
+        }
+    }, [sa.status, sa.wps, sa.lastChunkTime]);
+
+    // 1350ms display-update timer with decay (mirrors StatusBar exactly)
+    useEffect(() => {
+        if (sa.status !== 'running') {
+            setDisplayedWps(0);
+            return;
+        }
+
+        const timer = setInterval(() => {
+            const lastTime = lastChunkTimeRef.current;
+            const timeSinceLast = lastTime > 0 ? (Date.now() - lastTime) : 0;
+
+            if (lastTime > 0 && timeSinceLast > 1500) {
+                wpsHistoryRef.current = [];
+                setDisplayedWps(0);
+            } else if (lastTime > 0 && timeSinceLast > 600) {
+                // Chunks paused >600ms — decay the history
+                if (wpsHistoryRef.current.length > 0) {
+                    wpsHistoryRef.current.shift();
+                }
+                const history = wpsHistoryRef.current;
+                if (history.length > 0) {
+                    const sum = history.reduce((acc, val) => acc + val, 0);
+                    setDisplayedWps(Math.round(sum / history.length));
+                } else {
+                    setDisplayedWps(0);
+                }
+            } else {
+                const history = wpsHistoryRef.current;
+                if (history.length > 0) {
+                    const sum = history.reduce((acc, val) => acc + val, 0);
+                    setDisplayedWps(Math.round(sum / history.length));
+                } else if (sa.wps > 0) {
+                    setDisplayedWps(Math.round(sa.wps));
+                }
+            }
+        }, 750);
+
+        return () => clearInterval(timer);
+    }, [sa.status]);
 
     useEffect(() => {
         if (sa.status !== 'running') {
@@ -476,7 +541,7 @@ const SubagentRow = React.memo(({ sa }) => {
     return (
         <Box justifyContent="space-between" width="100%">
             <Text color="white"> • {sa.title} <Text color="white" dimColor>({sa.id})</Text></Text>
-            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text></Text>
+            <Text color="white"><Text color="white" dimColor bold>{sa.currentTool || 'Active'}</Text><Text color={dotColor}> ●</Text>{showTPMEstimate && <Text color="white" dimColor bold> ({displayedWps} tps)</Text>}</Text>
         </Box>
     );
 });
@@ -5458,7 +5523,7 @@ export default function App({ args = [] }) {
                                 </Box>
                                 <Box flexDirection="column" marginTop={1} width="100%">
                                     {activeSubagents.filter(sa => sa.status === 'running').map(sa => (
-                                        <SubagentRow key={sa.id} sa={sa} />
+                                        <SubagentRow key={sa.id} sa={sa} showTPMEstimate={systemSettings.showTPMEstimate} />
                                     ))}
                                 </Box>
                             </Box>

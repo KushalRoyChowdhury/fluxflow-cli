@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260726,
+    "release": 20260727,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -38,6 +38,11 @@
                     },
                     {
                         "cmd": "google/gemma-4-31b-it:free",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "google/gemma-4-26b-a4b-it:free",
                         "multimodal": true,
                         "desc": "Multimodal"
                     },
@@ -109,6 +114,11 @@
                     },
                     {
                         "cmd": "anthropic/claude-fable-5",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "anthropic/claude-opus-5",
                         "multimodal": true,
                         "desc": "Multimodal"
                     },

@@ -26,7 +26,7 @@ let globalSettings = {};
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -387,7 +387,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                     const data = part.inlineData.data;
                     const isImage = mimeType.startsWith('image/');
 
-                    if (isImage && MULTIMODAL_MODELS.includes(model)) {
+                    if (isImage && isModelMultimodal(model)) {
                         msgContent.push({
                             type: 'image_url',
                             image_url: {
@@ -1723,11 +1723,11 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         try {
             let stream;
             if (aiProvider === 'OpenRouter') {
-                stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+                stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'DeepSeek') {
-                stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+                stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'NVIDIA') {
-                stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+                stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const genStream = await client.models.generateContentStream({
                     model: model,
@@ -2597,6 +2597,25 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             continue;
                         }
 
+                        // For text files with no explicit line range, skip auto-read if file is too large
+                        if (startLine === null && !isMultimodalFile) {
+                            let lineCount = 0;
+                            try {
+                                lineCount = fs.readFileSync(absPath, 'utf8').split(/\r\n|\r|\n/).length;
+                            } catch (e) { }
+                            if (lineCount > 550) {
+                                const label = `↷  Skipped (Too Large): ${path.basename(filePath)}`;
+                                let terminalWidth = 115;
+                                if (process.stdout.isTTY) {
+                                    terminalWidth = process.stdout.columns - 5 || 120;
+                                }
+                                const boxWidth = Math.min(label.length + 4, terminalWidth);
+                                const boxMid = label.padEnd(boxWidth - 2).substring(0, boxWidth - 2);
+                                yield { type: 'visual_feedback', content: colorMainWords(`${boxMid}\n`) };
+                                continue;
+                            }
+                        }
+
                         const finalStart = startLine !== null ? startLine : 1;
                         let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 499);
                         if (finalEnd - finalStart > 500) {
@@ -2630,18 +2649,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (!isError) {
                             let label = '';
                             if (isImage) {
-                                label = `✔  Viewed: ${filePath}`;
+                                label = `✔  Processed: ${path.basename(filePath)}`;
                                 attachedBinaryPart = binPart;
                             } else if (isPdf || isOfficeFile) {
-                                label = `✔  Viewed: ${filePath}`;
+                                label = `✔  Auto-Analysed: ${path.basename(filePath)}`;
                                 attachedBinaryPart = binPart;
                             } else {
-                                let totalLines = '...';
-                                try {
-                                    const content = fs.readFileSync(absPath, 'utf8');
-                                    totalLines = content.split('\n').length;
-                                } catch (e) { }
-                                label = `✔  Auto-Read: ${filePath}` // → Lines ${finalStart} - ${Math.min(finalEnd, totalLines)} of ${totalLines}`;
+                                label = `✔  Auto-Read: ${path.basename(filePath)}`;
                                 taggedContextBlocks.push(textResult);
                             }
 
@@ -3659,11 +3673,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                     if (isPdf || isOfficeFile) {
-                                        label = `✔  Analyzed: ${targetPath}`;
+                                        label = `✔  Analyzed: ${path.basename(targetPath)}`;
                                     } else if (isImage) {
-                                        label = `✔  Analyzed: ${targetPath}`;
+                                        label = `✔  Processed: ${path.basename(targetPath)}`;
                                     } else {
-                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${targetPath} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
+                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${path.basename(targetPath)} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
@@ -5128,22 +5142,22 @@ Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-
 
             else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mRead File\x1b[0m: ${path}`;
+                label = `✔ \x1b[95mRead\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mBrowsed Folder\x1b[0m: ${path}`;
+                label = `✔ \x1b[95mBrowsed\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mFile Created\x1b[0m: ${path}`;
+                label = `✔ \x1b[95mCreated\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mFile Edited\x1b[0m: ${path}`;
+                label = `✔ \x1b[95mEdited\x1b[0m: ${path}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {

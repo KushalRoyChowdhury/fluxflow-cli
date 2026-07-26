@@ -6080,7 +6080,7 @@ Invocation Types:
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
 2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT IS WORKING. DO NOT SPAM 'GetProgress'
-3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, LAST RESORT ONLY IF ITS STUCK FOR UNUSUALLY LONG (2m+) WITH NO PROGRESS`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, ONLY IF STALLED FOR UNUSUALLY LONG (2m+) OR DOING SOMETHING WRONG`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -11012,9 +11012,11 @@ var init_invoke = __esm({
         task,
         status: "running",
         lastChunkTime: Date.now(),
+        wps: 0,
         progress: []
         // Array of arrays containing logs for each turn
       };
+      const wordStats = { chunks: [], totalWords: 0 };
       subagentProgress.push(taskEntry);
       if (context.onSubagentUpdate) {
         context.onSubagentUpdate();
@@ -11036,9 +11038,22 @@ var init_invoke = __esm({
             context.onSubagentUpdate();
           }
         },
-        onTokenChunk: () => {
-          taskEntry.lastChunkTime = Date.now();
+        onTokenChunk: (_chunkText, chunkWordCount) => {
+          const now = Date.now();
+          taskEntry.lastChunkTime = now;
           taskEntry.currentTool = "Thinking";
+          if (typeof chunkWordCount === "number" && chunkWordCount > 0) {
+            wordStats.totalWords += chunkWordCount;
+            wordStats.chunks.push({ time: now, words: chunkWordCount });
+            const cutoff = now - 400;
+            wordStats.chunks = wordStats.chunks.filter((c) => c.time >= cutoff);
+            if (wordStats.chunks.length > 0) {
+              const windowWords = wordStats.chunks.reduce((acc, c) => acc + c.words, 0);
+              const oldestTime = wordStats.chunks[0].time;
+              const timeSpanSec = Math.max(0.4, (now - oldestTime) / 1e3);
+              taskEntry.wps = Math.round(windowWords / timeSpanSec * 10) / 10;
+            }
+          }
           if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
           }
@@ -11894,7 +11909,7 @@ var init_ai = __esm({
     globalSettings = {};
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Auto-Read|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -12202,7 +12217,7 @@ var init_ai = __esm({
               const mimeType = part.inlineData.mimeType;
               const data = part.inlineData.data;
               const isImage = mimeType.startsWith("image/");
-              if (isImage && MULTIMODAL_MODELS.includes(model)) {
+              if (isImage && isModelMultimodal(model)) {
                 msgContent.push({
                   type: "image_url",
                   image_url: {
@@ -13311,11 +13326,11 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         try {
           let stream;
           if (aiProvider === "OpenRouter") {
-            stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else if (aiProvider === "DeepSeek") {
-            stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else if (aiProvider === "NVIDIA") {
-            stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, false, signal, temperature);
+            stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else {
             const genStream = await client.models.generateContentStream({
               model,
@@ -14162,6 +14177,25 @@ ${ideCtx.warnings}
 `) };
                   continue;
                 }
+                if (startLine === null && !isMultimodalFile) {
+                  let lineCount = 0;
+                  try {
+                    lineCount = fs25.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
+                  } catch (e) {
+                  }
+                  if (lineCount > 550) {
+                    const label = `\u21B7  Skipped (Too Large): ${path24.basename(filePath)}`;
+                    let terminalWidth = 115;
+                    if (process.stdout.isTTY) {
+                      terminalWidth = process.stdout.columns - 5 || 120;
+                    }
+                    const boxWidth = Math.min(label.length + 4, terminalWidth);
+                    const boxMid = label.padEnd(boxWidth - 2).substring(0, boxWidth - 2);
+                    yield { type: "visual_feedback", content: colorMainWords(`${boxMid}
+`) };
+                    continue;
+                  }
+                }
                 const finalStart = startLine !== null ? startLine : 1;
                 let finalEnd = endLine !== null ? endLine : startLine !== null ? startLine : finalStart + 499;
                 if (finalEnd - finalStart > 500) {
@@ -14191,19 +14225,13 @@ ${ideCtx.warnings}
                 if (!isError) {
                   let label = "";
                   if (isImage) {
-                    label = `\u2714  Viewed: ${filePath}`;
+                    label = `\u2714  Processed: ${path24.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else if (isPdf || isOfficeFile) {
-                    label = `\u2714  Viewed: ${filePath}`;
+                    label = `\u2714  Auto-Analysed: ${path24.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else {
-                    let totalLines = "...";
-                    try {
-                      const content = fs25.readFileSync(absPath, "utf8");
-                      totalLines = content.split("\n").length;
-                    } catch (e) {
-                    }
-                    label = `\u2714  Auto-Read: ${filePath}`;
+                    label = `\u2714  Auto-Read: ${path24.basename(filePath)}`;
                     taggedContextBlocks.push(textResult);
                   }
                   if (label) {
@@ -15110,11 +15138,11 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label = `\u2714  Analyzed: ${targetPath2}`;
+                        label = `\u2714  Analyzed: ${path24.basename(targetPath2)}`;
                       } else if (isImage) {
-                        label = `\u2714  Analyzed: ${targetPath2}`;
+                        label = `\u2714  Processed: ${path24.basename(targetPath2)}`;
                       } else {
-                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${targetPath2} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
+                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${path24.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
@@ -16426,16 +16454,16 @@ ${cleanResponse}
             label = `\u2714 \x1B[95mScraped\x1B[0m`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
             const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mRead File\x1B[0m: ${path26}`;
+            label = `\u2714 \x1B[95mRead\x1B[0m: ${path26}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
             const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mBrowsed Folder\x1B[0m: ${path26}`;
+            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path26}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
             const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mFile Created\x1B[0m: ${path26}`;
+            label = `\u2714 \x1B[95mCreated\x1B[0m: ${path26}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
             const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mFile Edited\x1B[0m: ${path26}`;
+            label = `\u2714 \x1B[95mEdited\x1B[0m: ${path26}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
             const path26 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mIndexed\x1B[0m: ${path26}`;
@@ -21637,7 +21665,7 @@ Selection: ${val}`,
           }
         )));
       default:
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6, theme: systemSettings.theme }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6, theme: systemSettings.theme }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa, showTPMEstimate: systemSettings.showTPMEstimate })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
             text: statusText.trimEnd(),
@@ -22168,10 +22196,64 @@ var init_app = __esm({
       }
       return "#ff0000";
     };
-    SubagentRow = React16.memo(({ sa }) => {
+    SubagentRow = React16.memo(({ sa, showTPMEstimate = false }) => {
       const [dotColor, setDotColor] = useState15("green");
+      const [displayedWps, setDisplayedWps] = useState15(0);
       const chunkTimesRef = useRef4([]);
       const smoothedDelayRef = useRef4(370);
+      const wpsHistoryRef = useRef4([]);
+      const lastChunkTimeRef = useRef4(sa.lastChunkTime);
+      useEffect12(() => {
+        lastChunkTimeRef.current = sa.lastChunkTime;
+      }, [sa.lastChunkTime]);
+      useEffect12(() => {
+        if (sa.status !== "running") {
+          wpsHistoryRef.current = [];
+          return;
+        }
+        if (sa.wps > 0) {
+          const history = wpsHistoryRef.current;
+          history.push(sa.wps);
+          if (history.length > 3) {
+            history.shift();
+          }
+          setDisplayedWps(Math.round(sa.wps));
+        }
+      }, [sa.status, sa.wps, sa.lastChunkTime]);
+      useEffect12(() => {
+        if (sa.status !== "running") {
+          setDisplayedWps(0);
+          return;
+        }
+        const timer = setInterval(() => {
+          const lastTime = lastChunkTimeRef.current;
+          const timeSinceLast = lastTime > 0 ? Date.now() - lastTime : 0;
+          if (lastTime > 0 && timeSinceLast > 1500) {
+            wpsHistoryRef.current = [];
+            setDisplayedWps(0);
+          } else if (lastTime > 0 && timeSinceLast > 600) {
+            if (wpsHistoryRef.current.length > 0) {
+              wpsHistoryRef.current.shift();
+            }
+            const history = wpsHistoryRef.current;
+            if (history.length > 0) {
+              const sum = history.reduce((acc, val) => acc + val, 0);
+              setDisplayedWps(Math.round(sum / history.length));
+            } else {
+              setDisplayedWps(0);
+            }
+          } else {
+            const history = wpsHistoryRef.current;
+            if (history.length > 0) {
+              const sum = history.reduce((acc, val) => acc + val, 0);
+              setDisplayedWps(Math.round(sum / history.length));
+            } else if (sa.wps > 0) {
+              setDisplayedWps(Math.round(sa.wps));
+            }
+          }
+        }, 750);
+        return () => clearInterval(timer);
+      }, [sa.status]);
       useEffect12(() => {
         if (sa.status !== "running") {
           chunkTimesRef.current = [];
@@ -22214,7 +22296,7 @@ var init_app = __esm({
         const timer = setInterval(checkLatency, 100);
         return () => clearInterval(timer);
       }, [sa.status, sa.lastChunkTime]);
-      return /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React16.createElement(Text16, { color: dotColor }, " \u25CF")));
+      return /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " \u2022 ", sa.title, " ", /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true }, "(", sa.id, ")")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true, bold: true }, sa.currentTool || "Active"), /* @__PURE__ */ React16.createElement(Text16, { color: dotColor }, " \u25CF"), showTPMEstimate && /* @__PURE__ */ React16.createElement(Text16, { color: "white", dimColor: true, bold: true }, " (", displayedWps, " tps)")));
     });
   }
 });
@@ -22291,7 +22373,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
-  --update latest                      Update the app to the latest version`);
+  --update [latest]                    Update the app to the latest version (latest is default)`);
       process.exit(0);
     }
     if (isHelpCommands) {
@@ -22328,7 +22410,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
       process.exit(0);
     }
     if (isUpdate) {
-      const subArg = args[1];
+      const subArg = args[1] || "latest";
       if (subArg === "check") {
         const checkLatest = args[2] === "latest";
         try {
@@ -22435,7 +22517,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
             manager = settings?.systemSettings?.updateManager || settings?.updateManager;
           } catch (e) {
           }
-          if (true) {
+          if (!manager) {
             const result = await promptPackageManager();
             manager = result.manager;
             customCommand = result.customCommand;
@@ -22457,7 +22539,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
         }
         process.exit(0);
       } else {
-        console.error("Unknown update command. Available options: --update check, --update check latest, --update latest");
+        console.error("Unknown update command. Available options: --update, --update check, --update check latest, --update latest");
         process.exit(1);
       }
     }

@@ -36,8 +36,12 @@ export const invoke = async (args, context = {}) => {
         task: task,
         status: 'running',
         lastChunkTime: Date.now(),
+        wps: 0,
         progress: [] // Array of arrays containing logs for each turn
     };
+
+    // Sliding-window word stats (mirrors the main agent's streamingWordStatsRef logic)
+    const wordStats = { chunks: [], totalWords: 0 };
 
     // setInterval(() => {
     //     fs.writeFileSync(`SUBAGENT_DEBUG_ENTRY-{${taskEntry.id}}.json`, JSON.stringify(taskEntry, null, 4));
@@ -66,9 +70,25 @@ export const invoke = async (args, context = {}) => {
                 context.onSubagentUpdate();
             }
         },
-        onTokenChunk: () => {
-            taskEntry.lastChunkTime = Date.now();
+        onTokenChunk: (_chunkText, chunkWordCount) => {
+            const now = Date.now();
+            taskEntry.lastChunkTime = now;
             taskEntry.currentTool = 'Thinking';
+
+            // Sliding-window TPS (same 400ms window as the main agent)
+            if (typeof chunkWordCount === 'number' && chunkWordCount > 0) {
+                wordStats.totalWords += chunkWordCount;
+                wordStats.chunks.push({ time: now, words: chunkWordCount });
+                const cutoff = now - 400;
+                wordStats.chunks = wordStats.chunks.filter(c => c.time >= cutoff);
+                if (wordStats.chunks.length > 0) {
+                    const windowWords = wordStats.chunks.reduce((acc, c) => acc + c.words, 0);
+                    const oldestTime = wordStats.chunks[0].time;
+                    const timeSpanSec = Math.max(0.4, (now - oldestTime) / 1000);
+                    taskEntry.wps = Math.round((windowWords / timeSpanSec) * 10) / 10;
+                }
+            }
+
             if (context.onSubagentUpdate) {
                 context.onSubagentUpdate();
             }

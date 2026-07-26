@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.11.0"]
+export const stableVersions = ["3.11.6"]
 
 export const changelogData = {
+    "3.11.6": {
+        "note": "JULY 27.",
+        "added": [
+            "TPS Estimation for Sub-Agents.",
+            "Multimodal Support for models via OpenRouter API."
+        ],
+        "changed": [],
+        "fixes": [
+            "Several Bug Fixes and UX Improvements."
+        ]
+    },
     "3.11.0": {
         "note": "JULY 25.",
         "added": [
