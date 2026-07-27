@@ -3,7 +3,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'google-gemini', text: 'Google Gemini', level: 2 },
     { id: 'deepseek', text: 'DeepSeek', level: 2 },
-    { id: 'mistral', text: 'Mistral (Experimental)', level: 2 },
+    { id: 'mistral', text: 'Mistral', level: 2 },
     { id: 'nvidia', text: 'NVIDIA (NIM)', level: 2 },
     { id: 'openrouter', text: 'OpenRouter', level: 2 },
 ]
@@ -152,7 +152,7 @@ export default function StableModels() {
 
             {/* MISTRAL */}
             <h2 id="mistral" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-                Mistral <Badge type="experimental" />
+                Mistral
             </h2>
             <p className="text-slate-600 dark:text-slate-400 mb-4">
                 Access to Mistral AI's reasoning, coding, and cost-saving models.
@@ -169,18 +169,18 @@ export default function StableModels() {
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-small-2506</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Cost Saving <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Cost Saving</td>
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">open-mistral-nemo</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving</td>
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">devstral-2512</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding</td>
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-medium-2505</td>
@@ -189,8 +189,8 @@ export default function StableModels() {
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">labs-leanstral-1-5-1</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Lab Models <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Enable Lab Models</td>
                         </tr>
                     </tbody>
                 </table>
