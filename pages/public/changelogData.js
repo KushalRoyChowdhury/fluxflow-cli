@@ -3,9 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.11.6"]
+export const stableVersions = ["3.12.0"]
 
 export const changelogData = {
+    "3.12.0": {
+        "note": "JULY 28.",
+        "added": [
+            "Added EXPERIMENTAL support for Mistral API (Free/Paid).",
+        ],
+        "changed": [],
+        "fixes": [
+            "Bug Fixes."
+        ]
+    },
     "3.11.6": {
         "note": "JULY 27.",
         "added": [

@@ -51,7 +51,7 @@ Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT IS WORKING. DO NOT SPAM 'GetProgress'
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. DO NOT SPAM 'GetProgress'
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, ONLY IF STALLED FOR UNUSUALLY LONG (2m+) OR DOING SOMETHING WRONG`.trim()
 :
 

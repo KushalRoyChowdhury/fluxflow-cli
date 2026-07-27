@@ -101,8 +101,9 @@ function fuzzyMatch(line, keyword) {
  *                                       Takes priority over subString mode.
  */
 export const search_keyword = async (args) => {
-    const { keyword, file, subString, regex } = parseArgs(args);
-    if (!keyword) return 'ERROR: Missing "keyword" argument.';
+    const { keyword: rawKeyword, file, subString, regex } = parseArgs(args);
+    if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
+    const keyword = String(rawKeyword);
 
     // Normalise boolean-like flags
     const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';

@@ -3,6 +3,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'google-gemini', text: 'Google Gemini', level: 2 },
     { id: 'deepseek', text: 'DeepSeek', level: 2 },
+    { id: 'mistral', text: 'Mistral (Experimental)', level: 2 },
     { id: 'nvidia', text: 'NVIDIA (NIM)', level: 2 },
     { id: 'openrouter', text: 'OpenRouter', level: 2 },
 ]
@@ -144,6 +145,52 @@ export default function StableModels() {
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-pro</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* MISTRAL */}
+            <h2 id="mistral" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Mistral <Badge type="experimental" />
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Access to Mistral AI's reasoning, coding, and cost-saving models.
+            </p>
+            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-small-2506</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Cost Saving <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">open-mistral-nemo</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">devstral-2512</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-medium-2505</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mistral Medium Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">labs-leanstral-1-5-1</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Lab Models <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">[Experimental]</span></td>
                         </tr>
                     </tbody>
                 </table>

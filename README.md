@@ -24,6 +24,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **DeepSeek** (Native DeepSeek API)
   - **OpenRouter** (Access to hundreds of models; *Experimental*)
   - **NVIDIA** (Access to many models)
+  - **Mistral** (Access to selected models; *Experimental*)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
   - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.

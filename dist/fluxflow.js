@@ -359,6 +359,7 @@ var init_secrets = __esm({
         if (provider === "Google") return secrets.GOOGLE_API_KEY || secrets.API_KEY || null;
         if (provider === "DeepSeek") return secrets.DEEPSEEK_API_KEY || null;
         if (provider === "OpenRouter") return secrets.OPENROUTER_API_KEY || null;
+        if (provider === "Mistral") return secrets.MISTRAL_API_KEY || null;
         if (provider === "NVIDIA") return secrets.NVIDIA_API_KEY || null;
       } catch (e) {
       }
@@ -372,6 +373,8 @@ var init_secrets = __esm({
         await saveSecret("DEEPSEEK_API_KEY", key);
       } else if (provider === "OpenRouter") {
         await saveSecret("OPENROUTER_API_KEY", key);
+      } else if (provider === "Mistral") {
+        await saveSecret("MISTRAL_API_KEY", key);
       } else if (provider === "NVIDIA") {
         await saveSecret("NVIDIA_API_KEY", key);
       }
@@ -5129,7 +5132,7 @@ var init_ChatLayout = __esm({
           return /* @__PURE__ */ React4.createElement(Text4, { key: idx, color: colors.textMuted }, part.value);
         }));
       };
-      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexShrink: 1 }, renderInlineDiff()));
+      return /* @__PURE__ */ React4.createElement(Box3, { backgroundColor: colors.codeBg, paddingX: 1, width: columns }, /* @__PURE__ */ React4.createElement(Box3, { width: 4, flexShrink: 0, justifyContent: "flex-end" }, /* @__PURE__ */ React4.createElement(Text4, { color: finalNumColor }, lineNum)), /* @__PURE__ */ React4.createElement(Box3, { width: 1, flexShrink: 0, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: finalPrefixColor }, displayPrefix)), /* @__PURE__ */ React4.createElement(Box3, { marginLeft: 1, backgroundColor: innerBgColor, flexGrow: 1 }, renderInlineDiff()));
     });
     DiffBlock = React4.memo(({ text, columns = 80, extension, theme = "Dark" }) => {
       const colors = getThemeColors(theme);
@@ -5805,7 +5808,7 @@ var init_StatusBar = __esm({
         };
       }, []);
       let maxLimit = 262144;
-      if (aiProvider === "NVIDIA" && (activeModel?.includes("glm") || activeModel?.includes("gpt") || activeModel?.includes("qwen"))) {
+      if (aiProvider === "NVIDIA" && (activeModel?.includes("glm") || activeModel?.includes("gpt") || activeModel?.includes("qwen") || activeModel?.includes("medium")) || aiProvider === "Mistral") {
         maxLimit = 128e3;
       } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (activeModel.includes("deepseek") || activeModel.includes("seed"))) {
         maxLimit = 409600;
@@ -6079,7 +6082,7 @@ Invocation Types:
 - Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
 - InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. NEVER FINISH WITHOUT 'AWAIT' WHILE SUBAGENT IS WORKING. DO NOT SPAM 'GetProgress'
+2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. DO NOT SPAM 'GetProgress'
 3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, ONLY IF STALLED FOR UNUSUALLY LONG (2m+) OR DOING SOMETHING WRONG`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
@@ -7514,7 +7517,7 @@ Check these first; These Files > Training Data. Safety rules apply
 ` : "";
       }
       const projectContextBlock = cachedProjectContextBlock;
-      return `${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}=== SYSTEM PROMPT ===
+      return `=== SYSTEM PROMPT ===
 Identity: Flux Flow (by Kushal Roy Chowdhury). ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
 Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
 
@@ -7525,15 +7528,15 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical
 - SYSTEM NOTIFICATION: [SYSTEM] in user turn
 
 -- THINKING GUIDANCE --
-${aiProvider === "Google" && !isGemini ? `${thinkingConfig}
-${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && !isGemini ? `
-CRITICAL THINKING POLICY
-- ALWAYS use <think> ... </think> before responding, even with simple queries/greetings
-` : ""}` : `${thinkingConfig}`}
+${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
+${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && !isGemini) ? `CRITICAL THINKING POLICY
+- Use <think> ... </think> before responding, even with simple queries/greetings
+` : ""}` : `${thinkingConfig}
+`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
 ${projectContextBlock}
--- MEMORY RULES --
-- ${isMemoryEnabled ? "Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves" : "DISABLED. Decline Remembering Memories"}
+${isMemoryEnabled ? `-- MEMORY RULES --
+- Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ""}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --${systemSettings.allowExternalAccess ? "" : "\n- ACCESS CONTROL: CWD only"}
@@ -7544,10 +7547,11 @@ ${projectContextBlock}
 - Chat Messages with GFM Formatting
 - Language: Same as User Query
 - NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
-- Short headsup summary of actions before firing tools
 - Task Complete? End response with summary of changes made (with reason) and files edited (if any)
 - Basic LaTeX${mode === "Flux" ? "" : ".\nUse Kaomojis HEAVILY"}
-=== END SYSTEM PROMPT ===`.trim();
+=== END SYSTEM PROMPT ===
+
+${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
     };
     getJanitorInstruction = (userMemories = "", isMemoryEnabled = true, needTitle = true) => {
       return `${userMemories ? `-- CURRENT SAVED USER MEMORIES --
@@ -10038,8 +10042,9 @@ var init_search_keyword = __esm({
   "src/tools/search_keyword.js"() {
     init_arg_parser();
     search_keyword = async (args) => {
-      const { keyword, file, subString, regex } = parseArgs(args);
-      if (!keyword) return 'ERROR: Missing "keyword" argument.';
+      const { keyword: rawKeyword, file, subString, regex } = parseArgs(args);
+      if (rawKeyword === void 0 || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
+      const keyword = String(rawKeyword);
       const toBool = (v) => v === true || v === "true" || v === 1 || v === "1" || v === "yes";
       const regexExplicitlyFalse = regex === false || regex === "false" || regex === 0 || regex === "0" || regex === "no";
       let matchRegex = toBool(regex);
@@ -11885,7 +11890,7 @@ __export(ai_exports, {
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path24, { normalize } from "path";
 import fs25 from "fs";
-var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -12180,6 +12185,130 @@ var init_ai = __esm({
               const thought = delta.reasoning_content || null;
               if (thought) {
                 pendingParts.push({ text: thought, thought: true });
+                hasNewData = true;
+              }
+              if (delta.content) {
+                pendingParts.push({ text: delta.content });
+                hasNewData = true;
+              }
+            }
+          } catch (e) {
+          }
+        }
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+          yield {
+            candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+            usageMetadata: latestUsageMetadata
+          };
+          pendingParts = [];
+          lastFlushTime = Date.now();
+          hasNewData = false;
+        }
+      }
+    };
+    getMistralStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.99) {
+      const messages = [];
+      if (systemInstruction) {
+        messages.push({ role: "system", content: systemInstruction });
+      }
+      for (const content of contents) {
+        const role = content.role === "user" ? "user" : "assistant";
+        const msgContent = [];
+        if (Array.isArray(content.parts)) {
+          for (const part of content.parts) {
+            if (part.text) {
+              msgContent.push({ type: "text", text: part.text });
+            } else if (part.inlineData && isMultiModal) {
+              const mimeType = part.inlineData.mimeType;
+              const data = part.inlineData.data;
+              if (mimeType.startsWith("image/")) {
+                msgContent.push({
+                  type: "image_url",
+                  image_url: `data:${mimeType};base64,${data}`
+                });
+              }
+            }
+          }
+        } else {
+          const text = content.text || "";
+          if (text) msgContent.push({ type: "text", text });
+        }
+        if (msgContent.length > 0) {
+          messages.push({
+            role,
+            content: msgContent.length === 1 && msgContent[0].type === "text" ? msgContent[0].text : msgContent
+          });
+        }
+      }
+      const requestPayload = {
+        model,
+        messages,
+        stream: true,
+        temperature,
+        prompt_cache_key: "flux-flow-session"
+      };
+      const response = await fetchWithBackoff("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(requestPayload),
+        signal
+      });
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        let errMsg = response.statusText;
+        try {
+          const errData = JSON.parse(errText);
+          errMsg = errData.error?.message || errData.message || JSON.stringify(errData.detail || errData);
+        } catch {
+          if (errText) errMsg = errText;
+        }
+        throw new Error(`Mistral Error (${response.status}): ${errMsg}`);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let pendingParts = [];
+      let latestUsageMetadata = null;
+      let lastFlushTime = Date.now();
+      let hasNewData = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+            yield {
+              candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+              usageMetadata: latestUsageMetadata
+            };
+          }
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        for (const line of lines) {
+          const cleanLine = line.trim();
+          if (!cleanLine || !cleanLine.startsWith("data: ")) continue;
+          if (cleanLine === "data: [DONE]") break;
+          try {
+            const json = JSON.parse(cleanLine.substring(6));
+            const delta = json.choices?.[0]?.delta;
+            const usage = json.usage;
+            if (usage) {
+              latestUsageMetadata = {
+                totalTokenCount: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+                promptTokenCount: usage.prompt_tokens || 0,
+                candidatesTokenCount: usage.completion_tokens || 0,
+                cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                thoughtsTokenCount: 0
+              };
+              hasNewData = true;
+            }
+            if (delta) {
+              if (delta.thinking) {
+                pendingParts.push({ text: delta.thinking, thought: true });
                 hasNewData = true;
               }
               if (delta.content) {
@@ -12832,6 +12961,22 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 const iterator2 = stream[Symbol.asyncIterator]();
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
+              } else if (aiProvider === "Mistral" && !useNvidiaFallback) {
+                const stream = getMistralStream(
+                  apiKey,
+                  getFallbackValue("mistral_janitor_fallback"),
+                  janitorContents,
+                  janitorPrompt,
+                  "Fast",
+                  // Janitor always minimal
+                  mode,
+                  false,
+                  null,
+                  0.6
+                );
+                const iterator2 = stream[Symbol.asyncIterator]();
+                const firstResult2 = await iterator2.next();
+                return { iterator: iterator2, firstResult: firstResult2 };
               } else if (aiProvider === "NVIDIA" || useNvidiaFallback) {
                 const stream = getNVIDIAStream(
                   useNvidiaFallback ? nvidiaApiKey : apiKey,
@@ -13329,6 +13474,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else if (aiProvider === "DeepSeek") {
             stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+          } else if (aiProvider === "Mistral") {
+            stream = getMistralStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else if (aiProvider === "NVIDIA") {
             stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else {
@@ -13484,6 +13631,7 @@ ${newMemoryListStr}
         let targetModel = getFallbackValue("gemma_janitor_fallback_google");
         if (aiProvider === "OpenRouter") targetModel = getFallbackValue("janitor_open_router");
         if (aiProvider === "DeepSeek") targetModel = getFallbackValue("deepseek_level_1");
+        if (aiProvider === "Mistral") targetModel = getFallbackValue("mistral_level_1");
         if (aiProvider === "NVIDIA") targetModel = getFallbackValue("nvidia_janitor_fallback");
         while (attempts <= maxAttempts && !success) {
           attempts++;
@@ -13551,6 +13699,7 @@ Provide a consolidated summary of the entire session.`;
         let targetModel = getFallbackValue("gemma_janitor_fallback_google");
         if (aiProvider === "OpenRouter") targetModel = getFallbackValue("janitor_open_router");
         if (aiProvider === "DeepSeek") targetModel = getFallbackValue("deepseek_level_1");
+        if (aiProvider === "Mistral") targetModel = getFallbackValue("mistral_level_1");
         if (aiProvider === "NVIDIA") targetModel = getFallbackValue("nvidia_chat_summarizer_fallback");
         let attempts = 0;
         let success = false;
@@ -13675,7 +13824,7 @@ Provide a consolidated summary of the entire session.`;
         });
         let contextCompressionCount = 255e3;
         let contextTruncationCount = 26e4;
-        if (aiProvider === "NVIDIA" && (modelName?.includes("glm") || modelName?.includes("gpt") || modelName?.includes("qwen"))) {
+        if (aiProvider === "NVIDIA" && (modelName?.includes("glm") || modelName?.includes("gpt") || modelName?.includes("qwen") || modelName?.includes("medium")) || aiProvider === "Mistral") {
           contextCompressionCount = 122e3;
           contextTruncationCount = 126e3;
         } else if (aiProvider === "DeepSeek" || aiProvider === "Google" && apiTier === "Paid" || aiProvider === "NVIDIA" && (modelName.includes("deepseek") || modelName.includes("seed"))) {
@@ -14263,7 +14412,9 @@ OS: ${osDetected}
 CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**\nSTRICTLY FOLLOW VALID TOOL CALLING SCHEMA [/SYSTEM]\n" : ""}` : '[SYSTEM Priority : HIGH] STRICTLY FOLLOW VALID TOOL CALLING SCHEMA eg. `[tool:functions.ReadFolder(path=".")]` NO OTHER FORMAT/TOKEN IS ALLOWED [/SYSTEM]\n'}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority : HIGH] FOLLOW TOOL CALLING SCHEMA IN SYSTEM PROMPT
+eg: [tool:functions.ReadFolder(path = ".")]. NO OTHER FORMAT/TOKEN IS ALLOWED [/SYSTEM]
+${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
@@ -14309,7 +14460,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 [SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
 [QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
                 }
               } else {
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
@@ -14317,7 +14468,7 @@ ${activeSummaryBlock}${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && 
 
 [STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `${modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
                 }
               }
               yield { type: "status", content: `${hint.startsWith("/btw") ? "Question Forwarded..." : "Steering Hint Injected..."}` };
@@ -14444,10 +14595,12 @@ ${ideErr} [/ERROR]`;
                 }
                 yield { type: "status", content: "Working" };
               }
-              const isGemma = modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google";
-              if (isGemma) {
+              const isGemmaOrMistral = aiProvider === "Mistral" || aiProvider === "Google" && modelName?.toLowerCase().startsWith("gemma");
+              if (isGemmaOrMistral) {
+                const needsThinkingWarning = thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh");
+                const thinkingText = needsThinkingWarning ? ". **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**" : "";
                 const jitInstruction = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingLevel !== "Fast" && thinkingLevel !== "xHigh" && aiProvider === "Google" ? `. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**` : ""} [/SYSTEM]`;
+[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingText} [/SYSTEM]`;
                 if (lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
                   lastUserMsg.parts[0].text += jitInstruction;
                 }
@@ -14479,13 +14632,11 @@ ${ideErr} [/ERROR]`;
                 } catch (err) {
                 }
               }
-              if (isGemma) {
-                const stepThreshold = Math.floor(MAX_LOOPS * (mode === "Flux" ? 0.98 : 0.8));
-                const currentStep = loop + 1;
-                if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                  lastUserMsg.parts[0].text += `
+              const stepThreshold = Math.floor(MAX_LOOPS * (mode === "Flux" ? 0.98 : 0.8));
+              const currentStep = loop + 1;
+              if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
+                lastUserMsg.parts[0].text += `
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
-                }
               }
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
@@ -14521,6 +14672,18 @@ ${ideErr} [/ERROR]`;
                   isMultiModal,
                   abortController.signal,
                   1.05
+                );
+              } else if (aiProvider === "Mistral") {
+                stream = getMistralStream(
+                  settings.apiKey,
+                  targetModel,
+                  activeContents,
+                  currentSystemInstruction,
+                  thinkingLevel,
+                  mode,
+                  isMultiModal,
+                  abortController.signal,
+                  1
                 );
               } else if (aiProvider === "NVIDIA") {
                 const rawStream = getNVIDIAStream(
@@ -14890,14 +15053,14 @@ ${ideErr} [/ERROR]`;
                       const title = pArgs.title || pArgs.task;
                       const id = pArgs.id || pArgs.taskId;
                       const timeVal = pArgs.time;
-                      if (keyword) {
-                        detail = keyword.replace(/["']/g, "");
+                      if (keyword !== void 0 && keyword !== null) {
+                        detail = String(keyword).replace(/["']/g, "");
                       } else if (filePath) {
-                        detail = path24.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/"));
+                        detail = path24.basename(String(filePath).replace(/["']/g, "").replace(/\\/g, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
-                        detail = title.replace(/["']/g, "").substring(0, 30);
+                        detail = String(title).replace(/["']/g, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
-                        detail = id.replace(/["']/g, "");
+                        detail = String(id).replace(/["']/g, "");
                       } else if (timeVal && potentialTool === "await") {
                         let sec = parseFloat(String(timeVal).replace(/["']/g, ""));
                         if (!isNaN(sec)) {
@@ -14982,16 +15145,16 @@ ${ideErr} [/ERROR]`;
                     const uniqueSentences = new Set(sentences);
                     const repetitionRatio = sentences.length > 10 ? (sentences.length - uniqueSentences.size) / sentences.length : 0;
                     const wordCount = thinkContent.split(/\s+/).filter((w) => w.length > 0).length;
-                    let repetitionThresholdThinking = 0.4;
-                    let repetitionThresholdResponse = 0.6;
+                    let repetitionThresholdThinking = 0.6;
+                    let repetitionThresholdResponse = 0.8;
                     let isOverVerboseThinking = false;
-                    if ((targetModel || "").toLowerCase().startsWith("gemma")) {
+                    if ((aiProvider.toLowerCase().includes("google") || aiProvider.toLowerCase().includes("mistral")) && ((targetModel || "").toLowerCase().startsWith("gemma") || (targetModel || "").toLowerCase().includes("stral"))) {
                       const thinkingCaps = {
                         "low": 256,
                         "medium": 768,
-                        "high": 2048,
-                        "max": 4096,
-                        "xhigh": 4096
+                        "high": 8192,
+                        "max": 16384,
+                        "xhigh": 16384
                       };
                       const cap = thinkingCaps[thinkingLevel?.toLowerCase()] || 2500;
                       isOverVerboseThinking = wordCount > cap;
@@ -16254,7 +16417,8 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
                   ""
                 );
                 msg.text = msg.text.replaceAll(/\n\[SYSTEM\] File Changes:\n(?:\* .+ \(created|modified|deleted\)\n)*\[\/SYSTEM\]/g, "");
-                if (modelName && modelName.toLowerCase().startsWith("gemma") && aiProvider === "Google" && msg.text.startsWith("[TOOL RESULT]")) {
+                const isGemmaOrMistral = aiProvider === "Mistral" || aiProvider === "Google" && modelName?.toLowerCase().startsWith("gemma");
+                if (isGemmaOrMistral && msg.text.startsWith("[TOOL RESULT]")) {
                   const jitInstructionFast = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
                   const jitInstructionThinking = `
@@ -17785,12 +17949,13 @@ function App({ args = [] }) {
         i++;
       } else if (arg === "--provider" && args[i + 1]) {
         const val = args[i + 1].toLowerCase();
-        if (["google", "deepseek", "openrouter", "nvidia"].includes(val)) {
+        if (["google", "deepseek", "openrouter", "nvidia", "mistral"].includes(val)) {
           let mapped = "Google";
           if (val === "google") mapped = "Google";
           else if (val === "deepseek") mapped = "DeepSeek";
           else if (val === "openrouter") mapped = "OpenRouter";
           else if (val === "nvidia") mapped = "NVIDIA";
+          else if (val === "mistral") mapped = "Mistral";
           parsed.provider = mapped;
         }
         i++;
@@ -18005,7 +18170,7 @@ function App({ args = [] }) {
   useEffect12(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
-      const hasStandard = aiProvider === "DeepSeek" || aiProvider === "NVIDIA";
+      const hasStandard = aiProvider === "DeepSeek" || aiProvider === "NVIDIA" || aiProvider === "Mistral";
       setThinkingLevel(hasStandard ? "Standard" : "Medium");
     } else {
       if (aiProvider === "Google" && thinkingLevel === "xHigh") {
@@ -18039,6 +18204,10 @@ function App({ args = [] }) {
       modelDisplayName = "Gemma";
     } else if (defaultModel.includes("deepseek")) {
       modelDisplayName = "DeepSeek Flash";
+    } else if (defaultModel.includes("devstral")) {
+      modelDisplayName = "Devstral";
+    } else if (defaultModel.includes("mistral")) {
+      modelDisplayName = "Mistral";
     } else if (defaultModel.includes("gemini")) {
       modelDisplayName = "Gemini Flash";
     }
@@ -18869,11 +19038,33 @@ function App({ args = [] }) {
   }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
   const handleSetup = async (val) => {
     const key = val.trim();
-    let minLength = 38;
-    if (aiProvider === "OpenRouter") minLength = 30;
-    if (aiProvider === "DeepSeek") minLength = 30;
-    if (aiProvider === "NVIDIA") minLength = 30;
-    if (key.length >= minLength) {
+    const validators = {
+      Google: {
+        prefix: "AIzaSy",
+        minLength: 39
+      },
+      OpenRouter: {
+        prefix: "sk-or-v1-",
+        minLength: 73
+      },
+      DeepSeek: {
+        prefix: "sk-",
+        minLength: 35
+      },
+      Mistral: {
+        prefix: "",
+        minLength: 32
+      },
+      NVIDIA: {
+        prefix: "nvapi-",
+        minLength: 70
+      }
+    };
+    const { prefix, minLength } = validators[aiProvider] ?? {
+      prefix: "",
+      minLength: 0
+    };
+    if (key.startsWith(prefix) && key.length >= minLength) {
       await saveProviderAPIKey(aiProvider, key);
       setApiKey(key);
       initAI(key, { aiProvider, onIDEApproval: resetPendingApproval });
@@ -18888,7 +19079,14 @@ function App({ args = [] }) {
       setActiveModel(defaultModel);
       setMessages((prev) => [...prev, { role: "system", text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
     } else {
-      setMessages((prev) => [...prev, { role: "system", text: `INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: `INVALID KEY: ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
+          isMeta: true
+        }
+      ]);
       setTempKey("");
     }
   };
@@ -18953,6 +19151,12 @@ function App({ args = [] }) {
         { cmd: "Low", desc: "Quick Reasoning" },
         { cmd: "Medium", desc: "Balanced Reasoning" },
         { cmd: "High", desc: "Deep Reasoning" },
+        { cmd: "xHigh", desc: "Extended Reasoning" }
+      ] : aiProvider === "Mistral" ? [
+        { cmd: "Fast", desc: "None (No Reasoning)" },
+        { cmd: "Low", desc: "Minimal Reasoning" },
+        { cmd: "Medium", desc: "Medium Reasoning" },
+        { cmd: "High", desc: "High Reasoning" },
         { cmd: "xHigh", desc: "Extended Reasoning" }
       ] : activeModel && activeModel.toLowerCase().startsWith("gemini-3") ? [
         { cmd: "Fast", desc: "Fastest" },
@@ -20835,6 +21039,7 @@ Selection: ${val}`,
               { label: "Google (Free/Paid)", value: "Google" },
               { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
               { label: "DeepSeek (Paid)", value: "DeepSeek" },
+              { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
               { label: "Back", value: "settings" }
             ],
@@ -21780,6 +21985,7 @@ Selection: ${val}`,
         { label: "Google (Free/Paid)", value: "Google" },
         { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
         { label: "DeepSeek (Paid)", value: "DeepSeek" },
+        { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
         { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" }
       ],
       onSelect: (item) => {

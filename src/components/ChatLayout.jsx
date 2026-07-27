@@ -582,7 +582,7 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
             </Box>
 
             {/* Content Wrapper */}
-            <Box marginLeft={1} backgroundColor={innerBgColor} flexShrink={1}>
+            <Box marginLeft={1} backgroundColor={innerBgColor} flexGrow={1}>
                 {renderInlineDiff()}
             </Box>
         </Box>

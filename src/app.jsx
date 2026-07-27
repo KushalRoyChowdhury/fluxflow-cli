@@ -799,12 +799,13 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
                     else if (val === 'openrouter') mapped = 'OpenRouter';
                     else if (val === 'nvidia') mapped = 'NVIDIA';
+                    else if (val === 'mistral') mapped = 'Mistral';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1035,7 +1036,7 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
-            const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA';
+            const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'Mistral';
             setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
         } else {
             if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
@@ -1075,6 +1076,10 @@ export default function App({ args = [] }) {
             modelDisplayName = 'Gemma';
         } else if (defaultModel.includes('deepseek')) {
             modelDisplayName = 'DeepSeek Flash';
+        } else if (defaultModel.includes('devstral')) {
+            modelDisplayName = 'Devstral';
+        } else if (defaultModel.includes('mistral')) {
+            modelDisplayName = 'Mistral';
         } else if (defaultModel.includes('gemini')) {
             modelDisplayName = 'Gemini Flash';
         }
@@ -2048,12 +2053,36 @@ export default function App({ args = [] }) {
 
     const handleSetup = async (val) => {
         const key = val.trim();
-        let minLength = 38;
-        if (aiProvider === 'OpenRouter') minLength = 30;
-        if (aiProvider === 'DeepSeek') minLength = 30;
-        if (aiProvider === 'NVIDIA') minLength = 30;
 
-        if (key.length >= minLength) {
+        const validators = {
+            Google: {
+                prefix: 'AIzaSy',
+                minLength: 39,
+            },
+            OpenRouter: {
+                prefix: 'sk-or-v1-',
+                minLength: 73,
+            },
+            DeepSeek: {
+                prefix: 'sk-',
+                minLength: 35,
+            },
+            Mistral: {
+                prefix: '',
+                minLength: 32,
+            },
+            NVIDIA: {
+                prefix: 'nvapi-',
+                minLength: 70,
+            },
+        };
+
+        const { prefix, minLength } = validators[aiProvider] ?? {
+            prefix: '',
+            minLength: 0,
+        };
+
+        if (key.startsWith(prefix) && key.length >= minLength) {
             await saveProviderAPIKey(aiProvider, key);
             setApiKey(key);
             initAI(key, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
@@ -2070,7 +2099,14 @@ export default function App({ args = [] }) {
 
             setMessages(prev => [...prev, { role: 'system', text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
         } else {
-            setMessages(prev => [...prev, { role: 'system', text: `INVALID KEY: ${aiProvider} API keys must be at least ${minLength} characters.`, isMeta: true }]);
+            setMessages(prev => [
+                ...prev,
+                {
+                    role: 'system',
+                    text: `INVALID KEY: ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
+                    isMeta: true
+                }
+            ]);
             setTempKey('');
         }
     };
@@ -2151,20 +2187,28 @@ export default function App({ args = [] }) {
                             { cmd: 'High', desc: 'Deep Reasoning' },
                             { cmd: 'xHigh', desc: 'Extended Reasoning' }
                         ]
-                        : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                        : aiProvider === 'Mistral'
                             ? [
-                                { cmd: 'Fast', desc: 'Fastest' },
-                                { cmd: 'Low', desc: 'Quick Reasoning' },
-                                { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                                { cmd: 'High', desc: 'Deep Reasoning' }
-                            ]
-                            : [ // Google General / Gemma
-                                { cmd: 'Fast', desc: 'Fastest' },
-                                { cmd: 'Low', desc: 'Quick Reasoning' },
-                                { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                                { cmd: 'High', desc: 'Deep Reasoning' },
+                                { cmd: 'Fast', desc: 'None (No Reasoning)' },
+                                { cmd: 'Low', desc: 'Minimal Reasoning' },
+                                { cmd: 'Medium', desc: 'Medium Reasoning' },
+                                { cmd: 'High', desc: 'High Reasoning' },
                                 { cmd: 'xHigh', desc: 'Extended Reasoning' }
                             ]
+                            : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                                ? [
+                                    { cmd: 'Fast', desc: 'Fastest' },
+                                    { cmd: 'Low', desc: 'Quick Reasoning' },
+                                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                    { cmd: 'High', desc: 'Deep Reasoning' }
+                                ]
+                                : [ // Google General / Gemma
+                                    { cmd: 'Fast', desc: 'Fastest' },
+                                    { cmd: 'Low', desc: 'Quick Reasoning' },
+                                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                    { cmd: 'High', desc: 'Deep Reasoning' },
+                                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                                ]
         },
         {
             cmd: '/model',
@@ -4228,6 +4272,7 @@ export default function App({ args = [] }) {
                             { label: 'Google (Free/Paid)', value: 'Google' },
                             { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                            { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
                             { label: 'Back', value: 'settings' }
                         ]}
@@ -5742,6 +5787,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Google (Free/Paid)', value: 'Google' },
                                                         { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
                                                         { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                                                        { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                                                         { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
                                                     ]}
                                                     onSelect={(item) => {
