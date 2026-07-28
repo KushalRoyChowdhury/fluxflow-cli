@@ -1038,7 +1038,14 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/resume', desc: 'Load previous session' },
             { cmd: '/revert', desc: 'Revert codebase to checkpoint' },
             { cmd: '/save', desc: 'Force save current chat' },
-            { cmd: '/export', desc: 'Export current chat in a .txt file' },
+            {
+                cmd: '/export',
+                desc: 'Export current chat or error logs',
+                subs: [
+                    { cmd: 'chat', desc: 'Export current active chat' },
+                    { cmd: 'logs', desc: 'Export error logs' }
+                ]
+            },
             { cmd: '/chats', desc: 'List all chat sessions' },
             { cmd: '/btw', desc: 'Send raw inquiry mid-turn' },
             { cmd: '/image', desc: 'Generate images' },

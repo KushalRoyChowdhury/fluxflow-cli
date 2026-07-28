@@ -56,8 +56,9 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     const isHelp = args.includes('--help') && !isHelpCommands;
     const isVersion = args.includes('--version') || args.includes('-v');
     const isUpdate = args[0] === '--update';
+    const isExport = args[0] === '--export';
 
-    if (isVersion || isHelp || isHelpCommands || isUpdate) {
+    if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
         const fs = await import('fs');
         const path = await import('path');
         const { fileURLToPath } = await import('url');
@@ -65,6 +66,24 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         const packageJsonPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../package.json');
         const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
         const versionFluxflow = packageJson.version;
+
+        if (isExport) {
+            const subArg = (args[1] || '').toLowerCase();
+            if (subArg === 'error' || subArg === 'logs') {
+                try {
+                    const { exportErrorLogs } = await import('./utils/export.js');
+                    const result = await exportErrorLogs();
+                    console.log(`[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}) to "${result.exportFile}"`);
+                    process.exit(0);
+                } catch (err) {
+                    console.error(`[EXPORT ERROR] Failed to export error logs: ${err.message}`);
+                    process.exit(1);
+                }
+            } else {
+                console.error(`[EXPORT ERROR] Invalid export target "${args[1] || ''}". --export only supports 'error'.\nUsage: fluxflow --export error`);
+                process.exit(1);
+            }
+        }
 
         if (isVersion) {
             console.log(`v${versionFluxflow}`);
@@ -90,6 +109,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --help                               Show this help menu
   --help commands                      Show available /commands
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
+  --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
   --update [latest]                    Update the app to the latest version (latest is default)`);
@@ -105,7 +125,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /compress                                Summarize and compress chat history
   /revert                                  Revert codebase back to a checkpoint
   /save                                    Force save current chat
-  /export                                  Export current chat in a .txt file
+  /export [chat|logs]                      Export chat session or system error logs
   /chats                                   List all chat sessions
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy

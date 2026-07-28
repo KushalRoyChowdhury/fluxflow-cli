@@ -110,9 +110,321 @@ var init_paths = __esm({
   }
 });
 
-// src/utils/crypto.js
-import fs2 from "fs";
+// src/utils/export.js
+var export_exports = {};
+__export(export_exports, {
+  exportCurrentChat: () => exportCurrentChat,
+  exportErrorLogs: () => exportErrorLogs,
+  handleExport: () => handleExport,
+  parseAgentText: () => parseAgentText,
+  parseLogEntries: () => parseLogEntries
+});
+import fs2 from "fs-extra";
 import path2 from "path";
+var parseAgentText, exportCurrentChat, parseLogEntries, exportErrorLogs, handleExport;
+var init_export = __esm({
+  "src/utils/export.js"() {
+    init_paths();
+    parseAgentText = (text) => {
+      if (!text) return [];
+      const blocks = [];
+      const toolRegex = /\[tool:(.*?)\((.*?)\)\]/g;
+      let lastIndex = 0;
+      let match;
+      while ((match = toolRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          const content = text.slice(lastIndex, match.index);
+          if (content.trim()) {
+            blocks.push({ type: "output", content });
+          }
+        }
+        blocks.push({
+          type: "tool",
+          toolName: match[1],
+          args: match[2]
+        });
+        lastIndex = toolRegex.lastIndex;
+      }
+      if (lastIndex < text.length) {
+        const content = text.slice(lastIndex);
+        if (content.trim()) {
+          blocks.push({ type: "output", content });
+        }
+      }
+      return blocks;
+    };
+    exportCurrentChat = async (chatId, messages, targetDir = process.cwd()) => {
+      const exportFile = `export-fluxflow-${chatId}.txt`;
+      const exportPath = path2.join(targetDir, exportFile);
+      const exportLines = [];
+      let insideAgentBlock = false;
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (!msg) continue;
+        if (msg.role === "system" || msg.isMeta || msg.isLogo || String(msg.id).startsWith("welcome")) {
+          continue;
+        }
+        if (msg.role === "user") {
+          let cleanUserText = msg.text || "";
+          cleanUserText = cleanUserText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
+          if (exportLines.length > 0) {
+            exportLines.push("");
+          }
+          exportLines.push("[USER]");
+          exportLines.push(cleanUserText);
+          insideAgentBlock = false;
+        } else if (msg.role === "think") {
+          if (!insideAgentBlock) {
+            exportLines.push("");
+            exportLines.push("[AGENT]");
+            insideAgentBlock = true;
+          }
+          const cleanThinkText = (msg.text || "").replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\[TOOL RESULTS\]\]/gi, "").replace(/\[TOOL RESULTS\]/gi, "").replace(/\[TOOL RESULT\]/gi, "").trim();
+          if (cleanThinkText) {
+            exportLines.push("[thoughts]");
+            exportLines.push(cleanThinkText);
+          }
+        } else if (msg.role === "agent") {
+          if (!insideAgentBlock) {
+            exportLines.push("");
+            exportLines.push("[AGENT]");
+            insideAgentBlock = true;
+          }
+          const blocks = parseAgentText(msg.text || "");
+          for (const block of blocks) {
+            if (block.type === "output") {
+              const cleanContent = block.content.replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\[TOOL RESULTS\]\]/gi, "").replace(/\[TOOL RESULTS\]/gi, "").replace(/\[TOOL RESULT\]/gi, "").trim();
+              if (cleanContent) {
+                exportLines.push("[output]");
+                exportLines.push(cleanContent);
+              }
+            } else if (block.type === "tool") {
+              exportLines.push("[tool]");
+              exportLines.push(`${block.toolName} ${block.args}`);
+            }
+          }
+        }
+      }
+      const fileContent = exportLines.join("\n");
+      await fs2.writeFile(exportPath, fileContent, "utf8");
+      return { exportFile, exportPath, totalLines: exportLines.length };
+    };
+    parseLogEntries = (content, defaultSource = "FluxFlow", fileMtime = null) => {
+      if (!content || !content.trim()) return [];
+      const lines = content.split("\n");
+      const rawBlocks = [];
+      let currentLines = [];
+      const headerRegex = /^\s*(?:CRITICAL\s+ERROR|ERROR|DEBUG|SEARCH|PUPPETEER|WARN|WARNING|INFO)\b/i;
+      const separatorRegex = /^\s*-{3,}\s*$/;
+      let hasExplicitHeaders = false;
+      for (const line of lines) {
+        if (headerRegex.test(line)) {
+          hasExplicitHeaders = true;
+          break;
+        }
+      }
+      if (!hasExplicitHeaders) {
+        const cleanMsg = content.trim();
+        if (!cleanMsg) return [];
+        const dateStr = fileMtime ? new Date(fileMtime).toLocaleString() : "Unknown Time";
+        const source = /\bjanitor\b/i.test(cleanMsg) ? "Memory" : defaultSource;
+        return [{
+          timestamp: dateStr,
+          level: "ERROR",
+          source,
+          message: cleanMsg
+        }];
+      }
+      for (const line of lines) {
+        if (separatorRegex.test(line)) {
+          if (currentLines.length > 0) {
+            rawBlocks.push(currentLines.join("\n").trim());
+            currentLines = [];
+          }
+        } else if (headerRegex.test(line)) {
+          if (currentLines.length > 0) {
+            rawBlocks.push(currentLines.join("\n").trim());
+            currentLines = [];
+          }
+          currentLines.push(line);
+        } else {
+          if (currentLines.length > 0 || line.trim()) {
+            currentLines.push(line);
+          }
+        }
+      }
+      if (currentLines.length > 0) {
+        rawBlocks.push(currentLines.join("\n").trim());
+      }
+      const structuredEntries = [];
+      for (const block of rawBlocks) {
+        if (!block) continue;
+        const blockLines = block.split("\n").map((l) => l.trimEnd());
+        const firstLine = blockLines[0] || "";
+        const isError = /\bERROR\b/i.test(block);
+        if (!isError) continue;
+        const timeMatch = firstLine.match(/\[(.*?)\]/);
+        const timestamp = timeMatch ? timeMatch[1] : null;
+        let level = "ERROR";
+        if (/CRITICAL\s+ERROR/i.test(firstLine)) {
+          level = "CRITICAL ERROR";
+        }
+        let messageText = "";
+        if (timeMatch) {
+          const headerEnd = firstLine.indexOf("]:");
+          if (headerEnd !== -1) {
+            messageText = firstLine.substring(headerEnd + 2).trim();
+          } else {
+            messageText = firstLine.replace(headerRegex, "").replace(/\[.*?\]/, "").replace(/^:\s*/, "").trim();
+          }
+        } else {
+          messageText = firstLine.replace(headerRegex, "").replace(/^:\s*/, "").trim();
+        }
+        if (blockLines.length > 1) {
+          const rest = blockLines.slice(1).join("\n").trim();
+          if (rest) {
+            messageText = messageText ? `${messageText}
+${rest}` : rest;
+          }
+        }
+        if (messageText) {
+          const entrySource = /\bjanitor\b/i.test(block) ? "Memory" : defaultSource;
+          structuredEntries.push({
+            timestamp: timestamp || (fileMtime ? new Date(fileMtime).toLocaleString() : "Unknown Time"),
+            level,
+            source: entrySource,
+            message: messageText
+          });
+        }
+      }
+      return structuredEntries;
+    };
+    exportErrorLogs = async (targetDir = process.cwd()) => {
+      const exportFile = `fluxflow-error-${Date.now()}.txt`;
+      const exportPath = path2.join(targetDir, exportFile);
+      const collectLogFiles = async (dir) => {
+        if (!await fs2.pathExists(dir)) return [];
+        const items = await fs2.readdir(dir);
+        let files = [];
+        for (const item of items) {
+          const fullPath = path2.join(dir, item);
+          const stat = await fs2.stat(fullPath);
+          if (stat.isDirectory()) {
+            const subFiles = await collectLogFiles(fullPath);
+            files = files.concat(subFiles);
+          } else if (item.endsWith(".log") || item.endsWith(".txt")) {
+            files.push({ path: fullPath, mtime: stat.mtimeMs });
+          }
+        }
+        return files;
+      };
+      const logFiles = await collectLogFiles(LOGS_DIR);
+      let allEntries = [];
+      for (const fileObj of logFiles) {
+        try {
+          const content = await fs2.readFile(fileObj.path, "utf8");
+          if (content.trim()) {
+            const normPath = fileObj.path.replace(/\\/g, "/").toLowerCase();
+            let defaultSource = "FluxFlow";
+            if (normPath.includes("/janitor") || normPath.includes("janitor")) {
+              defaultSource = "Memory";
+            } else if (!normPath.includes("/agent") && !normPath.includes("agent")) {
+              defaultSource = "Other";
+            }
+            const parsed = parseLogEntries(content, defaultSource, fileObj.mtime);
+            allEntries = allEntries.concat(parsed);
+          }
+        } catch (e) {
+        }
+      }
+      const uniqueEntries = [];
+      const seenKeys = /* @__PURE__ */ new Set();
+      for (const entry of allEntries) {
+        const key = `${entry.source}::${entry.timestamp}::${entry.message.trim()}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueEntries.push(entry);
+        }
+      }
+      const fluxflowEntries = uniqueEntries.filter((e) => e.source === "FluxFlow");
+      const memoryEntries = uniqueEntries.filter((e) => e.source === "Memory");
+      const otherEntries = uniqueEntries.filter((e) => e.source !== "FluxFlow" && e.source !== "Memory");
+      const renderSection = (title, entries, categoryName) => {
+        const sectionHeader = [
+          "================================================================================",
+          `${title} (${entries.length})`,
+          "================================================================================"
+        ].join("\n");
+        if (entries.length === 0) {
+          return `${sectionHeader}
+No ${categoryName} error entries found.`;
+        }
+        const blocks = entries.map((entry, idx) => {
+          const header = `[${categoryName} #${idx + 1}] ${entry.timestamp} (${entry.level})`;
+          const indentedMsg = entry.message.split("\n").map((line) => `    ${line}`).join("\n");
+          return `${header}
+${indentedMsg}`;
+        });
+        return `${sectionHeader}
+
+` + blocks.join("\n\n--------------------------------------------------------------------------------\n\n");
+      };
+      const exportHeader = [
+        "================================================================================",
+        "FLUXFLOW ERROR LOGS EXPORT",
+        `Exported At : ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
+        `Total Errors: ${uniqueEntries.length} (FluxFlow: ${fluxflowEntries.length} | Memory: ${memoryEntries.length}${otherEntries.length > 0 ? ` | Other: ${otherEntries.length}` : ""})`,
+        "================================================================================",
+        ""
+      ].join("\n");
+      const sections = [
+        renderSection("SECTION 1: FLUXFLOW ERRORS", fluxflowEntries, "FluxFlow"),
+        renderSection("SECTION 2: MEMORY ERRORS", memoryEntries, "Memory")
+      ];
+      if (otherEntries.length > 0) {
+        sections.push(renderSection("SECTION 3: OTHER SYSTEM ERRORS", otherEntries, "Other"));
+      }
+      const fileContent = exportHeader + sections.join("\n\n\n") + "\n";
+      await fs2.writeFile(exportPath, fileContent, "utf8");
+      return {
+        exportFile,
+        exportPath,
+        entryCount: uniqueEntries.length,
+        fluxflowCount: fluxflowEntries.length,
+        memoryCount: memoryEntries.length
+      };
+    };
+    handleExport = async (parts, { chatId, messages }) => {
+      const subCategory = (parts[1] || "chat").toLowerCase();
+      if (subCategory === "chat") {
+        const result = await exportCurrentChat(chatId, messages);
+        return {
+          success: true,
+          type: "chat",
+          message: `[EXPORT] Current chat exported to "${result.exportFile}"`
+        };
+      } else if (subCategory === "logs") {
+        const result = await exportErrorLogs();
+        return {
+          success: true,
+          type: "logs",
+          message: `[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}) to "${result.exportFile}"`
+        };
+      } else {
+        return {
+          success: false,
+          message: `[EXPORT USAGE] Unknown subcommand "${subCategory}". Options:
+ \u2022 /export chat current
+ \u2022 /export logs error`
+        };
+      }
+    };
+  }
+});
+
+// src/utils/crypto.js
+import fs3 from "fs";
+import path3 from "path";
 import crypto2 from "crypto";
 var XOR_KEY, bypass, xorTransform, AES_ALGORITHM, AES_KEY, encryptAes, decryptAes, readEncryptedJson, writeEncryptedJson, readAesEncryptedJson, writeAesEncryptedJson;
 var init_crypto = __esm({
@@ -152,8 +464,8 @@ var init_crypto = __esm({
     };
     readEncryptedJson = (filePath, defaultValue = {}) => {
       try {
-        if (!fs2.existsSync(filePath)) return defaultValue;
-        const rawContent = fs2.readFileSync(filePath);
+        if (!fs3.existsSync(filePath)) return defaultValue;
+        const rawContent = fs3.readFileSync(filePath);
         const fileContent = rawContent.toString("utf8").trim();
         if (fileContent.startsWith("{") || fileContent.startsWith("[")) {
           return JSON.parse(fileContent);
@@ -169,19 +481,19 @@ var init_crypto = __esm({
         }
         throw new Error("Unsupported or corrupt encryption format");
       } catch (err) {
-        console.error(`Vault Read Error [${path2.basename(filePath)}]:`, err.message);
+        console.error(`Vault Read Error [${path3.basename(filePath)}]:`, err.message);
         return defaultValue;
       }
     };
     writeEncryptedJson = (filePath, data) => {
       try {
-        const dir = path2.dirname(filePath);
-        if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+        const dir = path3.dirname(filePath);
+        if (!fs3.existsSync(dir)) fs3.mkdirSync(dir, { recursive: true });
         const jsonData = JSON.stringify(data, null, 2);
         const encrypted = encryptAes(jsonData);
-        fs2.writeFileSync(filePath, encrypted, "utf8");
+        fs3.writeFileSync(filePath, encrypted, "utf8");
       } catch (err) {
-        console.error(`Vault Write Error [${path2.basename(filePath)}]:`, err.message);
+        console.error(`Vault Write Error [${path3.basename(filePath)}]:`, err.message);
       }
     };
     readAesEncryptedJson = readEncryptedJson;
@@ -190,36 +502,36 @@ var init_crypto = __esm({
 });
 
 // src/data/model_config.js
-import fs3 from "fs";
-import path3 from "path";
+import fs4 from "fs";
+import path4 from "path";
 import { fileURLToPath } from "url";
 var __filename, __dirname, packageConfigPath, pathsToCheck, userConfigPath, activeConfig, multimodalModelsSet, rebuildMultimodalSet, loadRemoteModelConfig, isModelMultimodal, getModels, getDefaultModel, getFallbackValue;
 var init_model_config = __esm({
   "src/data/model_config.js"() {
     init_paths();
     __filename = fileURLToPath(import.meta.url);
-    __dirname = path3.dirname(__filename);
+    __dirname = path4.dirname(__filename);
     packageConfigPath = "";
     pathsToCheck = [
-      path3.join(__dirname, "../../model_config.json"),
+      path4.join(__dirname, "../../model_config.json"),
       // Dev: src/data/model_config.js -> root
-      path3.join(__dirname, "../model_config.json")
+      path4.join(__dirname, "../model_config.json")
       // Prod: dist/fluxflow.js -> root
     ];
     for (const p of pathsToCheck) {
       try {
-        if (fs3.existsSync(p)) {
+        if (fs4.existsSync(p)) {
           packageConfigPath = p;
           break;
         }
       } catch (e) {
       }
     }
-    userConfigPath = path3.join(FLUXFLOW_DIR, "model_config.json");
+    userConfigPath = path4.join(FLUXFLOW_DIR, "model_config.json");
     activeConfig = null;
-    if (fs3.existsSync(userConfigPath)) {
+    if (fs4.existsSync(userConfigPath)) {
       try {
-        const fileContent = fs3.readFileSync(userConfigPath, "utf-8");
+        const fileContent = fs4.readFileSync(userConfigPath, "utf-8");
         const parsed = JSON.parse(fileContent);
         if (parsed && parsed.providers && parsed.fallbacks && parsed.release) {
           activeConfig = parsed;
@@ -229,7 +541,7 @@ var init_model_config = __esm({
     }
     if (!activeConfig && packageConfigPath) {
       try {
-        const fileContent = fs3.readFileSync(packageConfigPath, "utf-8");
+        const fileContent = fs4.readFileSync(packageConfigPath, "utf-8");
         const parsed = JSON.parse(fileContent);
         if (parsed && parsed.providers && parsed.fallbacks && parsed.release) {
           activeConfig = parsed;
@@ -285,10 +597,10 @@ var init_model_config = __esm({
               activeConfig = data;
               rebuildMultimodalSet();
               try {
-                if (!fs3.existsSync(FLUXFLOW_DIR)) {
-                  fs3.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+                if (!fs4.existsSync(FLUXFLOW_DIR)) {
+                  fs4.mkdirSync(FLUXFLOW_DIR, { recursive: true });
                 }
-                fs3.writeFileSync(userConfigPath, JSON.stringify(data, null, 2), "utf-8");
+                fs4.writeFileSync(userConfigPath, JSON.stringify(data, null, 2), "utf-8");
               } catch (writeErr) {
               }
               return true;
@@ -337,14 +649,14 @@ __export(secrets_exports, {
   saveSearchKey: () => saveSearchKey,
   saveSecret: () => saveSecret
 });
-import fs4 from "fs-extra";
-import path4 from "path";
+import fs5 from "fs-extra";
+import path5 from "path";
 var SECRET_FILE, getAPIKey, getProviderAPIKey, saveProviderAPIKey, getSecret, saveSecret, getSearchSecrets, saveAPIKey, saveSearchKey, saveSearchId, removeSecret, removeAPIKey;
 var init_secrets = __esm({
   "src/utils/secrets.js"() {
     init_crypto();
     init_paths();
-    SECRET_FILE = path4.join(SECRET_DIR, "secrets.json");
+    SECRET_FILE = path5.join(SECRET_DIR, "secrets.json");
     getAPIKey = async () => {
       try {
         const secrets = readEncryptedJson(SECRET_FILE, {});
@@ -388,7 +700,7 @@ var init_secrets = __esm({
       }
     };
     saveSecret = async (key, value) => {
-      await fs4.ensureDir(SECRET_DIR);
+      await fs5.ensureDir(SECRET_DIR);
       let current = readEncryptedJson(SECRET_FILE, {});
       current[key] = value;
       writeEncryptedJson(SECRET_FILE, current);
@@ -425,8 +737,8 @@ __export(settings_exports, {
   loadSettings: () => loadSettings,
   saveSettings: () => saveSettings
 });
-import fs5 from "fs-extra";
-import path5 from "path";
+import fs6 from "fs-extra";
+import path6 from "path";
 var DEFAULT_SETTINGS, loadSettings, migrateToExternal, saveSettings;
 var init_settings = __esm({
   "src/utils/settings.js"() {
@@ -483,7 +795,7 @@ var init_settings = __esm({
     loadSettings = async () => {
       let settingsObj = { ...DEFAULT_SETTINGS };
       try {
-        if (await fs5.exists(SETTINGS_FILE)) {
+        if (await fs6.exists(SETTINGS_FILE)) {
           const saved = readAesEncryptedJson(SETTINGS_FILE);
           if (saved.imageSettings && saved.imageSettings.apiKey) {
             try {
@@ -535,12 +847,12 @@ var init_settings = __esm({
       const { FLUXFLOW_DIR: FLUXFLOW_DIR2 } = await Promise.resolve().then(() => (init_paths(), paths_exports));
       const folders = ["logs", "secret"];
       for (const folder of folders) {
-        const src = path5.join(FLUXFLOW_DIR2, folder);
-        const dest = path5.join(newPath, folder);
+        const src = path6.join(FLUXFLOW_DIR2, folder);
+        const dest = path6.join(newPath, folder);
         try {
-          if (await fs5.exists(src)) {
-            await fs5.ensureDir(dest);
-            await fs5.copy(src, dest, { overwrite: true });
+          if (await fs6.exists(src)) {
+            await fs6.ensureDir(dest);
+            await fs6.copy(src, dest, { overwrite: true });
           }
         } catch (err) {
           console.error(`Migration failed for ${folder}:`, err);
@@ -566,7 +878,7 @@ var init_settings = __esm({
         if (updated.imageSettings) {
           updated.imageSettings = { ...updated.imageSettings, apiKey: "" };
         }
-        await fs5.ensureDir(path5.dirname(SETTINGS_FILE));
+        await fs6.ensureDir(path6.dirname(SETTINGS_FILE));
         writeAesEncryptedJson(SETTINGS_FILE, updated);
         return true;
       } catch (err) {
@@ -5665,7 +5977,14 @@ var init_ChatLayout = __esm({
           { cmd: "/resume", desc: "Load previous session" },
           { cmd: "/revert", desc: "Revert codebase to checkpoint" },
           { cmd: "/save", desc: "Force save current chat" },
-          { cmd: "/export", desc: "Export current chat in a .txt file" },
+          {
+            cmd: "/export",
+            desc: "Export current chat or error logs",
+            subs: [
+              { cmd: "chat", desc: "Export current active chat" },
+              { cmd: "logs", desc: "Export error logs" }
+            ]
+          },
           { cmd: "/chats", desc: "List all chat sessions" },
           { cmd: "/btw", desc: "Send raw inquiry mid-turn" },
           { cmd: "/image", desc: "Generate images" },
@@ -7750,7 +8069,7 @@ var init_thinking_prompts = __esm({
 });
 
 // src/utils/prompts.js
-import fs6 from "fs";
+import fs7 from "fs";
 var cachedProjectContextBlock, cachedChatId, cachedUserMemories, getCachedUserMemories, getMemoryPrompt, getSystemInstruction, getJanitorInstruction;
 var init_prompts = __esm({
   async "src/utils/prompts.js"() {
@@ -7776,7 +8095,7 @@ var init_prompts = __esm({
           }
         } catch (e) {
           cachedUserMemories = "";
-          fs6.appendFileSync(`${LOGS_DIR}/memory/error.txt`, `${e.message}
+          fs7.appendFileSync(`${LOGS_DIR}/memory/error.txt`, `${e.message}
 -------------------------------------------------
 
 `);
@@ -7863,7 +8182,7 @@ ${userMemories}
         { name: "architecture.md", desc: "System Structure" }
       ];
       if (isFirstPrompt || cachedProjectContextBlock === null) {
-        const foundFiles = projectContextFiles.filter((f) => fs6.existsSync(f.name));
+        const foundFiles = projectContextFiles.filter((f) => fs7.existsSync(f.name));
         cachedProjectContextBlock = mode === "Flux" && foundFiles.length > 0 ? `
 -- PROJECT CONTEXT --
 ${foundFiles.map((f) => `- ${f.name}: ${f.desc}`).join("\n")}
@@ -7933,35 +8252,35 @@ ${userMemories}` : ""}`.trim();
 });
 
 // src/utils/revert.js
-import fs7 from "fs-extra";
-import path6 from "path";
+import fs8 from "fs-extra";
+import path7 from "path";
 async function performRestoration(change, tx) {
   try {
     if (change.type === "create") {
-      if (await fs7.pathExists(change.filePath)) {
-        await fs7.chmod(change.filePath, 438).catch(() => {
+      if (await fs8.pathExists(change.filePath)) {
+        await fs8.chmod(change.filePath, 438).catch(() => {
         });
-        await fs7.remove(change.filePath);
+        await fs8.remove(change.filePath);
       }
     } else if (change.type === "update") {
       if (!change.backupFile) return;
-      const backupPath = path6.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-      if (await fs7.pathExists(backupPath)) {
+      const backupPath = path7.join(BACKUPS_DIR, tx.chatId, change.backupFile);
+      if (await fs8.pathExists(backupPath)) {
         const backupContainer = readEncryptedJson(backupPath, null);
         if (!backupContainer || !backupContainer.data) {
-          throw new Error(`Backup container corrupt or empty for ${path6.basename(change.filePath)}`);
+          throw new Error(`Backup container corrupt or empty for ${path7.basename(change.filePath)}`);
         }
         const decrypted = decryptAes(backupContainer.data);
-        if (await fs7.pathExists(change.filePath)) {
-          await fs7.chmod(change.filePath, 438).catch(() => {
+        if (await fs8.pathExists(change.filePath)) {
+          await fs8.chmod(change.filePath, 438).catch(() => {
           });
         }
-        await fs7.writeFile(change.filePath, decrypted, "utf8");
+        await fs8.writeFile(change.filePath, decrypted, "utf8");
       } else {
       }
     }
   } catch (err) {
-    throw new Error(`Restoration failed for ${path6.basename(change.filePath)}: ${err.message}`);
+    throw new Error(`Restoration failed for ${path7.basename(change.filePath)}: ${err.message}`);
   }
 }
 async function restoreWithRetry(change, tx, maxAttempts = 7) {
@@ -7986,7 +8305,7 @@ var init_revert = __esm({
   "src/utils/revert.js"() {
     init_paths();
     init_crypto();
-    fs7.ensureDirSync(BACKUPS_DIR);
+    fs8.ensureDirSync(BACKUPS_DIR);
     currentTransaction = null;
     lastChatId = null;
     RevertManager = {
@@ -8011,16 +8330,16 @@ var init_revert = __esm({
               if (lastTx) {
                 const alreadyBackedUp2 = lastTx.changes.some((c) => c.filePath === absolutePath);
                 if (alreadyBackedUp2) return;
-                const fileExists2 = await fs7.pathExists(absolutePath);
+                const fileExists2 = await fs8.pathExists(absolutePath);
                 let type2 = fileExists2 || forcedContent ? "update" : "create";
                 let backupFile2 = null;
                 if (type2 === "update") {
-                  const fileName = path6.basename(absolutePath);
+                  const fileName = path7.basename(absolutePath);
                   backupFile2 = `${lastTx.id}_${fileName}.bak`;
-                  const chatBackupDir = path6.join(BACKUPS_DIR, lastTx.chatId);
-                  await fs7.ensureDir(chatBackupDir);
-                  const backupPath = path6.join(chatBackupDir, backupFile2);
-                  let content = forcedContent !== null ? forcedContent : await fs7.readFile(absolutePath, "utf8").catch(() => null);
+                  const chatBackupDir = path7.join(BACKUPS_DIR, lastTx.chatId);
+                  await fs8.ensureDir(chatBackupDir);
+                  const backupPath = path7.join(chatBackupDir, backupFile2);
+                  let content = forcedContent !== null ? forcedContent : await fs8.readFile(absolutePath, "utf8").catch(() => null);
                   if (content !== null) {
                     writeEncryptedJson(backupPath, { data: encryptAes(content) });
                   } else {
@@ -8036,16 +8355,16 @@ var init_revert = __esm({
           }
           const alreadyBackedUp = currentTransaction.changes.some((c) => c.filePath === absolutePath);
           if (alreadyBackedUp) return;
-          const fileExists = await fs7.pathExists(absolutePath);
+          const fileExists = await fs8.pathExists(absolutePath);
           let type = fileExists || forcedContent ? "update" : "create";
           let backupFile = null;
           if (type === "update") {
-            const fileName = path6.basename(absolutePath);
+            const fileName = path7.basename(absolutePath);
             backupFile = `${currentTransaction.id}_${fileName}.bak`;
-            const chatBackupDir = path6.join(BACKUPS_DIR, currentTransaction.chatId);
-            await fs7.ensureDir(chatBackupDir);
-            const backupPath = path6.join(chatBackupDir, backupFile);
-            let content = forcedContent !== null ? forcedContent : await fs7.readFile(absolutePath, "utf8").catch(() => null);
+            const chatBackupDir = path7.join(BACKUPS_DIR, currentTransaction.chatId);
+            await fs8.ensureDir(chatBackupDir);
+            const backupPath = path7.join(chatBackupDir, backupFile);
+            let content = forcedContent !== null ? forcedContent : await fs8.readFile(absolutePath, "utf8").catch(() => null);
             if (content !== null) {
               writeEncryptedJson(backupPath, { data: encryptAes(content) });
             } else {
@@ -8068,14 +8387,14 @@ var init_revert = __esm({
             if (removed.changes) {
               for (const change of removed.changes) {
                 if (change.backupFile) {
-                  await fs7.remove(path6.join(BACKUPS_DIR, removed.chatId, change.backupFile)).catch(() => {
+                  await fs8.remove(path7.join(BACKUPS_DIR, removed.chatId, change.backupFile)).catch(() => {
                   });
                 }
               }
             }
           }
           writeEncryptedJson(LEDGER_FILE, ledger);
-          await fs7.remove(ACTIVE_TX_FILE).catch(() => {
+          await fs8.remove(ACTIVE_TX_FILE).catch(() => {
           });
         } catch (err) {
         } finally {
@@ -8084,7 +8403,7 @@ var init_revert = __esm({
       },
       async recoverCrashedTransaction() {
         try {
-          if (await fs7.pathExists(ACTIVE_TX_FILE)) {
+          if (await fs8.pathExists(ACTIVE_TX_FILE)) {
             const orphanedTx = readEncryptedJson(ACTIVE_TX_FILE, null);
             if (orphanedTx?.changes?.length > 0) {
               const ledger = readEncryptedJson(LEDGER_FILE, []);
@@ -8093,7 +8412,7 @@ var init_revert = __esm({
                 writeEncryptedJson(LEDGER_FILE, ledger);
               }
             }
-            await fs7.remove(ACTIVE_TX_FILE).catch(() => {
+            await fs8.remove(ACTIVE_TX_FILE).catch(() => {
             });
           }
         } catch (e) {
@@ -8113,8 +8432,8 @@ var init_revert = __esm({
           }
           for (const change of tx.changes) {
             if (change.backupFile) {
-              const backupPath = path6.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-              await fs7.remove(backupPath).catch(() => {
+              const backupPath = path7.join(BACKUPS_DIR, tx.chatId, change.backupFile);
+              await fs8.remove(backupPath).catch(() => {
               });
             }
           }
@@ -8133,7 +8452,7 @@ var init_revert = __esm({
       },
       async deleteChatBackups(chatId) {
         try {
-          await fs7.remove(path6.join(BACKUPS_DIR, chatId));
+          await fs8.remove(path7.join(BACKUPS_DIR, chatId));
           let ledger = readEncryptedJson(LEDGER_FILE, []);
           const clean = ledger.filter((t) => t.chatId !== chatId);
           if (ledger.length !== clean.length) writeEncryptedJson(LEDGER_FILE, clean);
@@ -8145,8 +8464,8 @@ var init_revert = __esm({
 });
 
 // src/utils/history.js
-import fs8 from "fs-extra";
-import path7 from "path";
+import fs9 from "fs-extra";
+import path8 from "path";
 import { nanoid } from "nanoid";
 var WRITE_LOCK, withLock, loadHistory, saveChat, saveChatTitle, deleteChat, generateChatId, cleanupOldHistory, parseCustomDate, cleanupLogFile, cleanupOldLogs, getTruncatedHistory, saveChatContext, loadChatContext;
 var init_history = __esm({
@@ -8170,9 +8489,9 @@ var init_history = __esm({
       return nextLock;
     };
     loadHistory = async () => {
-      await fs8.ensureDir(HISTORY_DIR);
+      await fs9.ensureDir(HISTORY_DIR);
       let history = {};
-      if (await fs8.pathExists(HISTORY_FILE)) {
+      if (await fs9.pathExists(HISTORY_FILE)) {
         try {
           history = readEncryptedJson(HISTORY_FILE, {});
         } catch (e) {
@@ -8180,10 +8499,10 @@ var init_history = __esm({
         }
       }
       for (const id in history) {
-        const chatFile = path7.join(HISTORY_DIR, `${id}.json`);
+        const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
         Object.defineProperty(history[id], "messages", {
           get: () => {
-            if (fs8.existsSync(chatFile)) {
+            if (fs9.existsSync(chatFile)) {
               try {
                 return readEncryptedJson(chatFile, []);
               } catch (e) {
@@ -8206,7 +8525,7 @@ var init_history = __esm({
     };
     saveChat = async (id, name, messages) => {
       return withLock(async () => {
-        await fs8.ensureDir(HISTORY_DIR);
+        await fs9.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
         let persistentMessages = (messages || []).filter(
@@ -8238,7 +8557,7 @@ var init_history = __esm({
         const firstUserMsg = userMessages[0];
         const latestUserMsg = userMessages[userMessages.length - 1];
         if (existingChat && existingChat.prompt) {
-          if (Math.random() < 0.8) {
+          if (Math.random() < 0.95) {
             prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
           } else {
             prompt = existingChat.prompt;
@@ -8247,7 +8566,7 @@ var init_history = __esm({
           prompt = extractPrompt(firstUserMsg);
         }
         const finalName = name || (existingChat ? existingChat.name : prompt || `Session ${id.slice(-6)}`);
-        const chatFile = path7.join(HISTORY_DIR, `${id}.json`);
+        const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
         history[id] = {
           name: finalName,
@@ -8298,7 +8617,7 @@ var init_history = __esm({
           };
         }
         writeEncryptedJson(HISTORY_FILE, indexHistory);
-        if (await fs8.pathExists(CONTEXT_FILE)) {
+        if (await fs9.pathExists(CONTEXT_FILE)) {
           try {
             const contextData = readEncryptedJson(CONTEXT_FILE, []);
             if (Array.isArray(contextData)) {
@@ -8319,10 +8638,10 @@ var init_history = __esm({
           writeEncryptedJson(TEMP_MEM_CHAT_FILE, cache);
         }
         await RevertManager.deleteChatBackups(id);
-        const chatFile = path7.join(HISTORY_DIR, `${id}.json`);
-        if (await fs8.pathExists(chatFile)) {
+        const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
+        if (await fs9.pathExists(chatFile)) {
           try {
-            await fs8.remove(chatFile);
+            await fs9.remove(chatFile);
           } catch (e) {
           }
         }
@@ -8395,8 +8714,8 @@ var init_history = __esm({
     };
     cleanupLogFile = async (filePath) => {
       try {
-        if (!await fs8.pathExists(filePath)) return;
-        const content = await fs8.readFile(filePath, "utf8");
+        if (!await fs9.pathExists(filePath)) return;
+        const content = await fs9.readFile(filePath, "utf8");
         if (!content.trim()) return;
         const lines = content.split("\n");
         const entries = [];
@@ -8436,26 +8755,26 @@ var init_history = __esm({
         }
         const finalContent = keptEntries.join("\n").trim();
         if (finalContent) {
-          await fs8.writeFile(filePath, finalContent + "\n", "utf8");
+          await fs9.writeFile(filePath, finalContent + "\n", "utf8");
         } else {
-          await fs8.writeFile(filePath, "", "utf8");
+          await fs9.writeFile(filePath, "", "utf8");
         }
       } catch (e) {
       }
     };
     cleanupOldLogs = async (logsDir) => {
       try {
-        if (!await fs8.pathExists(logsDir)) return;
+        if (!await fs9.pathExists(logsDir)) return;
         const cleanRecursive = async (dir) => {
-          const files = await fs8.readdir(dir);
+          const files = await fs9.readdir(dir);
           for (const file of files) {
-            const fullPath = path7.join(dir, file);
-            const stat = await fs8.stat(fullPath);
+            const fullPath = path8.join(dir, file);
+            const stat = await fs9.stat(fullPath);
             if (stat.isDirectory()) {
               await cleanRecursive(fullPath);
-              const subFiles = await fs8.readdir(fullPath);
+              const subFiles = await fs9.readdir(fullPath);
               if (subFiles.length === 0) {
-                await fs8.remove(fullPath);
+                await fs9.remove(fullPath);
               }
             } else if (file.endsWith(".log")) {
               await cleanupLogFile(fullPath);
@@ -8490,7 +8809,7 @@ var init_history = __esm({
     };
     loadChatContext = async (chatId) => {
       try {
-        if (!await fs8.pathExists(CONTEXT_FILE)) return { total: 0, context: 0 };
+        if (!await fs9.pathExists(CONTEXT_FILE)) return { total: 0, context: 0 };
         const contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) return { total: 0, context: 0 };
         const entry = contextData.find((item) => Object.keys(item)[0] === String(chatId));
@@ -8503,8 +8822,8 @@ var init_history = __esm({
 });
 
 // src/utils/usage.js
-import fs9 from "fs-extra";
-import path8 from "path";
+import fs10 from "fs-extra";
+import path9 from "path";
 import os3 from "os";
 var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
@@ -8513,14 +8832,14 @@ var init_usage = __esm({
     init_crypto();
     getLocalBackupPath = () => {
       if (process.platform === "win32") {
-        const localAppData = process.env.LOCALAPPDATA || path8.join(os3.homedir(), "AppData", "Local");
-        return path8.join(localAppData, "FxFl", "backups", "backup.json");
+        const localAppData = process.env.LOCALAPPDATA || path9.join(os3.homedir(), "AppData", "Local");
+        return path9.join(localAppData, "FxFl", "backups", "backup.json");
       }
       if (process.platform === "darwin") {
-        return path8.join(os3.homedir(), "Library", "Application Support", "FxFl", "backups", "backup.json");
+        return path9.join(os3.homedir(), "Library", "Application Support", "FxFl", "backups", "backup.json");
       }
-      const xdgDataHome = process.env.XDG_DATA_HOME || path8.join(os3.homedir(), ".local", "share");
-      return path8.join(xdgDataHome, "fxfl", "backups", "backup.json");
+      const xdgDataHome = process.env.XDG_DATA_HOME || path9.join(os3.homedir(), ".local", "share");
+      return path9.join(xdgDataHome, "fxfl", "backups", "backup.json");
     };
     BACKUP_FILE = getLocalBackupPath();
     generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -8562,8 +8881,8 @@ var init_usage = __esm({
       let primaryData = null;
       let backupData = null;
       try {
-        if (await fs9.exists(tempFile)) {
-          const rawContent = (await fs9.readFile(tempFile, "utf8")).trim();
+        if (await fs10.exists(tempFile)) {
+          const rawContent = (await fs10.readFile(tempFile, "utf8")).trim();
           let parsed = null;
           if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
             parsed = JSON.parse(rawContent);
@@ -8573,26 +8892,26 @@ var init_usage = __esm({
           if (parsed && parsed.date && parsed.stats) {
             primaryData = parsed;
             try {
-              await fs9.rename(tempFile, USAGE_FILE);
+              await fs10.rename(tempFile, USAGE_FILE);
             } catch (e) {
             }
           } else {
             try {
-              await fs9.remove(tempFile);
+              await fs10.remove(tempFile);
             } catch (e) {
             }
           }
         }
       } catch (err) {
         try {
-          await fs9.remove(tempFile);
+          await fs10.remove(tempFile);
         } catch (e) {
         }
       }
       if (!primaryData) {
         try {
-          if (await fs9.exists(USAGE_FILE)) {
-            const rawContent = (await fs9.readFile(USAGE_FILE, "utf8")).trim();
+          if (await fs10.exists(USAGE_FILE)) {
+            const rawContent = (await fs10.readFile(USAGE_FILE, "utf8")).trim();
             if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
               primaryData = JSON.parse(rawContent);
             } else {
@@ -8603,8 +8922,8 @@ var init_usage = __esm({
         }
       }
       try {
-        if (await fs9.exists(BACKUP_FILE)) {
-          const rawContent = (await fs9.readFile(BACKUP_FILE, "utf8")).trim();
+        if (await fs10.exists(BACKUP_FILE)) {
+          const rawContent = (await fs10.readFile(BACKUP_FILE, "utf8")).trim();
           if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
             backupData = JSON.parse(rawContent);
           } else {
@@ -8618,8 +8937,8 @@ var init_usage = __esm({
         if (primaryData.saveId !== backupData.saveId) {
           resolvedData = primaryData;
           try {
-            await fs9.ensureDir(path8.dirname(BACKUP_FILE));
-            await fs9.copy(USAGE_FILE, BACKUP_FILE);
+            await fs10.ensureDir(path9.dirname(BACKUP_FILE));
+            await fs10.copy(USAGE_FILE, BACKUP_FILE);
           } catch (e) {
           }
         } else {
@@ -8628,15 +8947,15 @@ var init_usage = __esm({
       } else if (primaryData && !backupData) {
         resolvedData = primaryData;
         try {
-          await fs9.ensureDir(path8.dirname(BACKUP_FILE));
-          await fs9.copy(USAGE_FILE, BACKUP_FILE);
+          await fs10.ensureDir(path9.dirname(BACKUP_FILE));
+          await fs10.copy(USAGE_FILE, BACKUP_FILE);
         } catch (e) {
         }
       } else if (!primaryData && backupData) {
         resolvedData = backupData;
         try {
-          await fs9.ensureDir(path8.dirname(USAGE_FILE));
-          await fs9.copy(BACKUP_FILE, USAGE_FILE);
+          await fs10.ensureDir(path9.dirname(USAGE_FILE));
+          await fs10.copy(BACKUP_FILE, USAGE_FILE);
         } catch (e) {
         }
       }
@@ -8676,11 +8995,11 @@ var init_usage = __esm({
     flushUsage = async () => {
       if (!isDirty || !cachedUsage) return;
       try {
-        await fs9.ensureDir(path8.dirname(USAGE_FILE));
+        await fs10.ensureDir(path9.dirname(USAGE_FILE));
         let diskData = null;
         try {
-          if (await fs9.exists(USAGE_FILE)) {
-            const rawContent = (await fs9.readFile(USAGE_FILE, "utf8")).trim();
+          if (await fs10.exists(USAGE_FILE)) {
+            const rawContent = (await fs10.readFile(USAGE_FILE, "utf8")).trim();
             if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
               diskData = JSON.parse(rawContent);
             } else {
@@ -8756,14 +9075,14 @@ var init_usage = __esm({
         cachedUsage.saveId = generateSaveId();
         const tempFile = USAGE_FILE + ".tmp";
         const encryptedStr = encryptAes(JSON.stringify(cachedUsage, null, 2));
-        await fs9.writeFile(tempFile, encryptedStr, "utf8");
-        const fd = await fs9.open(tempFile, "r+");
-        await fs9.fsync(fd);
-        await fs9.close(fd);
-        await fs9.rename(tempFile, USAGE_FILE);
+        await fs10.writeFile(tempFile, encryptedStr, "utf8");
+        const fd = await fs10.open(tempFile, "r+");
+        await fs10.fsync(fd);
+        await fs10.close(fd);
+        await fs10.rename(tempFile, USAGE_FILE);
         try {
-          await fs9.ensureDir(path8.dirname(BACKUP_FILE));
-          await fs9.copy(USAGE_FILE, BACKUP_FILE);
+          await fs10.ensureDir(path9.dirname(BACKUP_FILE));
+          await fs10.copy(USAGE_FILE, BACKUP_FILE);
         } catch (backupErr) {
         }
         isDirty = false;
@@ -9247,8 +9566,8 @@ var init_usage = __esm({
 
 // src/utils/puppeteer_helper.js
 import os4 from "os";
-import path9 from "path";
-import fs10 from "fs";
+import path10 from "path";
+import fs11 from "fs";
 import { createRequire } from "module";
 import { fileURLToPath as fileURLToPath2 } from "url";
 function getPuppeteerConfig() {
@@ -9273,11 +9592,11 @@ function getPuppeteerConfig() {
   } else {
     return {};
   }
-  let configPath = path9.resolve(__dirname2, "..", "..", ".puppeteerrc.cjs");
-  if (!fs10.existsSync(configPath)) {
-    configPath = path9.resolve(__dirname2, "..", ".puppeteerrc.cjs");
+  let configPath = path10.resolve(__dirname2, "..", "..", ".puppeteerrc.cjs");
+  if (!fs11.existsSync(configPath)) {
+    configPath = path10.resolve(__dirname2, "..", ".puppeteerrc.cjs");
   }
-  if (!fs10.existsSync(configPath)) {
+  if (!fs11.existsSync(configPath)) {
     return {};
   }
   try {
@@ -9287,14 +9606,14 @@ function getPuppeteerConfig() {
     if (cacheDir) {
       process.env.PUPPETEER_CACHE_DIR = cacheDir;
       if (version) {
-        const expectedPath = path9.join(
+        const expectedPath = path10.join(
           cacheDir,
           "chrome",
           `${pptrPlatform}-${version}`,
           subDir,
           execName
         );
-        if (fs10.existsSync(expectedPath)) {
+        if (fs11.existsSync(expectedPath)) {
           return {
             executablePath: expectedPath,
             cacheDirectory: cacheDir
@@ -9302,15 +9621,15 @@ function getPuppeteerConfig() {
         }
       }
       const findExecutable = (dir) => {
-        if (!fs10.existsSync(dir)) return null;
+        if (!fs11.existsSync(dir)) return null;
         try {
-          const files = fs10.readdirSync(dir);
+          const files = fs11.readdirSync(dir);
           const dirsToSearch = [];
           for (const file of files) {
-            const fullPath = path9.join(dir, file);
+            const fullPath = path10.join(dir, file);
             let stat;
             try {
-              stat = fs10.statSync(fullPath);
+              stat = fs11.statSync(fullPath);
             } catch (e) {
               continue;
             }
@@ -9356,14 +9675,14 @@ var require2, __dirname2;
 var init_puppeteer_helper = __esm({
   "src/utils/puppeteer_helper.js"() {
     require2 = createRequire(import.meta.url);
-    __dirname2 = path9.dirname(fileURLToPath2(import.meta.url));
+    __dirname2 = path10.dirname(fileURLToPath2(import.meta.url));
   }
 });
 
 // src/tools/web_search.js
 import puppeteer from "puppeteer";
-import fs11 from "fs";
-import path10 from "path";
+import fs12 from "fs";
+import path11 from "path";
 var web_search;
 var init_web_search = __esm({
   "src/tools/web_search.js"() {
@@ -9512,7 +9831,7 @@ Sources:
 ${aiResult}`;
           } catch (err) {
             lastError = err;
-            fs11.writeFileSync(path10.join(LOGS_DIR, "web_tools", "search", "ai_mode", "ERROR.txt"), err.message);
+            fs12.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "ai_mode", "ERROR.txt"), err.message);
             if (browser) await browser.close();
             if (attempt < maxRetries) {
               const backoff = Math.pow(2, attempt) * 1e3;
@@ -9574,7 +9893,7 @@ ${finalResults}`;
         } catch (err) {
           lastError = err;
           if (browser) await browser.close();
-          fs11.writeFileSync(path10.join(LOGS_DIR, "web_tools", "search", "standard_mode", "ERROR.txt"), err.message);
+          fs12.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "standard_mode", "ERROR.txt"), err.message);
           if (attempt < maxRetries) {
             const backoff = Math.pow(2, attempt) * 1e3;
             await new Promise((r) => setTimeout(r, backoff));
@@ -9588,8 +9907,8 @@ ${finalResults}`;
 
 // src/tools/web_scrape.js
 import puppeteer2 from "puppeteer";
-import fs12 from "fs";
-import path11 from "path";
+import fs13 from "fs";
+import path12 from "path";
 var web_scrape;
 var init_web_scrape = __esm({
   "src/tools/web_scrape.js"() {
@@ -9666,7 +9985,7 @@ ${cleanedHtml}${htmlContent.length > 5e4 ? "\n\n[TRUNCATED AT 50K CHARS]" : ""}`
         } catch (err) {
           lastError = err;
           if (browser) await browser.close();
-          fs12.writeFileSync(path11.join(LOGS_DIR, "web_tools", "scrape", "standard_mode", "ERROR.txt"), err.message);
+          fs13.writeFileSync(path12.join(LOGS_DIR, "web_tools", "scrape", "standard_mode", "ERROR.txt"), err.message);
           if (attempt < maxRetries) {
             const backoff = Math.pow(2, attempt) * 1e3;
             await new Promise((r) => setTimeout(r, backoff));
@@ -9790,8 +10109,8 @@ var init_chat = __esm({
 });
 
 // src/tools/view_file.js
-import fs13 from "fs";
-import path12 from "path";
+import fs14 from "fs";
+import path13 from "path";
 var view_file;
 var init_view_file = __esm({
   "src/tools/view_file.js"() {
@@ -9803,16 +10122,16 @@ var init_view_file = __esm({
       const finalStart = sLine || 1;
       const finalEnd = eLine || (sLine ? sLine + 800 : 800);
       if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
-      const absolutePath = path12.resolve(process.cwd(), targetPath);
+      const absolutePath = path13.resolve(process.cwd(), targetPath);
       try {
-        if (!fs13.existsSync(absolutePath)) {
+        if (!fs14.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist.`;
         }
-        const stats = fs13.statSync(absolutePath);
+        const stats = fs14.statSync(absolutePath);
         if (stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a directory. Use list_files instead.`;
         }
-        const ext = path12.extname(targetPath).toLowerCase();
+        const ext = path13.extname(targetPath).toLowerCase();
         const videoExtensions = [".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".mpeg", ".mpg"];
         if (videoExtensions.includes(ext)) {
           const format = ext.slice(1).toUpperCase();
@@ -9832,7 +10151,7 @@ var init_view_file = __esm({
           if (!isMultiModal) {
             return `ERROR: Multimodality is not supported for the current model. Unable to load [${targetPath}].`;
           }
-          const buffer = fs13.readFileSync(absolutePath);
+          const buffer = fs14.readFileSync(absolutePath);
           const base64 = buffer.toString("base64");
           const mimeType = mimeMap[ext];
           return {
@@ -9845,7 +10164,7 @@ var init_view_file = __esm({
             }
           };
         }
-        let content = fs13.readFileSync(absolutePath, "utf8");
+        let content = fs14.readFileSync(absolutePath, "utf8");
         if (content.startsWith("\uFEFF")) {
           content = content.slice(1);
         }
@@ -9869,8 +10188,8 @@ ${code}`;
 });
 
 // src/tools/write_file.js
-import fs14 from "fs";
-import path13 from "path";
+import fs15 from "fs";
+import path14 from "path";
 var write_file;
 var init_write_file = __esm({
   "src/tools/write_file.js"() {
@@ -9881,14 +10200,14 @@ var init_write_file = __esm({
       if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';
       if (content === void 0) return 'ERROR: Missing "content" argument for write_file.';
       content = content.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-      const absolutePath = path13.resolve(process.cwd(), targetPath);
-      const parentDir = path13.dirname(absolutePath);
+      const absolutePath = path14.resolve(process.cwd(), targetPath);
+      const parentDir = path14.dirname(absolutePath);
       try {
         await RevertManager.recordFileChange(absolutePath);
         let ancestry = "";
-        if (fs14.existsSync(absolutePath)) {
+        if (fs15.existsSync(absolutePath)) {
           try {
-            const oldData = fs14.readFileSync(absolutePath, "utf8");
+            const oldData = fs15.readFileSync(absolutePath, "utf8");
             const lines = oldData.split(/\r?\n/);
             ancestry = `Old File contents:
 ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
@@ -9900,16 +10219,16 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 `;
           }
         }
-        if (!fs14.existsSync(parentDir)) {
-          fs14.mkdirSync(parentDir, { recursive: true });
+        if (!fs15.existsSync(parentDir)) {
+          fs15.mkdirSync(parentDir, { recursive: true });
         }
         const strip = (t) => t.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const processedContent = strip(content);
         const finalContent = processedContent.endsWith("\n") ? processedContent : processedContent + "\n";
         const lineCount = finalContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(finalContent, "utf8");
-        fs14.writeFileSync(absolutePath, finalContent, "utf8");
-        let verifiedContent = fs14.readFileSync(absolutePath, "utf8");
+        fs15.writeFileSync(absolutePath, finalContent, "utf8");
+        let verifiedContent = fs15.readFileSync(absolutePath, "utf8");
         const verifiedSize = Buffer.byteLength(verifiedContent, "utf8");
         const verifiedLines = verifiedContent.split(/\r?\n/);
         const verifiedLineCount = verifiedLines.length;
@@ -9944,8 +10263,8 @@ ${snippet}`;
 });
 
 // src/tools/update_file.js
-import fs15 from "fs";
-import path14 from "path";
+import fs16 from "fs";
+import path15 from "path";
 var update_file;
 var init_update_file = __esm({
   "src/tools/update_file.js"() {
@@ -9961,12 +10280,12 @@ var init_update_file = __esm({
       if (patchPairs.length === 0) {
         return "ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.";
       }
-      const absolutePath = path14.resolve(process.cwd(), targetPath);
+      const absolutePath = path15.resolve(process.cwd(), targetPath);
       try {
-        if (!fs15.existsSync(absolutePath)) {
+        if (!fs16.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
         }
-        let diskContent = context.forcedContent || fs15.readFileSync(absolutePath, "utf8");
+        let diskContent = context.forcedContent || fs16.readFileSync(absolutePath, "utf8");
         if (diskContent.startsWith("\uFEFF")) diskContent = diskContent.slice(1);
         const originalContent = diskContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const { content: finalContent, results } = applyPatches(originalContent, patchPairs);
@@ -9977,7 +10296,7 @@ var init_update_file = __esm({
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
         }
         await RevertManager.recordFileChange(absolutePath, originalContent);
-        fs15.writeFileSync(absolutePath, finalContent, "utf8");
+        fs16.writeFileSync(absolutePath, finalContent, "utf8");
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
         if (failures.length > 0) {
           return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.
@@ -9999,34 +10318,34 @@ ${diffText}`;
 });
 
 // src/tools/read_folder.js
-import fs16 from "fs";
-import path15 from "path";
+import fs17 from "fs";
+import path16 from "path";
 var read_folder;
 var init_read_folder = __esm({
   "src/tools/read_folder.js"() {
     init_arg_parser();
     read_folder = async (args) => {
       const { path: targetPath = "." } = parseArgs(args);
-      const absolutePath = path15.resolve(process.cwd(), targetPath);
+      const absolutePath = path16.resolve(process.cwd(), targetPath);
       try {
-        if (!fs16.existsSync(absolutePath)) {
+        if (!fs17.existsSync(absolutePath)) {
           return `ERROR: Path [${targetPath}] does not exist.`;
         }
-        const stats = fs16.statSync(absolutePath);
+        const stats = fs17.statSync(absolutePath);
         if (!stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
         }
-        const files = fs16.readdirSync(absolutePath);
+        const files = fs17.readdirSync(absolutePath);
         const totalItems = files.length;
         const maxDisplay = 100;
         const displayItems = files.slice(0, maxDisplay);
         const folderData = [];
         for (const file of displayItems) {
-          const fPath = path15.join(absolutePath, file);
+          const fPath = path16.join(absolutePath, file);
           let indicator = "\u{1F4C4}";
           let info = { name: file, type: "unknown", size: "N/A", mtime: "N/A" };
           try {
-            const fStats = fs16.statSync(fPath);
+            const fStats = fs17.statSync(fPath);
             info = {
               name: file,
               type: fStats.isDirectory() ? "directory" : "file",
@@ -10111,8 +10430,8 @@ var init_ask_user = __esm({
 
 // src/tools/write_pdf.js
 import puppeteer3 from "puppeteer";
-import path16 from "path";
-import fs17 from "fs-extra";
+import path17 from "path";
+import fs18 from "fs-extra";
 import { PDFDocument } from "pdf-lib";
 var write_pdf;
 var init_write_pdf = __esm({
@@ -10129,10 +10448,10 @@ var init_write_pdf = __esm({
       } = parseArgs(args);
       if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
       if (!content) return 'ERROR: Missing "content" (HTML/CSS) for write_pdf.';
-      const absolutePath = path16.resolve(process.cwd(), targetPath);
+      const absolutePath = path17.resolve(process.cwd(), targetPath);
       let browser = null;
       try {
-        await fs17.ensureDir(path16.dirname(absolutePath));
+        await fs18.ensureDir(path17.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
         const pptrConfig = getPuppeteerConfig();
         browser = await puppeteer3.launch({
@@ -10153,11 +10472,11 @@ var init_write_pdf = __esm({
             return null;
           }
           try {
-            const imgPath = path16.resolve(process.cwd(), originalSrc);
-            if (await fs17.pathExists(imgPath)) {
-              const ext = path16.extname(imgPath).toLowerCase().replace(".", "") || "png";
+            const imgPath = path17.resolve(process.cwd(), originalSrc);
+            if (await fs18.pathExists(imgPath)) {
+              const ext = path17.extname(imgPath).toLowerCase().replace(".", "") || "png";
               const mime = ext === "jpg" ? "jpeg" : ext === "svg" ? "svg+xml" : ext;
-              const base64 = await fs17.readFile(imgPath, "base64");
+              const base64 = await fs18.readFile(imgPath, "base64");
               return `data:image/${mime};base64,${base64}`;
             }
           } catch (e) {
@@ -10172,9 +10491,9 @@ var init_write_pdf = __esm({
           const fullTag = match[0];
           if (originalHref && fullTag.toLowerCase().includes("stylesheet") && !originalHref.startsWith("http://") && !originalHref.startsWith("https://") && !originalHref.startsWith("data:")) {
             try {
-              const cssPath = path16.resolve(process.cwd(), originalHref);
-              if (await fs17.pathExists(cssPath)) {
-                const cssContent = await fs17.readFile(cssPath, "utf-8");
+              const cssPath = path17.resolve(process.cwd(), originalHref);
+              if (await fs18.pathExists(cssPath)) {
+                const cssContent = await fs18.readFile(cssPath, "utf-8");
                 cssCache[fullTag] = `<style>${cssContent}</style>`;
               }
             } catch (e) {
@@ -10255,7 +10574,7 @@ var init_write_pdf = __esm({
           printBackground: true
         });
         const pdfDoc = await PDFDocument.load(pdfBytes);
-        const fileName = path16.basename(targetPath);
+        const fileName = path17.basename(targetPath);
         pdfDoc.setTitle(`FluxFlow_${fileName}`);
         pdfDoc.setAuthor("FluxFlow CLI");
         pdfDoc.setSubject("Generated with Agentic AI System");
@@ -10263,8 +10582,8 @@ var init_write_pdf = __esm({
         pdfDoc.setCreator("FluxFlow PDF Engine");
         pdfDoc.setProducer("FluxFlow (Generative AI)");
         const finalPdfBytes = await pdfDoc.save();
-        await fs17.writeFile(absolutePath, finalPdfBytes);
-        const stats = await fs17.stat(absolutePath);
+        await fs18.writeFile(absolutePath, finalPdfBytes);
+        const stats = await fs18.stat(absolutePath);
         return `SUCCESS: PDF generated successfully at [${targetPath}] (${(stats.size / 1024).toFixed(2)} KB).`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -10277,8 +10596,8 @@ var init_write_pdf = __esm({
 });
 
 // src/tools/write_docx.js
-import fs18 from "fs-extra";
-import path17 from "path";
+import fs19 from "fs-extra";
+import path18 from "path";
 import HTMLtoDOCX from "html-to-docx";
 var write_docx;
 var init_write_docx = __esm({
@@ -10292,11 +10611,11 @@ var init_write_docx = __esm({
       } = parseArgs(args);
       if (!targetPath) return 'ERROR: Missing "path" argument for write_docx.';
       if (!content) return 'ERROR: Missing "content" (HTML) for write_docx.';
-      const absolutePath = path17.resolve(process.cwd(), targetPath);
+      const absolutePath = path18.resolve(process.cwd(), targetPath);
       try {
-        await fs18.ensureDir(path17.dirname(absolutePath));
+        await fs19.ensureDir(path18.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
-        const fileName = path17.basename(targetPath);
+        const fileName = path18.basename(targetPath);
         const fullHtml = content.includes("<html") ? content : `
             <!DOCTYPE html>
             <html lang="en">
@@ -10317,7 +10636,7 @@ var init_write_docx = __esm({
           footer: true,
           pageNumber: true
         });
-        await fs18.writeFile(absolutePath, docxBuffer);
+        await fs19.writeFile(absolutePath, docxBuffer);
         return `SUCCESS: Word document [${targetPath}] generated successfully.
 - Size: ${(docxBuffer.length / 1024).toFixed(1)} KB`;
       } catch (err) {
@@ -10329,21 +10648,21 @@ var init_write_docx = __esm({
 });
 
 // src/tools/search_keyword.js
-import fs19 from "fs/promises";
-import path18 from "path";
+import fs20 from "fs/promises";
+import path19 from "path";
 async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
   if (depth > 12) return [];
   let results = [];
   let list;
   try {
-    list = await fs19.readdir(dir, { withFileTypes: true });
+    list = await fs20.readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   for (const file of list) {
-    const fullPath = path18.join(dir, file.name);
-    const relativePath = path18.relative(baseDir, fullPath);
-    const pathSegments = relativePath.split(path18.sep).map((s) => s.toLowerCase());
+    const fullPath = path19.join(dir, file.name);
+    const relativePath = path19.relative(baseDir, fullPath);
+    const pathSegments = relativePath.split(path19.sep).map((s) => s.toLowerCase());
     const isExcluded = excludes.some((ex) => pathSegments.includes(ex.toLowerCase()));
     if (isExcluded) continue;
     if (file.isDirectory()) {
@@ -10444,15 +10763,15 @@ var init_search_keyword = __esm({
         let pathArgType = null;
         if (pathArg) {
           const normalised = pathArg.replace(/[\/\\]+$/, "");
-          const fullPath = path18.resolve(rootDir, normalised);
+          const fullPath = path19.resolve(rootDir, normalised);
           try {
-            const stat = await fs19.stat(fullPath);
+            const stat = await fs20.stat(fullPath);
             if (stat.isDirectory()) {
               pathArgType = "dir";
               filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
             } else if (stat.isFile()) {
               pathArgType = "file";
-              filesToSearch.push({ fullPath, relativePath: path18.relative(rootDir, fullPath) });
+              filesToSearch.push({ fullPath, relativePath: path19.relative(rootDir, fullPath) });
             } else {
               return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
             }
@@ -10464,7 +10783,7 @@ var init_search_keyword = __esm({
         }
         const searchPromises = filesToSearch.map(async (fileObj) => {
           try {
-            const content = await fs19.readFile(fileObj.fullPath, "utf-8");
+            const content = await fs20.readFile(fileObj.fullPath, "utf-8");
             if (content.includes("\0")) return [];
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
@@ -10536,8 +10855,8 @@ var init_search_keyword = __esm({
 });
 
 // src/tools/generate_image.js
-import fs20 from "fs-extra";
-import path19 from "path";
+import fs21 from "fs-extra";
+import path20 from "path";
 var injectPngMetadata, generate_image;
 var init_generate_image = __esm({
   "src/tools/generate_image.js"() {
@@ -10716,12 +11035,12 @@ var init_generate_image = __esm({
           "Seed": String(seed)
         };
         finalBuffer = injectPngMetadata(finalBuffer, metadata);
-        const absolutePath = path19.resolve(process.cwd(), outputPath);
-        await fs20.ensureDir(path19.dirname(absolutePath));
+        const absolutePath = path20.resolve(process.cwd(), outputPath);
+        await fs21.ensureDir(path20.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
-        await fs20.writeFile(absolutePath, finalBuffer);
+        await fs21.writeFile(absolutePath, finalBuffer);
         await recordImageGeneration(settings);
-        const ext = path19.extname(outputPath).toLowerCase();
+        const ext = path20.extname(outputPath).toLowerCase();
         const mimeMap = {
           ".jpg": "image/jpeg",
           ".jpeg": "image/jpeg",
@@ -10836,13 +11155,13 @@ var init_addMemScore = __esm({
 });
 
 // src/utils/parsers.js
-import fs21 from "fs-extra";
-import path20 from "path";
+import fs22 from "fs-extra";
+import path21 from "path";
 import https from "https";
 async function downloadWasm(wasmFile, targetUrl = null) {
   const url = targetUrl || `https://unpkg.com/tree-sitter-wasms@0.1.13/out/${wasmFile}`;
-  const localPath = path20.join(PARSER_DIR, wasmFile);
-  await fs21.ensureDir(PARSER_DIR);
+  const localPath = path21.join(PARSER_DIR, wasmFile);
+  await fs22.ensureDir(PARSER_DIR);
   return new Promise((resolve, reject) => {
     const options = {
       headers: {
@@ -10863,27 +11182,27 @@ async function downloadWasm(wasmFile, targetUrl = null) {
         reject(new Error(`Failed to download ${wasmFile}: HTTP ${response.statusCode}`));
         return;
       }
-      const file = fs21.createWriteStream(localPath);
+      const file = fs22.createWriteStream(localPath);
       response.pipe(file);
       file.on("finish", () => {
         file.close();
         resolve();
       });
     }).on("error", (err) => {
-      if (fs21.existsSync(localPath)) fs21.unlink(localPath, () => {
+      if (fs22.existsSync(localPath)) fs22.unlink(localPath, () => {
       });
       reject(err);
     });
   });
 }
 function isParserInstalled(wasmFile) {
-  const localPath = path20.join(PARSER_DIR, wasmFile);
-  return fs21.existsSync(localPath);
+  const localPath = path21.join(PARSER_DIR, wasmFile);
+  return fs22.existsSync(localPath);
 }
 async function deleteParser(wasmFile) {
-  const localPath = path20.join(PARSER_DIR, wasmFile);
-  if (fs21.existsSync(localPath)) {
-    await fs21.unlink(localPath);
+  const localPath = path21.join(PARSER_DIR, wasmFile);
+  if (fs22.existsSync(localPath)) {
+    await fs22.unlink(localPath);
   }
 }
 var EXTENSION_TO_WASM;
@@ -10905,8 +11224,8 @@ var init_parsers = __esm({
 });
 
 // src/tools/file_map.js
-import fs22 from "fs-extra";
-import path21 from "path";
+import fs23 from "fs-extra";
+import path22 from "path";
 import { createRequire as createRequire2 } from "module";
 function sanitize(text, limit = 50) {
   if (!text) return "";
@@ -11098,17 +11417,17 @@ var init_file_map = __esm({
       if (!filePath) {
         return 'ERROR: No file path provided. Use [tool:functions.FileMap(path="...")]';
       }
-      const absolutePath = path21.isAbsolute(filePath) ? filePath : path21.resolve(process.cwd(), filePath);
-      if (!fs22.existsSync(absolutePath)) {
+      const absolutePath = path22.isAbsolute(filePath) ? filePath : path22.resolve(process.cwd(), filePath);
+      if (!fs23.existsSync(absolutePath)) {
         return `ERROR: File not found: ${filePath}`;
       }
-      const ext = path21.extname(absolutePath).slice(1).toLowerCase();
+      const ext = path22.extname(absolutePath).slice(1).toLowerCase();
       const wasmFile = EXTENSION_TO_WASM[ext];
       if (!wasmFile) {
         return `ERROR: Unsupported file extension: .${ext}`;
       }
-      const wasmPath = path21.resolve(PARSER_DIR, wasmFile);
-      if (!fs22.existsSync(wasmPath)) {
+      const wasmPath = path22.resolve(PARSER_DIR, wasmFile);
+      if (!fs23.existsSync(wasmPath)) {
         return `ERROR: Parser for .${ext} not found. Please download it in Settings > Other.`;
       }
       try {
@@ -11116,9 +11435,9 @@ var init_file_map = __esm({
         if (!isParserInitialized) {
           let tsWasmPath;
           try {
-            tsWasmPath = path21.join(path21.dirname(require3.resolve("web-tree-sitter")), "tree-sitter.wasm");
+            tsWasmPath = path22.join(path22.dirname(require3.resolve("web-tree-sitter")), "tree-sitter.wasm");
           } catch (e) {
-            tsWasmPath = path21.join(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm");
+            tsWasmPath = path22.join(process.cwd(), "node_modules", "web-tree-sitter", "tree-sitter.wasm");
           }
           await Parser.init({
             locateFile: (p) => {
@@ -11133,7 +11452,7 @@ var init_file_map = __esm({
         const parser = new Parser();
         const Lang = await TreeSitter.Language.load(wasmPath);
         parser.setLanguage(Lang);
-        const sourceCode = await fs22.readFile(absolutePath, "utf8");
+        const sourceCode = await fs23.readFile(absolutePath, "utf8");
         const lines = sourceCode.split("\n").length;
         let maxDepth = 12;
         if (lines > 1e4) maxDepth = 2;
@@ -11156,8 +11475,8 @@ Stack: ${err.stack}` : "";
 });
 
 // src/tools/todo.js
-import fs23 from "fs";
-import path22 from "path";
+import fs24 from "fs";
+import path23 from "path";
 var todo;
 var init_todo = __esm({
   "src/tools/todo.js"() {
@@ -11168,8 +11487,8 @@ var init_todo = __esm({
       const { method, tasks, markDone } = parseArgs(args);
       const chatId = context.chatId || "default";
       if (!method) return 'ERROR: Missing "method" argument for todo tool (create/append/get).';
-      const todoDir = path22.join(DATA_DIR, "plan", chatId);
-      const todoFile = path22.join(todoDir, "todo.md");
+      const todoDir = path23.join(DATA_DIR, "plan", chatId);
+      const todoFile = path23.join(todoDir, "todo.md");
       const parseMessyArray = (input) => {
         if (!input || Array.isArray(input)) return input;
         const trimmed = String(input).trim();
@@ -11229,8 +11548,8 @@ var init_todo = __esm({
         };
       };
       try {
-        if (!fs23.existsSync(todoDir)) {
-          fs23.mkdirSync(todoDir, { recursive: true });
+        if (!fs24.existsSync(todoDir)) {
+          fs24.mkdirSync(todoDir, { recursive: true });
         }
         if (method === "create") {
           if (!tasks) return 'ERROR: Missing "tasks" for create method.';
@@ -11242,7 +11561,7 @@ var init_todo = __esm({
             markedCount = result.markedCount;
           }
           await RevertManager.recordFileChange(todoFile);
-          fs23.writeFileSync(todoFile, content, "utf8");
+          fs24.writeFileSync(todoFile, content, "utf8");
           const total = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           if (markedCount > 0) {
             const completed = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -11256,8 +11575,8 @@ ${content}`;
           if (!tasks) return 'ERROR: Missing "tasks" for append method.';
           const appendContent = getTasksString(tasks);
           await RevertManager.recordFileChange(todoFile);
-          fs23.appendFileSync(todoFile, appendContent, "utf8");
-          const fullContent = fs23.readFileSync(todoFile, "utf8");
+          fs24.appendFileSync(todoFile, appendContent, "utf8");
+          const fullContent = fs24.readFileSync(todoFile, "utf8");
           const lines = fullContent.split(/\r?\n/).map((l) => l.trim());
           const total = lines.filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           const completed = lines.filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -11266,10 +11585,10 @@ ${content}`;
 ${fullContent}`;
         }
         if (method === "get") {
-          if (!fs23.existsSync(todoFile)) {
+          if (!fs24.existsSync(todoFile)) {
             return "TODO GET: No task list found for this session.";
           }
-          let content = fs23.readFileSync(todoFile, "utf8");
+          let content = fs24.readFileSync(todoFile, "utf8");
           let markedCount = 0;
           if (markDone) {
             const result = applyMarkDone(content, markDone);
@@ -11277,7 +11596,7 @@ ${fullContent}`;
               content = result.content;
               markedCount = result.markedCount;
               await RevertManager.recordFileChange(todoFile);
-              fs23.writeFileSync(todoFile, content, "utf8");
+              fs24.writeFileSync(todoFile, content, "utf8");
             }
           }
           const totalLines = content.split(/\r?\n/).map((l) => l.trim());
@@ -11673,20 +11992,20 @@ var init_await = __esm({
 });
 
 // src/utils/advanceRevert.js
-import fs24 from "fs-extra";
-import path23 from "path";
+import fs25 from "fs-extra";
+import path24 from "path";
 async function scanWorkspace(dir, baseDir = dir) {
   const manifest = {};
-  const entries = await fs24.readdir(dir, { withFileTypes: true }).catch(() => []);
+  const entries = await fs25.readdir(dir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (JUNK_DIRECTORIES.includes(entry.name)) continue;
-    const fullPath = path23.join(dir, entry.name);
-    const relPath = path23.relative(baseDir, fullPath).replace(/\\/g, "/");
+    const fullPath = path24.join(dir, entry.name);
+    const relPath = path24.relative(baseDir, fullPath).replace(/\\/g, "/");
     if (entry.isDirectory()) {
       const sub = await scanWorkspace(fullPath, baseDir);
       Object.assign(manifest, sub);
     } else {
-      const stats = await fs24.stat(fullPath).catch(() => null);
+      const stats = await fs25.stat(fullPath).catch(() => null);
       if (stats) {
         manifest[relPath] = {
           size: stats.size,
@@ -11698,34 +12017,34 @@ async function scanWorkspace(dir, baseDir = dir) {
   return manifest;
 }
 async function copyWorkspaceFiles(destDir, manifest) {
-  await fs24.ensureDir(destDir);
+  await fs25.ensureDir(destDir);
   for (const relPath of Object.keys(manifest)) {
-    const srcPath = path23.join(process.cwd(), relPath);
-    const destPath = path23.join(destDir, relPath);
-    await fs24.ensureDir(path23.dirname(destPath));
-    await fs24.copyFile(srcPath, destPath).catch(() => {
+    const srcPath = path24.join(process.cwd(), relPath);
+    const destPath = path24.join(destDir, relPath);
+    await fs25.ensureDir(path24.dirname(destPath));
+    await fs25.copyFile(srcPath, destPath).catch(() => {
     });
   }
 }
 async function restoreSnapshotDir(srcDir, destDir, stats = null, baseDir = null) {
-  if (!await fs24.pathExists(srcDir)) return;
+  if (!await fs25.pathExists(srcDir)) return;
   if (!baseDir) baseDir = srcDir;
-  const entries = await fs24.readdir(srcDir, { withFileTypes: true }).catch(() => []);
+  const entries = await fs25.readdir(srcDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
-    const srcPath = path23.join(srcDir, entry.name);
-    const destPath = path23.join(destDir, entry.name);
+    const srcPath = path24.join(srcDir, entry.name);
+    const destPath = path24.join(destDir, entry.name);
     if (entry.isDirectory()) {
       await restoreSnapshotDir(srcPath, destPath, stats, baseDir);
     } else {
-      const relPath = path23.relative(baseDir, srcPath).replace(/\\/g, "/");
-      const existed = await fs24.pathExists(destPath);
+      const relPath = path24.relative(baseDir, srcPath).replace(/\\/g, "/");
+      const existed = await fs25.pathExists(destPath);
       if (existed) {
-        await fs24.chmod(destPath, 438).catch(() => {
+        await fs25.chmod(destPath, 438).catch(() => {
         });
       }
-      await fs24.ensureDir(path23.dirname(destPath));
-      const ok = await fs24.copyFile(srcPath, destPath).then(() => true).catch(() => false);
-      await fs24.chmod(destPath, 438).catch(() => {
+      await fs25.ensureDir(path24.dirname(destPath));
+      const ok = await fs25.copyFile(srcPath, destPath).then(() => true).catch(() => false);
+      await fs25.chmod(destPath, 438).catch(() => {
       });
       if (stats) {
         if (!ok) {
@@ -11763,12 +12082,12 @@ var init_advanceRevert = __esm({
     AdvanceRevertManager = {
       async takeInitialSnapshot(chatId) {
         try {
-          const snapshotsDir = path23.join(DATA_DIR, "snapshots", chatId);
-          await fs24.remove(snapshotsDir).catch(() => {
+          const snapshotsDir = path24.join(DATA_DIR, "snapshots", chatId);
+          await fs25.remove(snapshotsDir).catch(() => {
           });
-          await fs24.ensureDir(snapshotsDir);
+          await fs25.ensureDir(snapshotsDir);
           const manifest = await scanWorkspace(process.cwd());
-          await copyWorkspaceFiles(path23.join(snapshotsDir, "initial"), manifest);
+          await copyWorkspaceFiles(path24.join(snapshotsDir, "initial"), manifest);
           const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
           ledger[chatId] = {
             initialManifest: manifest,
@@ -11817,7 +12136,7 @@ var init_advanceRevert = __esm({
             for (const file of changedFiles) {
               deltaManifest[file] = currentManifest[file];
             }
-            const turnDir = path23.join(DATA_DIR, "snapshots", chatId, `turn_${turnNumber}`);
+            const turnDir = path24.join(DATA_DIR, "snapshots", chatId, `turn_${turnNumber}`);
             await copyWorkspaceFiles(turnDir, deltaManifest);
           }
           session.checkpoints.push({
@@ -11851,28 +12170,28 @@ var init_advanceRevert = __esm({
           const checkpoints = session.checkpoints || [];
           const targetIdx = checkpoints.findIndex((c) => c.id === checkpointId);
           if (targetIdx === -1) throw new Error(`Checkpoint [${checkpointId}] not found.`);
-          const snapshotsDir = path23.join(DATA_DIR, "snapshots", chatId);
+          const snapshotsDir = path24.join(DATA_DIR, "snapshots", chatId);
           const stats = { restored: 0, replaced: 0, failed: [] };
           const currentFiles = await scanWorkspace(process.cwd());
           for (const relPath of Object.keys(currentFiles)) {
-            const fullPath = path23.join(process.cwd(), relPath);
-            await fs24.chmod(fullPath, 438).catch(() => {
+            const fullPath = path24.join(process.cwd(), relPath);
+            await fs25.chmod(fullPath, 438).catch(() => {
             });
-            await fs24.remove(fullPath).catch(() => {
+            await fs25.remove(fullPath).catch(() => {
             });
           }
-          const initialDir = path23.join(snapshotsDir, "initial");
+          const initialDir = path24.join(snapshotsDir, "initial");
           await restoreSnapshotDir(initialDir, process.cwd(), stats, initialDir);
           for (let i = 1; i <= targetIdx; i++) {
             const cp = checkpoints[i];
-            const turnDir = path23.join(snapshotsDir, cp.id);
+            const turnDir = path24.join(snapshotsDir, cp.id);
             await restoreSnapshotDir(turnDir, process.cwd(), stats, turnDir);
             if (cp.deletedFiles && cp.deletedFiles.length > 0) {
               for (const delFile of cp.deletedFiles) {
-                const fullPath = path23.join(process.cwd(), delFile);
-                await fs24.chmod(fullPath, 438).catch(() => {
+                const fullPath = path24.join(process.cwd(), delFile);
+                await fs25.chmod(fullPath, 438).catch(() => {
                 });
-                await fs24.remove(fullPath).catch(() => {
+                await fs25.remove(fullPath).catch(() => {
                 });
               }
             }
@@ -11904,8 +12223,8 @@ var init_advanceRevert = __esm({
       },
       async cleanup(chatId) {
         try {
-          const snapshotsDir = path23.join(DATA_DIR, "snapshots", chatId);
-          await fs24.remove(snapshotsDir).catch(() => {
+          const snapshotsDir = path24.join(DATA_DIR, "snapshots", chatId);
+          await fs25.remove(snapshotsDir).catch(() => {
           });
           const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
           if (ledger[chatId]) {
@@ -12260,8 +12579,8 @@ __export(ai_exports, {
 });
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
-import path24, { normalize } from "path";
-import fs25 from "fs";
+import path25, { normalize } from "path";
+import fs26 from "fs";
 var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
@@ -13240,7 +13559,7 @@ var init_ai = __esm({
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-        return filePath ? path24.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
+        return filePath ? path25.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
       } catch (e) {
         return null;
       }
@@ -13505,9 +13824,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             }
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
-          const janitorErrDir = path24.join(LOGS_DIR, "janitor");
-          if (!fs25.existsSync(janitorErrDir)) fs25.mkdirSync(janitorErrDir, { recursive: true });
-          fs25.appendFileSync(path24.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          const janitorErrDir = path25.join(LOGS_DIR, "janitor");
+          if (!fs26.existsSync(janitorErrDir)) fs26.mkdirSync(janitorErrDir, { recursive: true });
+          fs26.appendFileSync(path25.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -13516,8 +13835,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }
       }
       if (attempts) {
-        const janitorErrDir = path24.join(LOGS_DIR, "janitor");
-        fs25.appendFileSync(path24.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        const janitorErrDir = path25.join(LOGS_DIR, "janitor");
+        fs26.appendFileSync(path25.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
       }
@@ -14050,10 +14369,10 @@ ${newMemoryListStr}
           }
         })() : String(err);
         ;
-        const janitorLogDir = path24.join(LOGS_DIR, "janitor");
-        if (!fs25.existsSync(janitorLogDir)) fs25.mkdirSync(janitorLogDir, { recursive: true });
-        fs25.appendFileSync(
-          path24.join(janitorLogDir, "error.log"),
+        const janitorLogDir = path25.join(LOGS_DIR, "janitor");
+        if (!fs26.existsSync(janitorLogDir)) fs26.mkdirSync(janitorLogDir, { recursive: true });
+        fs26.appendFileSync(
+          path25.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
         );
@@ -14061,7 +14380,7 @@ ${newMemoryListStr}
     };
     compressHistory = async (settings, history, isAuto = false) => {
       const { chatId, aiProvider = "Google" } = settings;
-      const summariesFile = path24.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
       const flattenContext = (hist) => {
         return hist.filter(
           (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
@@ -14136,8 +14455,8 @@ Provide a consolidated summary of the entire session.`;
     };
     deleteChatSummary = (chatId) => {
       try {
-        const summariesFile = path24.join(SECRET_DIR, "chat-summaries.json");
-        if (fs25.existsSync(summariesFile)) {
+        const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
+        if (fs26.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -14153,7 +14472,7 @@ Provide a consolidated summary of the entire session.`;
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
       const originalText = history[history.length - 1].text;
-      const summariesFile = path24.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
       let wasCompressedInStream = false;
       const isFirstPrompt = history.filter((m) => m.role === "user").length === 1;
       const hasTitleSignal = originalText.includes("[TITLE-UPDATE]");
@@ -14399,7 +14718,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs25.readdirSync(dir, { withFileTypes: true });
+            return fs26.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -14412,16 +14731,16 @@ Provide a consolidated summary of the entire session.`;
             if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
             if (entry.isDirectory()) {
               currentCount.value++;
-              countFolders(path24.join(dir, entry.name), currentCount, depth + 1);
+              countFolders(path25.join(dir, entry.name), currentCount, depth + 1);
             }
           }
           return currentCount.value;
         };
         const getDirTree = (dir, maxDepth, prefix = "", depth = 1) => {
           const entries = safeReaddirWithTypes(dir);
-          const sep = path24.sep;
+          const sep = path25.sep;
           if (entries.length > 100) {
-            return `${prefix}\u2514\u2500\u2500 ${path24.basename(dir)}${sep} ...100+ files...
+            return `${prefix}\u2514\u2500\u2500 ${path25.basename(dir)}${sep} ...100+ files...
 `;
           }
           let result = "";
@@ -14439,7 +14758,7 @@ Provide a consolidated summary of the entire session.`;
           ];
           finalItems.forEach((item, index) => {
             const isLast = index === finalItems.length - 1;
-            const filePath = path24.join(dir, item.name);
+            const filePath = path25.join(dir, item.name);
             const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
             const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
             if (item.isCollapsed) {
@@ -14522,10 +14841,10 @@ ${currentSummary}
         if (isBridgeConnected()) {
           ideBlock = "[IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
-            const relFocused = path24.relative(process.cwd(), ideCtx.file_focused);
+            const relFocused = path25.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
-              const rel = path24.relative(process.cwd(), p);
-              return rel.startsWith("..") ? `[External] ${path24.basename(p)}` : rel;
+              const rel = path25.relative(process.cwd(), p);
+              return rel.startsWith("..") ? `[External] ${path25.basename(p)}` : rel;
             });
             ideBlock += `Focused File: ${relFocused}
 Cursor Line: ${ideCtx.cursor_line}
@@ -14567,7 +14886,7 @@ Cursor Line: ${ideCtx.cursor_line}
               }
               const getSumForLimit = (limit, activeFiles2) => {
                 return activeFiles2.reduce((sum, f) => {
-                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path24.resolve(process.cwd(), f.path) === path24.resolve(ideCtx.file_focused));
+                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path25.resolve(process.cwd(), f.path) === path25.resolve(ideCtx.file_focused));
                   const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
                   return sum + Math.min(f.edits.length, fileLimit);
                 }, 0);
@@ -14601,7 +14920,7 @@ Cursor Line: ${ideCtx.cursor_line}
                 }
               }
               for (const file of activeFiles) {
-                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path24.resolve(process.cwd(), file.path) === path24.resolve(ideCtx.file_focused));
+                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path25.resolve(process.cwd(), file.path) === path25.resolve(ideCtx.file_focused));
                 const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
                 if (file.edits.length > fileLimit) {
                   file.edits = file.edits.slice(-fileLimit);
@@ -14688,9 +15007,9 @@ ${ideCtx.warnings}
               endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
               filePath = tagClean.slice(0, matchRange.index);
             }
-            const absPath = path24.resolve(process.cwd(), filePath);
-            if (fs25.existsSync(absPath)) {
-              const stats = fs25.statSync(absPath);
+            const absPath = path25.resolve(process.cwd(), filePath);
+            if (fs26.existsSync(absPath)) {
+              const stats = fs26.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -14699,7 +15018,7 @@ ${ideCtx.warnings}
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
                 const isSupported = aiProvider === "Google" || isModelMultimodal(modelName);
                 if (isMultimodalFile && !isSupported) {
-                  const label = `\u2718 Unsupported Modality: ${path24.basename(filePath)}`;
+                  const label = `\u2718 Unsupported Modality: ${path25.basename(filePath)}`;
                   let terminalWidth = 115;
                   if (process.stdout.isTTY) {
                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -14715,11 +15034,11 @@ ${ideCtx.warnings}
                 if (startLine === null && !isMultimodalFile) {
                   let lineCount = 0;
                   try {
-                    lineCount = fs25.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
+                    lineCount = fs26.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
                   } catch (e) {
                   }
                   if (lineCount > 550) {
-                    const label = `\u21B7  Skipped (Too Large): ${path24.basename(filePath)}`;
+                    const label = `\u21B7  Skipped (Too Large): ${path25.basename(filePath)}`;
                     let terminalWidth = 115;
                     if (process.stdout.isTTY) {
                       terminalWidth = process.stdout.columns - 5 || 120;
@@ -14760,13 +15079,13 @@ ${ideCtx.warnings}
                 if (!isError) {
                   let label = "";
                   if (isImage) {
-                    label = `\u2714  Processed: ${path24.basename(filePath)}`;
+                    label = `\u2714  Processed: ${path25.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else if (isPdf || isOfficeFile) {
-                    label = `\u2714  Auto-Analysed: ${path24.basename(filePath)}`;
+                    label = `\u2714  Auto-Analysed: ${path25.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else {
-                    label = `\u2714  Auto-Read: ${path24.basename(filePath)}`;
+                    label = `\u2714  Auto-Read: ${path25.basename(filePath)}`;
                     taggedContextBlocks.push(textResult);
                   }
                   if (label) {
@@ -15441,7 +15760,7 @@ ${ideErr} [/ERROR]`;
                       if (keyword !== void 0 && keyword !== null) {
                         detail = String(keyword).replace(RE_STRIP_QUOTES, "");
                       } else if (filePath) {
-                        detail = path24.basename(String(filePath).replace(RE_STRIP_QUOTES, "").replace(RE_BACKSLASH_SLASH, "/"));
+                        detail = path25.basename(String(filePath).replace(RE_STRIP_QUOTES, "").replace(RE_BACKSLASH_SLASH, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
                         detail = String(title).replace(RE_STRIP_QUOTES, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
@@ -15470,7 +15789,7 @@ ${ideErr} [/ERROR]`;
                           if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
                             detail = val.substring(0, 30);
                           } else {
-                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path24.basename(val.replace(RE_BACKSLASH_SLASH, "/"));
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path25.basename(val.replace(RE_BACKSLASH_SLASH, "/"));
                           }
                         }
                       }
@@ -15676,9 +15995,9 @@ ${ideErr} [/ERROR]`;
                       let totalLines = "...";
                       let actualEndLine = eLine;
                       try {
-                        const absPath = path24.resolve(process.cwd(), targetPath2);
-                        if (fs25.existsSync(absPath)) {
-                          const content = fs25.readFileSync(absPath, "utf8");
+                        const absPath = path25.resolve(process.cwd(), targetPath2);
+                        if (fs26.existsSync(absPath)) {
+                          const content = fs26.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           actualEndLine = Math.min(eLine, lines);
@@ -15690,16 +16009,16 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label = `\u2714  Analyzed: ${path24.basename(targetPath2)}`;
+                        label = `\u2714  Analyzed: ${path25.basename(targetPath2)}`;
                       } else if (isImage) {
-                        label = `\u2714  Processed: ${path24.basename(targetPath2)}`;
+                        label = `\u2714  Processed: ${path25.basename(targetPath2)}`;
                       } else {
-                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${path24.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
+                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${path25.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path26 = parseArgs(toolCall.args).path;
-                      label = `\u2714  ${action}: ${path26 === "." ? "./" : path26}`;
+                      const path27 = parseArgs(toolCall.args).path;
+                      label = `\u2714  ${action}: ${path27 === "." ? "./" : path27}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
@@ -15710,8 +16029,8 @@ ${ideErr} [/ERROR]`;
                       label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
 `;
                     } else if (normToolName === "file_map") {
-                      const path26 = parseArgs(toolCall.args).path;
-                      label = `${path26 ? "\u2714" : "\u2718"}  Indexed${path26 ? ": " + path26 : " File Not Found"}`;
+                      const path27 = parseArgs(toolCall.args).path;
+                      label = `${path27 ? "\u2714" : "\u2718"}  Indexed${path27 ? ": " + path27 : " File Not Found"}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
@@ -15786,7 +16105,7 @@ ${ideErr} [/ERROR]`;
                       const { command } = parseArgs(toolCall.args);
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
-                        const currentDrive = path24.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                        const currentDrive = path25.resolve(process.cwd()).substring(0, 3).toLowerCase();
                         const splitCommands = (cmdString) => {
                           const commands = [];
                           let current = "";
@@ -15915,8 +16234,8 @@ ${ideErr} [/ERROR]`;
                     const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
                     if (targetPath) {
                       const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                      const absoluteTarget = path24.resolve(targetPath);
-                      const absoluteCwd = path24.resolve(process.cwd());
+                      const absoluteTarget = path25.resolve(targetPath);
+                      const absoluteCwd = path25.resolve(process.cwd());
                       if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                         if (normToolName === "write_file" || normToolName === "update_file") {
@@ -16105,7 +16424,7 @@ ${ideErr} [/ERROR]`;
                               const toolArgs = parseArgs(toolCall.args);
                               const { path: filePath } = toolArgs;
                               if (filePath) {
-                                const absPath = path24.resolve(process.cwd(), filePath);
+                                const absPath = path25.resolve(process.cwd(), filePath);
                                 const normalize2 = (p) => p ? p.toLowerCase().replace(/\\/g, "/").replace(/^[a-z]:/, (m) => m.toUpperCase()) : "";
                                 const normAbsPath = normalize2(absPath);
                                 let originalContent = "";
@@ -16115,8 +16434,8 @@ ${ideErr} [/ERROR]`;
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs25.existsSync(absPath)) {
-                                  originalContent = fs25.readFileSync(absPath, "utf8");
+                                } else if (fs26.existsSync(absPath)) {
+                                  originalContent = fs26.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -16143,9 +16462,9 @@ ${ideErr} [/ERROR]`;
                                     const successes = patchResults.filter((r) => r.success);
                                     const failures = patchResults.filter((r) => !r.success);
                                     if (successes.length === 0) {
-                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path24.basename(absPath)}].
+                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path25.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path24.basename(absPath)}`.toUpperCase();
+                                      const errorLabel = `\u2714  Edited: ${path25.basename(absPath)}`.toUpperCase();
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -16163,19 +16482,19 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                                       continue;
                                     }
                                   }
-                                  yield { type: "status", content: `Opening Diff in IDE: ${path24.basename(absPath)}` };
+                                  yield { type: "status", content: `Opening Diff in IDE: ${path25.basename(absPath)}` };
                                   showDiffInIDE(absPath, originalContent, modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs25.existsSync(absPath)) {
+                                  if (!fs26.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs25.mkdirSync(path24.dirname(absPath), { recursive: true });
-                                    fs25.writeFileSync(absPath, "", "utf8");
+                                    fs26.mkdirSync(path25.dirname(absPath), { recursive: true });
+                                    fs26.writeFileSync(absPath, "", "utf8");
                                   }
-                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path24.basename(absPath)}` };
+                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path25.basename(absPath)}` };
                                   showDiffInIDE(absPath, "", modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -16211,11 +16530,11 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const { path: filePath } = parseArgs(toolCall.args);
                             if (filePath) {
-                              const absPath = path24.resolve(process.cwd(), filePath);
+                              const absPath = path25.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs25.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs26.existsSync(absPath)) {
                                 try {
-                                  fs25.unlinkSync(absPath);
+                                  fs26.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -16227,13 +16546,13 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                         }
                         if (approval === "allow" && diffOpened && isBridgeConnected()) {
                           const { path: filePath } = parseArgs(toolCall.args);
-                          const absPath = path24.resolve(process.cwd(), filePath);
+                          const absPath = path25.resolve(process.cwd(), filePath);
                           const finalIDE = await getIDEContext();
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs25.existsSync(absPath)) {
-                            finalContent = fs25.readFileSync(absPath, "utf8");
+                          } else if (fs26.existsSync(absPath)) {
+                            finalContent = fs26.readFileSync(absPath, "utf8");
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -16395,7 +16714,7 @@ ${snippet2}
                       try {
                         const { path: filePath } = parseArgs(toolCall.args);
                         if (filePath) {
-                          const absPath = path24.resolve(process.cwd(), filePath);
+                          const absPath = path25.resolve(process.cwd(), filePath);
                           const currentIDE = await getIDEContext();
                           if (currentIDE && currentIDE.file_focused === absPath && currentIDE.full_content) {
                             execToolContext.forcedContent = currentIDE.full_content;
@@ -16409,7 +16728,7 @@ ${snippet2}
                     if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
-                        const absPath = path24.resolve(process.cwd(), filePath);
+                        const absPath = path25.resolve(process.cwd(), filePath);
                         openFileInEditor(absPath);
                       }
                     }
@@ -16426,7 +16745,7 @@ ${snippet2}
                       result = result.text;
                     }
                     if (normToolName === "search_keyword") {
-                      const { keyword, path: path26 } = parseArgs(toolCall.args);
+                      const { keyword, path: path27 } = parseArgs(toolCall.args);
                       const _isDir = typeof result === "string" && result.startsWith("[DIR]");
                       if (_isDir) result = result.slice(5);
                       let matchCount = 0;
@@ -16436,7 +16755,7 @@ ${snippet2}
                           matchCount = parseInt(m[1]);
                         }
                       }
-                      const _sp = path26 ? path26.replace(/[\/\\]+$/, "") : null;
+                      const _sp = path27 ? path27.replace(/[\/\\]+$/, "") : null;
                       const displayPath = _sp && _sp !== "." ? `"${_isDir ? `${_sp}/*` : _sp}"` : "./";
                       const postLabel = `\u2714  Searched: "${keyword}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
@@ -16676,9 +16995,9 @@ ${snippet2}
               })() : String(err);
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
-              const agentErrDir = path24.join(LOGS_DIR, "agent");
-              if (!fs25.existsSync(agentErrDir)) fs25.mkdirSync(agentErrDir, { recursive: true });
-              fs25.appendFileSync(path24.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              const agentErrDir = path25.join(LOGS_DIR, "agent");
+              if (!fs26.existsSync(agentErrDir)) fs26.mkdirSync(agentErrDir, { recursive: true });
+              fs26.appendFileSync(path25.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -16725,7 +17044,7 @@ ${recoveryText}`
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
                   throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)
-Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               } else {
                 if (retryCount <= MAX_RETRIES) {
@@ -16743,7 +17062,7 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
                   yield { type: "status", content: `Trying to reach ${modelName}` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
-Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               }
             }
@@ -16862,10 +17181,10 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
           }
         })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
-        const agentErrDir = path24.join(LOGS_DIR, "agent");
+        const agentErrDir = path25.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
-        if (!fs25.existsSync(agentErrDir)) fs25.mkdirSync(agentErrDir, { recursive: true });
-        fs25.appendFileSync(path24.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
+        if (!fs26.existsSync(agentErrDir)) fs26.mkdirSync(agentErrDir, { recursive: true });
+        fs26.appendFileSync(path25.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
 
 ----------------------------------------------------------------------
 
@@ -17009,20 +17328,20 @@ ${cleanResponse}
           } else if (normalizedToolName === "web_scrape" || normalizedToolName === "webscrape") {
             label = `\u2714 \x1B[95mScraped\x1B[0m`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
-            const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mRead\x1B[0m: ${path26}`;
+            const path27 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mRead\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
-            const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path26}`;
+            const path27 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mCreated\x1B[0m: ${path26}`;
+            const path27 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mCreated\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mEdited\x1B[0m: ${path26}`;
+            const path27 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mEdited\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
-            const path26 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mIndexed\x1B[0m: ${path26}`;
+            const path27 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mIndexed\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;
@@ -18017,7 +18336,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs26 from "fs";
+import fs27 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -18026,11 +18345,11 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const pptrConfig = getPuppeteerConfig();
-        if (pptrConfig.executablePath && fs26.existsSync(pptrConfig.executablePath)) {
+        if (pptrConfig.executablePath && fs27.existsSync(pptrConfig.executablePath)) {
           return true;
         }
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs26.existsSync(exePath);
+        const exists = exePath && fs27.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -18117,8 +18436,8 @@ __export(app_exports, {
 import os5 from "os";
 import React16, { useState as useState15, useEffect as useEffect12, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs27 from "fs-extra";
-import path25 from "path";
+import fs28 from "fs-extra";
+import path26 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath as fileURLToPath3 } from "url";
 import TextInput4 from "ink-text-input";
@@ -18445,10 +18764,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs27.ensureDir(path25.dirname(kbPath));
+      await fs28.ensureDir(path26.dirname(kbPath));
       let bindings = [];
-      if (fs27.existsSync(kbPath)) {
-        const content = fs27.readFileSync(kbPath, "utf8").trim();
+      if (fs28.existsSync(kbPath)) {
+        const content = fs28.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -18468,7 +18787,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs27.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs28.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -19179,7 +19498,7 @@ function App({ args = [] }) {
   useEffect12(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs27.readFileSync(path25.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs28.readFileSync(path26.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -19293,7 +19612,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs27.remove(path25.join(DATA_DIR, "playground")).catch(() => {
+        fs28.remove(path26.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -19327,9 +19646,9 @@ function App({ args = [] }) {
         }
       }
       if (parsedArgs.playground) {
-        const playgroundDir = path25.join(DATA_DIR, "playground");
+        const playgroundDir = path26.join(DATA_DIR, "playground");
         try {
-          fs27.ensureDirSync(playgroundDir);
+          fs28.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -19370,8 +19689,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs27.existsSync(kbPath)) {
-              const content = fs27.readFileSync(kbPath, "utf8").trim();
+            if (fs28.existsSync(kbPath)) {
+              const content = fs28.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -19527,7 +19846,14 @@ function App({ args = [] }) {
     { cmd: "/revert", desc: "Revert codebase back to a checkpoint" },
     { cmd: "/gemini", desc: "Get a happy message from Gemini CLI" },
     { cmd: "/save", desc: "Force save current chat" },
-    { cmd: "/export", desc: "Export current chat in a .txt file" },
+    {
+      cmd: "/export",
+      desc: "Export current chat or error logs",
+      subs: [
+        { cmd: "chat", desc: "Export current active chat" },
+        { cmd: "logs", desc: "Export error logs" }
+      ]
+    },
     { cmd: "/chats", desc: "List all chat sessions" },
     { cmd: "/btw", desc: "Ask a question without intefering with ongoing tasks" },
     {
@@ -19742,22 +20068,22 @@ ${cleanText}`, color: "magenta" }];
             });
             break;
           }
-          const src = path25.join(DATA_DIR, "playground");
-          const dest = path25.join(parsedArgs.originalCwd, "playground-export");
+          const src = path26.join(DATA_DIR, "playground");
+          const dest = path26.join(parsedArgs.originalCwd, "playground-export");
           const moveFiles = async () => {
             try {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs27.ensureDir(dest);
+              await fs28.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs27.copy(src, dest, {
+              await fs28.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
-                  const relative = path25.relative(src, srcPath);
+                  const relative = path26.relative(src, srcPath);
                   if (!relative) return true;
-                  const parts2 = relative.split(path25.sep);
+                  const parts2 = relative.split(path26.sep);
                   return !parts2.some((part) => excludeDirs.includes(part));
                 }
               });
@@ -19819,7 +20145,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs27.emptyDir(path25.join(DATA_DIR, "playground")).catch((err) => {
+              fs28.emptyDir(path26.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -20158,80 +20484,31 @@ ${cleanText}`, color: "magenta" }];
           break;
         }
         case "/export": {
-          const exportFile = `export-fluxflow-${chatId}.txt`;
-          const exportPath = path25.join(process.cwd(), exportFile);
-          const exportLines = [];
-          let insideAgentBlock = false;
-          for (let i = 0; i < messages.length; i++) {
-            const msg = messages[i];
-            if (!msg) continue;
-            if (msg.role === "system" || msg.isMeta || msg.isLogo || String(msg.id).startsWith("welcome")) {
-              continue;
+          const runExport = async () => {
+            try {
+              const result = await handleExport(parts, { chatId, messages });
+              setMessages((prev) => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                  id: Date.now(),
+                  role: "system",
+                  text: result.message,
+                  isMeta: true
+                }];
+              });
+            } catch (err) {
+              setMessages((prev) => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                  id: Date.now(),
+                  role: "system",
+                  text: `[EXPORT ERROR] Failed to export: ${err.message}`,
+                  isMeta: true
+                }];
+              });
             }
-            if (msg.role === "user") {
-              let cleanUserText = msg.text || "";
-              cleanUserText = cleanUserText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
-              if (exportLines.length > 0) {
-                exportLines.push("");
-              }
-              exportLines.push("[USER]");
-              exportLines.push(cleanUserText);
-              insideAgentBlock = false;
-            } else if (msg.role === "think") {
-              if (!insideAgentBlock) {
-                exportLines.push("");
-                exportLines.push("[AGENT]");
-                insideAgentBlock = true;
-              }
-              const cleanThinkText = (msg.text || "").replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\[TOOL RESULTS\]\]/gi, "").replace(/\[TOOL RESULTS\]/gi, "").replace(/\[TOOL RESULT\]/gi, "").trim();
-              if (cleanThinkText) {
-                exportLines.push("[thoughts]");
-                exportLines.push(cleanThinkText);
-              }
-            } else if (msg.role === "agent") {
-              if (!insideAgentBlock) {
-                exportLines.push("");
-                exportLines.push("[AGENT]");
-                insideAgentBlock = true;
-              }
-              const blocks = parseAgentText(msg.text || "");
-              for (const block of blocks) {
-                if (block.type === "output") {
-                  const cleanContent = block.content.replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, "").replace(/\[\[END\]\]/gi, "").replace(/\[\[TOOL RESULTS\]\]/gi, "").replace(/\[TOOL RESULTS\]/gi, "").replace(/\[TOOL RESULT\]/gi, "").trim();
-                  if (cleanContent) {
-                    exportLines.push("[output]");
-                    exportLines.push(cleanContent);
-                  }
-                } else if (block.type === "tool") {
-                  exportLines.push("[tool]");
-                  exportLines.push(`${block.toolName} ${block.args}`);
-                }
-              }
-            }
-          }
-          const fileContent = exportLines.join("\n");
-          try {
-            fs27.writeFileSync(exportPath, fileContent, "utf8");
-            setMessages((prev) => {
-              setCompletedIndex(prev.length + 1);
-              return [...prev, {
-                id: Date.now(),
-                role: "system",
-                text: `[EXPORT] Chat exported to "${exportFile}"`,
-                isMeta: true
-              }];
-            });
-          } catch (err) {
-            setMessages((prev) => {
-              setCompletedIndex(prev.length + 1);
-              return [...prev, {
-                id: Date.now(),
-                role: "system",
-                text: `[EXPORT ERROR] Failed to export chat: ${err.message}`,
-                isMeta: true
-              }];
-            });
-          }
+          };
+          runExport();
           break;
         }
         case "/chats": {
@@ -20258,12 +20535,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs27.existsSync(LOGS_DIR)) fs27.removeSync(LOGS_DIR);
-              if (fs27.existsSync(SECRET_DIR)) fs27.removeSync(SECRET_DIR);
-              if (fs27.existsSync(SETTINGS_FILE)) fs27.removeSync(SETTINGS_FILE);
+              if (fs28.existsSync(LOGS_DIR)) fs28.removeSync(LOGS_DIR);
+              if (fs28.existsSync(SECRET_DIR)) fs28.removeSync(SECRET_DIR);
+              if (fs28.existsSync(SETTINGS_FILE)) fs28.removeSync(SETTINGS_FILE);
               try {
-                const items = fs27.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs27.removeSync(FLUXFLOW_DIR);
+                const items = fs28.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs28.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -20385,15 +20662,15 @@ ${list || "No saved chats found."}`, isMeta: true }];
 # SKILLS & WORKFLOWS
 - [Define custom step-by-step recipes for this project here]
 `;
-            const filePath = path25.join(process.cwd(), "FluxFlow.md");
-            if (fs27.pathExistsSync(filePath)) {
+            const filePath = path26.join(process.cwd(), "FluxFlow.md");
+            if (fs28.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs27.writeFileSync(filePath, template);
+                fs28.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -22546,7 +22823,7 @@ Selection: ${val}`,
     return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", paddingX: 3, paddingY: 1, borderColor: colors.borderMuted, width: Math.min(100, (stdout?.columns || 100) - 2), marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { bold: true }, gradient2(colors.logoGradient || ["blue", "purple"])("Agent powering down. Goodbye!"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "Interaction Summary"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session ID:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, chatId)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( ", /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), " )")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Success Rate:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, successRate, "%")), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 16 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits")))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "Performance"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Wall Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(wallTimeMs))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 20 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Agent Active:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(agentActiveMs))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime), " (", apiPercent, "%)")), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime), " (", toolPercent, "%)"))));
   })())));
 }
-var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, parseAgentText, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
+var shouldClearValue, getPrefilledValue, getIDEName, getIDEDirName, getKeybindingsPath, parseJsonc, hasShiftEnterBinding, getPromoOptions, BridgePromo, SESSION_START_TIME, CHANGELOG_URL, DOCS_URL, packageJsonPath, packageJson, versionFluxflow, updatedOn, ResolutionModal, getProjectFiles, cachedShortcut, getLatencyColor2, SubagentRow;
 var init_app = __esm({
   async "src/app.jsx"() {
     init_build();
@@ -22582,6 +22859,7 @@ var init_app = __esm({
     init_text();
     init_editor();
     init_GlintText();
+    init_export();
     shouldClearValue = (val) => {
       const s = String(val);
       return s.startsWith("999") && s.endsWith("9");
@@ -22632,11 +22910,11 @@ var init_app = __esm({
       if (process.platform === "win32") {
         const appData = process.env.APPDATA;
         if (!appData) return null;
-        return path25.join(appData, dirName, "User", "keybindings.json");
+        return path26.join(appData, dirName, "User", "keybindings.json");
       } else if (process.platform === "darwin") {
-        return path25.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
+        return path26.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
       } else {
-        return path25.join(home, ".config", dirName, "User", "keybindings.json");
+        return path26.join(home, ".config", dirName, "User", "keybindings.json");
       }
     };
     parseJsonc = (content) => {
@@ -22680,8 +22958,8 @@ var init_app = __esm({
     SESSION_START_TIME = Date.now();
     CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog";
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
-    packageJsonPath = path25.join(path25.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs27.readFileSync(packageJsonPath, "utf8"));
+    packageJsonPath = path26.join(path26.dirname(fileURLToPath3(import.meta.url)), "../package.json");
+    packageJson = JSON.parse(fs28.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React16.createElement(
@@ -22698,74 +22976,6 @@ var init_app = __esm({
         }
       }
     )));
-    parseAgentText = (text) => {
-      const blocks = [];
-      const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
-      let lastIdx = 0;
-      let match;
-      while ((match = toolRegex.exec(text)) !== null) {
-        const toolName = match[1];
-        const startIdx = match.index + match[0].length - 1;
-        let balance = 0;
-        let inString = null;
-        let endIdx = -1;
-        let closingParenIdx = -1;
-        for (let i = startIdx; i < text.length; i++) {
-          const char = text[i];
-          if (inString) {
-            if (char === inString) {
-              let backslashCount = 0;
-              for (let j = i - 1; j >= 0 && text[j] === "\\"; j--) {
-                backslashCount++;
-              }
-              if (backslashCount % 2 === 0) {
-                inString = null;
-              }
-            }
-          } else {
-            if (char === '"' || char === "'" || char === "`") {
-              inString = char;
-            } else if (char === "(") {
-              balance++;
-            } else if (char === ")") {
-              balance--;
-              if (balance === 0) {
-                closingParenIdx = i;
-                let j = i + 1;
-                while (j < text.length && /\s/.test(text[j])) j++;
-                if (j < text.length && text[j] === "]") {
-                  endIdx = j;
-                  break;
-                }
-              }
-            }
-          }
-        }
-        if (endIdx !== -1) {
-          const beforeText = flattenString(text.substring(lastIdx, match.index));
-          if (beforeText.trim()) {
-            blocks.push({ type: "output", content: beforeText });
-          }
-          const finalArgsText = flattenString(text.substring(startIdx + 1, closingParenIdx));
-          blocks.push({
-            type: "tool",
-            toolName: flattenString(toolName.trim()),
-            args: flattenString(finalArgsText.trim())
-          });
-          lastIdx = endIdx + 1;
-          toolRegex.lastIndex = lastIdx;
-        } else {
-          break;
-        }
-      }
-      if (lastIdx < text.length) {
-        const remainingText = flattenString(text.substring(lastIdx));
-        if (remainingText.trim()) {
-          blocks.push({ type: "output", content: remainingText });
-        }
-      }
-      return blocks;
-    };
     getProjectFiles = /* @__PURE__ */ (() => {
       let cachedFiles = null;
       let lastScanTime = 0;
@@ -22778,20 +22988,20 @@ var init_app = __esm({
         const scan = (currentDir) => {
           if (fileList.length >= 2e3) return;
           try {
-            const files = fs27.readdirSync(currentDir);
+            const files = fs28.readdirSync(currentDir);
             for (const file of files) {
               if (fileList.length >= 2e3) return;
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
-              const filePath = path25.join(currentDir, file);
-              const stat = fs27.statSync(filePath);
+              const filePath = path26.join(currentDir, file);
+              const stat = fs28.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
                 fileList.push({
                   name: flattenString(file),
-                  relativePath: flattenString(path25.relative(process.cwd(), filePath))
+                  relativePath: flattenString(path26.relative(process.cwd(), filePath))
                 });
               }
             }
@@ -22989,13 +23199,32 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isHelp = args.includes("--help") && !isHelpCommands;
   const isVersion = args.includes("--version") || args.includes("-v");
   const isUpdate = args[0] === "--update";
-  if (isVersion || isHelp || isHelpCommands || isUpdate) {
-    const fs28 = await import("fs");
-    const path26 = await import("path");
+  const isExport = args[0] === "--export";
+  if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
+    const fs29 = await import("fs");
+    const path27 = await import("path");
     const { fileURLToPath: fileURLToPath5 } = await import("url");
-    const packageJsonPath2 = path26.join(path26.dirname(fileURLToPath5(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs28.readFileSync(packageJsonPath2, "utf8"));
+    const packageJsonPath2 = path27.join(path27.dirname(fileURLToPath5(import.meta.url)), "../package.json");
+    const packageJson2 = JSON.parse(fs29.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
+    if (isExport) {
+      const subArg = (args[1] || "").toLowerCase();
+      if (subArg === "error" || subArg === "logs") {
+        try {
+          const { exportErrorLogs: exportErrorLogs2 } = await Promise.resolve().then(() => (init_export(), export_exports));
+          const result = await exportErrorLogs2();
+          console.log(`[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}) to "${result.exportFile}"`);
+          process.exit(0);
+        } catch (err) {
+          console.error(`[EXPORT ERROR] Failed to export error logs: ${err.message}`);
+          process.exit(1);
+        }
+      } else {
+        console.error(`[EXPORT ERROR] Invalid export target "${args[1] || ""}". --export only supports 'error'.
+Usage: fluxflow --export error`);
+        process.exit(1);
+      }
+    }
     if (isVersion) {
       console.log(`v${versionFluxflow2}`);
       process.exit(0);
@@ -23019,6 +23248,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   --help                               Show this help menu
   --help commands                      Show available /commands
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
+  --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
   --update check                       Check for new updates
   --update check latest                Show the latest version available on npm
   --update [latest]                    Update the app to the latest version (latest is default)`);
@@ -23033,7 +23263,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   /compress                                Summarize and compress chat history
   /revert                                  Revert codebase back to a checkpoint
   /save                                    Force save current chat
-  /export                                  Export current chat in a .txt file
+  /export [chat|logs]                      Export chat session or system error logs
   /chats                                   List all chat sessions
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy

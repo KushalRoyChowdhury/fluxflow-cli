@@ -42,6 +42,7 @@ import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
 import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString } from './utils/text.js';
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
+import { handleExport } from './utils/export.js';
 
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -2164,7 +2165,14 @@ export default function App({ args = [] }) {
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/save', desc: 'Force save current chat' },
-        { cmd: '/export', desc: 'Export current chat in a .txt file' },
+        {
+            cmd: '/export',
+            desc: 'Export current chat or error logs',
+            subs: [
+                { cmd: 'chat', desc: 'Export current active chat' },
+                { cmd: 'logs', desc: 'Export error logs' }
+            ]
+        },
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         {
@@ -2827,100 +2835,31 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/export': {
-                    const exportFile = `export-fluxflow-${chatId}.txt`;
-                    const exportPath = path.join(process.cwd(), exportFile);
-
-                    const exportLines = [];
-                    let insideAgentBlock = false;
-
-                    for (let i = 0; i < messages.length; i++) {
-                        const msg = messages[i];
-                        if (!msg) continue;
-
-                        if (msg.role === 'system' || msg.isMeta || msg.isLogo || String(msg.id).startsWith('welcome')) {
-                            continue;
+                    const runExport = async () => {
+                        try {
+                            const result = await handleExport(parts, { chatId, messages });
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: result.message,
+                                    isMeta: true
+                                }];
+                            });
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `[EXPORT ERROR] Failed to export: ${err.message}`,
+                                    isMeta: true
+                                }];
+                            });
                         }
-
-                        if (msg.role === 'user') {
-                            let cleanUserText = msg.text || '';
-                            cleanUserText = cleanUserText.replace(/\s*\[Prompted on:.*?\]/g, '').trim();
-
-                            if (exportLines.length > 0) {
-                                exportLines.push('');
-                            }
-                            exportLines.push('[USER]');
-                            exportLines.push(cleanUserText);
-                            insideAgentBlock = false;
-                        } else if (msg.role === 'think') {
-                            if (!insideAgentBlock) {
-                                exportLines.push('');
-                                exportLines.push('[AGENT]');
-                                insideAgentBlock = true;
-                            }
-                            const cleanThinkText = (msg.text || '')
-                                .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
-                                .replace(/\[\[END\]\]/gi, '')
-                                .replace(/\[\[TOOL RESULTS\]\]/gi, '')
-                                .replace(/\[TOOL RESULTS\]/gi, '')
-                                .replace(/\[TOOL RESULT\]/gi, '')
-                                .trim();
-                            if (cleanThinkText) {
-                                exportLines.push('[thoughts]');
-                                exportLines.push(cleanThinkText);
-                            }
-                        } else if (msg.role === 'agent') {
-                            if (!insideAgentBlock) {
-                                exportLines.push('');
-                                exportLines.push('[AGENT]');
-                                insideAgentBlock = true;
-                            }
-
-                            const blocks = parseAgentText(msg.text || '');
-                            for (const block of blocks) {
-                                if (block.type === 'output') {
-                                    const cleanContent = block.content
-                                        .replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '')
-                                        .replace(/\[\[END\]\]/gi, '')
-                                        .replace(/\[\[TOOL RESULTS\]\]/gi, '')
-                                        .replace(/\[TOOL RESULTS\]/gi, '')
-                                        .replace(/\[TOOL RESULT\]/gi, '')
-                                        .trim();
-                                    if (cleanContent) {
-                                        exportLines.push('[output]');
-                                        exportLines.push(cleanContent);
-                                    }
-                                } else if (block.type === 'tool') {
-                                    exportLines.push('[tool]');
-                                    exportLines.push(`${block.toolName} ${block.args}`);
-                                }
-                            }
-                        }
-                    }
-
-                    const fileContent = exportLines.join('\n');
-                    try {
-                        fs.writeFileSync(exportPath, fileContent, 'utf8');
-
-                        setMessages(prev => {
-                            setCompletedIndex(prev.length + 1);
-                            return [...prev, {
-                                id: Date.now(),
-                                role: 'system',
-                                text: `[EXPORT] Chat exported to "${exportFile}"`,
-                                isMeta: true
-                            }];
-                        });
-                    } catch (err) {
-                        setMessages(prev => {
-                            setCompletedIndex(prev.length + 1);
-                            return [...prev, {
-                                id: Date.now(),
-                                role: 'system',
-                                text: `[EXPORT ERROR] Failed to export chat: ${err.message}`,
-                                isMeta: true
-                            }];
-                        });
-                    }
+                    };
+                    runExport();
                     break;
                 }
                 case '/chats': {
