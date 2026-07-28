@@ -95,13 +95,16 @@ function fuzzyMatch(line, keyword) {
  * Searches for a specific keyword in the current workspace natively without shell commands.
  *
  * @param {string}  keyword            - The keyword/word (or regex pattern) to search for.
- * @param {string}  [file]             - Optional: restrict search to a specific file.
+ * @param {string}  [path]             - Optional: restrict search to a specific file or directory.
+ *                                       If a file path is given, only that file is searched.
+ *                                       If a directory path is given (trailing slash optional),
+ *                                       all files inside that directory are searched recursively.
  * @param {boolean} [subString=false]  - When true, matches any substring (with fuzzy fallback).
  * @param {boolean} [regex=false]      - When true, treats keyword as a regex pattern (case-insensitive).
  *                                       Takes priority over subString mode.
  */
 export const search_keyword = async (args) => {
-    const { keyword: rawKeyword, file, subString, regex } = parseArgs(args);
+    const { keyword: rawKeyword, path: pathArg, subString, regex } = parseArgs(args);
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 
@@ -154,16 +157,25 @@ export const search_keyword = async (args) => {
     try {
         let filesToSearch = [];
         const rootDir = process.cwd();
+        let pathArgType = null; // 'file' | 'dir' | null
 
-        if (file) {
-            const fullPath = path.resolve(rootDir, file);
+        if (pathArg) {
+            // Strip trailing slash so both "src/utils" and "src/utils/" work
+            const normalised = pathArg.replace(/[\/\\]+$/, '');
+            const fullPath = path.resolve(rootDir, normalised);
             try {
                 const stat = await fs.stat(fullPath);
-                if (stat.isFile()) {
+                if (stat.isDirectory()) {
+                    pathArgType = 'dir';
+                    filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
+                } else if (stat.isFile()) {
+                    pathArgType = 'file';
                     filesToSearch.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
+                } else {
+                    return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
                 }
             } catch {
-                return `ERROR: File not found: ${file}`;
+                return `ERROR: Path not found: ${pathArg}`;
             }
         } else {
             filesToSearch = await getFilesRecursively(rootDir, excludes);
@@ -219,10 +231,28 @@ export const search_keyword = async (args) => {
         const modeLabel = matchRegex ? (isAutoRegex ? '(regex mode)' : '(keyword mode)') : matchSubstring ? '(subString mode)' : '';
 
         if (fileGroups.length === 0) {
-            return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : '. Try to specify files'} ${modeLabel}`;
+            const zeroLocation = pathArgType === 'file'
+                ? ` in '${pathArg}'`
+                : pathArgType === 'dir'
+                    ? ` in '${pathArg}'`
+                    : '. Try to specify files';
+            const dirPrefix = pathArgType === 'dir' ? '[DIR]' : '';
+            return `${dirPrefix}Found 0 matches of '${keyword}'${zeroLocation}${modeLabel ? ` ${modeLabel}` : ''}`;
         }
 
-        let output = `Found ${totalMatches} match${totalMatches === 1 ? '' : 'es'} across ${fileGroups.length} file${fileGroups.length === 1 ? '' : 's'} ${modeLabel}:\n\n`;
+        const ml = modeLabel ? ` ${modeLabel}` : '';
+        const fileCount = `${fileGroups.length} file${fileGroups.length === 1 ? '' : 's'}`;
+        const matchCount = `${totalMatches} match${totalMatches === 1 ? '' : 'es'}`;
+        let outputHeader;
+        if (pathArgType === 'file') {
+            outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}'${ml}:`;
+        } else if (pathArgType === 'dir') {
+            outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}' across ${fileCount}${ml}:`;
+        } else {
+            outputHeader = `Found ${matchCount} of '${keyword}' across ${fileCount}${ml}:`;
+        }
+        const dirPrefix = pathArgType === 'dir' ? '[DIR]' : '';
+        let output = `${dirPrefix}${outputHeader}\n\n`;
 
         for (const group of fileGroups) {
             output += `${group.path}\n`;

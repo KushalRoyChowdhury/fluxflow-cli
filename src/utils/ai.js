@@ -21,7 +21,24 @@ import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 
+
+// ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
+const RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
+const RE_STUTTER_CODE_BLOCK_OPEN   = /```[\s\S]*$/g;
+const RE_STUTTER_INLINE_CODE       = /`[^`]+`/g;
+const RE_STUTTER_TABLE_ROW         = /^\|.*\|$/gm;
+const RE_STUTTER_WORD_BOUNDARY     = /^[^\w]+|[^\w]+$/g;
+const RE_STUTTER_NON_ALNUM         = /[^a-z0-9]/gi;
+
+// ─── Live Streaming / Tool Sniffing – pre-compiled regexes ───
+const RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
+const RE_STRIP_QUOTES = /["']/g;
+const RE_BACKSLASH_SLASH = /\\/g;
+
+
 let client = null;
+
 let globalSettings = {};
 
 const colorMainWords = (label) => {
@@ -1194,7 +1211,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // fs.writeFileSync('test.txt', originalTextProcessed);
     // replace the consecutive newlines and literal escaped \n\n with clean formatting
     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    let userPrompt = `[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
+    let userPrompt = `[METADATA] Current date and Time: ${new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', hour12: true })}
+
+[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
 [AGENT (current turn)]: ${agentRes}`
 
     janitorContents.push({ role: 'user', parts: [{ text: userPrompt }] });
@@ -1495,9 +1514,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 };
 
 const getActiveToolContext = (text) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    RE_TOOL_CALL_FUNC.lastIndex = 0;
     let match;
-    while ((match = toolRegex.exec(text)) !== null) {
+    while ((match = RE_TOOL_CALL_FUNC.exec(text)) !== null) {
         const startIdx = match.index + match[0].length - 1; // Index of '('
         let balance = 0;
         let inString = null;
@@ -1522,7 +1541,7 @@ const getActiveToolContext = (text) => {
                     while (j < text.length && /\s/.test(text[j])) j++;
                     if (j < text.length && text[j] === ']') {
                         closed = true;
-                        toolRegex.lastIndex = j + 1;
+                        RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                         break;
                     }
                 }
@@ -2342,7 +2361,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
         const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
 
-        const isContext32k = (sessionStats?.tokens || 0) >= 24000;
+        const isContext32k = (sessionStats?.tokens || 0) >= 12000;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -2498,15 +2517,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
-        if (totalFolders > 4096) dynamicMaxDepth = 1;
-        else if (totalFolders > 3072) dynamicMaxDepth = 2;
-        else if (totalFolders > 2048) dynamicMaxDepth = 3;
-        else if (totalFolders > 1024) dynamicMaxDepth = 4;
-        else if (totalFolders > 512) dynamicMaxDepth = 6;
-        else if (totalFolders > 256) dynamicMaxDepth = 7;
-        else if (totalFolders > 128) dynamicMaxDepth = 8;
-        else if (totalFolders > 64) dynamicMaxDepth = 9;
-        else if (totalFolders > 32) dynamicMaxDepth = 10;
+        if (totalFolders > 3072) dynamicMaxDepth = 1;      // 24 * 128
+        else if (totalFolders > 2304) dynamicMaxDepth = 2; // 24 * 96
+        else if (totalFolders > 1536) dynamicMaxDepth = 3; // 24 * 64
+        else if (totalFolders > 768) dynamicMaxDepth = 4;  // 24 * 32
+        else if (totalFolders > 384) dynamicMaxDepth = 6;  // 24 * 16
+        else if (totalFolders > 192) dynamicMaxDepth = 7;  // 24 * 8
+        else if (totalFolders > 96) dynamicMaxDepth = 8;   // 24 * 4
+        else if (totalFolders > 48) dynamicMaxDepth = 9;   // 24 * 2
+        else if (totalFolders > 24) dynamicMaxDepth = 10;  // 24 * 1
 
         const chatPaths = readEncryptedJson(PATHS_FILE, {});
         const lastCwd = chatPaths[chatId];
@@ -2850,7 +2869,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority : HIGH] FOLLOW TOOL CALLING SCHEMA IN SYSTEM PROMPT\neg: [tool:functions.ReadFolder(path = ".")]. NO OTHER FORMAT/TOKEN IS ALLOWED [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -3589,15 +3608,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const timeVal = pArgs.time;
 
                                     if (keyword !== undefined && keyword !== null) {
-                                        detail = String(keyword).replace(/["']/g, '');
+                                        detail = String(keyword).replace(RE_STRIP_QUOTES, '');
                                     } else if (filePath) {
-                                        detail = path.basename(String(filePath).replace(/["']/g, '').replace(/\\/g, '/'));
+                                        detail = path.basename(String(filePath).replace(RE_STRIP_QUOTES, '').replace(RE_BACKSLASH_SLASH, '/'));
                                     } else if (title && (potentialTool === 'invoke' || potentialTool === 'invoke_sync')) {
-                                        detail = String(title).replace(/["']/g, '').substring(0, 30);
+                                        detail = String(title).replace(RE_STRIP_QUOTES, '').substring(0, 30);
                                     } else if (id && potentialTool === 'get_progress') {
-                                        detail = String(id).replace(/["']/g, '');
+                                        detail = String(id).replace(RE_STRIP_QUOTES, '');
                                     } else if (timeVal && potentialTool === 'await') {
-                                        let sec = parseFloat(String(timeVal).replace(/["']/g, ''));
+                                        let sec = parseFloat(String(timeVal).replace(RE_STRIP_QUOTES, ''));
                                         if (!isNaN(sec)) {
                                             if (sec < 5) sec = 5;
                                             if (sec > 120) sec = 120;
@@ -3611,17 +3630,17 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             };
                                             detail = formatTime(sec);
                                         } else {
-                                            detail = String(timeVal).replace(/["']/g, '');
+                                            detail = String(timeVal).replace(RE_STRIP_QUOTES, '');
                                         }
                                     } else {
                                         // [FALLBACK] - Super-permissive regex for mid-stream escaped paths/keywords/ids/titles
-                                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                                        const m = partialArgs.match(RE_TOOL_PARTIAL_ARGS_FALLBACK);
                                         if (m) {
-                                            const val = m[1].replace(/["']/g, '');
+                                            const val = m[1].replace(RE_STRIP_QUOTES, '');
                                             if (potentialTool === 'invoke' || potentialTool === 'invoke_sync' || potentialTool === 'get_progress') {
                                                 detail = val.substring(0, 30);
                                             } else {
-                                                detail = (potentialTool === 'search_keyword' || potentialTool === 'file_map') ? val : path.basename(val.replace(/\\/g, '/'));
+                                                detail = (potentialTool === 'search_keyword' || potentialTool === 'file_map') ? val : path.basename(val.replace(RE_BACKSLASH_SLASH, '/'));
                                             }
                                         }
                                     }
@@ -3734,17 +3753,41 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 // 4. Stutter / Word Loop Check (Global)
-                                const allWords = contextSafeText.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+                                // Step 1: Strip out markdown blocks and tables so they don't cause false alarms!
+                                // Streaming-Safe Prose Extraction
+                                const proseText = contextSafeText
+                                    // 1. Remove fully completed code blocks
+                                    .replace(RE_STUTTER_CODE_BLOCK_CLOSED, '')
+                                    // 2. Remove UNCLOSED code blocks currently streaming at the end!
+                                    .replace(RE_STUTTER_CODE_BLOCK_OPEN, '')
+                                    // 3. Remove inline code and tables
+                                    .replace(RE_STUTTER_INLINE_CODE, '')
+                                    .replace(RE_STUTTER_TABLE_ROW, '');
+
+                                // Step 2: Clean up the words by ripping off attached punctuation!
+                                const allWords = proseText
+                                    .toLowerCase()
+                                    .split(/\s+/)
+                                    .map(w => w.replace(RE_STUTTER_WORD_BOUNDARY, ''))
+                                    .filter(w => w.length > 0);
+
                                 let stutterDetected = false;
 
                                 // 4a. Word-level consecutive period repetition
-                                if (allWords.length > 5) {
+                                if (allWords.length >= 10) {
                                     for (let p = 1; p <= 15; p++) {
-                                        const R = Math.max(3, Math.ceil(8 / p));
+                                        const R = Math.max(3, Math.ceil(10 / p));
                                         if (allWords.length < p * R) continue;
-                                        let isRepeating = true;
+
                                         const pattern = allWords.slice(allWords.length - p);
                                         const patternStr = pattern.join(' ');
+
+                                        // Step 4: Sub-pattern check! If it's just a smaller stutter in disguise, skip it!
+                                        if (p > 1 && patternStr === pattern.slice(0, Math.floor(p / 2)).join(' ').repeat(2).trim()) {
+                                            continue;
+                                        }
+
+                                        let isRepeating = true;
                                         for (let r = 1; r < R; r++) {
                                             const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
                                             if (prevPattern.join(' ') !== patternStr) {
@@ -3752,6 +3795,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 break;
                                             }
                                         }
+
                                         if (isRepeating) {
                                             stutterDetected = true;
                                             break;
@@ -3761,13 +3805,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // 4b. Character-level consecutive period repetition
                                 if (!stutterDetected) {
-                                    const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, '');
-                                    if (cleanChars.length >= 10) {
+                                    const cleanChars = proseText.toLowerCase().replace(RE_STUTTER_NON_ALNUM, '');
+
+                                    // We need a bigger buffer here so we don't accidentally flag short words!
+                                    if (cleanChars.length >= 20) {
                                         for (let p = 1; p <= 10; p++) {
-                                            const R = Math.max(4, Math.ceil(12 / p));
+                                            // Step 5: Tighter thresholds to keep the AI in line!
+                                            const R = Math.max(5, Math.ceil(16 / p));
                                             if (cleanChars.length < p * R) continue;
+
                                             const pattern = cleanChars.substring(cleanChars.length - p);
                                             let isRepeating = true;
+
                                             for (let r = 1; r < R; r++) {
                                                 const prevPattern = cleanChars.substring(cleanChars.length - p * (r + 1), cleanChars.length - p * r);
                                                 if (prevPattern !== pattern) {
@@ -3775,6 +3824,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     break;
                                                 }
                                             }
+
                                             if (isRepeating) {
                                                 stutterDetected = true;
                                                 break;
@@ -4629,7 +4679,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (normToolName === 'search_keyword') {
-                                    const { keyword, file } = parseArgs(toolCall.args);
+                                    const { keyword, path } = parseArgs(toolCall.args);
+                                    // Detect and strip the hidden [DIR] token emitted by search_keyword
+                                    const _isDir = typeof result === 'string' && result.startsWith('[DIR]');
+                                    if (_isDir) result = result.slice(5); // strip "[DIR]"
                                     let matchCount = 0;
                                     if (result) {
                                         const m = result.match(/Found (\d+) match/i);
@@ -4637,7 +4690,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const postLabel = `✔  Searched: "${keyword}" in ${file ? `"${file}"` : './'} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const _sp = path ? path.replace(/[\/\\]+$/, '') : null;
+                                    const displayPath = _sp && _sp !== '.'
+                                        ? `"${_isDir ? `${_sp}/*` : _sp}"`
+                                        : './';
+                                    const postLabel = `✔  Searched: "${keyword}" in ${displayPath} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+
                                     // Get terminal physical width
                                     let terminalWidth = 115;
                                     if (process.stdout.isTTY) {
@@ -5195,9 +5253,9 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
 
         'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
 
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If \'file\' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true',
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true',
 
-        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON\'T hallucinate.aiMode for LLM based search results and richer data, default: false',
+        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)',
 
         'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
 
@@ -5210,11 +5268,11 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
-- USE multiple search & replace on patch tool if editing same file/path with many changes ← HIGHLY RECOMMENDED
-- FileMap >>> ReadFile to understand file efficiently
-- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
-- HUGE FILES? SearchKeyword >> FileMap/Full Read
+- MAX 3 TOOL CALLS PER TURN
+- Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**
+- FileMap → ReadFile for efficient file understanding
+- Need specific text ? SearchKeyword > Guessing/ReadFile
+- Huge files ? SearchKeyword > FileMap/Full Read
 - NO Terminal Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - **Escape quotes: \\" for code strings**
@@ -5230,11 +5288,13 @@ ${providedToolsSection.trimEnd()}
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
-Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
+Keep main focus on tools and task, not chatting
+Once you have fully completed the task, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
 
 CWD: ${process.cwd()}
-Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}\n=== END SYSTEM PROMPT ===`;
+=== END SYSTEM PROMPT ===`;
+
+    // Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}\n
 
     const subagentHistory = [
         { role: 'user', text: `Complete this task: ${task}` }

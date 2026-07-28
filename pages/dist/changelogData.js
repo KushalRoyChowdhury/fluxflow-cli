@@ -3,9 +3,22 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.12.0"]
+export const stableVersions = ["3.12.2"]
 
 export const changelogData = {
+    "3.12.2": {
+        "note": "JULY 29.",
+        "added": [
+            "Improved Code-Search Tools for Agent."
+        ],
+        "changed": [
+            "Added settings to enable/disable Sub-Agents System (Settings → Other → Enable Sub-Agents)\n\n**NOTE:**\n• Toggling Sub-Agents mid session will affect Prompt Caching negatively."
+        ],
+        "fixes": [
+            "Performance Improvements.",
+            "Improved Token Efficiency per turn."
+        ]
+    },
     "3.12.0": {
         "note": "JULY 28.",
         "added": [

@@ -38,7 +38,8 @@ const DEFAULT_SETTINGS = {
         preserveThinking: true,
         loadingPhrases: true,
         progressiveRendering: true,
-        showTPMEstimate: false
+        showTPMEstimate: false,
+        subAgents: true
     },
     profileData: {
         name: null,

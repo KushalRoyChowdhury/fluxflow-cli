@@ -59,41 +59,79 @@ const formatThinkText = (cleaned, columns = 80) => {
 // ============================================================================
 // PRE-COMPILED REGEXES (Prevents V8 recompilation during React render loop)
 // ============================================================================
-const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
 const REGEX_FENCED_CODE = /```(\w*)\n?([\s\S]*?)(?:```|$)/;
 const REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
 const REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
 const REGEX_HEADING = /^(#{1,6})\s+(.*)/;
 
+// Additional hoisted regexes to prevent V8 recompilation during render loops
+const REGEX_MATH_MULT = /\\multiply|\\mul|\\times/g;
+const REGEX_MATH_DIV = /\\div/g;
+const REGEX_MATH_CDOT = /\\cdot/g;
+const REGEX_MATH_INFTY = /\\infty/g;
+const REGEX_MATH_PM = /\\pm/g;
+const REGEX_MATH_LEQ = /\\leq/g;
+const REGEX_MATH_GEQ = /\\geq/g;
+const REGEX_MATH_NEQ = /\\neq/g;
+const REGEX_MATH_SQRT1 = /\\sqrt\s*\{([^}]+)\}/g;
+const REGEX_MATH_SQRT2 = /\\sqrt\s*(\w+|\d+)/g;
+const REGEX_MATH_ALPHA = /\\alpha/g;
+const REGEX_MATH_BETA = /\\beta/g;
+const REGEX_MATH_THETA = /\\theta/g;
+const REGEX_MATH_PI = /\\pi/g;
+const REGEX_MATH_APPROX = /\\approx/g;
+const REGEX_MATH_DELTA = /\\Delta/g;
+const REGEX_MATH_SIGMA = /\\sigma/g;
+const REGEX_MATH_SUM = /\\sum/g;
+const REGEX_MATH_PROD = /\\prod/g;
+const REGEX_MATH_ARROW = /\\rightarrow|\\to/g;
+const REGEX_MATH_LONE_LR = /\\left\b|\\right\b/g;
+const REGEX_MATH_LR_PAREN = /\\left\(|\\right\)/g;
+const REGEX_MATH_LR_BRACK = /\\left\[|\\right\]/g;
+const REGEX_MATH_LR_CURLY = /\\\{|\\\}/g;
+const REGEX_MATH_TEXT1 = /\\text\s*\{([^}]+)\}/g;
+const REGEX_MATH_TEXT2 = /\\text\s+(\w+)/g;
+const REGEX_MATH_PCT = /\\%/g;
+const REGEX_MATH_BARE_PAREN = /\\\(|\\\)/g;
+const REGEX_MATH_BARE_BRACK = /\\\[|\\\]/g;
+const REGEX_AT_REF = /@\[(.*?)\]/g;
+const REGEX_COLON_L = /:L/gi;
+const REGEX_MD_LINK_PAREN = /\[(.*?)\]\s*\((.*?)\)/;
+const REGEX_MD_LINK_BRACKET = /\[(.*?)\]\s*\[(.*?)\]/;
+const REGEX_LATEX_CMD = /\\(\w+)\{([^{}]*)\}/;
+
 const parseMathSymbols = (content) => {
     return content
-        .replace(/\\multiply|\\mul|\\times/g, '×')
-        .replace(/\\div/g, '÷')
-        .replace(/\\cdot/g, '⋅')
-        .replace(/\\infty/g, '∞')
-        .replace(/\\pm/g, '±')
-        .replace(/\\leq/g, '≤')
-        .replace(/\\geq/g, '≥')
-        .replace(/\\neq/g, '≠')
-        .replace(/\\sqrt\s*\{([^}]+)\}/g, '√($1)')
-        .replace(/\\sqrt\s*(\w+|\d+)/g, '√($1)')
-        .replace(/\\alpha/g, 'α')
-        .replace(/\\beta/g, 'β')
-        .replace(/\\theta/g, 'θ')
-        .replace(/\\pi/g, 'π')
-        .replace(/\\approx/g, '≈')
-        .replace(/\\Delta/g, 'Δ')
-        .replace(/\\sigma/g, 'σ')
-        .replace(/\\sum/g, 'Σ')
-        .replace(/\\prod/g, 'Π')
-        .replace(/\\rightarrow|\\to/g, '→')
-        .replace(/\\left\b|\\right\b/g, '') // strip lone left/right
-        .replace(/\\left\(|\\right\)/g, match => match.includes('left') ? '(' : ')')
-        .replace(/\\left\[|\\right\]/g, match => match.includes('left') ? '[' : ']')
-        .replace(/\\\{|\\\}/g, match => match.includes('{') ? '{' : '}')
-        .replace(/\\text\s*\{([^}]+)\}/g, '$1')
-        .replace(/\\text\s+(\w+)/g, '$1')
-        .replace(/\\%/g, '%');
+        .replace(REGEX_MATH_BARE_PAREN, match => match.includes('(') ? '(' : ')')
+        .replace(REGEX_MATH_BARE_BRACK, match => match.includes('[') ? '[' : ']')
+        .replace(REGEX_MATH_MULT, '×')
+        .replace(REGEX_MATH_DIV, '÷')
+        .replace(REGEX_MATH_CDOT, '⋅')
+        .replace(REGEX_MATH_INFTY, '∞')
+        .replace(REGEX_MATH_PM, '±')
+        .replace(REGEX_MATH_LEQ, '≤')
+        .replace(REGEX_MATH_GEQ, '≥')
+        .replace(REGEX_MATH_NEQ, '≠')
+        .replace(REGEX_MATH_SQRT1, '√($1)')
+        .replace(REGEX_MATH_SQRT2, '√($1)')
+        .replace(REGEX_MATH_ALPHA, 'α')
+        .replace(REGEX_MATH_BETA, 'β')
+        .replace(REGEX_MATH_THETA, 'θ')
+        .replace(REGEX_MATH_PI, 'π')
+        .replace(REGEX_MATH_APPROX, '≈')
+        .replace(REGEX_MATH_DELTA, 'Δ')
+        .replace(REGEX_MATH_SIGMA, 'σ')
+        .replace(REGEX_MATH_SUM, 'Σ')
+        .replace(REGEX_MATH_PROD, 'Π')
+        .replace(REGEX_MATH_ARROW, '→')
+        .replace(REGEX_MATH_LONE_LR, '')
+        .replace(REGEX_MATH_LR_PAREN, match => match.includes('left') ? '(' : ')')
+        .replace(REGEX_MATH_LR_BRACK, match => match.includes('left') ? '[' : ']')
+        .replace(REGEX_MATH_LR_CURLY, match => match.includes('{') ? '{' : '}')
+        .replace(REGEX_MATH_TEXT1, '$1')
+        .replace(REGEX_MATH_TEXT2, '$1')
+        .replace(REGEX_MATH_PCT, '%');
 };
 
 const SYNTAX_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|import|export|from|default|class|extends|new|this|typeof|instanceof|try|catch|finally|throw|async|await|yield|public|private|protected|static|void|int|float|double|char|bool|boolean|def|elif|fn|pub|mut|struct|impl|enum|type|interface|package|namespace|using|include|define|nil|None|self|lambda)\b/;
@@ -189,7 +227,7 @@ const renderLatexText = (content, key) => {
         <React.Fragment key={key}>
             {parts.map((p, idx) => {
                 if (p.startsWith('\\')) {
-                    const match = p.match(/\\(\w+)\{([^{}]*)\}/);
+                    const match = p.match(REGEX_LATEX_CMD);
                     if (match) {
                         const cmd = match[1];
                         const inner = match[2];
@@ -242,8 +280,8 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
 
                 if (part.startsWith('`') && part.endsWith('`')) {
                     const content = part.slice(1, -1);
-                    const formatted = content.replace(/@\[(.*?)\]/g, (match, p1) => {
-                        return p1.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
+                    const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
+                        return p1.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
                     });
                     const hasFileRef = content.includes('@[');
                     return <Text key={j} color="cyan" bold={hasFileRef}>{formatted}</Text>;
@@ -251,11 +289,20 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
 
                 if (part.startsWith('@[') && part.endsWith(']')) {
                     const filePath = part.slice(2, -1);
-                    const basename = filePath.split('/').pop().split('\\').pop().replace(/:L/gi, '#L');
+                    const basename = filePath.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
                     return <Text key={j} color="cyan" bold>{basename}</Text>;
                 }
 
-                // 📐 Advanced LaTeX support
+                // 📐 Advanced LaTeX support (\( ... \), \[ ... \], $ ... $)
+                if ((part.startsWith('\\(') && part.endsWith('\\)')) || (part.startsWith('\\[') && part.endsWith('\\]'))) {
+                    const content = part.slice(2, -2);
+                    return (
+                        <Text key={j} color="yellow">
+                            {renderLatexText(content, j)}
+                        </Text>
+                    );
+                }
+
                 if (part.startsWith('$') && part.endsWith('$')) {
                     const content = part.slice(1, -1);
                     return (
@@ -267,7 +314,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
 
                 // 🌐 Harmonized Link System
                 if (part.startsWith('[') && (part.includes('](') || part.includes('] ('))) {
-                    const match = part.match(/\[(.*?)\]\s*\((.*?)\)/);
+                    const match = part.match(REGEX_MD_LINK_PAREN);
                     if (match) return (
                         <Text key={j}>
                             <Text color="cyan" underline bold>{match[1]}</Text>
@@ -276,7 +323,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     );
                 }
                 if (part.startsWith('[') && (part.includes('][') || part.includes('] ['))) {
-                    const match = part.match(/\[(.*?)\]\s*\[(.*?)\]/);
+                    const match = part.match(REGEX_MD_LINK_BRACKET);
                     if (match) return (
                         <Text key={j}>
                             <Text color="cyan" underline bold>{match[1]}</Text>

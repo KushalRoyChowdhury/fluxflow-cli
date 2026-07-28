@@ -160,6 +160,7 @@ export default function SettingsMenu({
                 ];
             case 'other':
                 return [
+                    { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ];
@@ -322,6 +323,12 @@ export default function SettingsMenu({
             setActiveView('updateManager');
         } else if (item.value === 'parserDownload') {
             setActiveView('parserDownload');
+        } else if (item.value === 'subAgents') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, subAgents: s.subAgents === false ? true : false };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
         } else if (item.value === 'preserveThinking') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };

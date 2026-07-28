@@ -15,44 +15,43 @@ export const isPsAvailable = () => {
     return _isPsAvailable;
 };
 
-export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => `
 -- TOOL DEFINITIONS --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
+Tool calls: ONLY use [tool:functions.ToolName(args)]
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 **TOOL USAGE POLICY:**
-- **MAX 3 TOOL CALLS PER TURN${mode === 'Flux' ? ' (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)' : ''}. Next Turn, verify tool results, plan next**
-${mode === 'Flux' ? "- USE multiple search & replace on patch tool if editing same file/path with many changes ← **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY ← **MANDATORY**\n- FileMap >>> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full Read\n- No tool spamming\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EVERY TURN***" : ""}
+- MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
+${mode === 'Flux' ? "- Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn ← ** MANDATORY **\n- FileMap → ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST ask for path divergence, security or risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate. aiMode for LLM based search results and richer data, default: false
+1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
-${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
+4. [tool:functions.PatchFile(path="...", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY`) : `BASH`} command. Destructive/Irreversible ops → Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK → BREAK DOWN TASK → CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed OR markDone with 'create' to create completed tasks. **EVERY TURN UPDATE POLICY**
-9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
+6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
+7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY`) : `BASH`} command. Destructive/Irreversible ops → Ask user
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task list, no Markdown in arrays. Analyze request: if multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ''}
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
-Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
-1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop
-Usage: ONLY in catastrophic situations/Codebase Corruption. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint\n` : ''}
+Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` → revert:\`turn_2\`). Reason explicitly if needed.
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
+Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.\n` : ''}${enableSubAgents ? `
 - SUB AGENT TOOLS -
-**PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE EVEN SLIGHTLY BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
-Invocation Types:
-- Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
-- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
-1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. DO NOT SPAM 'GetProgress'
-3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, ONLY IF STALLED FOR UNUSUALLY LONG (2m+) OR DOING SOMETHING WRONG`.trim()
+**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed.**
+Invocations:
+- Invoke (async/background, ≤7 parallel). Parallelize long tasks. NEVER repeat while active
+- InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
+2. [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks. NEVER spam GetProgress
+3. [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ''}`.trim()
 :
 
 

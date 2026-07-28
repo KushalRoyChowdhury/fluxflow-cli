@@ -466,7 +466,8 @@ var init_settings = __esm({
         preserveThinking: true,
         loadingPhrases: true,
         progressiveRendering: true,
-        showTPMEstimate: false
+        showTPMEstimate: false,
+        subAgents: true
       },
       profileData: {
         name: null,
@@ -4800,7 +4801,7 @@ ${coloredArt[7]}`;
 import React4, { useState as useState4, useEffect as useEffect3, useRef as useRef2 } from "react";
 import { Box as Box3, Text as Text4 } from "ink";
 import { diffWordsWithSpace } from "diff";
-var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, parseMathSymbols, SYNTAX_KEYWORDS, SYNTAX_RULES, REGEX_SYNTAX, tokenCache, MAX_TOKEN_CACHE_SIZE, tokenizeLine, renderHighlightedLine, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
+var useStreamingText, formatThinkText, REGEX_MD_TOKENS, REGEX_LATEX_FRAC, REGEX_LATEX_STYLE, REGEX_MATH_MULT, REGEX_MATH_DIV, REGEX_MATH_CDOT, REGEX_MATH_INFTY, REGEX_MATH_PM, REGEX_MATH_LEQ, REGEX_MATH_GEQ, REGEX_MATH_NEQ, REGEX_MATH_SQRT1, REGEX_MATH_SQRT2, REGEX_MATH_ALPHA, REGEX_MATH_BETA, REGEX_MATH_THETA, REGEX_MATH_PI, REGEX_MATH_APPROX, REGEX_MATH_DELTA, REGEX_MATH_SIGMA, REGEX_MATH_SUM, REGEX_MATH_PROD, REGEX_MATH_ARROW, REGEX_MATH_LONE_LR, REGEX_MATH_LR_PAREN, REGEX_MATH_LR_BRACK, REGEX_MATH_LR_CURLY, REGEX_MATH_TEXT1, REGEX_MATH_TEXT2, REGEX_MATH_PCT, REGEX_MATH_BARE_PAREN, REGEX_MATH_BARE_BRACK, REGEX_AT_REF, REGEX_COLON_L, REGEX_MD_LINK_PAREN, REGEX_MD_LINK_BRACKET, REGEX_LATEX_CMD, parseMathSymbols, SYNTAX_KEYWORDS, SYNTAX_RULES, REGEX_SYNTAX, tokenCache, MAX_TOKEN_CACHE_SIZE, tokenizeLine, renderHighlightedLine, renderLatexText, InlineMarkdown, TableRenderer, MarkdownText, DiffLine, DiffBlock, CodeRenderer, formatThinkingDuration, MessageItem, BlockItem, ChatLayout;
 var init_ChatLayout = __esm({
   "src/components/ChatLayout.jsx"() {
     init_TerminalBox();
@@ -4836,11 +4837,45 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(MarkdownText, { key: i, text: cleanPart, color: "gray", columns: availableWidth, italic: true });
       }));
     };
-    REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+    REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
     REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
     REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
+    REGEX_MATH_MULT = /\\multiply|\\mul|\\times/g;
+    REGEX_MATH_DIV = /\\div/g;
+    REGEX_MATH_CDOT = /\\cdot/g;
+    REGEX_MATH_INFTY = /\\infty/g;
+    REGEX_MATH_PM = /\\pm/g;
+    REGEX_MATH_LEQ = /\\leq/g;
+    REGEX_MATH_GEQ = /\\geq/g;
+    REGEX_MATH_NEQ = /\\neq/g;
+    REGEX_MATH_SQRT1 = /\\sqrt\s*\{([^}]+)\}/g;
+    REGEX_MATH_SQRT2 = /\\sqrt\s*(\w+|\d+)/g;
+    REGEX_MATH_ALPHA = /\\alpha/g;
+    REGEX_MATH_BETA = /\\beta/g;
+    REGEX_MATH_THETA = /\\theta/g;
+    REGEX_MATH_PI = /\\pi/g;
+    REGEX_MATH_APPROX = /\\approx/g;
+    REGEX_MATH_DELTA = /\\Delta/g;
+    REGEX_MATH_SIGMA = /\\sigma/g;
+    REGEX_MATH_SUM = /\\sum/g;
+    REGEX_MATH_PROD = /\\prod/g;
+    REGEX_MATH_ARROW = /\\rightarrow|\\to/g;
+    REGEX_MATH_LONE_LR = /\\left\b|\\right\b/g;
+    REGEX_MATH_LR_PAREN = /\\left\(|\\right\)/g;
+    REGEX_MATH_LR_BRACK = /\\left\[|\\right\]/g;
+    REGEX_MATH_LR_CURLY = /\\\{|\\\}/g;
+    REGEX_MATH_TEXT1 = /\\text\s*\{([^}]+)\}/g;
+    REGEX_MATH_TEXT2 = /\\text\s+(\w+)/g;
+    REGEX_MATH_PCT = /\\%/g;
+    REGEX_MATH_BARE_PAREN = /\\\(|\\\)/g;
+    REGEX_MATH_BARE_BRACK = /\\\[|\\\]/g;
+    REGEX_AT_REF = /@\[(.*?)\]/g;
+    REGEX_COLON_L = /:L/gi;
+    REGEX_MD_LINK_PAREN = /\[(.*?)\]\s*\((.*?)\)/;
+    REGEX_MD_LINK_BRACKET = /\[(.*?)\]\s*\[(.*?)\]/;
+    REGEX_LATEX_CMD = /\\(\w+)\{([^{}]*)\}/;
     parseMathSymbols = (content) => {
-      return content.replace(/\\multiply|\\mul|\\times/g, "\xD7").replace(/\\div/g, "\xF7").replace(/\\cdot/g, "\u22C5").replace(/\\infty/g, "\u221E").replace(/\\pm/g, "\xB1").replace(/\\leq/g, "\u2264").replace(/\\geq/g, "\u2265").replace(/\\neq/g, "\u2260").replace(/\\sqrt\s*\{([^}]+)\}/g, "\u221A($1)").replace(/\\sqrt\s*(\w+|\d+)/g, "\u221A($1)").replace(/\\alpha/g, "\u03B1").replace(/\\beta/g, "\u03B2").replace(/\\theta/g, "\u03B8").replace(/\\pi/g, "\u03C0").replace(/\\approx/g, "\u2248").replace(/\\Delta/g, "\u0394").replace(/\\sigma/g, "\u03C3").replace(/\\sum/g, "\u03A3").replace(/\\prod/g, "\u03A0").replace(/\\rightarrow|\\to/g, "\u2192").replace(/\\left\b|\\right\b/g, "").replace(/\\left\(|\\right\)/g, (match) => match.includes("left") ? "(" : ")").replace(/\\left\[|\\right\]/g, (match) => match.includes("left") ? "[" : "]").replace(/\\\{|\\\}/g, (match) => match.includes("{") ? "{" : "}").replace(/\\text\s*\{([^}]+)\}/g, "$1").replace(/\\text\s+(\w+)/g, "$1").replace(/\\%/g, "%");
+      return content.replace(REGEX_MATH_BARE_PAREN, (match) => match.includes("(") ? "(" : ")").replace(REGEX_MATH_BARE_BRACK, (match) => match.includes("[") ? "[" : "]").replace(REGEX_MATH_MULT, "\xD7").replace(REGEX_MATH_DIV, "\xF7").replace(REGEX_MATH_CDOT, "\u22C5").replace(REGEX_MATH_INFTY, "\u221E").replace(REGEX_MATH_PM, "\xB1").replace(REGEX_MATH_LEQ, "\u2264").replace(REGEX_MATH_GEQ, "\u2265").replace(REGEX_MATH_NEQ, "\u2260").replace(REGEX_MATH_SQRT1, "\u221A($1)").replace(REGEX_MATH_SQRT2, "\u221A($1)").replace(REGEX_MATH_ALPHA, "\u03B1").replace(REGEX_MATH_BETA, "\u03B2").replace(REGEX_MATH_THETA, "\u03B8").replace(REGEX_MATH_PI, "\u03C0").replace(REGEX_MATH_APPROX, "\u2248").replace(REGEX_MATH_DELTA, "\u0394").replace(REGEX_MATH_SIGMA, "\u03C3").replace(REGEX_MATH_SUM, "\u03A3").replace(REGEX_MATH_PROD, "\u03A0").replace(REGEX_MATH_ARROW, "\u2192").replace(REGEX_MATH_LONE_LR, "").replace(REGEX_MATH_LR_PAREN, (match) => match.includes("left") ? "(" : ")").replace(REGEX_MATH_LR_BRACK, (match) => match.includes("left") ? "[" : "]").replace(REGEX_MATH_LR_CURLY, (match) => match.includes("{") ? "{" : "}").replace(REGEX_MATH_TEXT1, "$1").replace(REGEX_MATH_TEXT2, "$1").replace(REGEX_MATH_PCT, "%");
     };
     SYNTAX_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|import|export|from|default|class|extends|new|this|typeof|instanceof|try|catch|finally|throw|async|await|yield|public|private|protected|static|void|int|float|double|char|bool|boolean|def|elif|fn|pub|mut|struct|impl|enum|type|interface|package|namespace|using|include|define|nil|None|self|lambda)\b/;
     SYNTAX_RULES = [
@@ -4917,7 +4952,7 @@ var init_ChatLayout = __esm({
       const parts = formatted.split(REGEX_LATEX_STYLE);
       return /* @__PURE__ */ React4.createElement(React4.Fragment, { key }, parts.map((p, idx) => {
         if (p.startsWith("\\")) {
-          const match = p.match(/\\(\w+)\{([^{}]*)\}/);
+          const match = p.match(REGEX_LATEX_CMD);
           if (match) {
             const cmd = match[1];
             const inner = match[2];
@@ -4950,27 +4985,31 @@ var init_ChatLayout = __esm({
         }
         if (part.startsWith("`") && part.endsWith("`")) {
           const content = part.slice(1, -1);
-          const formatted = content.replace(/@\[(.*?)\]/g, (match, p1) => {
-            return p1.split("/").pop().split("\\").pop().replace(/:L/gi, "#L");
+          const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
+            return p1.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
           });
           const hasFileRef = content.includes("@[");
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan", bold: hasFileRef }, formatted);
         }
         if (part.startsWith("@[") && part.endsWith("]")) {
           const filePath = part.slice(2, -1);
-          const basename = filePath.split("/").pop().split("\\").pop().replace(/:L/gi, "#L");
+          const basename = filePath.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan", bold: true }, basename);
+        }
+        if (part.startsWith("\\(") && part.endsWith("\\)") || part.startsWith("\\[") && part.endsWith("\\]")) {
+          const content = part.slice(2, -2);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "yellow" }, renderLatexText(content, j));
         }
         if (part.startsWith("$") && part.endsWith("$")) {
           const content = part.slice(1, -1);
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "yellow" }, renderLatexText(content, j));
         }
         if (part.startsWith("[") && (part.includes("](") || part.includes("] ("))) {
-          const match = part.match(/\[(.*?)\]\s*\((.*?)\)/);
+          const match = part.match(REGEX_MD_LINK_PAREN);
           if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan", underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " (", match[2], ")"));
         }
         if (part.startsWith("[") && (part.includes("][") || part.includes("] ["))) {
-          const match = part.match(/\[(.*?)\]\s*\[(.*?)\]/);
+          const match = part.match(REGEX_MD_LINK_BRACKET);
           if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan", underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " [", match[2], "]"));
         }
         if (part.startsWith("http")) {
@@ -6045,45 +6084,44 @@ var init_main_tools = __esm({
       }
       return _isPsAvailable;
     };
-    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false) => `
+    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => `
 -- TOOL DEFINITIONS --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
+Tool calls: ONLY use [tool:functions.ToolName(args)]
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 **TOOL USAGE POLICY:**
-- **MAX 3 TOOL CALLS PER TURN${mode === "Flux" ? " (EXCEPTION FOR Todo TOOL: 3+ CALLS ALLOWED, Run TOOL: Limit 1, OR 2 CONSECUTIVE Run TOOL)" : ""}. Next Turn, verify tool results, plan next**
-${mode === "Flux" ? "- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 **HIGHLY RECOMMENDED**\n- Tool execution denied? MUST use 'Ask' tool immediately for user reason/changes. NEVER END RESPONSE OR PROCEED BLINDLY \u2190 **MANDATORY**\n- FileMap >>> ReadFile to understand file efficiently\n- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile\n- HUGE FILES? SearchKeyword >> FileMap/Full Read\n- No tool spamming\n- **MUST MARK DONE/APPEND Todos BASED ON REALTIME TASK PROGRESS ON *EVERY TURN***" : ""}
+- MAX 3 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 3+, Run: max 1 or 2 consecutive)" : ""}
+${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**" : ""}
 ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST ask for path divergence, security or risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate. aiMode for LLM based search results and richer data, default: false
+1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
-${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**
+4. [tool:functions.PatchFile(path="...", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL ONLY` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task List, NO Markdown IN ARRAY. USAGE: ANALYZE USER REQUEST **IF** MULTIPLE TASK \u2192 BREAK DOWN TASK \u2192 CREATE TODO **BEFORE** DIVING IN. 'tasks' & 'markDone' OPTIONAL PARAMETERS WITH method 'get'. USE 'get' method WITH 'markDone' to mark task completed OR markDone with 'create' to create completed tasks. **EVERY TURN UPDATE POLICY**
-9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s
+6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
+7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task list, no Markdown in arrays. Analyze request: if multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
 ${advanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
-Info: 'initial' = user prompted for THIS active task, revert 'id' should be a turn BEFORE the disaster tool ran eg. Disaster Tool: "turn_3", Revert ID: "turn_2" (do explicit reasoning if needed)
-1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a specific checkpoint in THIS agent loop
-Usage: ONLY in catastrophic situations/Codebase Corruption. Verify nothing catastrophic happened in codebase before ending agent loop. 'id' not needed with getCheckPoint
-` : ""}
+Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly if needed.
+1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
+Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.
+` : ""}${enableSubAgents ? `
 - SUB AGENT TOOLS -
-**PROACTIVE USE OF SUB AGENTS HIGHLY RECOMMENDED, PREFER USING FOR ALL TASK WHERE EVEN SLIGHTLY BENEFICIAL, EVEN WITHOUT EXPLICIT USER NUDGE**
-Invocation Types:
-- Invoke (async, background worker for parallel tasks, upto 7 parallel agents together). Usage: Benefits parallelism & speed. Can take long time, If invoked DO NOT REPEAT SAME TASK WHILE ACTIVE
-- InvokeSync (sync, blocking main agent loop). Usage: Repeatetive work, Sequential tasks, Task delegation. Tokens/Costs savings
-1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must me detailed, including exact file paths, imports/exports, dependency, folder structure
-2. [agent:generalist.GetProgress(id="...")]. Usage: Check progress of async subagent task, taking time? continue your task, MUST await (exponentially longer after 1st check) than spamming getProgress. DO NOT SPAM 'GetProgress'
-3. [agent:generalist.Cancel(id="...")]. Usage: Cancel async subagent task, ONLY IF STALLED FOR UNUSUALLY LONG (2m+) OR DOING SOMETHING WRONG`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed.**
+Invocations:
+- Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active
+- InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
+1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
+2. [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks. NEVER spam GetProgress
+3. [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
@@ -6854,6 +6892,7 @@ function SettingsMenu({
         ];
       case "other":
         return [
+          { label: "Sub-Agents", value: "subAgents", status: systemSettings.subAgents !== false ? "ON" : "OFF" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
@@ -7011,6 +7050,12 @@ function SettingsMenu({
       setActiveView("updateManager");
     } else if (item.value === "parserDownload") {
       setActiveView("parserDownload");
+    } else if (item.value === "subAgents") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, subAgents: s.subAgents === false ? true : false };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     } else if (item.value === "preserveThinking") {
       setSystemSettings((s) => {
         const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
@@ -7376,8 +7421,6 @@ Explicit Triggers for permanent memory:
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
 - IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD
-
-Usage Rules:
 - Chat Title is MANDATORY
 - TEMPORARY Memory is MANDATORY
 - WHEN Called User Memory, STILL use Temporary Memory
@@ -7390,11 +7433,11 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. Engage in adversarial self interrogation that treats every assumption as hostile until proven:\nDeconstruct requirements into atomic invariants. Trace every implicit dependency, side effect, and state mutation. Map the entire dependency graph and identify circular dependencies or tight coupling before they manifest\nEvaluate algorithmic complexity (time/space) for every operation. Consider memory models, cache locality, and allocation patterns. For concurrent systems, reason through race conditions, deadlocks, and memory ordering\nFormulate solutions by comparing multiple architectural approaches. Explicitly evaluate trade offs, monolithic vs modular, eager vs lazy, mutable vs immutable, sync vs async. Choose based on measured criteria, not intuition\nMentally execute the solution at multiple scales. What breaks at 10x load? 100x? Resource exhaustion? Trace error propagation paths through every layer\nActively attempt to falsify your own logic. Steel man the opposite approach\nReason about observability & vulnarability\nConsider future evolution, what changes will this architecture resist vs accommodate? Where are the extension points? What will break when requirements inevitably change?\nMap out implementation with surgical precision, exact file structure, module boundaries, interface contracts, error types, and test strategies before writing\nRULES:\n- Ruthlessly question every architectural choice. Default to skepticism\n- Think in terms of invariants, contracts, and failure modes, not just happy paths\n- Verify ALL imports and system stability, AVOID errors\n- MANDATORY THINKING: Full reasoning required for ALL requests/greetings",
-      High: "EFFORT LEVEL: HIGH\nThink in a rigorous, technically grounded monologue within <think>...</think> \u2190 **MANDATORY**\nBreak the objective into verifiable steps with clear success criteria. Identify the critical path and potential bottlenecks\nMentally compile and execute your approach. Check for: missing imports, undefined behavior, type mismatches, unhandled errors, and resource cleanup. Trace data flow from input to output, noting transformations\nRecognize design patterns and anti patterns. If you see God objects, tight coupling, or premature optimization, call it out and refactor mentally before committing\nEvaluate performance characteristics. Will this scale? Are there O(n\xB2) operations hiding in innocent looking code? Where are the allocation hotspots?\nConsider the error surface, what can fail and how? Design error handling that preserves invariants and provides actionable feedback\nReview your architecture for, separation of concerns, single responsibility, dependency inversion, and interface segregation. Ensure clean abstractions with minimal coupling\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Continuous analytical flow\n- Verify correctness through first principles reasoning, not pattern matching\n- Actively search for ways your solution could fail or degrade\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Full technical verification for all tasks/greetings",
-      Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technically-aware monologue within <think>...</think>\nIdentify the most direct path that satisfies requirements without over-engineering\nQuickly scan for obvious issues, missing error handling, incorrect input assumptions, forgotten edge cases, or missing dependencies\nVerify the solution is appropriately modular with cohesive changes\nOutline the concrete changes, which files, which functions, what the key logic looks like\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Clean logical stream\n- Efficient but deliberate. Focus energy on actionable implementation details\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
-      Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Just verify the basics:\nConfirm what the user wants and whether it's straightforward or has hidden complexity\nIdentify the specific tool, file, or action needed\nCheck for any obvious correctness issues before acting\nRULES:\n- NO HEADINGS/MARKERS/LISTS\n- Few lines of clear thought\n- Just enough thinking to avoid obvious mistakes\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n- Suitable for simple requests/greetings",
-      Off: "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify"
+      xHigh: "EFFORT LEVEL: HIGH\nChallenge assumptions. Verify before concluding\nPrefer the simplest correct solution\nAssess architecture, scalability & trade-offs\nVerify dependencies, regressions, failure modes & modularity\nPlan implementation: files, modules, interfaces & tests\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
+      High: "EFFORT LEVEL: HIGH\nThink in a rigorous monologue within <think>...</think>\nPrefer the simplest correct solution\nAssess architecture, performance & maintainability\nVerify error handling, assumptions, edge cases, dependencies & regressions\nPlan: files, functions, logic & interactions\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
+      Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technical monologue within <think>...</think>\nFind the simplest solution meeting requirements\nScan for missing error handling, invalid assumptions, edge cases & dependencies\nVerify cohesive, modular changes\nOutline changes: files, functions & key logic\nRULES:\n- Clean logical flow\n- Efficient, deliberate, implementation-focused\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
+      Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Verify Basics:\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results",
+      Off: "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results"
     };
   }
 });
@@ -7443,8 +7486,7 @@ var init_prompts = __esm({
       if (!isMemoryEnabled) return "";
       const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-LOW, FOCUS: Chat Context > Recent) --
 ${tempMemories}` : "";
-      return tempMemoriesStr ? `[MEMORY CONTEXT]
-${tempMemoriesStr}
+      return tempMemoriesStr ? `${tempMemoriesStr}
 ` : "";
     };
     getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini, chatId) => {
@@ -7468,10 +7510,11 @@ ${tempMemoriesStr}
           "Max": "HIGH"
         };
         thinkingConfig = thinking_prompts_default["xHigh"];
-        thinkingConfig = thinkingConfig.replace("EFFORT LEVEL: HIGH\nThink in a continuous, relentless analytical monologue. ", `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}
-`).replace("- MANDATORY THINKING: Full reasoning required for ALL requests/greetings", "");
+        thinkingConfig = thinkingConfig.replace("EFFORT LEVEL: HIGH", `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace("\n- MANDATORY THINKING: Full technical verification", "");
         if (thinkingLevel === "Fast") {
-          thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify ALL imports and system stability, AVOID ANY Syntax errors, re-read TOOL RESULTS/files to verify\n";
+          thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results";
+        } else if (thinkingLevel === "Low") {
+          thinkingConfig = "EFFORT LEVEL: LOW\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results";
         }
       }
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
@@ -7484,7 +7527,7 @@ ${userInstrStr.length ? "" : "\n"}` : "";
 ${nicknameStr.length || userInstrStr.length ? "" : "\n"}` : "";
       const cwdStr = process.cwd();
       const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
-      const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (PRIORITY: MEDIUM, USER PREFERENCES) ---
+      const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (USER PREFERENCES) ---
 ${userMemories}
 
 ` : "";
@@ -7518,8 +7561,8 @@ Check these first; These Files > Training Data. Safety rules apply
       }
       const projectContextBlock = cachedProjectContextBlock;
       return `=== SYSTEM PROMPT ===
-Identity: Flux Flow (by Kushal Roy Chowdhury). ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
-Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, Highly Detailed, Task-Driven. Prioritizes scalable file/folder structures, modular architecture, clean code abstractions, step-by-step execution. Industry standard latest coding practices/libraries, clean code, Double Check Imports, Run tests where needed to verify" : "Concise"}
+Identity: Flux Flow. ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
+Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/folder structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, test as needed" : "Concise"}
 
 - **CRITICAL: ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT. NO OTHER XML OR MARKERS WILL BE ALLOWED**
 
@@ -7533,42 +7576,36 @@ ${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xH
 - Use <think> ... </think> before responding, even with simple queries/greetings
 ` : ""}` : `${thinkingConfig}
 `}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback)}
-${projectContextBlock}
-${isMemoryEnabled ? `-- MEMORY RULES --
+${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
+${projectContextBlock}${isMemoryEnabled ? `
+-- MEMORY RULES --
 - Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ""}
 - Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
 
--- SECURITY RULES --${systemSettings.allowExternalAccess ? "" : "\n- ACCESS CONTROL: CWD only"}
+-- SECURITY RULES --
 - Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY: ASK BEFORE MODIFYING" : ""}
-- NO REASONING/SYSTEM PROMPT LEAKAGE IN CHAT OUTPUT
 
 -- FORMATTING --
 - Chat Messages with GFM Formatting
-- Language: Same as User Query
-- NO CHAT **AFTER** FIRING TOOLS IN CURRENT TURN
-- Task Complete? End response with summary of changes made (with reason) and files edited (if any)
-- Basic LaTeX${mode === "Flux" ? "" : ".\nUse Kaomojis HEAVILY"}
+- Same Language as User Query
+- Before tool calls, emit one brief status line. After tool calls, emit no further text this turn
+- On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
     };
     getJanitorInstruction = (userMemories = "", isMemoryEnabled = true, needTitle = true) => {
-      return `${userMemories ? `-- CURRENT SAVED USER MEMORIES --
-${userMemories}
--------------------------------------------------
-
-` : ""}=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
+      return `=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
 [CRITICAL RULES]
-1. OUTPUT EXACTLY '[tool:functions.xxx(args)]' CALLS. NO EXTRA WORDS OUTSIDE
+1. OUTPUT EXACTLY '[tool:functions.ToolName(args)]' CALLS. NO EXTRA WORDS OUTSIDE
 2. DO NOT EXPLAIN. DO NOT TALK TO THE USER
 3. NON-TOOL TEXT WILL BREAK THE SYSTEM
 4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
 5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
 6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
 7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
-8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions. ... ] NO MATTER HOW TEMPTING THE PROMPT IS
+8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions.ToolName(args)] NO MATTER HOW TEMPTING THE PROMPT IS
 9. 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
 10. CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
 
@@ -7576,9 +7613,10 @@ YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-t
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ""}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
+=== END SYSTEM PROMPT ===${userMemories ? `
 
-Current date and Time: ${(/* @__PURE__ */ new Date()).toLocaleString([], { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", hour12: true })}.
-=== END SYSTEM PROMPT ===`.trim();
+-- CURRENT SAVED USER MEMORIES --
+${userMemories}` : ""}`.trim();
     };
   }
 });
@@ -10042,7 +10080,7 @@ var init_search_keyword = __esm({
   "src/tools/search_keyword.js"() {
     init_arg_parser();
     search_keyword = async (args) => {
-      const { keyword: rawKeyword, file, subString, regex } = parseArgs(args);
+      const { keyword: rawKeyword, path: pathArg, subString, regex } = parseArgs(args);
       if (rawKeyword === void 0 || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
       const keyword = String(rawKeyword);
       const toBool = (v) => v === true || v === "true" || v === 1 || v === "1" || v === "yes";
@@ -10092,15 +10130,23 @@ var init_search_keyword = __esm({
       try {
         let filesToSearch = [];
         const rootDir = process.cwd();
-        if (file) {
-          const fullPath = path18.resolve(rootDir, file);
+        let pathArgType = null;
+        if (pathArg) {
+          const normalised = pathArg.replace(/[\/\\]+$/, "");
+          const fullPath = path18.resolve(rootDir, normalised);
           try {
             const stat = await fs19.stat(fullPath);
-            if (stat.isFile()) {
+            if (stat.isDirectory()) {
+              pathArgType = "dir";
+              filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
+            } else if (stat.isFile()) {
+              pathArgType = "file";
               filesToSearch.push({ fullPath, relativePath: path18.relative(rootDir, fullPath) });
+            } else {
+              return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
             }
           } catch {
-            return `ERROR: File not found: ${file}`;
+            return `ERROR: Path not found: ${pathArg}`;
           }
         } else {
           filesToSearch = await getFilesRecursively(rootDir, excludes);
@@ -10140,9 +10186,23 @@ var init_search_keyword = __esm({
         }
         const modeLabel = matchRegex ? isAutoRegex ? "(regex mode)" : "(keyword mode)" : matchSubstring ? "(subString mode)" : "";
         if (fileGroups.length === 0) {
-          return `Found 0 matches for keyword: "${keyword}"${file ? ` in file: ${file}` : ". Try to specify files"} ${modeLabel}`;
+          const zeroLocation = pathArgType === "file" ? ` in '${pathArg}'` : pathArgType === "dir" ? ` in '${pathArg}'` : ". Try to specify files";
+          const dirPrefix2 = pathArgType === "dir" ? "[DIR]" : "";
+          return `${dirPrefix2}Found 0 matches of '${keyword}'${zeroLocation}${modeLabel ? ` ${modeLabel}` : ""}`;
         }
-        let output = `Found ${totalMatches} match${totalMatches === 1 ? "" : "es"} across ${fileGroups.length} file${fileGroups.length === 1 ? "" : "s"} ${modeLabel}:
+        const ml = modeLabel ? ` ${modeLabel}` : "";
+        const fileCount = `${fileGroups.length} file${fileGroups.length === 1 ? "" : "s"}`;
+        const matchCount = `${totalMatches} match${totalMatches === 1 ? "" : "es"}`;
+        let outputHeader;
+        if (pathArgType === "file") {
+          outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}'${ml}:`;
+        } else if (pathArgType === "dir") {
+          outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}' across ${fileCount}${ml}:`;
+        } else {
+          outputHeader = `Found ${matchCount} of '${keyword}' across ${fileCount}${ml}:`;
+        }
+        const dirPrefix = pathArgType === "dir" ? "[DIR]" : "";
+        let output = `${dirPrefix}${outputHeader}
 
 `;
         for (const group of fileGroups) {
@@ -11890,7 +11950,7 @@ __export(ai_exports, {
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path24, { normalize } from "path";
 import fs25 from "fs";
-var client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -11910,6 +11970,16 @@ var init_ai = __esm({
     init_revert();
     init_advanceRevert();
     init_editor();
+    RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
+    RE_STUTTER_CODE_BLOCK_OPEN = /```[\s\S]*$/g;
+    RE_STUTTER_INLINE_CODE = /`[^`]+`/g;
+    RE_STUTTER_TABLE_ROW = /^\|.*\|$/gm;
+    RE_STUTTER_WORD_BOUNDARY = /^[^\w]+|[^\w]+$/g;
+    RE_STUTTER_NON_ALNUM = /[^a-z0-9]/gi;
+    RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
+    RE_STRIP_QUOTES = /["']/g;
+    RE_BACKSLASH_SLASH = /\\/g;
     client = null;
     globalSettings = {};
     colorMainWords = (label) => {
@@ -12900,7 +12970,9 @@ var init_ai = __esm({
       }
       let originalTextProcessed = agentText.replace(/\[Prompted on:.*?\]/g, "").trim();
       agentRes = agentRes.replace(/\r?\n\r?\n/g, "\n").replace(/\n\n/g, "\n").replace(/\\n\\n/g, "").trim();
-      let userPrompt = `[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}
+      let userPrompt = `[METADATA] Current date and Time: ${(/* @__PURE__ */ new Date()).toLocaleString([], { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", hour12: true })}
+
+[USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}
 ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n" : ""}
 [AGENT (current turn)]: ${agentRes}`;
       janitorContents.push({ role: "user", parts: [{ text: userPrompt }] });
@@ -13150,9 +13222,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       }
     };
     getActiveToolContext = (text) => {
-      const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+      RE_TOOL_CALL_FUNC.lastIndex = 0;
       let match;
-      while ((match = toolRegex.exec(text)) !== null) {
+      while ((match = RE_TOOL_CALL_FUNC.exec(text)) !== null) {
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
@@ -13174,7 +13246,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
               while (j < text.length && /\s/.test(text[j])) j++;
               if (j < text.length && text[j] === "]") {
                 closed = true;
-                toolRegex.lastIndex = j + 1;
+                RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                 break;
               }
             }
@@ -13854,7 +13926,7 @@ Provide a consolidated summary of the entire session.`;
         const otherMemories = [...cachedSummaries, ...otherRawMemories].map((mem) => `- ${mem}`).join("\n");
         const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
         const mainUserMemories = persistentStorage.map((m) => `- ${m.memory}`).join("\n");
-        const isContext32k = (sessionStats?.tokens || 0) >= 24e3;
+        const isContext32k = (sessionStats?.tokens || 0) >= 12e3;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = (/* @__PURE__ */ new Date()).toLocaleString([], { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
         const COLLAPSED_DIRS_GLOBAL = [
@@ -14085,15 +14157,15 @@ Provide a consolidated summary of the entire session.`;
         };
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
-        if (totalFolders > 4096) dynamicMaxDepth = 1;
-        else if (totalFolders > 3072) dynamicMaxDepth = 2;
-        else if (totalFolders > 2048) dynamicMaxDepth = 3;
-        else if (totalFolders > 1024) dynamicMaxDepth = 4;
-        else if (totalFolders > 512) dynamicMaxDepth = 6;
-        else if (totalFolders > 256) dynamicMaxDepth = 7;
-        else if (totalFolders > 128) dynamicMaxDepth = 8;
-        else if (totalFolders > 64) dynamicMaxDepth = 9;
-        else if (totalFolders > 32) dynamicMaxDepth = 10;
+        if (totalFolders > 3072) dynamicMaxDepth = 1;
+        else if (totalFolders > 2304) dynamicMaxDepth = 2;
+        else if (totalFolders > 1536) dynamicMaxDepth = 3;
+        else if (totalFolders > 768) dynamicMaxDepth = 4;
+        else if (totalFolders > 384) dynamicMaxDepth = 6;
+        else if (totalFolders > 192) dynamicMaxDepth = 7;
+        else if (totalFolders > 96) dynamicMaxDepth = 8;
+        else if (totalFolders > 48) dynamicMaxDepth = 9;
+        else if (totalFolders > 24) dynamicMaxDepth = 10;
         const chatPaths = readEncryptedJson(PATHS_FILE, {});
         const lastCwd = chatPaths[chatId];
         const cwdMismatch = lastCwd ? lastCwd !== process.cwd() : false;
@@ -14412,8 +14484,7 @@ OS: ${osDetected}
 CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority : HIGH] FOLLOW TOOL CALLING SCHEMA IN SYSTEM PROMPT
-eg: [tool:functions.ReadFolder(path = ".")]. NO OTHER FORMAT/TOKEN IS ALLOWED [/SYSTEM]
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
 ${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -15054,15 +15125,15 @@ ${ideErr} [/ERROR]`;
                       const id = pArgs.id || pArgs.taskId;
                       const timeVal = pArgs.time;
                       if (keyword !== void 0 && keyword !== null) {
-                        detail = String(keyword).replace(/["']/g, "");
+                        detail = String(keyword).replace(RE_STRIP_QUOTES, "");
                       } else if (filePath) {
-                        detail = path24.basename(String(filePath).replace(/["']/g, "").replace(/\\/g, "/"));
+                        detail = path24.basename(String(filePath).replace(RE_STRIP_QUOTES, "").replace(RE_BACKSLASH_SLASH, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
-                        detail = String(title).replace(/["']/g, "").substring(0, 30);
+                        detail = String(title).replace(RE_STRIP_QUOTES, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
-                        detail = String(id).replace(/["']/g, "");
+                        detail = String(id).replace(RE_STRIP_QUOTES, "");
                       } else if (timeVal && potentialTool === "await") {
-                        let sec = parseFloat(String(timeVal).replace(/["']/g, ""));
+                        let sec = parseFloat(String(timeVal).replace(RE_STRIP_QUOTES, ""));
                         if (!isNaN(sec)) {
                           if (sec < 5) sec = 5;
                           if (sec > 120) sec = 120;
@@ -15076,16 +15147,16 @@ ${ideErr} [/ERROR]`;
                           };
                           detail = formatTime(sec);
                         } else {
-                          detail = String(timeVal).replace(/["']/g, "");
+                          detail = String(timeVal).replace(RE_STRIP_QUOTES, "");
                         }
                       } else {
-                        const m = partialArgs.match(/(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/);
+                        const m = partialArgs.match(RE_TOOL_PARTIAL_ARGS_FALLBACK);
                         if (m) {
-                          const val = m[1].replace(/["']/g, "");
+                          const val = m[1].replace(RE_STRIP_QUOTES, "");
                           if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
                             detail = val.substring(0, 30);
                           } else {
-                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path24.basename(val.replace(/\\/g, "/"));
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path24.basename(val.replace(RE_BACKSLASH_SLASH, "/"));
                           }
                         }
                       }
@@ -15178,15 +15249,19 @@ ${ideErr} [/ERROR]`;
                       await new Promise((resolve) => setTimeout(resolve, 3e3));
                       break;
                     }
-                    const allWords = contextSafeText.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+                    const proseText = contextSafeText.replace(RE_STUTTER_CODE_BLOCK_CLOSED, "").replace(RE_STUTTER_CODE_BLOCK_OPEN, "").replace(RE_STUTTER_INLINE_CODE, "").replace(RE_STUTTER_TABLE_ROW, "");
+                    const allWords = proseText.toLowerCase().split(/\s+/).map((w) => w.replace(RE_STUTTER_WORD_BOUNDARY, "")).filter((w) => w.length > 0);
                     let stutterDetected = false;
-                    if (allWords.length > 5) {
+                    if (allWords.length >= 10) {
                       for (let p = 1; p <= 15; p++) {
-                        const R = Math.max(3, Math.ceil(8 / p));
+                        const R = Math.max(3, Math.ceil(10 / p));
                         if (allWords.length < p * R) continue;
-                        let isRepeating = true;
                         const pattern = allWords.slice(allWords.length - p);
                         const patternStr = pattern.join(" ");
+                        if (p > 1 && patternStr === pattern.slice(0, Math.floor(p / 2)).join(" ").repeat(2).trim()) {
+                          continue;
+                        }
+                        let isRepeating = true;
                         for (let r = 1; r < R; r++) {
                           const prevPattern = allWords.slice(allWords.length - p * (r + 1), allWords.length - p * r);
                           if (prevPattern.join(" ") !== patternStr) {
@@ -15201,10 +15276,10 @@ ${ideErr} [/ERROR]`;
                       }
                     }
                     if (!stutterDetected) {
-                      const cleanChars = contextSafeText.toLowerCase().replace(/[^a-z0-9]/gi, "");
-                      if (cleanChars.length >= 10) {
+                      const cleanChars = proseText.toLowerCase().replace(RE_STUTTER_NON_ALNUM, "");
+                      if (cleanChars.length >= 20) {
                         for (let p = 1; p <= 10; p++) {
-                          const R = Math.max(4, Math.ceil(12 / p));
+                          const R = Math.max(5, Math.ceil(16 / p));
                           if (cleanChars.length < p * R) continue;
                           const pattern = cleanChars.substring(cleanChars.length - p);
                           let isRepeating = true;
@@ -16037,7 +16112,9 @@ ${snippet2}
                       result = result.text;
                     }
                     if (normToolName === "search_keyword") {
-                      const { keyword, file } = parseArgs(toolCall.args);
+                      const { keyword, path: path26 } = parseArgs(toolCall.args);
+                      const _isDir = typeof result === "string" && result.startsWith("[DIR]");
+                      if (_isDir) result = result.slice(5);
                       let matchCount = 0;
                       if (result) {
                         const m = result.match(/Found (\d+) match/i);
@@ -16045,7 +16122,9 @@ ${snippet2}
                           matchCount = parseInt(m[1]);
                         }
                       }
-                      const postLabel = `\u2714  Searched: "${keyword}" in ${file ? `"${file}"` : "./"} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
+                      const _sp = path26 ? path26.replace(/[\/\\]+$/, "") : null;
+                      const displayPath = _sp && _sp !== "." ? `"${_isDir ? `${_sp}/*` : _sp}"` : "./";
+                      const postLabel = `\u2714  Searched: "${keyword}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
                       if (process.stdout.isTTY) {
                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -16508,8 +16587,8 @@ Error Log can be found in ${path24.join(LOGS_DIR, "agent", "error.log")}`);
         "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
         "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
-        "searchkeyword": `- [tool:functions.SearchKeyword(keyword="...", file="optional", subString="true/false optional", regex="optional, false for keyword")]. Global project search. If 'file' is provided, searches only that file. Finds definitions/logic without reading every file. Usage: Can search for relevent lines/logic area to read specifically for edit. defaults subString: false, regex: true`,
-        "websearch": `- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (not needed with aiMode). Proactive use for unknown info/docs. DON'T hallucinate.aiMode for LLM based search results and richer data, default: false`,
+        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true',
+        "websearch": '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
       };
@@ -16518,11 +16597,11 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- MAX 3 TOOL CALLS PER TURN. Next Turn, verify tool results, plan next
-- USE multiple search & replace on patch tool if editing same file/path with many changes \u2190 HIGHLY RECOMMENDED
-- FileMap >>> ReadFile to understand file efficiently
-- Want spefific STRING across project/file? SearchKeyword >> Guessing/ReadFile
-- HUGE FILES? SearchKeyword >> FileMap/Full Read
+- MAX 3 TOOL CALLS PER TURN
+- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**
+- FileMap \u2192 ReadFile for efficient file understanding
+- Need specific text ? SearchKeyword > Guessing/ReadFile
+- Huge files ? SearchKeyword > FileMap/Full Read
 - NO Terminal Access
 
 -- PROVIDED TOOLS --
@@ -16541,11 +16620,10 @@ ${providedToolsSection.trimEnd()}
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
 
-Your main focus should be on tools and task, not chatting. Your Chat won't be visible to user
-Once you have fully completed the task, provide a detailed final structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
+Keep main focus on tools and task, not chatting
+Once you have fully completed the task, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
 
 CWD: ${process.cwd()}
-Current Time: ${(/* @__PURE__ */ new Date()).toLocaleString("en-US", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, "$3-$1-$2").replace(":", "-")}
 === END SYSTEM PROMPT ===`;
       const subagentHistory = [
         { role: "user", text: `Complete this task: ${task}` }
@@ -19145,23 +19223,23 @@ function App({ args = [] }) {
       ] : aiProvider === "NVIDIA" ? [
         { cmd: "Fast", desc: "Reasoning Disabled" },
         { cmd: "Standard", desc: "Balanced Reasoning" },
-        { cmd: "High", desc: "Deep Reasoning" }
+        { cmd: "High", desc: "Extended Reasoning" }
       ] : aiProvider === "OpenRouter" ? [
         { cmd: "Fast", desc: "Fastest" },
         { cmd: "Low", desc: "Quick Reasoning" },
-        { cmd: "Medium", desc: "Balanced Reasoning" },
+        { cmd: "Standard", desc: "Balanced Reasoning" },
         { cmd: "High", desc: "Deep Reasoning" },
         { cmd: "xHigh", desc: "Extended Reasoning" }
       ] : aiProvider === "Mistral" ? [
         { cmd: "Fast", desc: "None (No Reasoning)" },
         { cmd: "Low", desc: "Minimal Reasoning" },
-        { cmd: "Medium", desc: "Medium Reasoning" },
-        { cmd: "High", desc: "High Reasoning" },
+        { cmd: "Standard", desc: "Balanced Reasoning" },
+        { cmd: "High", desc: "Deep Reasoning" },
         { cmd: "xHigh", desc: "Extended Reasoning" }
       ] : activeModel && activeModel.toLowerCase().startsWith("gemini-3") ? [
         { cmd: "Fast", desc: "Fastest" },
         { cmd: "Low", desc: "Quick Reasoning" },
-        { cmd: "Medium", desc: "Balanced Reasoning" },
+        { cmd: "Standard", desc: "Balanced Reasoning" },
         { cmd: "High", desc: "Deep Reasoning" }
       ] : [
         // Google General / Gemma

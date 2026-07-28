@@ -2177,13 +2177,13 @@ export default function App({ args = [] }) {
                     ? [
                         { cmd: 'Fast', desc: 'Reasoning Disabled' },
                         { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                        { cmd: 'High', desc: 'Deep Reasoning' }
+                        { cmd: 'High', desc: 'Extended Reasoning' }
                     ]
                     : aiProvider === 'OpenRouter'
                         ? [
                             { cmd: 'Fast', desc: 'Fastest' },
                             { cmd: 'Low', desc: 'Quick Reasoning' },
-                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                            { cmd: 'Standard', desc: 'Balanced Reasoning' },
                             { cmd: 'High', desc: 'Deep Reasoning' },
                             { cmd: 'xHigh', desc: 'Extended Reasoning' }
                         ]
@@ -2191,15 +2191,15 @@ export default function App({ args = [] }) {
                             ? [
                                 { cmd: 'Fast', desc: 'None (No Reasoning)' },
                                 { cmd: 'Low', desc: 'Minimal Reasoning' },
-                                { cmd: 'Medium', desc: 'Medium Reasoning' },
-                                { cmd: 'High', desc: 'High Reasoning' },
+                                { cmd: 'Standard', desc: 'Balanced Reasoning' },
+                                { cmd: 'High', desc: 'Deep Reasoning' },
                                 { cmd: 'xHigh', desc: 'Extended Reasoning' }
                             ]
                             : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
                                 ? [
                                     { cmd: 'Fast', desc: 'Fastest' },
                                     { cmd: 'Low', desc: 'Quick Reasoning' },
-                                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                    { cmd: 'Standard', desc: 'Balanced Reasoning' },
                                     { cmd: 'High', desc: 'Deep Reasoning' }
                                 ]
                                 : [ // Google General / Gemma
