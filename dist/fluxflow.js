@@ -18582,7 +18582,7 @@ function App({ args = [] }) {
       return;
     }
     if (activeView === "providerBudgetSelect") {
-      const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+      const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
       if (key.upArrow) {
         setPbsCursor((c) => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
         return;
@@ -20905,7 +20905,7 @@ Selection: ${val}`,
   }, [suggestionVisibleCount, suggestions.length]);
   useEffect12(() => {
     if (activeView !== "providerBudgetSelect") return;
-    const PBS_PROVIDERS = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+    const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
     const existingBudgets = quotas.providerBudgets || {};
     const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
       acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -21222,7 +21222,7 @@ Selection: ${val}`,
           }
         );
       case "providerBudgetSelect": {
-        const PROVIDERS_LIST = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"];
+        const PROVIDERS_LIST = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
         const anySelected = PROVIDERS_LIST.some((p) => pbsSelected[p]);
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
           const isActive = i === pbsCursor;
@@ -21277,7 +21277,7 @@ Selection: ${val}`,
         const isFreeTier = apiTier !== "Paid";
         const usingProviderBudgets = !!quotas.providerBudgets?.__useProvider;
         const providerBudgetsMap = quotas.providerBudgets || {};
-        const configuredProviders = ["Google", "DeepSeek", "NVIDIA", "OpenRouter"].filter(
+        const configuredProviders = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"].filter(
           (p) => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
         );
         const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
