@@ -2,6 +2,9 @@
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 /**
  * AUTO-HEAP SCALER (6GB)

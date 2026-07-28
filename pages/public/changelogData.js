@@ -7,10 +7,10 @@ export const stableVersions = ["3.13.0"]
 
 export const changelogData = {
     "3.13.0": {
-        "note": "JULY 30.",
+        "note": "JULY 29.",
         "added": [
             "Improved Code-Search Tools for Agent.",
-            "Added new /commands for better navigation and ease of access to features.",
+            "Added new \"/\" commands for better navigation and ease of access to features.",
             "Added ENV support for `NVIDIA_API_KEY` to use any keys directly with `NVIDIA_BASE_URL`.",
             "Added 2 new themes:\n  • Synthwave 84 (Community Designed)\n  • Forest Sprite ⭐ [Flagship]"
         ],

@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';

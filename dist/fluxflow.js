@@ -12254,6 +12254,7 @@ __export(ai_exports, {
   runSubagent: () => runSubagent,
   signalTermination: () => signalTermination
 });
+import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path24, { normalize } from "path";
 import fs25 from "fs";
@@ -12277,6 +12278,7 @@ var init_ai = __esm({
     init_revert();
     init_advanceRevert();
     init_editor();
+    dotenv.config();
     RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
     RE_STUTTER_CODE_BLOCK_OPEN = /```[\s\S]*$/g;
     RE_STUTTER_INLINE_CODE = /`[^`]+`/g;
@@ -22935,6 +22937,8 @@ var init_app = __esm({
 import { spawn as spawn3 } from "child_process";
 import { fileURLToPath as fileURLToPath4 } from "url";
 import os6 from "os";
+import dotenv2 from "dotenv";
+dotenv2.config();
 var totalSystemRamBytes = os6.totalmem();
 var totalSystemRamMB = totalSystemRamBytes / (1024 * 1024);
 var SAFETY_MARGIN = 0.5;
