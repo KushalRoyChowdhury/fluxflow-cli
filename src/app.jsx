@@ -2712,21 +2712,32 @@ export default function App({ args = [] }) {
                     if (parts[1]) {
                         let val = parts[1].toLowerCase();
                         const isBypass = parts.includes('--bypass');
+                        const isForce = parts.includes('--force');
                         formattedLevel = val.charAt(0).toUpperCase() + val.slice(1);
                         if (val === 'xhigh') {
                             formattedLevel = 'xHigh';
+                        }
+
+                        let forceMsg = '';
+                        if (isForce) {
+                            if (process.env.NVIDIA_BASE_URL) {
+                                forceMsg = ' Enabled Forced Reasoning';
+                            } else {
+                                forceMsg = ' --force is not supported in this context';
+                            }
+                            process.env.forcedReasoning = 'true';
                         }
 
                         // Strict Mode Validation
                         if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.${forceMsg}`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
                             const s = emojiSpace(1);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated)` : ''}`, isMeta: true }]; });
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated)` : ''}${forceMsg}`, isMeta: true }]; });
                         }
                     } else {
                         setActiveView('thinking');
@@ -6022,7 +6033,7 @@ export default function App({ args = [] }) {
                             return (
                                 <Box flexDirection="column" borderStyle="round" paddingX={3} paddingY={1} borderColor={colors.borderMuted} width={Math.min(100, (stdout?.columns || 100) - 2)} marginTop={0} marginBottom={0}>
                                     <Box marginBottom={1}>
-                                        <Text bold>{gradient(['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
+                                        <Text bold>{gradient(colors.logoGradient || ['blue', 'purple'])('Agent powering down. Goodbye!')}</Text>
                                     </Box>
                                     <Box flexDirection="column">
                                         <Text color={colors.text} bold underline>Interaction Summary</Text>

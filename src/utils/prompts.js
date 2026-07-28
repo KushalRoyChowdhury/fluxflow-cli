@@ -45,6 +45,10 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId) => {
 
+    let forcedReasoning = false;
+    if (process.env.forcedReasoning && process.env.NVIDIA_BASE_URL && aiProvider.toUpperCase() === 'NVIDIA') {
+        forcedReasoning = true;
+    }
 
     let thinkingConfig = '';
     if (!isGemini && aiProvider === 'Google') {
@@ -134,7 +138,7 @@ Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
-${thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && !isGemini)) ? `CRITICAL THINKING POLICY
+${forcedReasoning || (thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && !isGemini))) ? `CRITICAL THINKING POLICY
 - Use <think> ... </think> before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}\n`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --

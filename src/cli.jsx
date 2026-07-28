@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import os from 'os';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 /**
  * AUTO-HEAP SCALER (6GB)
