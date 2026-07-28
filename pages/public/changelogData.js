@@ -3,20 +3,24 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.12.2"]
+export const stableVersions = ["3.13.0"]
 
 export const changelogData = {
-    "3.12.2": {
-        "note": "JULY 29.",
+    "3.13.0": {
+        "note": "JULY 30.",
         "added": [
-            "Improved Code-Search Tools for Agent."
+            "Improved Code-Search Tools for Agent.",
+            "Added new /commands for better navigation and ease of access to features.",
+            "Added ENV support for `NVIDIA_API_KEY` to use any keys directly with `NVIDIA_BASE_URL`.",
+            "Added 2 new themes:\n  • Synthwave 84 (Community Designed)\n  • Forest Sprite ⭐ [Flagship]"
         ],
         "changed": [
+            "Redesinged Theme Selector to be more Interactive & Intuitive.",
             "Added settings to enable/disable Sub-Agents System (Settings → Other → Enable Sub-Agents)\n\n**NOTE:**\n• Toggling Sub-Agents mid session will affect Prompt Caching negatively."
         ],
         "fixes": [
             "Performance Improvements.",
-            "Improved Token Efficiency per turn."
+            "Improved Input Token Efficiency."
         ]
     },
     "3.12.0": {

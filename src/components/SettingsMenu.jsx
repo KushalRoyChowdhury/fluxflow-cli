@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
-import { getThemeColors } from '../utils/theme.js';
+import { getThemeColors, THEMES } from '../utils/theme.js';
 import v8 from 'v8';
+
+const themeOptions = [...Object.keys(THEMES), 'Mystery'];
 
 const CATEGORIES = [
     { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
@@ -68,13 +70,22 @@ export default function SettingsMenu({
     saveSettings,
     quotas,
     setMessages,
-    aiProvider
+    aiProvider,
+    initialSelectingTheme = false,
+    onCloseTheme = null,
+    setProviderReturnView = null
 }) {
+    const activeTheme = (systemSettings.theme === 'Chaos' || systemSettings.theme === 'Mystery') ? 'Mystery' : (systemSettings.theme || 'Dark');
+    const defaultIdx = themeOptions.indexOf(activeTheme);
+
     const [activeColumn, setActiveColumn] = useState('categories'); // 'categories' or 'items'
     const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(0);
     const [selectedItemIndex, setSelectedItemIndex] = useState(0);
     const [editingItem, setEditingItem] = useState(null);
     const [editValue, setEditValue] = useState('');
+    const [isSelectingTheme, setIsSelectingTheme] = useState(initialSelectingTheme);
+    const [themeIndex, setThemeIndex] = useState(defaultIdx >= 0 ? defaultIdx : 0);
+    const [initialTheme, setInitialTheme] = useState(systemSettings.theme || 'Dark');
 
     const [currentMemory, setCurrentMemory] = useState(0);
     const [maxMemory, setMaxMemory] = useState(0);
@@ -173,6 +184,29 @@ export default function SettingsMenu({
     const currentItems = getCategoryItems(currentCatId);
 
     useInput((input, key) => {
+        if (isSelectingTheme) {
+            if (key.upArrow) {
+                const nextIdx = (themeIndex - 1 + themeOptions.length) % themeOptions.length;
+                setThemeIndex(nextIdx);
+            } else if (key.downArrow) {
+                const nextIdx = (themeIndex + 1) % themeOptions.length;
+                setThemeIndex(nextIdx);
+            } else if (key.return) {
+                const selectedTheme = themeOptions[themeIndex];
+                setSystemSettings(s => {
+                    const newSysSettings = { ...s, theme: selectedTheme };
+                    saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                    return newSysSettings;
+                });
+                if (onCloseTheme) onCloseTheme();
+                else setIsSelectingTheme(false);
+            } else if (key.escape) {
+                if (onCloseTheme) onCloseTheme();
+                else setIsSelectingTheme(false);
+            }
+            return;
+        }
+
         if (editingItem) {
             if (key.escape) {
                 setEditingItem(null);
@@ -285,6 +319,7 @@ export default function SettingsMenu({
         } else if (item.value === 'apiTier') {
             setActiveView('apiTier');
         } else if (item.value === 'aiProvider') {
+            if (setProviderReturnView) setProviderReturnView('settings');
             setActiveView('selectProvider');
         } else if (item.value === 'advanceRollback') {
             if (!systemSettings.advanceRollback) {
@@ -354,19 +389,129 @@ export default function SettingsMenu({
                 return newSysSettings;
             });
         } else if (item.value === 'theme') {
-            const options = ['Dark', 'Light', 'GitHub Dark', 'GitHub Light', 'Transparent Dark', 'Transparent Light', 'Chaos'];
-            const activeTheme = systemSettings.theme === 'Mystery' ? 'Chaos' : (systemSettings.theme || 'Dark');
-            const currentIndex = options.indexOf(activeTheme);
-            const nextIndex = (currentIndex + 1) % options.length;
-            setSystemSettings(s => {
-                const newSysSettings = { ...s, theme: options[nextIndex] };
-                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
-                return newSysSettings;
-            });
+            const activeTheme = (systemSettings.theme === 'Chaos' || systemSettings.theme === 'Mystery') ? 'Mystery' : (systemSettings.theme || 'Dark');
+            const idx = themeOptions.indexOf(activeTheme);
+            setThemeIndex(idx >= 0 ? idx : 0);
+            setInitialTheme(systemSettings.theme || 'Dark');
+            setIsSelectingTheme(true);
         }
     };
 
     const colors = getThemeColors(systemSettings.theme);
+
+    if (isSelectingTheme) {
+        const previewThemeName = themeOptions[themeIndex];
+        const previewColors = getThemeColors(previewThemeName);
+
+        return (
+            <Box flexDirection="column" borderStyle="round" borderColor={previewColors.border} padding={1} width="100%" minHeight={32}>
+                {/* Title */}
+                <Box marginBottom={1}>
+                    <Text color={previewColors.text} bold>
+                        Choose your color scheme:
+                    </Text>
+                </Box>
+
+                {/* 2 Column Main Body */}
+                <Box flexDirection="row" width="100%" flexGrow={1}>
+                    {/* Left Column: Theme List (No box border, clean list) */}
+                    <Box flexDirection="column" width="30%" paddingRight={1}>
+                        {themeOptions.map((tName, index) => {
+                            const isSelected = themeIndex === index;
+                            const isSaved = (systemSettings.theme || 'Dark') === tName;
+                            const isForest = tName === 'Forest Sprite';
+                            return (
+                                <Box key={tName} paddingX={0}>
+                                    <Text color={isSelected ? previewColors.text : previewColors.textDim} bold={isSelected}>
+                                        {isSelected ? '> ' : '  '}{tName}
+                                        {isForest && <Text color={isSelected ? (previewColors.success || '#52b788') : 'green'} bold> ★</Text>}
+                                        {isSaved ? <Text color={previewColors.primary || 'cyan'} italic> (saved)</Text> : ''}
+                                    </Text>
+                                </Box>
+                            );
+                        })}
+                    </Box>
+
+                    {/* Right Column: Dummy Terminal & Diff Viewer Box */}
+                    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={previewColors.borderMuted} paddingX={2} paddingY={1} backgroundColor={previewColors.cardBg}>
+                        {/* User Prompt */}
+                        <Box marginBottom={1}>
+                            <Text color={previewColors.secondary || 'cyan'} bold>{'> '}you: </Text>
+                            <Text color={previewColors.text}>add a greeting function</Text>
+                        </Box>
+
+                        {/* Heading */}
+                        <Box marginBottom={1}>
+                            <Text color={previewColors.success || 'green'}>  Here's the change:</Text>
+                        </Box>
+
+                        {/* Diff Lines */}
+                        <Box flexDirection="column" marginLeft={2} marginBottom={1}>
+                            <Text>
+                                <Text color={previewColors.textDim}>3 </Text>
+                                <Text color={previewColors.textDim}>  import "fmt"</Text>
+                            </Text>
+                            <Text color={previewColors.textDim}>4</Text>
+                            <Box backgroundColor={previewColors.diffRemovalBg}>
+                                <Text>
+                                    <Text color={previewColors.diffRemovalNum || previewColors.diffRemovalText}>5 </Text>
+                                    <Text color={previewColors.diffRemovalPrefix || previewColors.diffRemovalText}>- </Text>
+                                    <Text color={previewColors.diffRemovalText}>func </Text>
+                                    <Text color={previewColors.diffRemovalHighlightColor || previewColors.diffRemovalText} backgroundColor={previewColors.diffRemovalHighlightBg} bold>main()</Text>
+                                    <Text color={previewColors.diffRemovalText}> &#123;</Text>
+                                </Text>
+                            </Box>
+                            <Box backgroundColor={previewColors.diffAdditionBg}>
+                                <Text>
+                                    <Text color={previewColors.diffAdditionNum || previewColors.diffAdditionText}>5 </Text>
+                                    <Text color={previewColors.diffAdditionPrefix || previewColors.diffAdditionText}>+ </Text>
+                                    <Text color={previewColors.diffAdditionText}>func </Text>
+                                    <Text color={previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText} backgroundColor={previewColors.diffAdditionHighlightBg} bold>greet(name string)</Text>
+                                    <Text color={previewColors.diffAdditionText}> &#123;</Text>
+                                </Text>
+                            </Box>
+                            <Box backgroundColor={previewColors.diffAdditionBg}>
+                                <Text>
+                                    <Text color={previewColors.diffAdditionNum || previewColors.diffAdditionText}>6 </Text>
+                                    <Text color={previewColors.diffAdditionPrefix || previewColors.diffAdditionText}>+ </Text>
+                                    <Text color={previewColors.diffAdditionText}>    </Text>
+                                    <Text color={previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText} backgroundColor={previewColors.diffAdditionHighlightBg}>fmt.Printf("Hello, %s!\n", name)</Text>
+                                </Text>
+                            </Box>
+                            <Text color={previewColors.textDim}>7   &#125;</Text>
+                        </Box>
+
+                        {/* Thought Process */}
+                        <Box flexDirection="column" marginTop={1} marginBottom={1}>
+                            <Text color={previewColors.textDim}>▾ Thought Process</Text>
+                            <Text color={previewColors.textMuted}>  I need to add a greeting function. I'll use fmt.Printf.</Text>
+                        </Box>
+
+                        {/* UI Indicators */}
+                        <Box flexDirection="column">
+                            <Text><Text color={previewColors.warning || 'yellow'}>⚙ tool: </Text><Text color={previewColors.text}>write_file main.go</Text></Text>
+                            <Text><Text color={previewColors.accent || 'magenta'}>⦿ task: </Text><Text color={previewColors.text}>Implementing greeting</Text></Text>
+                            <Text><Text color={previewColors.danger || 'red'}>X error: </Text><Text color={previewColors.text}>compilation failed</Text></Text>
+                            <Text><Text color={previewColors.warning || 'yellow'}>⚠ warning: </Text><Text color={previewColors.text}>deprecation warning</Text></Text>
+                            <Text><Text color={previewColors.info || 'blue'}>→ link: </Text><Text color={previewColors.info || 'blue'} underline>file:///path/to/main.go</Text></Text>
+                            <Text><Text color={previewColors.accent || 'magenta'}>★ accent: </Text><Text color={previewColors.text}>highlighted text</Text></Text>
+                            <Text color={previewColors.textDim}>· dim: press Enter to continue</Text>
+                        </Box>
+                    </Box>
+                </Box>
+
+                {/* Footer Navigation */}
+                <Box paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
+                    <Text color="gray" italic>
+                        ▲▼ Navigate • ENTER to Select • ESC to Cancel
+                    </Text>
+                    <Text color="gray">
+                        Previewing: {themeOptions[themeIndex]}{themeOptions[themeIndex] === 'Forest Sprite' ? ' ★' : ''}
+                    </Text>
+                </Box>
+            </Box>
+        );
+    }
 
     return (
         <Box flexDirection="column" borderStyle="round" borderColor={colors.border} padding={0} width="100%" minHeight={32}>

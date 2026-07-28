@@ -963,6 +963,7 @@ export default function App({ args = [] }) {
     const [quotas, setQuotas] = useState({ limitMode: 'Daily', agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: '', customLimit: 0, providerBudgets: {} });
     const [inputConfig, setInputConfig] = useState(null); // { label, key, subKey, value, next }
     const [budgetReturnView, setBudgetReturnView] = useState('chat');
+    const [providerReturnView, setProviderReturnView] = useState('settings');
     const [providerBudgetQueue, setProviderBudgetQueue] = useState([]); // ordered list of providers to configure
     const [providerBudgetCursor, setProviderBudgetCursor] = useState(0); // which provider in the queue we're on
     const [pbsCursor, setPbsCursor] = useState(0); // providerBudgetSelect list cursor
@@ -2216,12 +2217,17 @@ export default function App({ args = [] }) {
             subs: getModels(aiProvider, apiTier)
         },
         {
+            cmd: '/provider',
+            desc: 'Select AI Provider'
+        },
+        {
             cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
                 { cmd: 'flux', desc: 'Enable Dev toolset' },
                 { cmd: 'flow', desc: 'Enable Chat mode' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
+        { cmd: '/theme', desc: 'Customize UI color theme' },
         { cmd: '/key', desc: 'Manage API keys' },
         { cmd: '/profile', desc: 'Edit developer persona' },
         { cmd: '/memory', desc: 'Manage agent memory' },
@@ -2755,6 +2761,16 @@ export default function App({ args = [] }) {
                 }
                 case '/settings': {
                     setActiveView('settings');
+                    break;
+                }
+                case '/provider':
+                case '/providers': {
+                    setProviderReturnView('chat');
+                    setActiveView('selectProvider');
+                    break;
+                }
+                case '/theme': {
+                    setActiveView('theme');
                     break;
                 }
                 case '/key': {
@@ -4261,6 +4277,25 @@ export default function App({ args = [] }) {
                         quotas={quotas}
                         setMessages={setMessages}
                         aiProvider={aiProvider}
+                        setProviderReturnView={setProviderReturnView}
+                    />
+                );
+
+            case 'theme':
+                return (
+                    <SettingsMenu
+                        systemSettings={systemSettings}
+                        setSystemSettings={setSystemSettings}
+                        apiTier={apiTier}
+                        setActiveView={setActiveView}
+                        setInputConfig={setInputConfig}
+                        saveSettings={saveSettings}
+                        quotas={quotas}
+                        setMessages={setMessages}
+                        aiProvider={aiProvider}
+                        initialSelectingTheme={true}
+                        onCloseTheme={() => setActiveView('chat')}
+                        setProviderReturnView={setProviderReturnView}
                     />
                 );
 
@@ -4274,12 +4309,12 @@ export default function App({ args = [] }) {
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                             { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
-                            { label: 'Back', value: 'settings' }
+                            { label: 'Back', value: providerReturnView }
                         ]}
                         theme={systemSettings.theme}
                         onSelect={async (item) => {
-                            if (item.value === 'settings' || item.value === 'Back') {
-                                setActiveView('settings');
+                            if (item.value === providerReturnView || item.value === 'settings' || item.value === 'Back') {
+                                setActiveView(providerReturnView);
                                 return;
                             }
 
@@ -4308,19 +4343,19 @@ export default function App({ args = [] }) {
                                         isMeta: true
                                     }
                                 ]);
-                                setActiveView('settings');
+                                setActiveView(providerReturnView);
                             } else {
                                 setInputConfig({
                                     label: `Enter ${selectedProvider} API Key:`,
                                     key: 'providerKey',
                                     provider: selectedProvider,
                                     value: '',
-                                    returnView: 'settings'
+                                    returnView: providerReturnView
                                 });
                                 setActiveView('input');
                             }
                         }}
-                        onClose={() => setActiveView('settings')}
+                        onClose={() => setActiveView(providerReturnView)}
                     />
                 );
 
@@ -5022,6 +5057,7 @@ export default function App({ args = [] }) {
                         <Text marginTop={1}>If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase).</Text>
                         <Text>The agent may be able to automatically restore the repo to a safe state.</Text>
                         <Text marginTop={1}>Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content.</Text>
+                        <Text marginTop={1}>(Requires Restart to take effect)</Text>
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Confirm"
@@ -5244,6 +5280,7 @@ export default function App({ args = [] }) {
                                 }
                             }}
                             onClose={() => setActiveView('chat')}
+                            theme={systemSettings.theme}
                         />
                     </Box>
                 );

@@ -252,6 +252,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
     if (!text) return null;
     const colors = getThemeColors(theme);
     const textColor = color || colors.text;
+    const highlightColor = colors.codeText || (colors.logoGradient && colors.logoGradient[0]) || colors.info || colors.secondary || 'cyan';
 
     // Use cached regex to prevent GC thrashing during stream renders
     const parts = text.split(REGEX_MD_TOKENS);
@@ -265,7 +266,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                 if (part.startsWith('```') && part.endsWith('```')) {
                     // Render as inline to prevent <Box> inside <Text> crashes
                     const content = part.slice(3, -3);
-                    return <Text key={j} color="cyan">{content}</Text>;
+                    return <Text key={j} color={highlightColor}>{content}</Text>;
                 }
 
                 // 🏷️ Recursive Bold
@@ -284,13 +285,13 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                         return p1.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
                     });
                     const hasFileRef = content.includes('@[');
-                    return <Text key={j} color="cyan" bold={hasFileRef}>{formatted}</Text>;
+                    return <Text key={j} color={highlightColor} bold={hasFileRef}>{formatted}</Text>;
                 }
 
                 if (part.startsWith('@[') && part.endsWith(']')) {
                     const filePath = part.slice(2, -1);
                     const basename = filePath.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
-                    return <Text key={j} color="cyan" bold>{basename}</Text>;
+                    return <Text key={j} color={highlightColor} bold>{basename}</Text>;
                 }
 
                 // 📐 Advanced LaTeX support (\( ... \), \[ ... \], $ ... $)
@@ -317,7 +318,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     const match = part.match(REGEX_MD_LINK_PAREN);
                     if (match) return (
                         <Text key={j}>
-                            <Text color="cyan" underline bold>{match[1]}</Text>
+                            <Text color={highlightColor} underline bold>{match[1]}</Text>
                             <Text color="gray" italic> ({match[2]})</Text>
                         </Text>
                     );
@@ -326,13 +327,13 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     const match = part.match(REGEX_MD_LINK_BRACKET);
                     if (match) return (
                         <Text key={j}>
-                            <Text color="cyan" underline bold>{match[1]}</Text>
+                            <Text color={highlightColor} underline bold>{match[1]}</Text>
                             <Text color="gray" italic> [{match[2]}]</Text>
                         </Text>
                     );
                 }
                 if (part.startsWith('http')) {
-                    return <Text key={j} color="cyan" underline italic>{part}</Text>;
+                    return <Text key={j} color={highlightColor} underline italic>{part}</Text>;
                 }
 
                 return renderLatexText(part, j);
@@ -346,6 +347,7 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
 const TableRenderer = React.memo(({ buffer, terminalWidth = 80, theme = 'Dark' }) => {
     if (buffer.length < 2) return null;
     const colors = getThemeColors(theme);
+    const headerColor = colors.codeText || colors.secondary || colors.info || 'cyan';
 
     const rows = buffer.map(line => {
         const parts = line.split('|');
@@ -369,7 +371,7 @@ const TableRenderer = React.memo(({ buffer, terminalWidth = 80, theme = 'Dark' }
             <Box flexDirection="row" borderStyle="single" borderBottom borderTop={false} borderLeft={false} borderRight={false} borderColor={colors.borderMuted} marginBottom={1} paddingBottom={0} width="100%">
                 {header.map((cell, i) => (
                     <Box key={i} flexBasis={`${colPercentage}%`} flexGrow={1} flexShrink={0} paddingRight={2}>
-                        <InlineMarkdown text={wrapText(cell, colChars)} color="cyan" theme={theme} />
+                        <InlineMarkdown text={wrapText(cell, colChars)} color={headerColor} theme={theme} />
                     </Box>
                 ))}
             </Box>
@@ -1044,7 +1046,9 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
             { cmd: '/thinking', desc: 'Set AI reasoning depth' },
             { cmd: '/model', desc: 'Switch AI model' },
+            { cmd: '/provider', desc: 'Select AI Provider' },
             { cmd: '/settings', desc: 'Configure system prefs' },
+            { cmd: '/theme', desc: 'Customize UI color theme' },
             { cmd: '/key', desc: 'Manage API keys' },
             { cmd: '/profile', desc: 'Edit developer persona' },
             { cmd: '/memory', desc: 'Manage agent memory' },

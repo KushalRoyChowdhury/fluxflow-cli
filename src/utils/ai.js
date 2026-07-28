@@ -680,19 +680,20 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     const maxAttempts = 6;
     let hasYielded = false;
 
-    let baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1/chat/completions';
-    if (!baseUrl.endsWith('/chat/completions')) {
-        baseUrl = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    let _baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1/chat/completions';
+    let _apiKey = process.env.NVIDIA_API_KEY && process.env.NVIDIA_BASE_URL ? process.env.NVIDIA_API_KEY : apiKey;
+    if (!_baseUrl.endsWith('/chat/completions')) {
+        _baseUrl = _baseUrl.replace(/\/+$/, '') + '/chat/completions';
     }
 
     while (attempts < maxAttempts) {
         attempts++;
         try {
-            const response = await fetchWithBackoff(baseUrl, {
+            const response = await fetchWithBackoff(_baseUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${_apiKey}`
                 },
                 body: JSON.stringify(body),
                 signal: signal

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { emojiSpace } from '../utils/terminal.js';
+import { getThemeColors } from '../utils/theme.js';
 
-export default function RevertModal({ prompts, onSelect, onClose }) {
+export default function RevertModal({ prompts, onSelect, onClose, theme = 'Dark' }) {
+    const colors = getThemeColors(theme);
     const [selectedIndex, setSelectedIndex] = useState(0);
 
     useInput((input, key) => {
@@ -28,24 +30,24 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
     const visiblePrompts = prompts.slice(startIndex, startIndex + MAX_VISIBLE);
 
     return (
-        <Box flexDirection="column" borderStyle="round" borderColor="grey" padding={0} width="100%">
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
             <Box paddingX={1} marginBottom={1}>
-                <Text color="white" bold>CODEBASE TIME TRAVEL: SELECT UNDO POINT</Text>
+                <Text color={colors.text} bold>CODEBASE TIME TRAVEL: SELECT UNDO POINT</Text>
             </Box>
 
             <Box paddingX={2} marginBottom={1}>
-                <Text>Select a prompt to revert the codebase back to the state <Text bold color="cyan">immediately before</Text> it was executed:</Text>
+                <Text color={colors.text}>Select a prompt to revert the codebase back to the state <Text bold color={colors.secondary || 'cyan'}>immediately before</Text> it was executed:</Text>
             </Box>
 
             {prompts.length === 0 ? (
                 <Box paddingX={2} paddingY={1}>
-                    <Text italic color="gray">No prompt checkpoints found for this session.</Text>
+                    <Text italic color={colors.textMuted}>No prompt checkpoints found for this session.</Text>
                 </Box>
             ) : (
                 <Box flexDirection="column" width="100%">
                     {startIndex > 0 && (
                         <Box paddingX={2} marginBottom={1}>
-                            <Text color="gray">▲ (+{startIndex} more prompts above)</Text>
+                            <Text color={colors.textMuted}>▲ (+{startIndex} more prompts above)</Text>
                         </Box>
                     )}
 
@@ -59,14 +61,14 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
                             <Box
                                 key={p.id}
                                 paddingX={1}
-                                backgroundColor={isSelected ? "#444444" : undefined}
+                                backgroundColor={isSelected ? colors.highlightBg : undefined}
                                 width="100%"
                             >
                                 <Box flexGrow={1}>
-                                    <Text color={isSelected ? 'white' : 'grey'} bold={isSelected}>
+                                    <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}
                                         "{formatPromptPreview(p.prompt)}"
-                                        <Text color={`${isSelected ? 'white' : 'grey'}`} dimColor> [{dateStr} • {fileCount} file(s) changed]</Text>
+                                        <Text color={colors.textMuted}> [{dateStr} • {fileCount} file(s) changed]</Text>
                                     </Text>
                                 </Box>
                             </Box>
@@ -75,7 +77,7 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
 
                     {startIndex + MAX_VISIBLE < prompts.length && (
                         <Box paddingX={2} marginTop={1}>
-                            <Text color="gray">▼ (+{prompts.length - (startIndex + MAX_VISIBLE)} more prompts below)</Text>
+                            <Text color={colors.textMuted}>▼ (+{prompts.length - (startIndex + MAX_VISIBLE)} more prompts below)</Text>
                         </Box>
                     )}
                 </Box>
@@ -88,9 +90,9 @@ export default function RevertModal({ prompts, onSelect, onClose }) {
                 borderLeft={false}
                 borderRight={false}
                 borderBottom={false}
-                borderColor="grey"
+                borderColor={colors.borderMuted}
             >
-                <Text color={"grey"} italic>↑↓ navigate • Enter select undo point • Esc close</Text>
+                <Text color={colors.textMuted} italic>↑↓ navigate • Enter select undo point • Esc close</Text>
             </Box>
         </Box>
     );

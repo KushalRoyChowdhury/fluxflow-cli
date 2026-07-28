@@ -3731,7 +3731,7 @@ var init_MultilineInput = __esm({
 });
 
 // src/utils/theme.js
-var CHAOS_PRESETS, THEMES, getThemeColors;
+var CHAOS_PRESETS, THEMES, cachedChaosPreset, getThemeColors;
 var init_theme = __esm({
   "src/utils/theme.js"() {
     CHAOS_PRESETS = [
@@ -3979,6 +3979,153 @@ var init_theme = __esm({
         logoBodyAnsi: "\x1B[35m",
         logoMutedAnsi: "\x1B[90m",
         logoGradient: ["#ffb3d9", "#ff3399"]
+      },
+      {
+        name: "Radioactive Slime",
+        text: "#ccff00",
+        textMuted: "#99cc00",
+        textDim: "#669900",
+        textInverted: "#0a0f00",
+        border: "#ccff00",
+        borderMuted: "#99cc00",
+        borderDim: "#669900",
+        bg: void 0,
+        cardBg: "#0f1400",
+        highlightBg: "#1a2400",
+        activeBg: "#2a3b00",
+        inputBg: "#1a2400",
+        inputBorder: "#1a2400",
+        inputText: "#ccff00",
+        inputPlaceholder: "#669900",
+        inputPrompt: "#cc00ff",
+        codeBg: "#050a00",
+        codeBorder: "#99cc00",
+        userMsgBg: "#1a2400",
+        userMsgBorder: "#1a2400",
+        userMsgText: "#ccff00",
+        diffRemovalBg: "#2a0033",
+        diffAdditionBg: "#0f3300",
+        diffRemovalText: "#ff00cc",
+        diffAdditionText: "#00ff33",
+        diffRemovalHighlightColor: "#ff33cc",
+        diffRemovalHighlightBg: "#4d0066",
+        diffAdditionHighlightColor: "#33ff66",
+        diffAdditionHighlightBg: "#1a6600",
+        diffRemovalNum: "#ff00cc",
+        diffAdditionNum: "#00ff33",
+        diffRemovalPrefix: "#ff33cc",
+        diffAdditionPrefix: "#33ff66",
+        primary: "#ccff00",
+        secondary: "#cc00ff",
+        accent: "#ff00cc",
+        success: "#00ff33",
+        warning: "#ffcc00",
+        danger: "#ff0033",
+        info: "#00ccff",
+        statusOn: "#ccff00",
+        statusOff: "#669900",
+        logoTextAnsi: "\x1B[1;38;5;190m",
+        logoBodyAnsi: "\x1B[38;5;190m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#ccff00", "#cc00ff"]
+      },
+      {
+        name: "Cosmic Void",
+        text: "#f0f8ff",
+        textMuted: "#a6aeb5",
+        textDim: "#5e656e",
+        textInverted: "#010103",
+        border: "#f0f8ff",
+        borderMuted: "#a6aeb5",
+        borderDim: "#5e656e",
+        bg: void 0,
+        cardBg: "#05030d",
+        highlightBg: "#0b081a",
+        activeBg: "#171133",
+        inputBg: "#0b081a",
+        inputBorder: "#0b081a",
+        inputText: "#f0f8ff",
+        inputPlaceholder: "#5e656e",
+        inputPrompt: "#ff007f",
+        codeBg: "#020108",
+        codeBorder: "#a6aeb5",
+        userMsgBg: "#0b081a",
+        userMsgBorder: "#0b081a",
+        userMsgText: "#f0f8ff",
+        diffRemovalBg: "#2e0a29",
+        diffAdditionBg: "#091c33",
+        diffRemovalText: "#ff33a6",
+        diffAdditionText: "#33d6ff",
+        diffRemovalHighlightColor: "#ff66c2",
+        diffRemovalHighlightBg: "#5c1452",
+        diffAdditionHighlightColor: "#66e0ff",
+        diffAdditionHighlightBg: "#123866",
+        diffRemovalNum: "#ff33a6",
+        diffAdditionNum: "#33d6ff",
+        diffRemovalPrefix: "#ff66c2",
+        diffAdditionPrefix: "#66e0ff",
+        primary: "#f0f8ff",
+        secondary: "#ff007f",
+        accent: "#9d00ff",
+        success: "#33d6ff",
+        warning: "#ffcc00",
+        danger: "#ff0040",
+        info: "#9d00ff",
+        statusOn: "#f0f8ff",
+        statusOff: "#5e656e",
+        logoTextAnsi: "\x1B[1;38;5;231m",
+        logoBodyAnsi: "\x1B[38;5;231m",
+        logoMutedAnsi: "\x1B[38;5;240m",
+        logoGradient: ["#ffffff", "#9d00ff"]
+      },
+      {
+        name: "Magma Eruption",
+        text: "#ff4d00",
+        textMuted: "#cc3d00",
+        textDim: "#802600",
+        textInverted: "#0d0300",
+        border: "#ff4d00",
+        borderMuted: "#cc3d00",
+        borderDim: "#802600",
+        bg: void 0,
+        cardBg: "#1a0600",
+        highlightBg: "#260a00",
+        activeBg: "#401100",
+        inputBg: "#260a00",
+        inputBorder: "#260a00",
+        inputText: "#ff4d00",
+        inputPlaceholder: "#802600",
+        inputPrompt: "#ffcc00",
+        codeBg: "#080200",
+        codeBorder: "#cc3d00",
+        userMsgBg: "#260a00",
+        userMsgBorder: "#260a00",
+        userMsgText: "#ff4d00",
+        diffRemovalBg: "#2e0a0a",
+        diffAdditionBg: "#1f1400",
+        diffRemovalText: "#ff3333",
+        diffAdditionText: "#ffaa00",
+        diffRemovalHighlightColor: "#ff6666",
+        diffRemovalHighlightBg: "#5c1414",
+        diffAdditionHighlightColor: "#ffcc33",
+        diffAdditionHighlightBg: "#3d2900",
+        diffRemovalNum: "#ff3333",
+        diffAdditionNum: "#ffaa00",
+        diffRemovalPrefix: "#ff6666",
+        diffAdditionPrefix: "#ffcc33",
+        primary: "#ff4d00",
+        secondary: "#ffcc00",
+        accent: "#ff0040",
+        success: "#ffaa00",
+        warning: "#ffff00",
+        danger: "#ff0000",
+        info: "#ff8800",
+        statusOn: "#ff4d00",
+        statusOff: "#802600",
+        logoTextAnsi: "\x1B[1;38;5;202m",
+        logoBodyAnsi: "\x1B[38;5;202m",
+        logoMutedAnsi: "\x1B[38;5;236m",
+        logoGradient: ["#ff4d00", "#ff0000"]
       }
     ];
     THEMES = {
@@ -4337,17 +4484,129 @@ var init_theme = __esm({
         logoBodyAnsi: "\x1B[30m",
         logoMutedAnsi: "\x1B[38;5;244m",
         logoGradient: ["#0077ff", "#ff00ff"]
+      },
+      "Synthwave 84": {
+        id: "Synthwave 84",
+        name: "Synthwave 84",
+        text: "#fdfdfd",
+        textMuted: "#a08eb7",
+        textDim: "#705c8a",
+        textInverted: "#1a1025",
+        textExclusive: "#e3dcf0",
+        textMutedExclusive: "#b9abc9",
+        border: "#fc28a8",
+        borderMuted: "#a21568",
+        borderDim: "#5c0a3a",
+        bg: void 0,
+        cardBg: "#261b38",
+        highlightBg: "#35254d",
+        activeBg: "#4c3570",
+        inputBg: "#35254d",
+        inputBorder: "#35254d",
+        inputText: "#fdfdfd",
+        inputPlaceholder: "#a08eb7",
+        inputPrompt: "#03e8fc",
+        codeBg: "#1e142b",
+        codeBorder: "#a21568",
+        userMsgBg: "#35254d",
+        userMsgBorder: "#35254d",
+        userMsgText: "#fdfdfd",
+        diffRemovalBg: "#471434",
+        diffAdditionBg: "#144743",
+        diffRemovalText: "#ff4081",
+        diffAdditionText: "#00e5ff",
+        diffRemovalHighlightColor: "#ff79a1",
+        diffRemovalHighlightBg: "#6b1e4e",
+        diffAdditionHighlightColor: "#66f5ff",
+        diffAdditionHighlightBg: "#1e6b65",
+        diffRemovalNum: "#ff4081",
+        diffAdditionNum: "#00e5ff",
+        diffRemovalPrefix: "#ff79a1",
+        diffAdditionPrefix: "#66f5ff",
+        primary: "#fdfdfd",
+        secondary: "#03e8fc",
+        accent: "#fc28a8",
+        success: "#00e5ff",
+        warning: "#ffc107",
+        danger: "#ff4081",
+        info: "#b388ff",
+        statusOn: "#03e8fc",
+        statusOff: "#a08eb7",
+        logoTextAnsi: "\x1B[1;35m",
+        logoBodyAnsi: "\x1B[35m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#fc28a8", "#03e8fc"]
+      },
+      "Forest Sprite": {
+        id: "Forest Sprite",
+        name: "Forest Sprite",
+        text: "#d6e6d1",
+        textMuted: "#95b38d",
+        textDim: "#628059",
+        textInverted: "#161c14",
+        textExclusive: "#eaf2e8",
+        textMutedExclusive: "#a9c7a2",
+        border: "#74a862",
+        borderMuted: "#477038",
+        borderDim: "#2b4720",
+        bg: void 0,
+        cardBg: "#1f291c",
+        highlightBg: "#2a3826",
+        activeBg: "#3a4d35",
+        inputBg: "#2a3826",
+        inputBorder: "#2a3826",
+        inputText: "#d6e6d1",
+        inputPlaceholder: "#95b38d",
+        inputPrompt: "#8feb73",
+        codeBg: "#161e14",
+        codeBorder: "#477038",
+        userMsgBg: "#2a3826",
+        userMsgBorder: "#2a3826",
+        userMsgText: "#d6e6d1",
+        diffRemovalBg: "#3b231c",
+        diffAdditionBg: "#203b1c",
+        diffRemovalText: "#db6242",
+        diffAdditionText: "#59cc3f",
+        diffRemovalHighlightColor: "#f0896c",
+        diffRemovalHighlightBg: "#5c362a",
+        diffAdditionHighlightColor: "#80e368",
+        diffAdditionHighlightBg: "#305929",
+        diffRemovalNum: "#db6242",
+        diffAdditionNum: "#59cc3f",
+        diffRemovalPrefix: "#f0896c",
+        diffAdditionPrefix: "#80e368",
+        primary: "#d6e6d1",
+        secondary: "#8feb73",
+        accent: "#e69835",
+        success: "#59cc3f",
+        warning: "#e69835",
+        danger: "#db6242",
+        info: "#73b4eb",
+        statusOn: "#8feb73",
+        statusOff: "#95b38d",
+        logoTextAnsi: "\x1B[1;32m",
+        logoBodyAnsi: "\x1B[32m",
+        logoMutedAnsi: "\x1B[90m",
+        logoGradient: ["#8feb73", "#e69835"]
       }
     };
+    cachedChaosPreset = null;
     getThemeColors = (themeName = "Dark") => {
-      if (themeName === "Chaos" || themeName === "Mystery") {
-        const randomPreset = CHAOS_PRESETS[Math.floor(Math.random() * CHAOS_PRESETS.length)];
-        return { ...randomPreset, id: "Chaos" };
+      let colors;
+      if (themeName === "Mystery" || themeName === "Chaos") {
+        if (!cachedChaosPreset) {
+          cachedChaosPreset = CHAOS_PRESETS[Math.floor(Math.random() * CHAOS_PRESETS.length)];
+        }
+        colors = { ...cachedChaosPreset, id: "Mystery" };
+      } else {
+        cachedChaosPreset = null;
+        if (THEMES[themeName]) colors = THEMES[themeName];
+        else if (themeName === "GitHub") colors = THEMES["GitHub Dark"];
+        else if (themeName === "Transparent") colors = THEMES["Transparent Dark"];
+        else colors = THEMES.Dark;
       }
-      if (THEMES[themeName]) return THEMES[themeName];
-      if (themeName === "GitHub") return THEMES["GitHub Dark"];
-      if (themeName === "Transparent") return THEMES["Transparent Dark"];
-      return THEMES.Dark;
+      const codeColor = colors.codeText || colors.secondary || colors.info || colors.logoGradient && colors.logoGradient[0] || "cyan";
+      return { ...colors, codeText: codeColor };
     };
   }
 });
@@ -4788,7 +5047,7 @@ var init_terminal = __esm({
       return `${coloredArt[0]}
 ${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
 ${coloredArt[2]}
-${coloredArt[3]}  ${textColor}FLUX FLOW ${grey("v" + version)}${reset}
+${coloredArt[3]}  ${textColor}FluxFlow ${grey("v" + version)}${reset}
 ${coloredArt[4]}
 ${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
@@ -4970,12 +5229,13 @@ var init_ChatLayout = __esm({
       if (!text) return null;
       const colors = getThemeColors(theme);
       const textColor = color || colors.text;
+      const highlightColor = colors.codeText || colors.logoGradient && colors.logoGradient[0] || colors.info || colors.secondary || "cyan";
       const parts = text.split(REGEX_MD_TOKENS);
       return /* @__PURE__ */ React4.createElement(Text4, { color: textColor, wrap: "anywhere", italic }, parts.map((part, j) => {
         if (!part) return null;
         if (part.startsWith("```") && part.endsWith("```")) {
           const content = part.slice(3, -3);
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan" }, content);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor }, content);
         }
         if (part.startsWith("**") && part.endsWith("**")) {
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, bold: true, color: textColor }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(2, -2), color: textColor, theme }));
@@ -4989,12 +5249,12 @@ var init_ChatLayout = __esm({
             return p1.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
           });
           const hasFileRef = content.includes("@[");
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan", bold: hasFileRef }, formatted);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor, bold: hasFileRef }, formatted);
         }
         if (part.startsWith("@[") && part.endsWith("]")) {
           const filePath = part.slice(2, -1);
           const basename = filePath.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan", bold: true }, basename);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor, bold: true }, basename);
         }
         if (part.startsWith("\\(") && part.endsWith("\\)") || part.startsWith("\\[") && part.endsWith("\\]")) {
           const content = part.slice(2, -2);
@@ -5006,14 +5266,14 @@ var init_ChatLayout = __esm({
         }
         if (part.startsWith("[") && (part.includes("](") || part.includes("] ("))) {
           const match = part.match(REGEX_MD_LINK_PAREN);
-          if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan", underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " (", match[2], ")"));
+          if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: highlightColor, underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " (", match[2], ")"));
         }
         if (part.startsWith("[") && (part.includes("][") || part.includes("] ["))) {
           const match = part.match(REGEX_MD_LINK_BRACKET);
-          if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: "cyan", underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " [", match[2], "]"));
+          if (match) return /* @__PURE__ */ React4.createElement(Text4, { key: j }, /* @__PURE__ */ React4.createElement(Text4, { color: highlightColor, underline: true, bold: true }, match[1]), /* @__PURE__ */ React4.createElement(Text4, { color: "gray", italic: true }, " [", match[2], "]"));
         }
         if (part.startsWith("http")) {
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: "cyan", underline: true, italic: true }, part);
+          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor, underline: true, italic: true }, part);
         }
         return renderLatexText(part, j);
       }));
@@ -5021,6 +5281,7 @@ var init_ChatLayout = __esm({
     TableRenderer = React4.memo(({ buffer, terminalWidth = 80, theme = "Dark" }) => {
       if (buffer.length < 2) return null;
       const colors = getThemeColors(theme);
+      const headerColor = colors.codeText || colors.secondary || colors.info || "cyan";
       const rows = buffer.map((line) => {
         const parts = line.split("|");
         if (parts[0] !== void 0 && parts[0].trim() === "") parts.shift();
@@ -5034,7 +5295,7 @@ var init_ChatLayout = __esm({
       const colChars = Math.floor(availableWidth / header.length) - 2;
       return (
         // Table MarginY here
-        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 1, marginY: 0, width: terminalWidth - 2 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: colors.borderMuted, marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: "cyan", theme })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: colors.text, theme }))))))
+        /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 1, marginY: 0, width: terminalWidth - 2 }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", borderStyle: "single", borderBottom: true, borderTop: false, borderLeft: false, borderRight: false, borderColor: colors.borderMuted, marginBottom: 1, paddingBottom: 0, width: "100%" }, header.map((cell, i) => /* @__PURE__ */ React4.createElement(Box3, { key: i, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: headerColor, theme })))), data.map((row, ri) => /* @__PURE__ */ React4.createElement(Box3, { key: ri, flexDirection: "row", marginBottom: ri === data.length - 1 ? 0 : 1, width: "100%" }, row.map((cell, ci) => /* @__PURE__ */ React4.createElement(Box3, { key: ci, flexBasis: `${colPercentage}%`, flexGrow: 1, flexShrink: 0, paddingRight: 2, flexDirection: "column" }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: wrapText(cell, colChars), color: colors.text, theme }))))))
       );
     });
     MarkdownText = React4.memo(({ text, color, columns = 80, italic = false, theme = "Dark" }) => {
@@ -5412,7 +5673,9 @@ var init_ChatLayout = __esm({
           { cmd: "/mode", desc: "Toggle Flux/Flow modes" },
           { cmd: "/thinking", desc: "Set AI reasoning depth" },
           { cmd: "/model", desc: "Switch AI model" },
+          { cmd: "/provider", desc: "Select AI Provider" },
           { cmd: "/settings", desc: "Configure system prefs" },
+          { cmd: "/theme", desc: "Customize UI color theme" },
           { cmd: "/key", desc: "Manage API keys" },
           { cmd: "/profile", desc: "Edit developer persona" },
           { cmd: "/memory", desc: "Manage agent memory" },
@@ -6068,7 +6331,7 @@ var init_arg_parser = __esm({
 
 // src/data/main_tools.js
 import { execSync } from "child_process";
-var _isPsAvailable, isPsAvailable, TOOL_PROTOCOL;
+var _isPsAvailable, isPsAvailable, _cachedAdvanceRollback, TOOL_PROTOCOL;
 var init_main_tools = __esm({
   async "src/data/main_tools.js"() {
     await init_exec_command();
@@ -6084,7 +6347,12 @@ var init_main_tools = __esm({
       }
       return _isPsAvailable;
     };
-    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => `
+    _cachedAdvanceRollback = null;
+    TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => {
+      if (_cachedAdvanceRollback === null) {
+        _cachedAdvanceRollback = advanceRollback;
+      }
+      return `
 -- TOOL DEFINITIONS --
 Tool calls: ONLY use [tool:functions.ToolName(args)]
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
@@ -6108,7 +6376,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path se
 6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task list, no Markdown in arrays. Analyze request: if multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
-${advanceRollback ? `
+${_cachedAdvanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
 Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly if needed.
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
@@ -6130,6 +6398,7 @@ Invocations:
 - **Escape quotes: \\" for code strings**
 - **Literal escapes: Double-escape sequences (e.g., \\\\n)**
 - **File structure: Real newlines for code formatting**`.trim();
+    };
   }
 });
 
@@ -6822,13 +7091,21 @@ function SettingsMenu({
   saveSettings: saveSettings2,
   quotas,
   setMessages,
-  aiProvider
+  aiProvider,
+  initialSelectingTheme = false,
+  onCloseTheme = null,
+  setProviderReturnView = null
 }) {
+  const activeTheme = systemSettings.theme === "Chaos" || systemSettings.theme === "Mystery" ? "Mystery" : systemSettings.theme || "Dark";
+  const defaultIdx = themeOptions.indexOf(activeTheme);
   const [activeColumn, setActiveColumn] = useState6("categories");
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState6(0);
   const [selectedItemIndex, setSelectedItemIndex] = useState6(0);
   const [editingItem, setEditingItem] = useState6(null);
   const [editValue, setEditValue] = useState6("");
+  const [isSelectingTheme, setIsSelectingTheme] = useState6(initialSelectingTheme);
+  const [themeIndex, setThemeIndex] = useState6(defaultIdx >= 0 ? defaultIdx : 0);
+  const [initialTheme, setInitialTheme] = useState6(systemSettings.theme || "Dark");
   const [currentMemory, setCurrentMemory] = useState6(0);
   const [maxMemory, setMaxMemory] = useState6(0);
   const [memoryUnit, setMemoryUnit] = useState6("MB");
@@ -6903,6 +7180,28 @@ function SettingsMenu({
   const currentCatId = CATEGORIES[selectedCategoryIndex].id;
   const currentItems = getCategoryItems(currentCatId);
   useInput3((input, key) => {
+    if (isSelectingTheme) {
+      if (key.upArrow) {
+        const nextIdx = (themeIndex - 1 + themeOptions.length) % themeOptions.length;
+        setThemeIndex(nextIdx);
+      } else if (key.downArrow) {
+        const nextIdx = (themeIndex + 1) % themeOptions.length;
+        setThemeIndex(nextIdx);
+      } else if (key.return) {
+        const selectedTheme = themeOptions[themeIndex];
+        setSystemSettings((s) => {
+          const newSysSettings = { ...s, theme: selectedTheme };
+          saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+          return newSysSettings;
+        });
+        if (onCloseTheme) onCloseTheme();
+        else setIsSelectingTheme(false);
+      } else if (key.escape) {
+        if (onCloseTheme) onCloseTheme();
+        else setIsSelectingTheme(false);
+      }
+      return;
+    }
     if (editingItem) {
       if (key.escape) {
         setEditingItem(null);
@@ -7012,6 +7311,7 @@ function SettingsMenu({
     } else if (item.value === "apiTier") {
       setActiveView("apiTier");
     } else if (item.value === "aiProvider") {
+      if (setProviderReturnView) setProviderReturnView("settings");
       setActiveView("selectProvider");
     } else if (item.value === "advanceRollback") {
       if (!systemSettings.advanceRollback) {
@@ -7081,18 +7381,24 @@ function SettingsMenu({
         return newSysSettings;
       });
     } else if (item.value === "theme") {
-      const options = ["Dark", "Light", "GitHub Dark", "GitHub Light", "Transparent Dark", "Transparent Light", "Chaos"];
-      const activeTheme = systemSettings.theme === "Mystery" ? "Chaos" : systemSettings.theme || "Dark";
-      const currentIndex = options.indexOf(activeTheme);
-      const nextIndex = (currentIndex + 1) % options.length;
-      setSystemSettings((s) => {
-        const newSysSettings = { ...s, theme: options[nextIndex] };
-        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
-        return newSysSettings;
-      });
+      const activeTheme2 = systemSettings.theme === "Chaos" || systemSettings.theme === "Mystery" ? "Mystery" : systemSettings.theme || "Dark";
+      const idx = themeOptions.indexOf(activeTheme2);
+      setThemeIndex(idx >= 0 ? idx : 0);
+      setInitialTheme(systemSettings.theme || "Dark");
+      setIsSelectingTheme(true);
     }
   };
   const colors = getThemeColors(systemSettings.theme);
+  if (isSelectingTheme) {
+    const previewThemeName = themeOptions[themeIndex];
+    const previewColors = getThemeColors(previewThemeName);
+    return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: previewColors.border, padding: 1, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text, bold: true }, "Choose your color scheme:")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", flexGrow: 1 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", paddingRight: 1 }, themeOptions.map((tName, index) => {
+      const isSelected = themeIndex === index;
+      const isSaved = (systemSettings.theme || "Dark") === tName;
+      const isForest = tName === "Forest Sprite";
+      return /* @__PURE__ */ React7.createElement(Box6, { key: tName, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: isSelected ? previewColors.text : previewColors.textDim, bold: isSelected }, isSelected ? "> " : "  ", tName, isForest && /* @__PURE__ */ React7.createElement(Text7, { color: isSelected ? previewColors.success || "#52b788" : "green", bold: true }, " \u2605"), isSaved ? /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.primary || "cyan", italic: true }, " (saved)") : ""));
+    })), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", flexGrow: 1, borderStyle: "round", borderColor: previewColors.borderMuted, paddingX: 2, paddingY: 1, backgroundColor: previewColors.cardBg }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.secondary || "cyan", bold: true }, "> ", "you: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "add a greeting function")), /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.success || "green" }, "  Here's the change:")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", marginLeft: 2, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "3 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, '  import "fmt"')), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "4"), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffRemovalBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalNum || previewColors.diffRemovalText }, "5 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalPrefix || previewColors.diffRemovalText }, "- "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalText }, "func "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalHighlightColor || previewColors.diffRemovalText, backgroundColor: previewColors.diffRemovalHighlightBg, bold: true }, "main()"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalText }, " {"))), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffAdditionBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionNum || previewColors.diffAdditionText }, "5 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionPrefix || previewColors.diffAdditionText }, "+ "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, "func "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText, backgroundColor: previewColors.diffAdditionHighlightBg, bold: true }, "greet(name string)"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, " {"))), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffAdditionBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionNum || previewColors.diffAdditionText }, "6 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionPrefix || previewColors.diffAdditionText }, "+ "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, "    "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText, backgroundColor: previewColors.diffAdditionHighlightBg }, 'fmt.Printf("Hello, %s!\\n", name)'))), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "7   }")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "\u25BE Thought Process"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textMuted }, "  I need to add a greeting function. I'll use fmt.Printf.")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column" }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.warning || "yellow" }, "\u2699 tool: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "write_file main.go")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.accent || "magenta" }, "\u29BF task: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "Implementing greeting")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.danger || "red" }, "X error: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "compilation failed")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.warning || "yellow" }, "\u26A0 warning: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "deprecation warning")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.info || "blue" }, "\u2192 link: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.info || "blue", underline: true }, "file:///path/to/main.go")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.accent || "magenta" }, "\u2605 accent: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "highlighted text")), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "\xB7 dim: press Enter to continue")))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 1, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, "\u25B2\u25BC Navigate \u2022 ENTER to Select \u2022 ESC to Cancel"), /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Previewing: ", themeOptions[themeIndex], themeOptions[themeIndex] === "Forest Sprite" ? " \u2605" : "")));
+  }
   return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: colors.borderMuted, width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text, bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", maxWidth: 40, borderStyle: "round", borderColor: activeColumn === "categories" ? colors.border : colors.borderMuted, padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? colors.text : colors.textDim, bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
     const isSelected = selectedCategoryIndex === index;
     const isExit = cat.id === "exit";
@@ -7181,11 +7487,12 @@ function SettingsMenu({
     return elements;
   })() : /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, CATEGORIES[selectedCategoryIndex].desc), currentCatId === "exit" && /* @__PURE__ */ React7.createElement(React7.Fragment, null, /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 19, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited")), /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit)))))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 0, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, activeColumn === "categories" ? "\u25B2\u25BC Select Category \u2022 Enter/\u25BA to configure" : "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 \u25C4/ESC to go back"), activeColumn === "categories" && /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, CATEGORIES[selectedCategoryIndex].desc)));
 }
-var CATEGORIES, getActivePreset, truncateCSV;
+var themeOptions, CATEGORIES, getActivePreset, truncateCSV;
 var init_SettingsMenu = __esm({
   async "src/components/SettingsMenu.jsx"() {
     await init_exec_command();
     init_theme();
+    themeOptions = [...Object.keys(THEMES), "Mystery"];
     CATEGORIES = [
       { id: "appearance", label: "Appearance", desc: "Customize UI theme & rendering options" },
       { id: "memory", label: "Memory", desc: "Manage system context & agent's memory" },
@@ -12535,18 +12842,19 @@ var init_ai = __esm({
       let attempts = 0;
       const maxAttempts = 6;
       let hasYielded = false;
-      let baseUrl = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1/chat/completions";
-      if (!baseUrl.endsWith("/chat/completions")) {
-        baseUrl = baseUrl.replace(/\/+$/, "") + "/chat/completions";
+      let _baseUrl = process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1/chat/completions";
+      let _apiKey = process.env.NVIDIA_API_KEY && process.env.NVIDIA_BASE_URL ? process.env.NVIDIA_API_KEY : apiKey;
+      if (!_baseUrl.endsWith("/chat/completions")) {
+        _baseUrl = _baseUrl.replace(/\/+$/, "") + "/chat/completions";
       }
       while (attempts < maxAttempts) {
         attempts++;
         try {
-          const response = await fetchWithBackoff(baseUrl, {
+          const response = await fetchWithBackoff(_baseUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": `Bearer ${apiKey}`
+              "Authorization": `Bearer ${_apiKey}`
             },
             body: JSON.stringify(body),
             signal
@@ -17616,7 +17924,8 @@ var init_witty_phrases = __esm({
 // src/components/RevertModal.jsx
 import React14, { useState as useState13 } from "react";
 import { Box as Box13, Text as Text14, useInput as useInput8 } from "ink";
-function RevertModal({ prompts, onSelect, onClose }) {
+function RevertModal({ prompts, onSelect, onClose, theme = "Dark" }) {
+  const colors = getThemeColors(theme);
   const [selectedIndex, setSelectedIndex] = useState13(0);
   useInput8((input, key) => {
     if (key.escape) onClose();
@@ -17637,7 +17946,7 @@ function RevertModal({ prompts, onSelect, onClose }) {
     }
   }
   const visiblePrompts = prompts.slice(startIndex, startIndex + MAX_VISIBLE);
-  return /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box13, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "white", bold: true }, "CODEBASE TIME TRAVEL: SELECT UNDO POINT")), /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, null, "Select a prompt to revert the codebase back to the state ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: "cyan" }, "immediately before"), " it was executed:")), prompts.length === 0 ? /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: "gray" }, "No prompt checkpoints found for this session.")) : /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "\u25B2 (+", startIndex, " more prompts above)")), visiblePrompts.map((p, index) => {
+  return /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box13, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text, bold: true }, "CODEBASE TIME TRAVEL: SELECT UNDO POINT")), /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text }, "Select a prompt to revert the codebase back to the state ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: colors.secondary || "cyan" }, "immediately before"), " it was executed:")), prompts.length === 0 ? /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: colors.textMuted }, "No prompt checkpoints found for this session.")) : /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more prompts above)")), visiblePrompts.map((p, index) => {
     const actualIndex = startIndex + index;
     const isSelected = actualIndex === selectedIndex;
     const dateStr = formatDate2(p.timestamp);
@@ -17647,12 +17956,12 @@ function RevertModal({ prompts, onSelect, onClose }) {
       {
         key: p.id,
         paddingX: 1,
-        backgroundColor: isSelected ? "#444444" : void 0,
+        backgroundColor: isSelected ? colors.highlightBg : void 0,
         width: "100%"
       },
-      /* @__PURE__ */ React14.createElement(Box13, { flexGrow: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: isSelected ? "white" : "grey", bold: isSelected }, isSelected ? "\u276F " : "  ", '"', formatPromptPreview(p.prompt), '"', /* @__PURE__ */ React14.createElement(Text14, { color: `${isSelected ? "white" : "grey"}`, dimColor: true }, " [", dateStr, " \u2022 ", fileCount, " file(s) changed]")))
+      /* @__PURE__ */ React14.createElement(Box13, { flexGrow: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", '"', formatPromptPreview(p.prompt), '"', /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted }, " [", dateStr, " \u2022 ", fileCount, " file(s) changed]")))
     );
-  }), startIndex + MAX_VISIBLE < prompts.length && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: "gray" }, "\u25BC (+", prompts.length - (startIndex + MAX_VISIBLE), " more prompts below)"))), /* @__PURE__ */ React14.createElement(
+  }), startIndex + MAX_VISIBLE < prompts.length && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginTop: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted }, "\u25BC (+", prompts.length - (startIndex + MAX_VISIBLE), " more prompts below)"))), /* @__PURE__ */ React14.createElement(
     Box13,
     {
       marginTop: 1,
@@ -17661,9 +17970,9 @@ function RevertModal({ prompts, onSelect, onClose }) {
       borderLeft: false,
       borderRight: false,
       borderBottom: false,
-      borderColor: "grey"
+      borderColor: colors.borderMuted
     },
-    /* @__PURE__ */ React14.createElement(Text14, { color: "grey", italic: true }, "\u2191\u2193 navigate \u2022 Enter select undo point \u2022 Esc close")
+    /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted, italic: true }, "\u2191\u2193 navigate \u2022 Enter select undo point \u2022 Esc close")
   ));
 }
 function formatPromptPreview(prompt) {
@@ -17694,6 +18003,7 @@ function formatDate2(timestamp) {
 var init_RevertModal = __esm({
   "src/components/RevertModal.jsx"() {
     init_terminal();
+    init_theme();
   }
 });
 
@@ -18180,6 +18490,7 @@ function App({ args = [] }) {
   const [quotas, setQuotas] = useState15({ limitMode: "Daily", agentLimit: 99999999, tokenLimit: 99999999999999, backgroundLimit: 999999, searchLimit: 100, customModelId: "", customLimit: 0, providerBudgets: {} });
   const [inputConfig, setInputConfig] = useState15(null);
   const [budgetReturnView, setBudgetReturnView] = useState15("chat");
+  const [providerReturnView, setProviderReturnView] = useState15("settings");
   const [providerBudgetQueue, setProviderBudgetQueue] = useState15([]);
   const [providerBudgetCursor, setProviderBudgetCursor] = useState15(0);
   const [pbsCursor, setPbsCursor] = useState15(0);
@@ -19256,6 +19567,10 @@ function App({ args = [] }) {
       subs: getModels(aiProvider, apiTier)
     },
     {
+      cmd: "/provider",
+      desc: "Select AI Provider"
+    },
+    {
       cmd: "/mode",
       desc: "Toggle Flux/Flow modes",
       subs: [
@@ -19264,6 +19579,7 @@ function App({ args = [] }) {
       ]
     },
     { cmd: "/settings", desc: "Configure system prefs" },
+    { cmd: "/theme", desc: "Customize UI color theme" },
     { cmd: "/key", desc: "Manage API keys" },
     { cmd: "/profile", desc: "Edit developer persona" },
     { cmd: "/memory", desc: "Manage agent memory" },
@@ -19769,6 +20085,16 @@ ${cleanText}`, color: "magenta" }];
         }
         case "/settings": {
           setActiveView("settings");
+          break;
+        }
+        case "/provider":
+        case "/providers": {
+          setProviderReturnView("chat");
+          setActiveView("selectProvider");
+          break;
+        }
+        case "/theme": {
+          setActiveView("theme");
           break;
         }
         case "/key": {
@@ -21105,7 +21431,26 @@ Selection: ${val}`,
             saveSettings,
             quotas,
             setMessages,
-            aiProvider
+            aiProvider,
+            setProviderReturnView
+          }
+        );
+      case "theme":
+        return /* @__PURE__ */ React16.createElement(
+          SettingsMenu,
+          {
+            systemSettings,
+            setSystemSettings,
+            apiTier,
+            setActiveView,
+            setInputConfig,
+            saveSettings,
+            quotas,
+            setMessages,
+            aiProvider,
+            initialSelectingTheme: true,
+            onCloseTheme: () => setActiveView("chat"),
+            setProviderReturnView
           }
         );
       case "selectProvider":
@@ -21119,12 +21464,12 @@ Selection: ${val}`,
               { label: "DeepSeek (Paid)", value: "DeepSeek" },
               { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
-              { label: "Back", value: "settings" }
+              { label: "Back", value: providerReturnView }
             ],
             theme: systemSettings.theme,
             onSelect: async (item) => {
-              if (item.value === "settings" || item.value === "Back") {
-                setActiveView("settings");
+              if (item.value === providerReturnView || item.value === "settings" || item.value === "Back") {
+                setActiveView(providerReturnView);
                 return;
               }
               const selectedProvider = item.value;
@@ -21151,19 +21496,19 @@ Selection: ${val}`,
                     isMeta: true
                   }
                 ]);
-                setActiveView("settings");
+                setActiveView(providerReturnView);
               } else {
                 setInputConfig({
                   label: `Enter ${selectedProvider} API Key:`,
                   key: "providerKey",
                   provider: selectedProvider,
                   value: "",
-                  returnView: "settings"
+                  returnView: providerReturnView
                 });
                 setActiveView("input");
               }
             },
-            onClose: () => setActiveView("settings")
+            onClose: () => setActiveView(providerReturnView)
           }
         );
       case "apiTier": {
@@ -21522,7 +21867,7 @@ Selection: ${val}`,
           }
         )));
       case "advanceRollbackDanger":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React16.createElement(Text16, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React16.createElement(Text16, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "(Requires Restart to take effect)"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm",
@@ -21708,7 +22053,8 @@ Selection: ${val}`,
                 setActiveView("chat");
               }
             },
-            onClose: () => setActiveView("chat")
+            onClose: () => setActiveView("chat"),
+            theme: systemSettings.theme
           }
         ));
       case "resume":
@@ -22674,12 +23020,12 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
   /budget                                  Set or View budget limits
-  /image setup quality <low...premium>     Configure default image generation quality
-  /image stats                             Show image quota stats
   /mode <flux|flow>                        Toggle Flux/Flow modes
   /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
   /model <model_name>                      Switch Model for Agent
+  /provider                                Select AI Provider
   /settings                                Configure system preferences
+  /theme                                   Customize UI color theme
   /key                                     Manage API keys
   /profile                                 Edit developer persona
   /memory                                  Manage agent memory

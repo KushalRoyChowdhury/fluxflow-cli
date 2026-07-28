@@ -107,12 +107,12 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /btw <question>                          Send raw inquiry to the agent mid-turn
   /image setup key <default|custom>        Configure image API key strategy
   /budget                                  Set or View budget limits
-  /image setup quality <low...premium>     Configure default image generation quality
-  /image stats                             Show image quota stats
   /mode <flux|flow>                        Toggle Flux/Flow modes
   /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
   /model <model_name>                      Switch Model for Agent
+  /provider                                Select AI Provider
   /settings                                Configure system preferences
+  /theme                                   Customize UI color theme
   /key                                     Manage API keys
   /profile                                 Edit developer persona
   /memory                                  Manage agent memory

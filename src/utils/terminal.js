@@ -74,7 +74,7 @@ export const getFluxLogo = (version = '...', provider = 'Loading...', theme = 'D
     return `${coloredArt[0]}
 ${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
 ${coloredArt[2]}
-${coloredArt[3]}  ${textColor}FLUX FLOW ${grey('v' + version)}${reset}
+${coloredArt[3]}  ${textColor}FluxFlow ${grey('v' + version)}${reset}
 ${coloredArt[4]}
 ${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
