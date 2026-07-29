@@ -123,8 +123,8 @@ export const saveChat = async (id, name, messages) => {
         const extractedFirst = extractPrompt(firstUserMsg);
 
         if (existingChat && existingChat.prompt) {
-            // Gacha: 80% chance to update prompt with latest user prompt if valid, otherwise retain existing
-            if (Math.random() < 0.80 && extractedLatest) {
+            // Gacha: 50% chance to update prompt with latest user prompt if valid, otherwise retain existing
+            if (Math.random() < 0.50 && extractedLatest) {
                 prompt = extractedLatest;
             } else {
                 prompt = existingChat.prompt;

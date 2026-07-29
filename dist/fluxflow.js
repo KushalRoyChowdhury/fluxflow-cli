@@ -6703,7 +6703,7 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 
 **TOOL USAGE POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**\n" : ""}
+${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance \u2190 ** MANDATORY **\n- FileMap > ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > Full Read\n- **Update Todos from realtime progress EVERY TURN**\n" : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
@@ -6712,12 +6712,12 @@ ${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Pat
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
+1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ``}` : `Supports images/docs`}
 2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes
-3. [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs
+3. [tool:functions.FileMap(path="file")]. Shows file structure
+4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST SNIPPETS/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
-6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
+6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
 ${_cachedAdvanceRollback ? `
@@ -6732,7 +6732,7 @@ Invocations:
 - Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active
 - InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
 1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
-2. [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks. NEVER spam GetProgress
+2. [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks
 3. [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
@@ -8244,7 +8244,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 - Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY" : ""}
 
 -- CHAT FORMATTING --
-- GFM Markdown
+- GFM Markdown ONLY
 - Same Language as User Query
 - Before tool calls, emit one brief current update. After tool calls, emit no further text this turn
 - On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
@@ -8590,7 +8590,7 @@ var init_history = __esm({
         const extractedLatest = extractPrompt(latestUserMsg);
         const extractedFirst = extractPrompt(firstUserMsg);
         if (existingChat && existingChat.prompt) {
-          if (Math.random() < 0.8 && extractedLatest) {
+          if (Math.random() < 0.5 && extractedLatest) {
             prompt = extractedLatest;
           } else {
             prompt = existingChat.prompt;
@@ -17673,7 +17673,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
         "filemap": '- [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables',
         "patchfile": '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
-        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code',
+        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code',
         "websearch": '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
         "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`
@@ -20970,7 +20970,7 @@ ${cleanText}`, color: "magenta" }];
         case "/chats": {
           const run = async () => {
             const history = await loadHistory();
-            const list = Object.entries(history).map(([id, info]) => `\u2022 ${id}: ${info.name}`).join("\n");
+            const list = Object.entries(history).sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0)).map(([id, info]) => `\u2022 ${id}: ${info.name}`).join("\n");
             setMessages((prev) => {
               setCompletedIndex(prev.length + 1);
               return [...prev, { id: Date.now(), role: "system", text: `[HISTORY] Saved Chats:
@@ -22151,7 +22151,8 @@ Selection: ${val}`,
     );
   };
   const renderProgressBar = (label, current, limit) => {
-    const percent = limit > 0 ? Math.min(100, Math.round(current / limit * 100)) : 0;
+    const actualPercent = limit > 0 ? Math.min(100, current / limit * 100) : 0;
+    const percent = Math.round(actualPercent);
     const barWidth = 15;
     const filledCount = Math.round(percent / 100 * barWidth);
     const barStr = "\u2588".repeat(filledCount) + "\u2591".repeat(Math.max(0, barWidth - filledCount));
@@ -22164,7 +22165,15 @@ Selection: ${val}`,
     const isTokens = label.toLowerCase().includes("token");
     const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
     const displayCurrent = isTokens ? formatTokens(current) : current;
-    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
+    let displayPercent;
+    if (actualPercent === 0) {
+      displayPercent = "0%";
+    } else if (actualPercent > 0 && actualPercent < 1) {
+      displayPercent = "<1%";
+    } else {
+      displayPercent = `${percent}%`;
+    }
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", displayPercent, " (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
@@ -22466,7 +22475,7 @@ Selection: ${val}`,
           }
           const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
           const monthName = resetDate.toLocaleString("default", { month: "short" });
-          resetInfo = `Resets on: ${resetDay}-${monthName}`;
+          resetInfo = `${monthName}-${resetDay}`;
         }
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
           const pb = providerBudgetsMap[prov];
@@ -22483,7 +22492,7 @@ Selection: ${val}`,
             provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
           }
           return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
-        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))));
+        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))));
       }
       case "input":
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, inputConfig.note)), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React16.createElement(

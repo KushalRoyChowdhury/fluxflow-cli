@@ -147,7 +147,7 @@ ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 - Sensitive files? Ask before Read${isSystemDir ? '\n- PROTECTED DIRECTORY' : ''}
 
 -- CHAT FORMATTING --
-- GFM Markdown
+- GFM Markdown ONLY
 - Same Language as User Query
 - Before tool calls, emit one brief current update. After tool calls, emit no further text this turn
 - On completion: summarize changes (why) + edited files${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}

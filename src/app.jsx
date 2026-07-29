@@ -2870,7 +2870,10 @@ export default function App({ args = [] }) {
                 case '/chats': {
                     const run = async () => {
                         const history = await loadHistory();
-                        const list = Object.entries(history).map(([id, info]) => `• ${id}: ${info.name}`).join('\n');
+                        const list = Object.entries(history)
+                            .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
+                            .map(([id, info]) => `• ${id}: ${info.name}`)
+                            .join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
                             return [...prev, { id: Date.now(), role: 'system', text: `[HISTORY] Saved Chats:\n${list || 'No saved chats found.'}`, isMeta: true }];
@@ -4191,7 +4194,8 @@ export default function App({ args = [] }) {
     };
 
     const renderProgressBar = (label, current, limit) => {
-        const percent = limit > 0 ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+        const actualPercent = limit > 0 ? Math.min(100, (current / limit) * 100) : 0;
+        const percent = Math.round(actualPercent);
         const barWidth = 15;
         const filledCount = Math.round((percent / 100) * barWidth);
         const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
@@ -4207,13 +4211,22 @@ export default function App({ args = [] }) {
         const displayLimit = shouldClearValue(limit) ? '∞' : (isTokens ? formatTokens(limit) : limit);
         const displayCurrent = isTokens ? formatTokens(current) : current;
 
+        let displayPercent;
+        if (actualPercent === 0) {
+            displayPercent = '0%';
+        } else if (actualPercent > 0 && actualPercent < 1) {
+            displayPercent = '<1%';
+        } else {
+            displayPercent = `${percent}%`;
+        }
+
         return (
             <Box flexDirection="row" paddingLeft={4} key={label}>
                 <Box width={18}>
                     <Text color={colors.textMuted}>{label}: </Text>
                 </Box>
                 <Text color={barColor}>{barStr}</Text>
-                <Text color={colors.textMuted}> {percent}% ({displayCurrent}/{displayLimit})</Text>
+                <Text color={colors.textMuted}> {displayPercent} ({displayCurrent}/{displayLimit})</Text>
             </Box>
         );
     };
@@ -4571,7 +4584,7 @@ export default function App({ args = [] }) {
                     }
                     const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
                     const monthName = resetDate.toLocaleString('default', { month: 'short' });
-                    resetInfo = `Resets on: ${resetDay}-${monthName}`;
+                    resetInfo = `${monthName}-${resetDay}`;
                 }
 
                 return (
@@ -4616,12 +4629,12 @@ export default function App({ args = [] }) {
                                 })}
                                 {resetInfo ? (
                                     <Box marginLeft={4}>
-                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
                                     </Box>
                                 ) : (
                                     <Box marginLeft={4}>
-                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.secondary || "blue"} bold>Rolling 30-Day Window</Text>
                                     </Box>
                                 )}
@@ -4633,12 +4646,12 @@ export default function App({ args = [] }) {
                                 {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
                                 {resetInfo ? (
                                     <Box marginLeft={4} marginTop={1}>
-                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
                                     </Box>
                                 ) : (
                                     <Box marginLeft={4} marginTop={1}>
-                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.secondary || "blue"} bold>Rolling 30-Day Window</Text>
                                     </Box>
                                 )}
