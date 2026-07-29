@@ -3896,7 +3896,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             actualEndLine = Math.min(eLine, lines);
                                         }
                                     } catch (e) { }
-                                    const pathLower = targetPath.toLowerCase();
+                                    const pathLower = (targetPath || '').toLowerCase();
                                     const isPdf = pathLower.endsWith('.pdf');
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
@@ -3909,7 +3909,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
-                                    const path = parseArgs(toolCall.args).path;
+                                    const path = parseArgs(toolCall.args).path || '';
                                     const recurse = parseArgs(toolCall.args).recurse || 0;
                                     label = `✔  ${action}: ${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
@@ -4484,12 +4484,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const absPath = path.resolve(process.cwd(), filePath);
 
                                             // Get the FINAL content from IDE (after user tweaks and save)
+                                            const normPath = (p) => p ? path.resolve(p).replace(/\\/g, '/').toLowerCase() : '';
                                             const finalIDE = await getIDEContext();
                                             let finalContent = "";
-                                            if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
+                                            if (finalIDE && finalIDE.file_focused && normPath(finalIDE.file_focused) === normPath(absPath) && finalIDE.full_content) {
                                                 finalContent = finalIDE.full_content;
-                                            } else if (fs.existsSync(absPath)) {
+                                            }
+                                            if (!finalContent && fs.existsSync(absPath)) {
                                                 finalContent = fs.readFileSync(absPath, 'utf8');
+                                                if (!finalContent) {
+                                                    await new Promise(r => setTimeout(r, 100));
+                                                    finalContent = fs.readFileSync(absPath, 'utf8');
+                                                }
                                             }
 
                                             // Prepare Reporting (Match write_file.js style)
@@ -4537,7 +4543,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                     snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}\n\n[SYSTEM] Check the content preview for verification [/SYSTEM]`;
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}`;
+                                                console.log(result);
                                             }
 
                                             // Restore UI feedback

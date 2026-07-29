@@ -122,7 +122,7 @@ export const search_keyword = async (args) => {
     let matchRegex     = toBool(regex);
     let matchSubstring = !matchRegex && toBool(subString);
 
-    const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword) || (() => {
+    const hasRegexIndicators = /[|]/.test(keyword) || /\\([.*+?{}()|[\]\^$])/.test(keyword) || (() => {
         // Detect raw regex metacharacters (not backslash-escaped) that are strongly indicative of regex intent.
         // Avoid common false-positives like a standalone dot in file paths or simple punctuation.
         // Strip backslash-escaped sequences first

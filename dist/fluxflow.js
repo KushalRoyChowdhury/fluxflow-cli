@@ -2912,7 +2912,6 @@ var init_text = __esm({
       const isR = clean.startsWith("-");
       const isA = clean.startsWith("+");
       let rest = isR || isA ? clean.substring(1) : clean;
-      rest = rest.trim();
       const splitIdx = rest.indexOf("|");
       const num = splitIdx !== -1 ? flattenString(rest.substring(0, splitIdx).trim()) : "";
       const content = splitIdx !== -1 ? flattenString(rest.substring(splitIdx + 1)) : flattenString(rest);
@@ -6590,7 +6589,7 @@ var init_arg_parser = __esm({
                 return "\\";
               default:
                 if (char === quote) return quote;
-                return match;
+                return char;
             }
           });
         } else if (i < argsString.length && argsString[i] === "[") {
@@ -10981,7 +10980,7 @@ var init_search_keyword = __esm({
       const regexExplicitlyFalse = regex === false || regex === "false" || regex === 0 || regex === "0" || regex === "no";
       let matchRegex = toBool(regex);
       let matchSubstring = !matchRegex && toBool(subString);
-      const hasRegexIndicators = /[|]/.test(keyword) || /\\([*+?{}()|[\]\^$])/.test(keyword) || (() => {
+      const hasRegexIndicators = /[|]/.test(keyword) || /\\([.*+?{}()|[\]\^$])/.test(keyword) || (() => {
         const stripped = keyword.replace(/\\./g, "");
         return /[*+?{}()|]/.test(stripped) || /\[.*?\]/.test(stripped) || /^\^/.test(stripped) || /\$/.test(stripped);
       })();
@@ -16427,7 +16426,7 @@ ${ideErr} [/ERROR]`;
                         }
                       } catch (e) {
                       }
-                      const pathLower = targetPath2.toLowerCase();
+                      const pathLower = (targetPath2 || "").toLowerCase();
                       const isPdf = pathLower.endsWith(".pdf");
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
@@ -16440,9 +16439,9 @@ ${ideErr} [/ERROR]`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path27 = parseArgs(toolCall.args).path;
+                      const path27 = parseArgs(toolCall.args).path || "";
                       const recurse = parseArgs(toolCall.args).recurse || 0;
-                      label = `\u2714  ${action}: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `**${recurse}` : `/**${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
+                      label = `\u2714  ${action}: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
@@ -16972,12 +16971,18 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                         if (approval === "allow" && diffOpened && isBridgeConnected()) {
                           const { path: filePath } = parseArgs(toolCall.args);
                           const absPath = path25.resolve(process.cwd(), filePath);
+                          const normPath = (p) => p ? path25.resolve(p).replace(/\\/g, "/").toLowerCase() : "";
                           const finalIDE = await getIDEContext();
                           let finalContent = "";
-                          if (finalIDE && finalIDE.file_focused === absPath && finalIDE.full_content) {
+                          if (finalIDE && finalIDE.file_focused && normPath(finalIDE.file_focused) === normPath(absPath) && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
-                          } else if (fs26.existsSync(absPath)) {
+                          }
+                          if (!finalContent && fs26.existsSync(absPath)) {
                             finalContent = fs26.readFileSync(absPath, "utf8");
+                            if (!finalContent) {
+                              await new Promise((r) => setTimeout(r, 100));
+                              finalContent = fs26.readFileSync(absPath, "utf8");
+                            }
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
                           const verifiedLineCount = verifiedLines.length;
@@ -17036,9 +17041,8 @@ ${tail}`;
 
 - Stats: [${verifiedLineCount2} lines, ${(verifiedSize2 / 1024).toFixed(1)} KB]
 ${ancestry2}- Content Preview:
-${snippet2}
-
-[SYSTEM] Check the content preview for verification [/SYSTEM]`;
+${snippet2}`;
+                            console.log(result2);
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
                           const feedbackLabel = `\u2714 ${action}: ${filePath || "..."}`;
@@ -17758,7 +17762,8 @@ ${cleanResponse}
             label = `\u2714 \x1B[95mRead\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
             const path27 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path27}`;
+            const recurse = parseArgs(toolCall.args).recurse || 0;
+            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
             const path27 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mCreated\x1B[0m: ${path27}`;

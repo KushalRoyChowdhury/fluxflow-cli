@@ -445,7 +445,6 @@ export const parseLineInfo = (l) => {
 
     // Slice away the prefix symbol if it exists, otherwise keep it clean
     let rest = (isR || isA) ? clean.substring(1) : clean;
-    rest = rest.trim();
 
     const splitIdx = rest.indexOf('|');
 

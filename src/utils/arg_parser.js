@@ -101,7 +101,7 @@ export const parseArgs = (argsString) => {
                     case '\\': return '\\';
                     default:
                         if (char === quote) return quote;
-                        return match; // Keep other escaped characters as-is if not recognized
+                        return char; // Properly unescape \. \+ \( \) \* \? etc. to . + ( ) * ?
                 }
             });
         } else if (i < argsString.length && argsString[i] === '[') {
