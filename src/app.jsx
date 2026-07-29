@@ -5331,7 +5331,7 @@ export default function App({ args = [] }) {
                         initialData={profileData}
                         onSave={(profile) => {
                             setProfileData(profile);
-                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `Profile updated: ${profile.name} (${profile.nickname})` }]);
+                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `Profile Updated: ${profile.name.length > 0 ? `${profile.name} ` : ''}${profile.nickname.length > 0 ? `(${profile.nickname})` : ''}` : 'Profile: Nothing to Update' }`, isMeta: true }]);
                             setActiveView('chat');
                         }}
                         onCancel={() => setActiveView('chat')}
@@ -5421,7 +5421,7 @@ export default function App({ args = [] }) {
                             </Box>
                         ) : (
                             <Box marginTop={1} paddingX={1}>
-                                <Text color="cyan" italic>⚡️ FluxFlow Companion is active. Review the changes in your editor.</Text>
+                                <Text color="cyan" italic>FluxFlow Companion is active. Review the changes in your editor.</Text>
                             </Box>
                         )}
 

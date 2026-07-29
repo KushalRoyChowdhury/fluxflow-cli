@@ -15,12 +15,16 @@ export const update_file = async (args, context = {}) => {
     if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
 
     // Extract replacement pairs using shared utility
-    const { patchPairs, error: parseError } = parsePatchPairs(parsed);
+    const { patchPairs, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(parsed);
     if (parseError) return `ERROR: ${parseError}`;
 
     if (patchPairs.length === 0) {
         return 'ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.';
     }
+
+    const allowMultiple = parsed.allowMultiple !== undefined
+        ? (parsed.allowMultiple === true || String(parsed.allowMultiple).toLowerCase() === 'true')
+        : parsedAllowMultiple;
 
     const absolutePath = path.resolve(process.cwd(), targetPath);
 
@@ -34,7 +38,7 @@ export const update_file = async (args, context = {}) => {
         const originalContent = diskContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
         // --- ATOMIC EXECUTION ---
-        const { content: finalContent, results } = applyPatches(originalContent, patchPairs);
+        const { content: finalContent, results } = applyPatches(originalContent, patchPairs, { allowMultiple });
 
         // Check for failures
         const failures = results.filter(r => !r.success);

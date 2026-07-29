@@ -115,6 +115,7 @@ export const truncatePath = (p, maxLength = 40) => {
 export const parsePatchPairs = (args) => {
     const patchPairs = [];
     const indices = new Set();
+    const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === 'true';
 
     Object.keys(args).forEach(key => {
         const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
@@ -138,14 +139,15 @@ export const parsePatchPairs = (args) => {
         if (r !== undefined && n !== undefined) {
             patchPairs.push({ replace: r, new: n });
         } else if (r !== undefined || n !== undefined) {
-            return { error: `Mismatched replacement pair for index ${i}. Both replacement and new content must be provided.` };
+            return { error: `Mismatched replacement pair for index ${i}. Both replacement and new content must be provided.`, allowMultiple };
         }
     }
 
-    return { patchPairs };
+    return { patchPairs, allowMultiple };
 };
 
-export const applyPatches = (content, patches) => {
+export const applyPatches = (content, patches, options = {}) => {
+    const allowMultiple = typeof options === 'boolean' ? options : !!(options && options.allowMultiple);
     let currentFileContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const strip = (t) => t.replace(/^```[\w]*\n?/, '').replace(/```\s*$/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
@@ -231,18 +233,20 @@ export const applyPatches = (content, patches) => {
             patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Could not find match.` });
             continue;
         }
-        if (matches.length > 1) {
-            patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique).` });
+        if (matches.length > 1 && !allowMultiple) {
+            patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique or use allowMultiple: true if sure).` });
             continue;
         }
 
-        patchMatches.push({
-            index: i,
-            success: true,
-            startPos: matches[0].index,
-            firstMatchContent: matches[0][0],
-            content_to_add
-        });
+        for (const matchItem of matches) {
+            patchMatches.push({
+                index: i,
+                success: true,
+                startPos: matchItem.index,
+                firstMatchContent: matchItem[0],
+                content_to_add
+            });
+        }
     }
 
     // Identify and mark overlapping patches
@@ -290,8 +294,9 @@ export const applyPatches = (content, patches) => {
             contextAfter.push({ num: j + 1, text: allLines[j] });
         }
 
-        resultsMap.set(match.index, {
+        resultsMap.set(match, {
             success: true,
+            index: match.index,
             oldContent: match.firstMatchContent,
             newContent: finalReplacement,
             originalStartLine,
@@ -310,13 +315,18 @@ export const applyPatches = (content, patches) => {
 
     const results = [];
     for (let i = 0; i < patches.length; i++) {
-        if (resultsMap.has(i)) {
-            results.push(resultsMap.get(i));
+        const matchesForI = toApply.filter(m => m.index === i);
+        if (matchesForI.length > 0) {
+            for (const match of matchesForI) {
+                if (resultsMap.has(match)) {
+                    results.push(resultsMap.get(match));
+                }
+            }
         } else {
-            const match = patchMatches.find(m => m.index === i);
+            const failedMatch = patchMatches.find(m => m.index === i);
             results.push({
                 success: false,
-                error: match ? match.error : `Block ${i + 1}: Unknown error.`
+                error: failedMatch ? failedMatch.error : `Block ${i + 1}: Unknown error.`
             });
         }
     }
@@ -449,10 +459,10 @@ export const parseLineInfo = (l) => {
 export const getSimilarity = (s1, s2) => {
     if (!s1 && !s2) return 1.0;
     if (!s1 || !s2) return 0.0;
-    
+
     const l1 = s1.length;
     const l2 = s2.length;
-    
+
     // Optimisation: Make sure s2 is the shorter string to save space/time
     let str1 = s1;
     let str2 = s2;
@@ -460,17 +470,17 @@ export const getSimilarity = (s1, s2) => {
         str1 = s2;
         str2 = s1;
     }
-    
+
     const n = str1.length;
     const m = str2.length;
-    
+
     const prevRow = new Int32Array(m + 1);
     const currRow = new Int32Array(m + 1);
-    
+
     for (let j = 0; j <= m; j++) {
         prevRow[j] = j;
     }
-    
+
     for (let i = 1; i <= n; i++) {
         currRow[0] = i;
         const char1 = str1[i - 1];
@@ -484,7 +494,7 @@ export const getSimilarity = (s1, s2) => {
         // Copy currRow to prevRow for next iteration
         prevRow.set(currRow);
     }
-    
+
     const dist = prevRow[m];
     const maxLen = Math.max(l1, l2);
     if (maxLen === 0) return 1.0;

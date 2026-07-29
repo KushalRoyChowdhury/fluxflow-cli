@@ -28,8 +28,8 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 
 **TOOL USAGE POLICY:**
 - MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
-${mode === 'Flux' ? "- Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn ← ** MANDATORY **\n- FileMap → ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**" : ""}
-${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
+${mode === 'Flux' ? "- Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn ← ** MANDATORY **\n- FileMap → ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**\n" : ""}
+- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST ask for path divergence, security or risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
@@ -37,10 +37,10 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
+1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
+4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY`) : `BASH`} command. Destructive/Irreversible ops → Ask user
@@ -51,7 +51,7 @@ Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE th
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
 Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.\n` : ''}${enableSubAgents ? `
 - SUB AGENT TOOLS -
-**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed.**
+**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
 Invocations:
 - Invoke (async/background, ≤7 parallel). Parallelize long tasks. NEVER repeat while active
 - InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost

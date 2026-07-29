@@ -3,15 +3,18 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.13.4"]
+export const stableVersions = ["3.13.5"]
 
 export const changelogData = {
-    "3.13.4": {
+    "3.13.5": {
         "note": "JULY 29.",
         "added": [
-            "Added --force flag with `/thinking <effort> --force` to force reasoning on local models with no native reasoning support."
+            "Added --force flag with `/thinking <effort> --force` to force reasoning on local models with no native reasoning support.",
+            "Added Alphabet Limits for Custom Instructions."
         ],
-        "changed": [],
+        "changed": [
+            "Improved Context Efficiency with File Modifications in some cases."
+        ],
         "fixes": []
     },
     "3.13.0": {

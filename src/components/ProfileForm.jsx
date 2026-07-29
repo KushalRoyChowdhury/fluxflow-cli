@@ -14,15 +14,25 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
     }));
 
     const steps = [
-        { key: 'name', label: 'Enter your Name: ' },
-        { key: 'nickname', label: 'Enter a Nickname (Agent will use this): ' },
-        { key: 'instructions', label: 'System Instructions (Persona overrides): ' }
+        { key: 'name', label: 'Enter your Name: ', maxLength: 20 },
+        { key: 'nickname', label: 'Enter a Nickname: ', maxLength: 20 },
+        { key: 'instructions', label: 'System Instructions: ', maxLength: 200 }
     ];
+
+    const currentStep = steps[step];
 
     useEffect(() => {
         const currentKey = steps[step].key;
-        setCurrentInput(profile[currentKey] || '');
+        setCurrentInput((profile[currentKey] || '').slice(0, steps[step].maxLength));
     }, [step, profile]);
+
+    const handleInputChange = (val) => {
+        if (val.length > currentStep.maxLength) {
+            setCurrentInput(val.slice(0, currentStep.maxLength));
+        } else {
+            setCurrentInput(val);
+        }
+    };
 
     const handleSubmit = (val) => {
         if (val.trim().toLowerCase() === '/cancel') {
@@ -30,8 +40,8 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
             return;
         }
 
-        const currentKey = steps[step].key;
-        const newProfile = { ...profile, [currentKey]: val.trim() };
+        const currentKey = currentStep.key;
+        const newProfile = { ...profile, [currentKey]: val.trim().slice(0, currentStep.maxLength) };
         setProfile(newProfile);
         setCurrentInput('');
 
@@ -41,6 +51,8 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
             onSave(newProfile);
         }
     };
+
+    const isAtMax = currentInput.length >= currentStep.maxLength;
 
     return (
         <Box
@@ -58,16 +70,19 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
 
             <Box paddingX={1} flexDirection="column">
                 <Box>
-                    <Text color={colors.text} bold>{steps[step].label}</Text>
+                    <Text color={colors.text} bold>{currentStep.label}</Text>
                     <TextInput
                         value={currentInput}
-                        onChange={setCurrentInput}
+                        onChange={handleInputChange}
                         onSubmit={handleSubmit}
                     />
                 </Box>
 
-                <Box marginTop={1}>
+                <Box marginTop={1} justifyContent="space-between">
                     <Text color={colors.textMuted} italic>Step {step + 1} of {steps.length}</Text>
+                    <Text color={isAtMax ? (colors.warning || 'yellow') : colors.textMuted}>
+                        [{currentInput.length}/{currentStep.maxLength}]
+                    </Text>
                 </Box>
             </Box>
 

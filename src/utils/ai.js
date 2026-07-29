@@ -2563,9 +2563,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
-        const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**\n${currentSummary}\n` : '';
+        const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS**\n${currentSummary}\n` : '';
 
-        let dirStructure = process.cwd() + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = 'CWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -2873,7 +2873,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}\nOS: ${osDetected}\nCWD: ${process.cwd()}${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -4356,7 +4356,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             if (normToolName === 'write_file') {
                                                                 modifiedContent = toolArgs.content || toolArgs.newContent || '';
                                                             } else {
-                                                                const { patchPairs: patches, error: parseError } = parsePatchPairs(toolArgs);
+                                                                const { patchPairs: patches, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(toolArgs);
                                                                 if (parseError) {
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: ${parseError}`;
                                                                     toolResults.push({ role: 'user', text: errorMsg });
@@ -4367,8 +4367,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     continue;
                                                                 }
 
+                                                                const allowMultiple = toolArgs.allowMultiple !== undefined
+                                                                    ? (toolArgs.allowMultiple === true || String(toolArgs.allowMultiple).toLowerCase() === 'true')
+                                                                    : parsedAllowMultiple;
+
                                                                 requestedPatchCount = patches.length;
-                                                                const sim = applyPatches(originalContent, patches);
+                                                                const sim = applyPatches(originalContent, patches, { allowMultiple });
                                                                 modifiedContent = sim.content;
                                                                 patchResults = sim.results;
                                                                 // STRICT MATCHING ENFORCEMENT:
@@ -4617,11 +4621,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     thisIsFirstToolFeedback = false;
                                 }
 
-                                // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1.5s gap between tool executions
+                                // [ARTIFICIAL TOOL DELAY] - Ensure a minimum 1s gap between tool executions
                                 if (lastToolFinishedAt > 0) {
                                     const timeSinceLastTool = Date.now() - lastToolFinishedAt;
-                                    if (timeSinceLastTool < 1500) {
-                                        await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastTool));
+                                    const delay = Math.max(0, 1000 - timeSinceLastTool);
+                                    if (delay > 0) {
+                                        await new Promise(resolve => setTimeout(resolve, delay));
                                     }
                                 }
 
@@ -5253,7 +5258,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
 
         'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
 
-        'patchfile': '- [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**',
+        'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF',
 
         'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
 

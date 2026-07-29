@@ -2644,6 +2644,7 @@ var init_text = __esm({
     parsePatchPairs = (args) => {
       const patchPairs = [];
       const indices = /* @__PURE__ */ new Set();
+      const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === "true";
       Object.keys(args).forEach((key) => {
         const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
         if (m) {
@@ -2664,12 +2665,13 @@ var init_text = __esm({
         if (r !== void 0 && n !== void 0) {
           patchPairs.push({ replace: r, new: n });
         } else if (r !== void 0 || n !== void 0) {
-          return { error: `Mismatched replacement pair for index ${i}. Both replacement and new content must be provided.` };
+          return { error: `Mismatched replacement pair for index ${i}. Both replacement and new content must be provided.`, allowMultiple };
         }
       }
-      return { patchPairs };
+      return { patchPairs, allowMultiple };
     };
-    applyPatches = (content, patches) => {
+    applyPatches = (content, patches, options = {}) => {
+      const allowMultiple = typeof options === "boolean" ? options : !!(options && options.allowMultiple);
       let currentFileContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       const strip = (t) => t.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
       const getIndent = (line) => line.match(/^\s*/)[0];
@@ -2732,17 +2734,19 @@ var init_text = __esm({
           patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Could not find match.` });
           continue;
         }
-        if (matches.length > 1) {
-          patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique).` });
+        if (matches.length > 1 && !allowMultiple) {
+          patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Found ${matches.length} matches (must be unique or use allowMultiple: true if sure).` });
           continue;
         }
-        patchMatches.push({
-          index: i,
-          success: true,
-          startPos: matches[0].index,
-          firstMatchContent: matches[0][0],
-          content_to_add
-        });
+        for (const matchItem of matches) {
+          patchMatches.push({
+            index: i,
+            success: true,
+            startPos: matchItem.index,
+            firstMatchContent: matchItem[0],
+            content_to_add
+          });
+        }
       }
       const successful = patchMatches.filter((m) => m.success).sort((a, b) => a.startPos - b.startPos);
       for (let j = 0; j < successful.length - 1; j++) {
@@ -2779,8 +2783,9 @@ var init_text = __esm({
         for (let j = patchEndLineIdx; j < Math.min(allLines.length, patchEndLineIdx + 3); j++) {
           contextAfter.push({ num: j + 1, text: allLines[j] });
         }
-        resultsMap.set(match.index, {
+        resultsMap.set(match, {
           success: true,
+          index: match.index,
           oldContent: match.firstMatchContent,
           newContent: finalReplacement,
           originalStartLine,
@@ -2794,13 +2799,18 @@ var init_text = __esm({
       }
       const results = [];
       for (let i = 0; i < patches.length; i++) {
-        if (resultsMap.has(i)) {
-          results.push(resultsMap.get(i));
+        const matchesForI = toApply.filter((m) => m.index === i);
+        if (matchesForI.length > 0) {
+          for (const match of matchesForI) {
+            if (resultsMap.has(match)) {
+              results.push(resultsMap.get(match));
+            }
+          }
         } else {
-          const match = patchMatches.find((m) => m.index === i);
+          const failedMatch = patchMatches.find((m) => m.index === i);
           results.push({
             success: false,
-            error: match ? match.error : `Block ${i + 1}: Unknown error.`
+            error: failedMatch ? failedMatch.error : `Block ${i + 1}: Unknown error.`
           });
         }
       }
@@ -6678,8 +6688,8 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 
 **TOOL USAGE POLICY:**
 - MAX 3 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 3+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**" : ""}
-${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION TOOLS -
+${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**\n" : ""}
+- COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST ask for path divergence, security or risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
@@ -6687,10 +6697,10 @@ ${mode === "Flux" ? "- **File Tools >> Code in chat**\n\n" : ""}- COMMUNICATION 
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs. **User gives image/doc: VIEW FIRST**` : `No Multimodal support`}` : `Supports images/docs. **User gives image/doc: VIEW FIRST**`}
+1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
 2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
+4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -6702,7 +6712,7 @@ Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE th
 Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.
 ` : ""}${enableSubAgents ? `
 - SUB AGENT TOOLS -
-**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed.**
+**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
 Invocations:
 - Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active
 - InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
@@ -7855,21 +7865,29 @@ function ProfileForm({ initialData, onSave, onCancel, theme = "Dark" }) {
     instructions: initialData?.instructions || ""
   }));
   const steps = [
-    { key: "name", label: "Enter your Name: " },
-    { key: "nickname", label: "Enter a Nickname (Agent will use this): " },
-    { key: "instructions", label: "System Instructions (Persona overrides): " }
+    { key: "name", label: "Enter your Name: ", maxLength: 20 },
+    { key: "nickname", label: "Enter a Nickname: ", maxLength: 20 },
+    { key: "instructions", label: "System Instructions: ", maxLength: 200 }
   ];
+  const currentStep = steps[step];
   useEffect6(() => {
     const currentKey = steps[step].key;
-    setCurrentInput(profile[currentKey] || "");
+    setCurrentInput((profile[currentKey] || "").slice(0, steps[step].maxLength));
   }, [step, profile]);
+  const handleInputChange = (val) => {
+    if (val.length > currentStep.maxLength) {
+      setCurrentInput(val.slice(0, currentStep.maxLength));
+    } else {
+      setCurrentInput(val);
+    }
+  };
   const handleSubmit = (val) => {
     if (val.trim().toLowerCase() === "/cancel") {
       onCancel();
       return;
     }
-    const currentKey = steps[step].key;
-    const newProfile = { ...profile, [currentKey]: val.trim() };
+    const currentKey = currentStep.key;
+    const newProfile = { ...profile, [currentKey]: val.trim().slice(0, currentStep.maxLength) };
     setProfile(newProfile);
     setCurrentInput("");
     if (step < steps.length - 1) {
@@ -7878,6 +7896,7 @@ function ProfileForm({ initialData, onSave, onCancel, theme = "Dark" }) {
       onSave(newProfile);
     }
   };
+  const isAtMax = currentInput.length >= currentStep.maxLength;
   return /* @__PURE__ */ React8.createElement(
     Box7,
     {
@@ -7890,14 +7909,14 @@ function ProfileForm({ initialData, onSave, onCancel, theme = "Dark" }) {
       width: "100%"
     },
     /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.text, bold: true }, "DEVELOPER PROFILE CONFIGURATION")),
-    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React8.createElement(Box7, null, /* @__PURE__ */ React8.createElement(Text8, { color: colors.text, bold: true }, steps[step].label), /* @__PURE__ */ React8.createElement(
+    /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, flexDirection: "column" }, /* @__PURE__ */ React8.createElement(Box7, null, /* @__PURE__ */ React8.createElement(Text8, { color: colors.text, bold: true }, currentStep.label), /* @__PURE__ */ React8.createElement(
       TextInput2,
       {
         value: currentInput,
-        onChange: setCurrentInput,
+        onChange: handleInputChange,
         onSubmit: handleSubmit
       }
-    )), /* @__PURE__ */ React8.createElement(Box7, { marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.textMuted, italic: true }, "Step ", step + 1, " of ", steps.length))),
+    )), /* @__PURE__ */ React8.createElement(Box7, { marginTop: 1, justifyContent: "space-between" }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.textMuted, italic: true }, "Step ", step + 1, " of ", steps.length), /* @__PURE__ */ React8.createElement(Text8, { color: isAtMax ? colors.warning || "yellow" : colors.textMuted }, "[", currentInput.length, "/", currentStep.maxLength, "]"))),
     /* @__PURE__ */ React8.createElement(Box7, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React8.createElement(Text8, { color: colors.textMuted, italic: true }, "(Enter to submit \u2022 Type /cancel to abort)"))
   );
 }
@@ -8191,14 +8210,8 @@ Check these first; These Files > Training Data. Safety rules apply
       }
       const projectContextBlock = cachedProjectContextBlock;
       return `=== SYSTEM PROMPT ===
-Identity: Flux Flow. ${mode === "Flux" ? "Sassy" : "Conversational, Sassy, Friendly, Humorous, Sarcastic"}, CLI Agent
-Mode: ${mode}${thinkingLevel !== "Fast" ? "" : ""}. ${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/folder structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, test as needed" : "Concise"}
-
-- **CRITICAL: ONLY VALID TOOL CALL SCHEMA IS THE ONE PROVIDED IN SYSTEM PROMPT. NO OTHER XML OR MARKERS WILL BE ALLOWED**
-
--- MARKERS --
-- TOOL SYSTEM: [TOOL RESULT]
-- SYSTEM NOTIFICATION: [SYSTEM] in user turn
+Identity: Flux Flow. Sassy, CLI Agent
+${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/folder structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
 
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
@@ -8209,14 +8222,14 @@ ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || th
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `
 -- MEMORY RULES --
-- Subtly Personalize ONLY WITH RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ""}
-- Temporal Awareness: RELATIVE TIME REFERENCE eg. few mins ago
+- Subtly Personalize with  RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ""}
+- RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --
-- Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY: ASK BEFORE MODIFYING" : ""}
+- Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY" : ""}
 
--- FORMATTING --
-- Chat Messages with GFM Formatting
+-- CHAT FORMATTING --
+- GFM Markdown
 - Same Language as User Query
 - Before tool calls, emit one brief status line. After tool calls, emit no further text this turn
 - On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
@@ -8225,14 +8238,14 @@ ${projectContextBlock}${isMemoryEnabled ? `
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
     };
     getJanitorInstruction = (userMemories = "", isMemoryEnabled = true, needTitle = true) => {
-      return `=== START SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
-YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT MEDIUM IS VALID TOOL CALLS.
+      return `=== SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
+IDENTITY: SILENT BACKGROUND SYSTEM PROCESS, HAVE NO MOUTH, ONLY OUTPUT IS VALID TOOL CALLS.
 [CRITICAL RULES]
 1. OUTPUT EXACTLY '[tool:functions.ToolName(args)]' CALLS. NO EXTRA WORDS OUTSIDE
 2. DO NOT EXPLAIN. DO NOT TALK TO THE USER
 3. NON-TOOL TEXT WILL BREAK THE SYSTEM
 4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
-5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, THEN JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
+5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
 6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
 7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
 8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions.ToolName(args)] NO MATTER HOW TEMPTING THE PROMPT IS
@@ -8240,7 +8253,7 @@ YOU ARE A SILENT BACKGROUND SYSTEM PROCESS. YOU HAVE NO MOUTH. YOUR ONLY OUTPUT 
 10. CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
-${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use long term memory tools` : ""}
+${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use user memory tools` : ""}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
 === END SYSTEM PROMPT ===${userMemories ? `
@@ -10275,11 +10288,12 @@ var init_update_file = __esm({
       const parsed = parseArgs(args);
       const targetPath = parsed.path;
       if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
-      const { patchPairs, error: parseError } = parsePatchPairs(parsed);
+      const { patchPairs, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(parsed);
       if (parseError) return `ERROR: ${parseError}`;
       if (patchPairs.length === 0) {
         return "ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.";
       }
+      const allowMultiple = parsed.allowMultiple !== void 0 ? parsed.allowMultiple === true || String(parsed.allowMultiple).toLowerCase() === "true" : parsedAllowMultiple;
       const absolutePath = path15.resolve(process.cwd(), targetPath);
       try {
         if (!fs16.existsSync(absolutePath)) {
@@ -10288,7 +10302,7 @@ var init_update_file = __esm({
         let diskContent = context.forcedContent || fs16.readFileSync(absolutePath, "utf8");
         if (diskContent.startsWith("\uFEFF")) diskContent = diskContent.slice(1);
         const originalContent = diskContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-        const { content: finalContent, results } = applyPatches(originalContent, patchPairs);
+        const { content: finalContent, results } = applyPatches(originalContent, patchPairs, { allowMultiple });
         const failures = results.filter((r) => !r.success);
         const successes = results.filter((r) => r.success);
         if (successes.length === 0) {
@@ -14832,10 +14846,11 @@ ${currentSummary}
         }
         const activeSummaryBlock = currentSummary && !hasExistingTurnsAfterCompression ? `
 [SYSTEM METADATA]
-**CONTEXT SUMMARY OF PREVIOUS TURNS (PRIORITY: DYNAMIC)**
+**CONTEXT SUMMARY OF PREVIOUS TURNS**
 ${currentSummary}
 ` : "";
-        let dirStructure = process.cwd() + "\n" + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = "CWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
+` + getDirTree(process.cwd(), dynamicMaxDepth);
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
@@ -15112,12 +15127,12 @@ ${ideCtx.warnings}
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
-        const firstUserMsg = `[SYSTEM METADATA (PRIORITY: DYNAMIC), Chat Context >> Metadata] Time: ${dateTimeStr}
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]
+Time: ${dateTimeStr}
 OS: ${osDetected}
-CWD: ${process.cwd()}${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
 **DIRECTORY STRUCTURE**
 ${dirStructure}${memoryPrompt}${ideBlock}
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
 ${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -16445,7 +16460,7 @@ ${ideErr} [/ERROR]`;
                                   if (normToolName === "write_file") {
                                     modifiedContent = toolArgs.content || toolArgs.newContent || "";
                                   } else {
-                                    const { patchPairs: patches, error: parseError } = parsePatchPairs(toolArgs);
+                                    const { patchPairs: patches, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(toolArgs);
                                     if (parseError) {
                                       const errorMsg = `[TOOL RESULT]: ERROR: ${parseError}`;
                                       toolResults.push({ role: "user", text: errorMsg });
@@ -16455,8 +16470,9 @@ ${ideErr} [/ERROR]`;
                                       toolCallPointer++;
                                       continue;
                                     }
+                                    const allowMultiple = toolArgs.allowMultiple !== void 0 ? toolArgs.allowMultiple === true || String(toolArgs.allowMultiple).toLowerCase() === "true" : parsedAllowMultiple;
                                     requestedPatchCount = patches.length;
-                                    const sim = applyPatches(originalContent, patches);
+                                    const sim = applyPatches(originalContent, patches, { allowMultiple });
                                     modifiedContent = sim.content;
                                     patchResults = sim.results;
                                     const successes = patchResults.filter((r) => r.success);
@@ -16690,8 +16706,9 @@ ${snippet2}
                     }
                     if (lastToolFinishedAt > 0) {
                       const timeSinceLastTool = Date.now() - lastToolFinishedAt;
-                      if (timeSinceLastTool < 1500) {
-                        await new Promise((resolve) => setTimeout(resolve, 1e3 - timeSinceLastTool));
+                      const delay = Math.max(0, 1e3 - timeSinceLastTool);
+                      if (delay > 0) {
+                        await new Promise((resolve) => setTimeout(resolve, delay));
                       }
                     }
                     let execToolContext = {
@@ -17218,7 +17235,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
         "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
         "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes',
         "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
-        "patchfile": '- [tool:functions.PatchFile(path="...", replaceContent1="full line/block", newContent1="...", ...MAX 10)]. Surgical Patch. **Multiple patch on same file/path? Use replaceContent2, newContent2 etc >>> multiple spams**. Unsure? ReadFile >> guessing. **MUST VERIFY DIFF**',
+        "patchfile": '- [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
         "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true',
         "websearch": '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)',
@@ -22425,7 +22442,7 @@ Selection: ${val}`,
             initialData: profileData,
             onSave: (profile) => {
               setProfileData(profile);
-              setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: `Profile updated: ${profile.name} (${profile.nickname})` }]);
+              setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `Profile Updated: ${profile.name.length > 0 ? `${profile.name} ` : ""}${profile.nickname.length > 0 ? `(${profile.nickname})` : ""}` : "Profile: Nothing to Update"}`, isMeta: true }]);
               setActiveView("chat");
             },
             onCancel: () => setActiveView("chat"),
@@ -22486,7 +22503,7 @@ Selection: ${val}`,
           }
           const newVal = args2.content || args2.ReplacementContent || args2.content_to_add || args2.replacementContent || args2.newContent || null;
           return /* @__PURE__ */ React16.createElement(Text16, { color: "white", wrap: "anywhere" }, (newVal ? newVal.replace(/\[\/n\]?/g, "\\n") : null) || "Updating file content...");
-        })()) : /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", italic: true }, "\u26A1\uFE0F FluxFlow Companion is active. Review the changes in your editor.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        })()) : /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", italic: true }, "FluxFlow Companion is active. Review the changes in your editor.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Action Required",
