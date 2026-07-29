@@ -2380,7 +2380,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
 
             // --- JS / TS / Web Dev Armageddon ---
-            '.npm', '.yarn', '.pnpm-store', '.expo', '.nuxt', '.svelte-kit',
+            '.npm', '.yarn', '.pnpm-store', '.pnpm', '.expo', '.nuxt', '.svelte-kit',
             '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
             '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
             '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
@@ -2442,7 +2442,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const entries = safeReaddirWithTypes(dir);
             for (const entry of entries) {
                 if (currentCount.value > 6200) break;
-                if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
+                if (COLLAPSED_DIRS_GLOBAL.includes(entry.name) || entry.name.startsWith('.')) continue;
 
                 if (entry.isDirectory()) {
                     currentCount.value++;
@@ -2464,8 +2464,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             const COLLAPSED_DIRS = COLLAPSED_DIRS_GLOBAL;
 
             // Filter into categories using the entry types we already fetched
-            const filtered = entries.filter(e => !COLLAPSED_DIRS.includes(e.name));
-            const collapsedInDir = entries.filter(e => COLLAPSED_DIRS.includes(e.name))
+            const filtered = entries.filter(e => !COLLAPSED_DIRS.includes(e.name) && !e.name.startsWith('.'));
+            const collapsedInDir = entries.filter(e => COLLAPSED_DIRS.includes(e.name) || e.name.startsWith('.'))
                 .map(e => e.name)
                 .sort();
 
@@ -3910,7 +3910,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
                                     const path = parseArgs(toolCall.args).path;
-                                    label = `✔  ${action}: ${path === '.' ? './' : path}`;
+                                    const recurse = parseArgs(toolCall.args).recurse || 0;
+                                    label = `✔  ${action}: ${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     label = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`;
@@ -5254,7 +5255,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const SUBAGENT_TOOL_DEFINITIONS = {
         'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
 
-        'readfolder': '- [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes',
+        'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0',
 
         'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
 
@@ -5391,7 +5392,8 @@ CWD: ${process.cwd()}
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mBrowsed\x1b[0m: ${path}`;
+                const recurse = parseArgs(toolCall.args).recurse || 0;
+                label = `✔ \x1b[95mBrowsed\x1b[0m: ${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {

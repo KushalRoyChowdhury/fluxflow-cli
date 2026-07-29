@@ -38,7 +38,7 @@ ${mode === 'Flux' ? "- Same file, many edits? Prefer multi search-replace in Pat
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
-2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
+2. [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
 4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports

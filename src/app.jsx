@@ -4191,11 +4191,11 @@ export default function App({ args = [] }) {
         const filledCount = Math.round((percent / 100) * barWidth);
         const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
 
-        let barColor = 'gray';
+        let barColor = colors.success || 'green';
         if (percent >= 40 && percent <= 80) {
-            barColor = 'yellow';
+            barColor = colors.warning || 'yellow';
         } else if (percent > 80) {
-            barColor = 'red';
+            barColor = colors.danger || 'red';
         }
 
         const isTokens = label.toLowerCase().includes('token');
@@ -4205,10 +4205,10 @@ export default function App({ args = [] }) {
         return (
             <Box flexDirection="row" paddingLeft={4} key={label}>
                 <Box width={18}>
-                    <Text color="gray">{label}: </Text>
+                    <Text color={colors.textMuted}>{label}: </Text>
                 </Box>
                 <Text color={barColor}>{barStr}</Text>
-                <Text color="gray"> {percent}% ({displayCurrent}/{displayLimit})</Text>
+                <Text color={colors.textMuted}> {percent}% ({displayCurrent}/{displayLimit})</Text>
             </Box>
         );
     };
@@ -4363,6 +4363,7 @@ export default function App({ args = [] }) {
                             { label: 'Custom (Set reset day of month)', value: 'Custom' },
                             { label: 'Back', value: 'apiTier' }
                         ]}
+                        theme={systemSettings.theme}
                         onSelect={(item) => {
                             if (item.value === 'apiTier' || item.value === 'Back') {
                                 setActiveView('apiTier');
@@ -4400,6 +4401,7 @@ export default function App({ args = [] }) {
                             { label: `Provider Budgets  (set limits per provider individually) ${quotas.providerBudgets?.['__useProvider'] ? '●' : ''}`, value: 'provider' },
                             { label: 'Back', value: budgetReturnView }
                         ]}
+                        theme={systemSettings.theme}
                         onSelect={(item) => {
                             if (item.value === budgetReturnView || item.value === 'Back') {
                                 setActiveView(budgetReturnView);
@@ -4462,29 +4464,33 @@ export default function App({ args = [] }) {
                 const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
                         <Box paddingX={1} marginBottom={1}>
-                            <Text color="gray" bold>SELECT PROVIDERS TO SET BUDGETS FOR</Text>
+                            <Text color={colors.text} bold>SELECT PROVIDERS TO SET BUDGETS FOR</Text>
                         </Box>
                         {PROVIDERS_LIST.map((prov, i) => {
                             const isActive = i === pbsCursor;
                             const isChecked = !!pbsSelected[prov];
                             return (
-                                <Box key={prov} backgroundColor={isActive ? "#2a2a2a" : undefined} paddingX={1} width="100%">
-                                    <Text color={isActive ? 'white' : 'gray'} bold={isActive}>
+                                <Box key={prov} backgroundColor={isActive ? (colors.highlightBg || "#2a2a2a") : undefined} paddingX={1} width="100%" flexDirection="row">
+                                    <Text color={isActive ? colors.text : colors.textMuted} bold={isActive}>
                                         {isActive ? '❯ ' : '  '}
-                                        <Text color={isChecked ? 'green' : 'gray'}>{isChecked ? '☑' : '☐'}</Text>
-                                        {'  '}{prov}
-                                        {isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? (
-                                            <Text color="cyan"> (budget set)</Text>
-                                        ) : null}
                                     </Text>
+                                    <Text color={isChecked ? (colors.success || 'green') : colors.textMuted}>
+                                        {isChecked ? '☑' : '☐'}
+                                    </Text>
+                                    <Text color={isActive ? colors.text : colors.textMuted} bold={isActive}>
+                                        {'  '}{prov}
+                                    </Text>
+                                    {isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? (
+                                        <Text color={colors.primary || "cyan"}> (budget set)</Text>
+                                    ) : null}
                                 </Box>
                             );
                         })}
                         <Box paddingX={1} marginTop={1} flexDirection="column">
-                            <Text color="gray" italic>↑↓ Navigate  •  Space to toggle  •  Enter to confirm  •  ESC to go back</Text>
-                            {!anySelected && <Text color="yellow" italic>  Select at least one provider to continue</Text>}
+                            <Text color={colors.textMuted} italic>↑↓ Navigate  •  Space to toggle  •  Enter to confirm  •  ESC to go back</Text>
+                            {!anySelected && <Text color={colors.warning || "yellow"} italic>  Select at least one provider to continue</Text>}
                         </Box>
                     </Box>
                 );
@@ -4505,6 +4511,7 @@ export default function App({ args = [] }) {
                             { label: 'Custom (Set reset day of month)', value: 'Custom' },
                             { label: 'Back', value: 'chat' }
                         ]}
+                        theme={systemSettings.theme}
                         onSelect={(item) => {
                             if (item.value === 'chat' || item.value === 'Back') {
                                 setActiveView('chat');
@@ -4563,14 +4570,14 @@ export default function App({ args = [] }) {
                 }
 
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={1} width="100%">
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
-                            <Text color="white" bold underline>BUDGET LIMIT STATUS</Text>
-                            <Text color="gray">[ ESC to Close ]</Text>
+                            <Text color={colors.text} bold underline>BUDGET LIMIT STATUS</Text>
+                            <Text color={colors.textMuted}>[ ESC to Close ]</Text>
                         </Box>
                         {limitsNotSet ? (
                             <Box padding={1} justifyContent="center" alignItems="center" width="100%">
-                                <Text color="white" bold>LIMITS NOT SET</Text>
+                                <Text color={colors.text} bold>LIMITS NOT SET</Text>
                             </Box>
                         ) : usingProviderBudgets && configuredProviders.length > 0 ? (
                             <Box flexDirection="column" gap={1} width="100%">
@@ -4592,9 +4599,9 @@ export default function App({ args = [] }) {
                                     }
 
                                     return (
-                                        <Box key={prov} flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} width="100%">
+                                        <Box key={prov} flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
                                             <Box marginBottom={0}>
-                                                <Text color="cyan" bold>◆ {prov}</Text>
+                                                <Text color={colors.primary} bold>◆ {prov}</Text>
                                             </Box>
                                             {renderProgressBar('Daily Requests', provReqCurrent, pb.agentLimit || 99999999, 'cyan')}
                                             {renderProgressBar('Daily Tokens', provTokenCurrent, pb.tokenLimit || 99999999999999, 'green')}
@@ -4604,30 +4611,30 @@ export default function App({ args = [] }) {
                                 })}
                                 {resetInfo ? (
                                     <Box marginLeft={4}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="magenta" bold>{resetInfo}</Text>
+                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
                                     </Box>
                                 ) : (
                                     <Box marginLeft={4}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
+                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.secondary || "blue"} bold>Rolling 30-Day Window</Text>
                                     </Box>
                                 )}
                             </Box>
                         ) : (
-                            <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} width="100%">
+                            <Box flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
                                 {renderProgressBar('Daily Requests', reqCurrent, reqLimit, 'cyan')}
                                 {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
                                 {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
                                 {resetInfo ? (
                                     <Box marginLeft={4} marginTop={1}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="magenta" bold>{resetInfo}</Text>
+                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
                                     </Box>
                                 ) : (
                                     <Box marginLeft={4} marginTop={1}>
-                                        <Text color="gray">Monthly Reset  : </Text>
-                                        <Text color="blue" bold>Rolling 30-Day Window</Text>
+                                        <Text color={colors.textMuted}>Monthly Reset  : </Text>
+                                        <Text color={colors.secondary || "blue"} bold>Rolling 30-Day Window</Text>
                                     </Box>
                                 )}
                             </Box>
@@ -4638,21 +4645,21 @@ export default function App({ args = [] }) {
 
             case 'input':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
                         <Box paddingX={1}>
-                            <Text color="white" bold>DATA CONFIGURATION</Text>
+                            <Text color={colors.text} bold>DATA CONFIGURATION</Text>
                         </Box>
 
                         {inputConfig?.note && (
                             <Box paddingX={1} marginBottom={1}>
-                                <Text color="gray" italic>
+                                <Text color={colors.textMuted} italic>
                                     {inputConfig.note}
                                 </Text>
                             </Box>
                         )}
 
                         <Box paddingX={1} flexDirection="row">
-                            <Text color="white" bold>{inputConfig?.label} </Text>
+                            <Text color={colors.text} bold>{inputConfig?.label} </Text>
                             <TextInput
                                 value={inputConfig?.value || ''}
                                 onChange={(val) => setInputConfig(prev => ({ ...prev, value: val }))}
@@ -4759,7 +4766,7 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box paddingX={1} marginTop={1}>
-                            <Text color="gray" dimColor italic>(Press Enter to confirm selection)</Text>
+                            <Text color={colors.textMuted} dimColor italic>(Press Enter to confirm selection)</Text>
                         </Box>
                     </Box>
                 );
@@ -4774,13 +4781,13 @@ export default function App({ args = [] }) {
                 const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes:' : 'Code Changes:';
                 const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls:' : 'Tool Calls:';
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor={'grey'} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
                         {statsMode === 'modelBreakdown' ? (
                             <Box flexDirection="column">
-                                <Text color="white" bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
+                                <Text color={colors.text} bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
                                 {(!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) ? (
                                     <Box marginTop={1}>
-                                        <Text color="grey" italic>No model token usage recorded in the last 30 days.</Text>
+                                        <Text color={colors.textMuted} italic>No model token usage recorded in the last 30 days.</Text>
                                     </Box>
                                 ) : (
                                     Object.entries(monthlyUsage.models).map(([provider, models]) => {
@@ -4788,28 +4795,28 @@ export default function App({ args = [] }) {
                                         return (
                                             <Box key={provider} flexDirection="column" marginTop={1}>
                                                 <Box>
-                                                    <Box width={40}><Text color="cyan" bold>{provider}:</Text></Box>
-                                                    <Text color="white" bold>{formatTokens(providerTotalTokens)}</Text>
+                                                    <Box width={40}><Text color={colors.primary} bold>{provider}:</Text></Box>
+                                                    <Text color={colors.text} bold>{formatTokens(providerTotalTokens)}</Text>
                                                 </Box>
                                                 {Object.entries(models).map(([modelName, stats]) => (
                                                     <Box key={modelName} flexDirection="column" marginLeft={4} marginTop={1}>
                                                         <Box>
-                                                            <Box width={36}><Text color="blue">» {modelName}:</Text></Box>
-                                                            <Text color="white">{formatTokens(stats.tokens || 0)}</Text>
+                                                            <Box width={36}><Text color={colors.secondary}>» {modelName}:</Text></Box>
+                                                            <Text color={colors.text}>{formatTokens(stats.tokens || 0)}</Text>
                                                         </Box>
                                                         <Box marginLeft={4}>
-                                                            <Box width={32}><Text color="grey">» Input Tokens:</Text></Box>
-                                                            <Text color="white">{formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0))}</Text>
+                                                            <Box width={32}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
+                                                            <Text color={colors.text}>{formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0))}</Text>
                                                         </Box>
                                                         {(stats.cachedTokens || 0) > 0 && (
                                                             <Box marginLeft={5}>
-                                                                <Box width={31}><Text color="grey">» Cached:</Text></Box>
-                                                                <Text color="white">{formatTokens(stats.cachedTokens)}</Text>
+                                                                <Box width={31}><Text color={colors.textMuted}>» Cached:</Text></Box>
+                                                                <Text color={colors.text}>{formatTokens(stats.cachedTokens)}</Text>
                                                             </Box>
                                                         )}
                                                         <Box marginLeft={4}>
-                                                            <Box width={32}><Text color="grey">» Output Tokens:</Text></Box>
-                                                            <Text color="white">{formatTokens(stats.candidateTokens || 0)}</Text>
+                                                            <Box width={32}><Text color={colors.textMuted}>» Output Tokens:</Text></Box>
+                                                            <Text color={colors.text}>{formatTokens(stats.candidateTokens || 0)}</Text>
                                                         </Box>
                                                     </Box>
                                                 ))}
@@ -4821,54 +4828,54 @@ export default function App({ args = [] }) {
                         ) : (
                             <>
                                 <Box marginBottom={1}>
-                                    <Text color="white" bold underline>SESSION TELEMETRY</Text>
+                                    <Text color={colors.text} bold underline>SESSION TELEMETRY</Text>
                                 </Box>
 
                                 <Box flexDirection="column">
                                     <Box>
-                                        <Box width={25}><Text color="blue">Session Duration:</Text></Box>
-                                        <Text color="white">{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Session Duration:</Text></Box>
+                                        <Text color={colors.text}>{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Model Requests:</Text></Box>
-                                        <Text color="white">{sessionAgentCalls}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
+                                        <Text color={colors.text}>{sessionAgentCalls}</Text>
                                     </Box>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="grey">» API Time:</Text></Box>
-                                        <Text color="white">{formatMsDuration(sessionApiTime)}</Text>
+                                        <Box width={23}><Text color={colors.textMuted}>» API Time:</Text></Box>
+                                        <Text color={colors.text}>{formatMsDuration(sessionApiTime)}</Text>
                                     </Box>
                                     <Box marginLeft={2}>
-                                        <Box width={23}><Text color="grey">» Tool Time:</Text></Box>
-                                        <Text color="white">{formatMsDuration(sessionToolTime)}</Text>
+                                        <Box width={23}><Text color={colors.textMuted}>» Tool Time:</Text></Box>
+                                        <Text color={colors.text}>{formatMsDuration(sessionToolTime)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Memory Agent:</Text></Box>
-                                        <Text color="white">{sessionBackgroundCalls}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
+                                        <Text color={colors.text}>{sessionBackgroundCalls}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Tokens Consumed:</Text></Box>
-                                        <Text color="white">{formatTokens(sessionTotalTokens)}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
+                                        <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Active Context:</Text></Box>
-                                        <Text color="white">{formatTokens(sessionStats.tokens)}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Active Context:</Text></Box>
+                                        <Text color={colors.text}>{formatTokens(sessionStats.tokens)}</Text>
                                     </Box>
                                     {sessionTotalTokens > 0 && (
                                         <>
                                             <Box marginLeft={2}>
-                                                <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
-                                                <Text color="white">{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
+                                                <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
+                                                <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
                                             </Box>
                                             {sessionTotalCachedTokens > 0 && (
                                                 <Box marginLeft={4}>
-                                                    <Box width={21}><Text color="grey">» Cached:</Text></Box>
-                                                    <Text color="white">{formatTokens(sessionTotalCachedTokens)}</Text>
+                                                    <Box width={21}><Text color={colors.textMuted}>» Cached:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(sessionTotalCachedTokens)}</Text>
                                                 </Box>
                                             )}
                                             {sessionTotalCandidateTokens > 0 && (
                                                 <Box marginLeft={2}>
-                                                    <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
-                                                    <Text color="white">{formatTokens(sessionTotalCandidateTokens)}</Text>
+                                                    <Box width={23}><Text color={colors.textMuted}>» Output Tokens:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(sessionTotalCandidateTokens)}</Text>
                                                 </Box>
                                             )}
                                         </>
@@ -4876,65 +4883,65 @@ export default function App({ args = [] }) {
                                     {sessionImageCount > 0 && (
                                         <>
                                             <Box>
-                                                <Box width={25}><Text color="blue">Images Made:</Text></Box>
-                                                <Text color="white">{sessionImageCount}</Text>
+                                                <Box width={25}><Text color={colors.secondary}>Images Made:</Text></Box>
+                                                <Text color={colors.text}>{sessionImageCount}</Text>
                                             </Box>
                                             <Box>
-                                                <Box width={25}><Text color="blue">Image Credits:</Text></Box>
-                                                <Text color="white">{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
+                                                <Box width={25}><Text color={colors.secondary}>Image Credits:</Text></Box>
+                                                <Text color={colors.text}>{Number(((sessionImageCredits || 0) * 1000).toFixed(0))} credits</Text>
                                             </Box>
                                         </>
                                     )}
                                     <Box>
-                                        <Box width={25}><Text color="blue">Code Changes (Sess):</Text></Box>
-                                        <Text color="white"><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
+                                        <Box width={25}><Text color={colors.secondary}>Code Changes (Sess):</Text></Box>
+                                        <Text color={colors.text}><Text color={colors.success || "green"}>+{runtimeSession.linesAdded}</Text> <Text color={colors.danger || "red"}>-{runtimeSession.linesRemoved}</Text></Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Tool Calls (Sess):</Text></Box>
-                                        <Text color="white">{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( </Text>
-                                        <Text color="green">✔ {runtimeSession.toolSuccess}</Text>
-                                        <Text color="white"> </Text>
-                                        <Text color="yellow">🛇 {runtimeSession.toolDenied}</Text>
-                                        <Text color="white"> </Text>
-                                        <Text color="red">✘ {runtimeSession.toolFailure}</Text>
-                                        <Text color="white"> )</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Tool Calls (Sess):</Text></Box>
+                                        <Text color={colors.text}>{runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied} ( </Text>
+                                        <Text color={colors.success || "green"}>✔ {runtimeSession.toolSuccess}</Text>
+                                        <Text color={colors.text}> </Text>
+                                        <Text color={colors.warning || "yellow"}>🛇 {runtimeSession.toolDenied}</Text>
+                                        <Text color={colors.text}> </Text>
+                                        <Text color={colors.danger || "red"}>✘ {runtimeSession.toolFailure}</Text>
+                                        <Text color={colors.text}> )</Text>
                                     </Box>
                                 </Box>
 
                                 <Box flexDirection="column" marginTop={1}>
-                                    <Text color="white" bold underline>{trackerTitle}</Text>
+                                    <Text color={colors.text} bold underline>{trackerTitle}</Text>
                                     <Box marginTop={1}>
-                                        <Box width={25}><Text color="blue">{timeLabel}</Text></Box>
-                                        <Text color="white">{formatDuration(u?.duration || 0)}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>{timeLabel}</Text></Box>
+                                        <Text color={colors.text}>{formatDuration(u?.duration || 0)}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Model Requests:</Text></Box>
-                                        <Text color="white">{u?.agent || 0}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
+                                        <Text color={colors.text}>{u?.agent || 0}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">Memory Agent:</Text></Box>
-                                        <Text color="white">{u?.background || 0}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
+                                        <Text color={colors.text}>{u?.background || 0}</Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">{tokensLabel}</Text></Box>
-                                        <Text color="white">{formatTokens(u?.tokens || 0)}</Text>
+                                        <Box width={25}><Text color={colors.secondary}>{tokensLabel}</Text></Box>
+                                        <Text color={colors.text}>{formatTokens(u?.tokens || 0)}</Text>
                                     </Box>
                                     {(u?.tokens || 0) > 0 && (
                                         <>
                                             <Box marginLeft={2}>
-                                                <Box width={23}><Text color="grey">» Input Tokens:</Text></Box>
-                                                <Text color="white">{formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0))}</Text>
+                                                <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
+                                                <Text color={colors.text}>{formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0))}</Text>
                                             </Box>
                                             {(u?.cachedTokens || 0) > 0 && (
                                                 <Box marginLeft={4}>
-                                                    <Box width={21}><Text color="grey">» Cached:</Text></Box>
-                                                    <Text color="white">{formatTokens(u.cachedTokens)}</Text>
+                                                    <Box width={21}><Text color={colors.textMuted}>» Cached:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(u.cachedTokens)}</Text>
                                                 </Box>
                                             )}
                                             {(u?.candidateTokens || 0) > 0 && (
                                                 <Box marginLeft={2}>
-                                                    <Box width={23}><Text color="grey">» Output Tokens:</Text></Box>
-                                                    <Text color="white">{formatTokens(u.candidateTokens)}</Text>
+                                                    <Box width={23}><Text color={colors.textMuted}>» Output Tokens:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(u.candidateTokens)}</Text>
                                                 </Box>
                                             )}
                                         </>
@@ -4942,49 +4949,50 @@ export default function App({ args = [] }) {
                                     {(u?.imageCalls?.length || 0) > 0 && (
                                         <>
                                             <Box>
-                                                <Box width={25}><Text color="blue">{imagesLabel}</Text></Box>
-                                                <Text color="white">{u.imageCalls.length}</Text>
+                                                <Box width={25}><Text color={colors.secondary}>{imagesLabel}</Text></Box>
+                                                <Text color={colors.text}>{u.imageCalls.length}</Text>
                                             </Box>
                                             <Box>
-                                                <Box width={25}><Text color="blue">{imageCreditsLabel}</Text></Box>
-                                                <Text color="white">{Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
+                                                <Box width={25}><Text color={colors.secondary}>{imageCreditsLabel}</Text></Box>
+                                                <Text color={colors.text}>{Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1000).toFixed(0))} credits</Text>
                                             </Box>
                                         </>
                                     )}
                                     <Box>
-                                        <Box width={25}><Text color="blue">{codeChangesLabel}</Text></Box>
-                                        <Text color="white"><Text color="green">+{u?.linesAdded || 0}</Text> <Text color="red">-{u?.linesRemoved || 0}</Text></Text>
+                                        <Box width={25}><Text color={colors.secondary}>{codeChangesLabel}</Text></Box>
+                                        <Text color={colors.text}><Text color={colors.success || "green"}>+{u?.linesAdded || 0}</Text> <Text color={colors.danger || "red"}>-{u?.linesRemoved || 0}</Text></Text>
                                     </Box>
                                     <Box>
-                                        <Box width={25}><Text color="blue">{toolCallsLabel}</Text></Box>
-                                        <Text color="white">{(u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0)} ( </Text>
-                                        <Text color="green">✔ {u?.toolSuccess || 0}</Text>
-                                        <Text color="white"> </Text>
-                                        <Text color="yellow">🛇 {u?.toolDenied || 0}</Text>
-                                        <Text color="white"> </Text>
-                                        <Text color="red">✘ {u?.toolFailure || 0}</Text>
-                                        <Text color="white"> )</Text>
+                                        <Box width={25}><Text color={colors.secondary}>{toolCallsLabel}</Text></Box>
+                                        <Text color={colors.text}>{(u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0)} ( </Text>
+                                        <Text color={colors.success || "green"}>✔ {u?.toolSuccess || 0}</Text>
+                                        <Text color={colors.text}> </Text>
+                                        <Text color={colors.warning || "yellow"}>🛇 {u?.toolDenied || 0}</Text>
+                                        <Text color={colors.text}> </Text>
+                                        <Text color={colors.danger || "red"}>✘ {u?.toolFailure || 0}</Text>
+                                        <Text color={colors.text}> )</Text>
                                     </Box>
                                 </Box>
                             </>
                         )}
 
-                        <Text dimColor marginTop={1} italic>(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
+                        <Text color={colors.textMuted} dimColor marginTop={1} italic>(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
                     </Box>
                 );
             }
             case 'autoExecDanger':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
-                        <Text color="white" bold underline>SECURITY WARNING: YOLO MODE</Text>
-                        <Text marginTop={1}>Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step.</Text>
-                        <Text marginTop={1} color="white">RISKS INVOLVED:</Text>
-                        <Text>• The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules.</Text>
-                        <Text>• Unintended system changes if the agent hallucinates a path or command.</Text>
-                        <Text>• Reduced control over the agent's step-by-step decision making.</Text>
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                        <Text color={colors.warning || "yellow"} bold underline>SECURITY WARNING: YOLO MODE</Text>
+                        <Text marginTop={1} color={colors.text}>Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step.</Text>
+                        <Text marginTop={1} color={colors.text} bold>RISKS INVOLVED:</Text>
+                        <Text color={colors.textMuted}>• The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules.</Text>
+                        <Text color={colors.textMuted}>• Unintended system changes if the agent hallucinates a path or command.</Text>
+                        <Text color={colors.textMuted}>• Reduced control over the agent's step-by-step decision making.</Text>
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Confirm Intent"
+                                theme={systemSettings.theme}
                                 items={[
                                     { label: 'I know the risk and turning on intentionally', value: 'on' },
                                     { label: 'Keep Off (Recommended)', value: 'off' }
@@ -5001,16 +5009,17 @@ export default function App({ args = [] }) {
                 );
             case 'advanceRollbackDanger':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} paddingTop={0} width="100%">
-                        <Text color="white" bold>⚠ Emergency Rollback Notice</Text>
-                        <Text marginTop={1}>When enabled, full repo snapshots exist only during active AI turns.</Text>
-                        <Text marginTop={1}>If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase).</Text>
-                        <Text>The agent may be able to automatically restore the repo to a safe state.</Text>
-                        <Text marginTop={1}>Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content.</Text>
-                        <Text marginTop={1}>(Requires Restart to take effect)</Text>
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} paddingTop={0} width="100%">
+                        <Text color={colors.warning || "yellow"} bold>⚠ Emergency Rollback Notice</Text>
+                        <Text marginTop={1} color={colors.text}>When enabled, full repo snapshots exist only during active AI turns.</Text>
+                        <Text marginTop={1} color={colors.text}>If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase).</Text>
+                        <Text color={colors.textMuted}>The agent may be able to automatically restore the repo to a safe state.</Text>
+                        <Text marginTop={1} color={colors.textMuted}>Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content.</Text>
+                        <Text marginTop={1} color={colors.textMuted}>(Requires Restart to take effect)</Text>
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Confirm"
+                                theme={systemSettings.theme}
                                 items={[
                                     { label: 'I understand and wish to enable', value: 'on' },
                                     { label: 'Keep Off', value: 'off' }
@@ -5027,16 +5036,17 @@ export default function App({ args = [] }) {
                 );
             case 'externalDanger':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
-                        <Text color="white" bold underline>SECURITY WARNING: EXTERNAL WORKSPACE ACCESS</Text>
-                        <Text marginTop={1}>Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory.</Text>
-                        <Text marginTop={1} color="white">RISKS INVOLVED:</Text>
-                        <Text>• Access to sensitive system files (SSH keys, Browser data, etc.)</Text>
-                        <Text>• Potential for accidental or malicious deletion of OS-critical files.</Text>
-                        <Text>• Unauthorized script execution across your entire file system.</Text>
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                        <Text color={colors.warning || "yellow"} bold underline>SECURITY WARNING: EXTERNAL WORKSPACE ACCESS</Text>
+                        <Text marginTop={1} color={colors.text}>Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory.</Text>
+                        <Text marginTop={1} color={colors.text} bold>RISKS INVOLVED:</Text>
+                        <Text color={colors.textMuted}>• Access to sensitive system files (SSH keys, Browser data, etc.)</Text>
+                        <Text color={colors.textMuted}>• Potential for accidental or malicious deletion of OS-critical files.</Text>
+                        <Text color={colors.textMuted}>• Unauthorized script execution across your entire file system.</Text>
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Confirm Intent"
+                                theme={systemSettings.theme}
                                 items={[
                                     { label: 'I know the risk and turning on intentionally', value: 'on' },
                                     { label: 'Keep Off (Recommended)', value: 'off' }
@@ -5053,16 +5063,17 @@ export default function App({ args = [] }) {
                 );
             case 'doubleDanger':
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="white" paddingX={2} paddingY={1} width="100%">
-                        <Text color="white" bold underline>CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK</Text>
-                        <Text marginTop={1}>You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously.</Text>
-                        <Text marginTop={1} color="red" bold>THIS IS NOT RECOMMENDED.</Text>
-                        <Text marginTop={1} color="white">THE CRITICAL RISK:</Text>
-                        <Text>The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision.</Text>
-                        <Text color="red" italic marginTop={1}>A single hallucination or error could result in full system wipe or data theft.</Text>
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                        <Text color={colors.danger || "red"} bold underline>CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK</Text>
+                        <Text marginTop={1} color={colors.text}>You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously.</Text>
+                        <Text marginTop={1} color={colors.danger || "red"} bold>THIS IS NOT RECOMMENDED.</Text>
+                        <Text marginTop={1} color={colors.text} bold>THE CRITICAL RISK:</Text>
+                        <Text color={colors.textMuted}>The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision.</Text>
+                        <Text color={colors.danger || "red"} italic marginTop={1}>A single hallucination or error could result in full system wipe or data theft.</Text>
                         <Box marginTop={1}>
                             <CommandMenu
                                 title="Final Confirmation"
+                                theme={systemSettings.theme}
                                 items={[
                                     { label: 'I agree knowing the consequences', value: 'on' },
                                     { label: 'Keep Off', value: 'off' }

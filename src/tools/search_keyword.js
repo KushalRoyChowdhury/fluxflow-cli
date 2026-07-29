@@ -23,7 +23,15 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
         const relativePath = path.relative(baseDir, fullPath);
 
         const pathSegments = relativePath.split(path.sep).map(s => s.toLowerCase());
-        const isExcluded = excludes.some(ex => pathSegments.includes(ex.toLowerCase()));
+        const fileNameLower = file.name.toLowerCase();
+
+        const isExcluded = excludes.some(ex => {
+            const exLower = ex.toLowerCase();
+            if (exLower.startsWith('.') && fileNameLower.endsWith(exLower)) {
+                return true;
+            }
+            return pathSegments.some(seg => seg === exLower || seg.startsWith('.pnpm'));
+        });
 
         if (isExcluded) continue;
 
@@ -149,8 +157,41 @@ export const search_keyword = async (args) => {
     }
 
     const excludes = [
-        'node_modules', '.git', 'dist', '.next', '.gemini',
-        '.exe', '.dll', '.png', '.jpg', '.jpeg', '.gif', '.zip', '.tgz'
+        // Clutter, VCS, Cache & Build Directories
+        '.git', 'node_modules', '.gemini', 'dist', 'build', '.next', 'out',
+        '.cache', 'bin', 'obj', 'vendor', 'venv', '.idea', '.gradle',
+        '.terraform', 'target', 'coverage', '.vscode',
+        '.svn', '.hg', '.fslckout', '.github', '.gitlab', '.circleci',
+        '.gitea', '.gitee', '.lerna', '.changeset', '.nx',
+        '.npm', '.yarn', '.pnpm-store', '.pnpm', '.expo', '.nuxt', '.svelte-kit',
+        '.docusaurus', '.turbo', '.vercel', 'bower_components', '.netlify',
+        '.vuepress', '.quasar', '.output', '.angular', 'jspm_packages',
+        '.parcel-cache', '.rollup.cache', '.rspack', '.vitepress',
+        '__pycache__', '.pytest_cache', '.mypy_cache', '.tox', '.poetry',
+        'env', 'vhdl', '.ipynb_checkpoints', '.jupyter', '.conda', '.pdm-build',
+        '.bundle', '.yardoc', '.metadata', 'App_Data', 'ClientBin',
+        '.cargo', '.rustc_info', '.go', 'Godeps', '_vendor', '.rake_tasks',
+        'CMakefiles', '.wakatime',
+        '.dart_tool', '.fvm', '.cocoapods', 'Pods', '.pub-cache',
+        '.symlinks', 'DerivedData', '.xcworkspace',
+        '.serverless', '.aws', '.gcloud', '.azure', '.kube',
+        '.vagrant', '.docker', 'postgres-data', 'redis-data', 'mongo-data',
+        '.Spotlight-V100', '.Trashes', '$RECYCLE.BIN',
+        'System Volume Information', '.DocumentRevisions-V100', '.fseventsd',
+        'AppData', 'Application Data', 'Local', 'LocalLow', 'Roaming',
+        '$WinREAgent', '$WINDOWS.~BT', '$WINDOWS.~WS', 'scw', 'System32', 'SysWOW64',
+        '.AppleDouble', '.AppleDB', '.AppleDesktop', '_CodeSignature',
+        '.cmio', '.LSOverride', '.localized', '.TemporaryItems',
+        '.Trash', '.Trash-0', '.Trash-1000', '.gvfs', '.local', '.config',
+        '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
+        '.thumb', '.thumbnails',
+        'EFI', 'boot', 'grub',
+        'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter',
+
+        // Binaries, Media, Compressed & Font Files
+        '.exe', '.dll', '.so', '.dylib', '.png', '.jpg', '.jpeg', '.gif', '.ico',
+        '.svg', '.webp', '.mp3', '.mp4', '.avi', '.zip', '.tgz', '.tar', '.gz',
+        '.7z', '.rar', '.pdf', '.docx', '.xlsx', '.pptx', '.woff', '.woff2', '.ttf', '.eot'
     ];
     const maxMatches = 150;
 

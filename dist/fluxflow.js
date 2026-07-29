@@ -6698,7 +6698,7 @@ ${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Pat
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
-2. [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes
+2. [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
 4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
@@ -10334,12 +10334,168 @@ ${diffText}`;
 // src/tools/read_folder.js
 import fs17 from "fs";
 import path16 from "path";
-var read_folder;
+var EXCLUDED_DIRS, isExcludedDir, read_folder;
 var init_read_folder = __esm({
   "src/tools/read_folder.js"() {
     init_arg_parser();
+    EXCLUDED_DIRS = /* @__PURE__ */ new Set([
+      // Version control, package managers & build clutter
+      ".git",
+      "node_modules",
+      ".gemini",
+      "dist",
+      "build",
+      ".next",
+      "out",
+      ".cache",
+      "bin",
+      "obj",
+      "vendor",
+      "venv",
+      ".idea",
+      ".gradle",
+      ".terraform",
+      "target",
+      "coverage",
+      ".vscode",
+      ".svn",
+      ".hg",
+      ".fslckout",
+      ".github",
+      ".gitlab",
+      ".circleci",
+      ".gitea",
+      ".gitee",
+      ".lerna",
+      ".changeset",
+      ".nx",
+      ".npm",
+      ".yarn",
+      ".pnpm-store",
+      ".expo",
+      ".nuxt",
+      ".svelte-kit",
+      ".docusaurus",
+      ".turbo",
+      ".vercel",
+      "bower_components",
+      ".netlify",
+      ".vuepress",
+      ".quasar",
+      ".output",
+      ".angular",
+      "jspm_packages",
+      ".parcel-cache",
+      ".rollup.cache",
+      ".rspack",
+      ".vitepress",
+      "__pycache__",
+      ".pytest_cache",
+      ".mypy_cache",
+      ".tox",
+      ".poetry",
+      "env",
+      "vhdl",
+      ".ipynb_checkpoints",
+      ".jupyter",
+      ".conda",
+      ".pdm-build",
+      ".bundle",
+      ".yardoc",
+      ".metadata",
+      "App_Data",
+      "ClientBin",
+      ".cargo",
+      ".rustc_info",
+      ".go",
+      "Godeps",
+      "_vendor",
+      ".rake_tasks",
+      "CMakefiles",
+      ".wakatime",
+      ".dart_tool",
+      ".fvm",
+      ".cocoapods",
+      "Pods",
+      ".pub-cache",
+      ".symlinks",
+      "DerivedData",
+      ".xcworkspace",
+      ".serverless",
+      ".aws",
+      ".gcloud",
+      ".azure",
+      ".kube",
+      ".vagrant",
+      ".docker",
+      "postgres-data",
+      "redis-data",
+      "mongo-data",
+      ".Spotlight-V100",
+      ".Trashes",
+      "$RECYCLE.BIN",
+      "System Volume Information",
+      ".DocumentRevisions-V100",
+      ".fseventsd",
+      "AppData",
+      "Application Data",
+      "Local",
+      "LocalLow",
+      "Roaming",
+      "$WinREAgent",
+      "$WINDOWS.~BT",
+      "$WINDOWS.~WS",
+      "scw",
+      "System32",
+      "SysWOW64",
+      ".AppleDouble",
+      ".AppleDB",
+      ".AppleDesktop",
+      "_CodeSignature",
+      ".cmio",
+      ".LSOverride",
+      ".localized",
+      ".TemporaryItems",
+      ".Trash",
+      ".Trash-0",
+      ".Trash-1000",
+      ".gvfs",
+      ".local",
+      ".config",
+      ".dbus",
+      ".fontconfig",
+      ".snap",
+      ".var",
+      ".lost+found",
+      "lost+found",
+      ".thumb",
+      ".thumbnails",
+      "EFI",
+      "boot",
+      "grub",
+      "logs",
+      "log",
+      ".nyc_output",
+      ".sonar",
+      ".ruff_cache",
+      ".VSCodeCounter"
+    ]);
+    isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsWith(".pnpm");
     read_folder = async (args) => {
-      const { path: targetPath = "." } = parseArgs(args);
+      const parsed = parseArgs(args);
+      const targetPath = parsed.path || ".";
+      let recurseDepth = 0;
+      if (parsed.recurse !== void 0 && parsed.recurse !== null) {
+        if (typeof parsed.recurse === "number") {
+          recurseDepth = parsed.recurse;
+        } else if (typeof parsed.recurse === "boolean") {
+          recurseDepth = parsed.recurse ? 1 : 0;
+        } else {
+          const val = parseInt(String(parsed.recurse).trim(), 10);
+          recurseDepth = isNaN(val) ? 0 : val;
+        }
+      }
+      recurseDepth = Math.max(0, Math.min(5, recurseDepth));
       const absolutePath = path16.resolve(process.cwd(), targetPath);
       try {
         if (!fs17.existsSync(absolutePath)) {
@@ -10349,50 +10505,137 @@ var init_read_folder = __esm({
         if (!stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
         }
-        const files = fs17.readdirSync(absolutePath);
-        const totalItems = files.length;
-        const maxDisplay = 100;
-        const displayItems = files.slice(0, maxDisplay);
-        const folderData = [];
-        for (const file of displayItems) {
-          const fPath = path16.join(absolutePath, file);
-          let indicator = "\u{1F4C4}";
-          let info = { name: file, type: "unknown", size: "N/A", mtime: "N/A" };
-          try {
-            const fStats = fs17.statSync(fPath);
-            info = {
-              name: file,
-              type: fStats.isDirectory() ? "directory" : "file",
-              size: (fStats.size / 1024).toFixed(1) + " KB",
-              mtime: fStats.mtime.toLocaleString()
-            };
-          } catch (e) {
-            info.type = "inaccessible";
+        if (recurseDepth === 0) {
+          const files = fs17.readdirSync(absolutePath);
+          const totalItems = files.length;
+          const maxDisplay = 150;
+          const displayItems = files.slice(0, maxDisplay);
+          const folderData = [];
+          for (const file of displayItems) {
+            const fPath = path16.join(absolutePath, file);
+            let info = { name: file, type: "unknown", size: "N/A", mtime: "N/A" };
+            try {
+              const fStats = fs17.statSync(fPath);
+              info = {
+                name: file,
+                type: fStats.isDirectory() ? "directory" : "file",
+                size: (fStats.size / 1024).toFixed(1) + " KB",
+                mtime: fStats.mtime.toLocaleString()
+              };
+            } catch (e) {
+              info.type = "inaccessible";
+            }
+            folderData.push(info);
           }
-          folderData.push(info);
-        }
-        const formatted = folderData.map((f) => {
-          const indicator = f.type === "directory" ? "\u{1F4C1}" : f.type === "file" ? "\u{1F4C4}" : "\u2753";
-          if (f.type === "directory") {
-            return `${indicator} ${f.name} - [DIR] - [Modified: ${f.mtime}]`;
-          }
-          return `${indicator} ${f.name} - [Size: ${f.size}] - [Modified: ${f.mtime}]`;
-        }).join("\n");
-        let footer = `
+          const formatted = folderData.map((f) => {
+            const indicator = f.type === "directory" ? "\u{1F4C1}" : f.type === "file" ? "\u{1F4C4}" : "\u2753";
+            if (f.type === "directory") {
+              return `${indicator} ${f.name} - [DIR] - [Modified: ${f.mtime}]`;
+            }
+            return `${indicator} ${f.name} - [Size: ${f.size}] - [Modified: ${f.mtime}]`;
+          }).join("\n");
+          let footer2 = `
 
 (Total items in folder: ${totalItems})`;
-        if (totalItems > maxDisplay) {
-          footer = `
+          if (totalItems > maxDisplay) {
+            footer2 = `
 
 \u26A0\uFE0F TRUNCATED: Showing first ${maxDisplay} of ${totalItems} items.`;
-        }
-        const result = `Detailed folder stats for [${targetPath}]:
+          }
+          files.length = 0;
+          displayItems.length = 0;
+          folderData.length = 0;
+          return `Detailed folder stats for [${targetPath}]:
 
-${formatted}${footer}`;
-        files.length = 0;
-        displayItems.length = 0;
-        folderData.length = 0;
-        return result;
+${formatted}${footer2}`;
+        }
+        let totalDirectories = 0;
+        let totalFiles = 0;
+        let totalItemsScanned = 0;
+        const maxTotalItems = 500;
+        let truncated = false;
+        const buildTree = (dirPath, currentDepth, prefix = "") => {
+          if (currentDepth > recurseDepth + 1 || truncated) return [];
+          let entries = [];
+          try {
+            entries = fs17.readdirSync(dirPath);
+          } catch (e) {
+            return [`${prefix}\u26A0\uFE0F [Inaccessible Directory]`];
+          }
+          const sortedEntries = [];
+          for (const name of entries) {
+            const fullPath = path16.join(dirPath, name);
+            let isDir = false;
+            try {
+              isDir = fs17.statSync(fullPath).isDirectory();
+            } catch (e) {
+            }
+            sortedEntries.push({ name, fullPath, isDir });
+          }
+          sortedEntries.sort((a, b) => {
+            if (a.isDir && !b.isDir) return -1;
+            if (!a.isDir && b.isDir) return 1;
+            return a.name.localeCompare(b.name);
+          });
+          const lines = [];
+          const count = sortedEntries.length;
+          for (let i = 0; i < count; i++) {
+            if (totalItemsScanned >= maxTotalItems) {
+              truncated = true;
+              lines.push(`${prefix}\u26A0\uFE0F [Truncated - Maximum item limit reached (${maxTotalItems})]`);
+              break;
+            }
+            const item = sortedEntries[i];
+            const isLast = i === count - 1;
+            const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
+            const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
+            totalItemsScanned++;
+            let itemType = "unknown";
+            let sizeStr = "N/A";
+            let mtimeStr = "N/A";
+            try {
+              const fStats = fs17.statSync(item.fullPath);
+              if (fStats.isDirectory()) {
+                itemType = "directory";
+                mtimeStr = fStats.mtime.toLocaleString();
+                totalDirectories++;
+              } else {
+                itemType = "file";
+                sizeStr = (fStats.size / 1024).toFixed(1) + " KB";
+                mtimeStr = fStats.mtime.toLocaleString();
+                totalFiles++;
+              }
+            } catch (e) {
+              itemType = "inaccessible";
+            }
+            const indicator = itemType === "directory" ? "\u{1F4C1}" : itemType === "file" ? "\u{1F4C4}" : "\u2753";
+            let lineText = "";
+            if (itemType === "directory") {
+              lineText = `${prefix}${connector}${indicator} ${item.name} - [DIR] - [Modified: ${mtimeStr}]`;
+            } else {
+              lineText = `${prefix}${connector}${indicator} ${item.name} - [Size: ${sizeStr}] - [Modified: ${mtimeStr}]`;
+            }
+            lines.push(lineText);
+            if (itemType === "directory" && currentDepth <= recurseDepth && !isExcludedDir(item.name)) {
+              const childLines = buildTree(item.fullPath, currentDepth + 1, childPrefix);
+              lines.push(...childLines);
+            }
+          }
+          return lines;
+        };
+        const treeLines = buildTree(absolutePath, 1, "");
+        const formattedTree = treeLines.join("\n");
+        let footer = `
+
+(Total items scanned: ${totalItemsScanned}, Directories: ${totalDirectories}, Files: ${totalFiles})`;
+        if (truncated) {
+          footer = `
+
+\u26A0\uFE0F TRUNCATED: Scan capped at ${maxTotalItems} items. (Directories: ${totalDirectories}, Files: ${totalFiles})`;
+        }
+        return `Detailed directory tree for [${targetPath}] (recurse depth: ${recurseDepth}):
+
+${formattedTree}${footer}`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to read folder [${targetPath}]: ${errorMsg}`;
@@ -10677,7 +10920,14 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
     const fullPath = path19.join(dir, file.name);
     const relativePath = path19.relative(baseDir, fullPath);
     const pathSegments = relativePath.split(path19.sep).map((s) => s.toLowerCase());
-    const isExcluded = excludes.some((ex) => pathSegments.includes(ex.toLowerCase()));
+    const fileNameLower = file.name.toLowerCase();
+    const isExcluded = excludes.some((ex) => {
+      const exLower = ex.toLowerCase();
+      if (exLower.startsWith(".") && fileNameLower.endsWith(exLower)) {
+        return true;
+      }
+      return pathSegments.some((seg) => seg === exLower || seg.startsWith(".pnpm"));
+    });
     if (isExcluded) continue;
     if (file.isDirectory()) {
       const nestedFiles = await getFilesRecursively(fullPath, excludes, baseDir, depth + 1);
@@ -10756,19 +11006,176 @@ var init_search_keyword = __esm({
         wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
       }
       const excludes = [
-        "node_modules",
+        // Clutter, VCS, Cache & Build Directories
         ".git",
-        "dist",
-        ".next",
+        "node_modules",
         ".gemini",
+        "dist",
+        "build",
+        ".next",
+        "out",
+        ".cache",
+        "bin",
+        "obj",
+        "vendor",
+        "venv",
+        ".idea",
+        ".gradle",
+        ".terraform",
+        "target",
+        "coverage",
+        ".vscode",
+        ".svn",
+        ".hg",
+        ".fslckout",
+        ".github",
+        ".gitlab",
+        ".circleci",
+        ".gitea",
+        ".gitee",
+        ".lerna",
+        ".changeset",
+        ".nx",
+        ".npm",
+        ".yarn",
+        ".pnpm-store",
+        ".pnpm",
+        ".expo",
+        ".nuxt",
+        ".svelte-kit",
+        ".docusaurus",
+        ".turbo",
+        ".vercel",
+        "bower_components",
+        ".netlify",
+        ".vuepress",
+        ".quasar",
+        ".output",
+        ".angular",
+        "jspm_packages",
+        ".parcel-cache",
+        ".rollup.cache",
+        ".rspack",
+        ".vitepress",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".tox",
+        ".poetry",
+        "env",
+        "vhdl",
+        ".ipynb_checkpoints",
+        ".jupyter",
+        ".conda",
+        ".pdm-build",
+        ".bundle",
+        ".yardoc",
+        ".metadata",
+        "App_Data",
+        "ClientBin",
+        ".cargo",
+        ".rustc_info",
+        ".go",
+        "Godeps",
+        "_vendor",
+        ".rake_tasks",
+        "CMakefiles",
+        ".wakatime",
+        ".dart_tool",
+        ".fvm",
+        ".cocoapods",
+        "Pods",
+        ".pub-cache",
+        ".symlinks",
+        "DerivedData",
+        ".xcworkspace",
+        ".serverless",
+        ".aws",
+        ".gcloud",
+        ".azure",
+        ".kube",
+        ".vagrant",
+        ".docker",
+        "postgres-data",
+        "redis-data",
+        "mongo-data",
+        ".Spotlight-V100",
+        ".Trashes",
+        "$RECYCLE.BIN",
+        "System Volume Information",
+        ".DocumentRevisions-V100",
+        ".fseventsd",
+        "AppData",
+        "Application Data",
+        "Local",
+        "LocalLow",
+        "Roaming",
+        "$WinREAgent",
+        "$WINDOWS.~BT",
+        "$WINDOWS.~WS",
+        "scw",
+        "System32",
+        "SysWOW64",
+        ".AppleDouble",
+        ".AppleDB",
+        ".AppleDesktop",
+        "_CodeSignature",
+        ".cmio",
+        ".LSOverride",
+        ".localized",
+        ".TemporaryItems",
+        ".Trash",
+        ".Trash-0",
+        ".Trash-1000",
+        ".gvfs",
+        ".local",
+        ".config",
+        ".dbus",
+        ".fontconfig",
+        ".snap",
+        ".var",
+        ".lost+found",
+        "lost+found",
+        ".thumb",
+        ".thumbnails",
+        "EFI",
+        "boot",
+        "grub",
+        "logs",
+        "log",
+        ".nyc_output",
+        ".sonar",
+        ".ruff_cache",
+        ".VSCodeCounter",
+        // Binaries, Media, Compressed & Font Files
         ".exe",
         ".dll",
+        ".so",
+        ".dylib",
         ".png",
         ".jpg",
         ".jpeg",
         ".gif",
+        ".ico",
+        ".svg",
+        ".webp",
+        ".mp3",
+        ".mp4",
+        ".avi",
         ".zip",
-        ".tgz"
+        ".tgz",
+        ".tar",
+        ".gz",
+        ".7z",
+        ".rar",
+        ".pdf",
+        ".docx",
+        ".xlsx",
+        ".pptx",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".eot"
       ];
       const maxMatches = 150;
       try {
@@ -14612,6 +15019,7 @@ Provide a consolidated summary of the entire session.`;
           ".npm",
           ".yarn",
           ".pnpm-store",
+          ".pnpm",
           ".expo",
           ".nuxt",
           ".svelte-kit",
@@ -14742,7 +15150,7 @@ Provide a consolidated summary of the entire session.`;
           const entries = safeReaddirWithTypes(dir);
           for (const entry of entries) {
             if (currentCount.value > 6200) break;
-            if (COLLAPSED_DIRS_GLOBAL.includes(entry.name)) continue;
+            if (COLLAPSED_DIRS_GLOBAL.includes(entry.name) || entry.name.startsWith(".")) continue;
             if (entry.isDirectory()) {
               currentCount.value++;
               countFolders(path25.join(dir, entry.name), currentCount, depth + 1);
@@ -14759,8 +15167,8 @@ Provide a consolidated summary of the entire session.`;
           }
           let result = "";
           const COLLAPSED_DIRS = COLLAPSED_DIRS_GLOBAL;
-          const filtered = entries.filter((e) => !COLLAPSED_DIRS.includes(e.name));
-          const collapsedInDir = entries.filter((e) => COLLAPSED_DIRS.includes(e.name)).map((e) => e.name).sort();
+          const filtered = entries.filter((e) => !COLLAPSED_DIRS.includes(e.name) && !e.name.startsWith("."));
+          const collapsedInDir = entries.filter((e) => COLLAPSED_DIRS.includes(e.name) || e.name.startsWith(".")).map((e) => e.name).sort();
           filtered.sort((a, b) => {
             if (a.isDirectory() && !b.isDirectory()) return -1;
             if (!a.isDirectory() && b.isDirectory()) return 1;
@@ -16033,7 +16441,8 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
                       const path27 = parseArgs(toolCall.args).path;
-                      label = `\u2714  ${action}: ${path27 === "." ? "./" : path27}`;
+                      const recurse = parseArgs(toolCall.args).recurse || 0;
+                      label = `\u2714  ${action}: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `**${recurse}` : `/**${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
@@ -17233,7 +17642,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
       const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const SUBAGENT_TOOL_DEFINITIONS = {
         "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
-        "readfolder": '- [tool:functions.ReadFolder(path="...")]. Detailed DIR stats including File Sizes',
+        "readfolder": '- [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0',
         "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
         "patchfile": '- [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF',
         "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
@@ -21716,16 +22125,16 @@ Selection: ${val}`,
     const barWidth = 15;
     const filledCount = Math.round(percent / 100 * barWidth);
     const barStr = "\u2588".repeat(filledCount) + "\u2591".repeat(Math.max(0, barWidth - filledCount));
-    let barColor = "gray";
+    let barColor = colors.success || "green";
     if (percent >= 40 && percent <= 80) {
-      barColor = "yellow";
+      barColor = colors.warning || "yellow";
     } else if (percent > 80) {
-      barColor = "red";
+      barColor = colors.danger || "red";
     }
     const isTokens = label.toLowerCase().includes("token");
     const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
     const displayCurrent = isTokens ? formatTokens(current) : current;
-    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", percent, "% (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
@@ -21864,6 +22273,7 @@ Selection: ${val}`,
               { label: "Custom (Set reset day of month)", value: "Custom" },
               { label: "Back", value: "apiTier" }
             ],
+            theme: systemSettings.theme,
             onSelect: (item) => {
               if (item.value === "apiTier" || item.value === "Back") {
                 setActiveView("apiTier");
@@ -21899,6 +22309,7 @@ Selection: ${val}`,
               { label: `Provider Budgets  (set limits per provider individually) ${quotas.providerBudgets?.["__useProvider"] ? "\u25CF" : ""}`, value: "provider" },
               { label: "Back", value: budgetReturnView }
             ],
+            theme: systemSettings.theme,
             onSelect: (item) => {
               if (item.value === budgetReturnView || item.value === "Back") {
                 setActiveView(budgetReturnView);
@@ -21957,11 +22368,11 @@ Selection: ${val}`,
       case "providerBudgetSelect": {
         const PROVIDERS_LIST = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
         const anySelected = PROVIDERS_LIST.some((p) => pbsSelected[p]);
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
           const isActive = i === pbsCursor;
           const isChecked = !!pbsSelected[prov];
-          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, backgroundColor: isActive ? "#2a2a2a" : void 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? "white" : "gray", bold: isActive }, isActive ? "\u276F " : "  ", /* @__PURE__ */ React16.createElement(Text16, { color: isChecked ? "green" : "gray" }, isChecked ? "\u2611" : "\u2610"), "  ", prov, isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React16.createElement(Text16, { color: "cyan" }, " (budget set)") : null));
-        }), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React16.createElement(Text16, { color: "yellow", italic: true }, "  Select at least one provider to continue")));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, backgroundColor: isActive ? colors.highlightBg || "#2a2a2a" : void 0, paddingX: 1, width: "100%", flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? colors.text : colors.textMuted, bold: isActive }, isActive ? "\u276F " : "  "), /* @__PURE__ */ React16.createElement(Text16, { color: isChecked ? colors.success || "green" : colors.textMuted }, isChecked ? "\u2611" : "\u2610"), /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? colors.text : colors.textMuted, bold: isActive }, "  ", prov), isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary || "cyan" }, " (budget set)") : null);
+        }), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", italic: true }, "  Select at least one provider to continue")));
       }
       case "providerBudgetFlow":
         return null;
@@ -21975,6 +22386,7 @@ Selection: ${val}`,
               { label: "Custom (Set reset day of month)", value: "Custom" },
               { label: "Back", value: "chat" }
             ],
+            theme: systemSettings.theme,
             onSelect: (item) => {
               if (item.value === "chat" || item.value === "Back") {
                 setActiveView("chat");
@@ -22026,7 +22438,7 @@ Selection: ${val}`,
           const monthName = resetDate.toLocaleString("default", { month: "short" });
           resetInfo = `Resets on: ${resetDay}-${monthName}`;
         }
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
           const pb = providerBudgetsMap[prov];
           const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
           let provTokenCurrent = 0;
@@ -22040,11 +22452,11 @@ Selection: ${val}`,
           for (const m in monthlyModels) {
             provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
           }
-          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
-        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: "gray", paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray" }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: "blue", bold: true }, "Rolling 30-Day Window"))));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
+        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset  : "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))));
       }
       case "input":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, inputConfig.note)), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, inputConfig.note)), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React16.createElement(
           TextInput4,
           {
             value: inputConfig?.value || "",
@@ -22144,7 +22556,7 @@ Selection: ${val}`,
               }
             }
           }
-        )), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", dimColor: true, italic: true }, "(Press Enter to confirm selection)")));
+        )), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "(Press Enter to confirm selection)")));
       case "stats": {
         const u = statsMode === "monthly" ? monthlyUsage : dailyUsage;
         const trackerTitle = statsMode === "monthly" ? "LAST 30 DAYS USAGE" : "TODAY's USAGE";
@@ -22154,16 +22566,17 @@ Selection: ${val}`,
         const imageCreditsLabel = statsMode === "monthly" ? "Image Credits:" : "Image Credits:";
         const codeChangesLabel = statsMode === "monthly" ? "Code Changes:" : "Code Changes:";
         const toolCallsLabel = statsMode === "monthly" ? "Tool Calls:" : "Tool Calls:";
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey", italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
           const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-          return /* @__PURE__ */ React16.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 40 }, /* @__PURE__ */ React16.createElement(Text16, { color: "cyan", bold: true }, provider, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React16.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 36 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "\xBB ", modelName, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React16.createElement(Box14, { width: 31 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: "blue" }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+          return /* @__PURE__ */ React16.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 40 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, provider, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React16.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 36 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "\xBB ", modelName, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React16.createElement(Box14, { width: 31 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.candidateTokens || 0))))));
+        })) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "autoExecDanger":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text, bold: true }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm Intent",
+            theme: systemSettings.theme,
             items: [
               { label: "I know the risk and turning on intentionally", value: "on" },
               { label: "Keep Off (Recommended)", value: "off" }
@@ -22177,10 +22590,11 @@ Selection: ${val}`,
           }
         )));
       case "advanceRollbackDanger":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React16.createElement(Text16, null, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "(Requires Restart to take effect)"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, paddingTop: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true }, "\u26A0 Emergency Rollback Notice"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "When enabled, full repo snapshots exist only during active AI turns."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "If catastrophic changes occur during a turn, avoid abruptly stopping the agent unless absolutely necessary (external damages out of codebase)."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "The agent may be able to automatically restore the repo to a safe state."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.textMuted }, "Once the turn ends, emergency snapshots are deleted and standard /revert takes over which may not retain full repo content."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.textMuted }, "(Requires Restart to take effect)"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm",
+            theme: systemSettings.theme,
             items: [
               { label: "I understand and wish to enable", value: "on" },
               { label: "Keep Off", value: "off" }
@@ -22194,10 +22608,11 @@ Selection: ${val}`,
           }
         )));
       case "externalDanger":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "SECURITY WARNING: EXTERNAL WORKSPACE ACCESS"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Access to sensitive system files (SSH keys, Browser data, etc.)"), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Potential for accidental or malicious deletion of OS-critical files."), /* @__PURE__ */ React16.createElement(Text16, null, "\u2022 Unauthorized script execution across your entire file system."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true, underline: true }, "SECURITY WARNING: EXTERNAL WORKSPACE ACCESS"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "Turning this ON allows the agent to execute tools (Read/Write/Exec) outside of the current active workspace directory."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text, bold: true }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Access to sensitive system files (SSH keys, Browser data, etc.)"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Potential for accidental or malicious deletion of OS-critical files."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Unauthorized script execution across your entire file system."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Confirm Intent",
+            theme: systemSettings.theme,
             items: [
               { label: "I know the risk and turning on intentionally", value: "on" },
               { label: "Keep Off (Recommended)", value: "off" }
@@ -22211,10 +22626,11 @@ Selection: ${val}`,
           }
         )));
       case "doubleDanger":
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "white", paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, "CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1 }, "You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "red", bold: true }, "THIS IS NOT RECOMMENDED."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: "white" }, "THE CRITICAL RISK:"), /* @__PURE__ */ React16.createElement(Text16, null, "The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision."), /* @__PURE__ */ React16.createElement(Text16, { color: "red", italic: true, marginTop: 1 }, "A single hallucination or error could result in full system wipe or data theft."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red", bold: true, underline: true }, "CRITICAL SECURITY WARNING: COMBINED SYSTEM RISK"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "You are attempting to enable BOTH [YOLO Mode] and [External Workspace Access] simultaneously."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.danger || "red", bold: true }, "THIS IS NOT RECOMMENDED."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text, bold: true }, "THE CRITICAL RISK:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "The agent will have the power to execute any command across your entire system WITHOUT your approval or supervision."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red", italic: true, marginTop: 1 }, "A single hallucination or error could result in full system wipe or data theft."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,
           {
             title: "Final Confirmation",
+            theme: systemSettings.theme,
             items: [
               { label: "I agree knowing the consequences", value: "on" },
               { label: "Keep Off", value: "off" }
