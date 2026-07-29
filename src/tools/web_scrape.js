@@ -9,8 +9,18 @@ import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
  * Uses a full Chromium instance to handle JS-heavy pages and single-page apps.
  */
 export const web_scrape = async (args) => {
-    const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
-    const url = urlMatch ? urlMatch[1] : args;
+    let rawUrl = args;
+    if (typeof args === 'object' && args !== null) {
+        rawUrl = args.url || args.targetUrl || args.href || '';
+    } else if (typeof args === 'string') {
+        const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
+        rawUrl = urlMatch ? urlMatch[1] : args;
+    }
+
+    const url = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+    if (!url) {
+        return "ERROR: No target URL provided.";
+    }
 
     const maxRetries = 3;
     let lastError = null;

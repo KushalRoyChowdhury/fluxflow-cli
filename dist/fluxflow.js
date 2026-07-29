@@ -2864,9 +2864,21 @@ var init_text = __esm({
             }
           }
         }
+        const originalLineIdx = res.originalStartLine - 1;
+        const fullOrigLine = allLinesOriginal[originalLineIdx] || "";
         const oldLines = res.oldContent.split("\n");
+        const origIndentMatch = fullOrigLine.match(/^\s*/);
+        const origIndent = origIndentMatch ? origIndentMatch[0] : "";
         oldLines.forEach((line, i) => {
-          diffText += `-${res.originalStartLine + i}|${line}
+          let lineText = line;
+          if (i === 0) {
+            const lineIndentMatch = line.match(/^\s*/);
+            const lineIndent = lineIndentMatch ? lineIndentMatch[0] : "";
+            if (lineIndent.length < origIndent.length && fullOrigLine.includes(line.trim())) {
+              lineText = origIndent + line.trimStart();
+            }
+          }
+          diffText += `-${res.originalStartLine + i}|${lineText}
 `;
         });
         let hunkEndInFinal = currentFinalLineIdx;
@@ -6021,7 +6033,7 @@ var init_ChatLayout = __esm({
         const cmdMatch = msg.text.match(/COMMAND: (.*)/);
         const ptyMatch = msg.text.match(/PTY: (true|false)/);
         const outputMatch = msg.text.match(/OUTPUT: ([\s\S]*)/);
-        const cmd = cmdMatch ? cmdMatch[1] : "Unknown";
+        const cmd = cmdMatch ? cmdMatch[1] : "No Command";
         const isPty = ptyMatch ? ptyMatch[1] === "true" : false;
         const outputList = outputMatch ? outputMatch[1] : "";
         return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TerminalBox, { command: cmd, output: outputList, completed: true, columns, isPty, theme }));
@@ -6699,7 +6711,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path se
 1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
 2. [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0
 3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF
+4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2...
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
 6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -8078,9 +8090,9 @@ var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
       xHigh: "EFFORT LEVEL: HIGH\nChallenge assumptions. Verify before concluding\nPrefer the simplest correct solution\nAssess architecture, scalability & trade-offs\nVerify dependencies, regressions, failure modes & modularity\nPlan implementation: files, modules, interfaces & tests\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
-      High: "EFFORT LEVEL: HIGH\nThink in a rigorous monologue within <think>...</think>\nPrefer the simplest correct solution\nAssess architecture, performance & maintainability\nVerify error handling, assumptions, edge cases, dependencies & regressions\nPlan: files, functions, logic & interactions\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
-      Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technical monologue within <think>...</think>\nFind the simplest solution meeting requirements\nScan for missing error handling, invalid assumptions, edge cases & dependencies\nVerify cohesive, modular changes\nOutline changes: files, functions & key logic\nRULES:\n- Clean logical flow\n- Efficient, deliberate, implementation-focused\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
-      Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue within <think>...</think>. Verify Basics:\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results",
+      High: "EFFORT LEVEL: HIGH\nThink in a rigorous monologue\nPrefer the simplest correct solution\nAssess architecture, performance & maintainability\nVerify error handling, assumptions, edge cases, dependencies & regressions\nPlan: files, functions, logic & interactions\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
+      Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technical monologue\nFind the simplest solution meeting requirements\nScan for missing error handling, invalid assumptions, edge cases & dependencies\nVerify cohesive, modular changes\nOutline changes: files, functions & key logic\nRULES:\n- Clean logical flow\n- Efficient, deliberate, implementation-focused\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
+      Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue. Verify Basics:\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results",
       Off: "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results"
     };
   }
@@ -8215,7 +8227,7 @@ ${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/fo
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
 ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && !isGemini) ? `CRITICAL THINKING POLICY
-- Use <think> ... </think> before responding, even with simple queries/greetings
+- Use <think> ... </think> for reasoning before responding, even with simple queries/greetings
 ` : ""}` : `${thinkingConfig}
 `}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
@@ -8551,8 +8563,11 @@ var init_history = __esm({
         } catch (e) {
         }
         const extractPrompt = (msg) => {
-          if (!msg || !msg.text) return void 0;
-          const text = msg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, "").trim();
+          if (!msg) return void 0;
+          const rawText = typeof msg === "string" ? msg : msg.text || msg.content || "";
+          if (!rawText || typeof rawText !== "string") return void 0;
+          let text = rawText.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, "").replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, "").trim();
+          if (!text) return void 0;
           const words = text.split(/\s+/);
           let prompt2 = void 0;
           if (words.length > 7) {
@@ -8568,16 +8583,18 @@ var init_history = __esm({
         const userMessages = persistentMessages.filter((m) => m.role === "user");
         const firstUserMsg = userMessages[0];
         const latestUserMsg = userMessages[userMessages.length - 1];
+        const extractedLatest = extractPrompt(latestUserMsg);
+        const extractedFirst = extractPrompt(firstUserMsg);
         if (existingChat && existingChat.prompt) {
-          if (Math.random() < 0.95) {
-            prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
+          if (Math.random() < 0.8 && extractedLatest) {
+            prompt = extractedLatest;
           } else {
             prompt = existingChat.prompt;
           }
         } else {
-          prompt = extractPrompt(firstUserMsg);
+          prompt = extractedFirst || extractedLatest;
         }
-        const finalName = name || (existingChat ? existingChat.name : prompt || `Session ${id.slice(-6)}`);
+        const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
         const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
         history[id] = {
@@ -9927,8 +9944,17 @@ var init_web_scrape = __esm({
     init_paths();
     init_puppeteer_helper();
     web_scrape = async (args) => {
-      const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
-      const url = urlMatch ? urlMatch[1] : args;
+      let rawUrl = args;
+      if (typeof args === "object" && args !== null) {
+        rawUrl = args.url || args.targetUrl || args.href || "";
+      } else if (typeof args === "string") {
+        const urlMatch = args.match(/url\s*=\s*["'](.*)["']/);
+        rawUrl = urlMatch ? urlMatch[1] : args;
+      }
+      const url = typeof rawUrl === "string" ? rawUrl.trim() : "";
+      if (!url) {
+        return "ERROR: No target URL provided.";
+      }
       const maxRetries = 3;
       let lastError = null;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -10482,7 +10508,10 @@ var init_read_folder = __esm({
     isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsWith(".pnpm");
     read_folder = async (args) => {
       const parsed = parseArgs(args);
-      const targetPath = parsed.path || ".";
+      const targetPath = parsed.path || null;
+      if (!targetPath) {
+        return "ERROR: No directory path provided.";
+      }
       let recurseDepth = 0;
       if (parsed.recurse !== void 0 && parsed.recurse !== null) {
         if (typeof parsed.recurse === "number") {
@@ -10502,7 +10531,7 @@ var init_read_folder = __esm({
         }
         const stats = fs17.statSync(absolutePath);
         if (!stats.isDirectory()) {
-          return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
+          return `ERROR: Path [${targetPath}] is a file, not a directory. Use ReadFile instead.`;
         }
         if (recurseDepth === 0) {
           const files = fs17.readdirSync(absolutePath);
@@ -10978,30 +11007,22 @@ var init_search_keyword = __esm({
       const keyword = String(rawKeyword);
       const toBool = (v) => v === true || v === "true" || v === 1 || v === "1" || v === "yes";
       const regexExplicitlyFalse = regex === false || regex === "false" || regex === 0 || regex === "0" || regex === "no";
-      let matchRegex = toBool(regex);
-      let matchSubstring = !matchRegex && toBool(subString);
-      const hasRegexIndicators = /[|]/.test(keyword) || /\\([.*+?{}()|[\]\^$])/.test(keyword) || (() => {
-        const stripped = keyword.replace(/\\./g, "");
-        return /[*+?{}()|]/.test(stripped) || /\[.*?\]/.test(stripped) || /^\^/.test(stripped) || /\$/.test(stripped);
-      })();
-      let isAutoRegex = true;
-      if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
-        matchRegex = true;
-        isAutoRegex = true;
-      }
+      const regexExplicitlyTrue = regex === true || regex === "true" || regex === 1 || regex === "1" || regex === "yes";
+      let matchSubstring = regexExplicitlyFalse && toBool(subString);
+      let regexPattern = null;
+      let wordRegex = null;
       if (regexExplicitlyFalse) {
-        matchRegex = false;
-        isAutoRegex = false;
-      }
-      let regexPattern;
-      let wordRegex;
-      if (matchRegex) {
+        if (!matchSubstring) {
+          wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
+        }
+      } else {
         try {
           regexPattern = new RegExp(keyword, "i");
         } catch (e) {
-          return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+          if (regexExplicitlyTrue) {
+            return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+          }
         }
-      } else {
         wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w])`, "i");
       }
       const excludes = [
@@ -11208,7 +11229,7 @@ var init_search_keyword = __esm({
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
             for (let i = 0; i < lines.length; i++) {
-              const matched = matchRegex ? regexPattern.test(lines[i]) : matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) : wordRegex.test(lines[i]);
+              const matched = regexExplicitlyFalse ? matchSubstring ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) : wordRegex && wordRegex.test(lines[i]) : regexPattern && regexPattern.test(lines[i]) || wordRegex && wordRegex.test(lines[i]);
               if (matched) {
                 fileMatches.push({ line: i + 1, content: lines[i].trim() });
               }
@@ -11234,7 +11255,7 @@ var init_search_keyword = __esm({
         if (typeof global.gc === "function") {
           global.gc();
         }
-        const modeLabel = matchRegex ? isAutoRegex ? "(regex mode)" : "(keyword mode)" : matchSubstring ? "(subString mode)" : "";
+        const modeLabel = regexExplicitlyFalse ? matchSubstring ? "(subString mode)" : "(keyword mode)" : regexExplicitlyTrue ? "(regex mode)" : "(standard mode)";
         if (fileGroups.length === 0) {
           const zeroLocation = pathArgType === "file" ? ` in '${pathArg}'` : pathArgType === "dir" ? ` in '${pathArg}'` : ". Try to specify files";
           const dirPrefix2 = pathArgType === "dir" ? "[DIR]" : "";
@@ -16404,10 +16425,10 @@ ${ideErr} [/ERROR]`;
                     let label = "";
                     if (normToolName === "web_search") {
                       const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args);
-                      label = `\u2714  ${aiMode ? "AI Search" : "Searched"}: ${query}${aiMode === false ? ` \u2192 ${limit}` : ""}`;
+                      label = `${query ? "\u2714" : "\u2718"}  ${aiMode ? "AI Search" : "Searched"}: ${query ? `${query}` : "No Search Query"}${aiMode === false && query ? ` \u2192 ${limit}` : ""}`;
                     } else if (normToolName === "web_scrape") {
-                      const url = parseArgs(toolCall.args).url || "...";
-                      label = `\u2714  Visited: ${url}`;
+                      const url = parseArgs(toolCall.args).url || null;
+                      label = `${url ? "\u2714" : "\u2718"}  Visited: ${url ? url : "No Source"}`;
                     } else if (normToolName === "view_file") {
                       const { path: targetPath2, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
                       const rawStart = StartLine || start_line || startLine;
@@ -16431,29 +16452,30 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label = `\u2714  Analyzed: ${path25.basename(targetPath2)}`;
+                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Analyzed: ${path25.basename(targetPath2)}` : "Analyzed: File Not Found"}`;
                       } else if (isImage) {
-                        label = `\u2714  Processed: ${path25.basename(targetPath2)}`;
+                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Processed: ${path25.basename(targetPath2)}` : "Processed: File Not Found"}`;
                       } else {
-                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${path25.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}`;
+                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${targetPath2 ? `${path25.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path27 = parseArgs(toolCall.args).path || "";
+                      const path27 = parseArgs(toolCall.args).path || null;
                       const recurse = parseArgs(toolCall.args).recurse || 0;
-                      label = `\u2714  ${action}: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
+                      label = `${path27 ? "\u2714" : "\u2718"}  ${action}: ${path27 ? `${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}` : "No Folder Selected"}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
-                      label = `\u2714  ${action}: ${parseArgs(toolCall.args).path || "..."}`;
+                      const path27 = parseArgs(toolCall.args).path || null;
+                      label = `${path27 ? "\u2714" : "\u2718"}  ${action}: ${path27 || "No File Changes"}`;
                     } else if (normToolName === "write_pdf") {
-                      label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
-`;
+                      const path27 = parseArgs(toolCall.args).path || null;
+                      label = `${path27 ? "\u2714" : "\u2718"}  Generated: ${path27 || "No PDF Generated"}`;
                     } else if (normToolName === "write_docx") {
-                      label = `\u2714  Generated: ${parseArgs(toolCall.args).path || "..."}
-`;
+                      const path27 = parseArgs(toolCall.args).path || null;
+                      label = `${path27 ? "\u2714" : "\u2718"}  Generated: ${path27 || "No Docx Generated"}`;
                     } else if (normToolName === "file_map") {
                       const path27 = parseArgs(toolCall.args).path;
-                      label = `${path27 ? "\u2714" : "\u2718"}  Indexed${path27 ? ": " + path27 : " File Not Found"}`;
+                      label = `${path27 ? "\u2714" : "\u2718"}  Indexed: ${path27 ? "" + path27 : "File Not Found"}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
@@ -16638,7 +16660,7 @@ ${ideErr} [/ERROR]`;
                         });
                         if (isViolating) {
                           const denyMsg = `Access Denied. Prohibited from accessing external directories while "External Workspace Access" is disabled.`;
-                          if (settings.onExecStart) settings.onExecStart(command || "Unknown");
+                          if (settings.onExecStart) settings.onExecStart(command || "No Command");
                           yield { type: "exec_start" };
                           await new Promise((resolve) => setTimeout(resolve, 50));
                           if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
@@ -16650,7 +16672,7 @@ ${ideErr} [/ERROR]`;
                           continue;
                         }
                       }
-                      if (settings.onExecStart) settings.onExecStart(command || "Unknown");
+                      if (settings.onExecStart) settings.onExecStart(command || "No Command");
                       yield { type: "exec_start" };
                     }
                     const parsedArgs = parseArgs(toolCall.args);
@@ -16888,15 +16910,14 @@ ${ideErr} [/ERROR]`;
                                     if (successes.length === 0) {
                                       const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path25.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path25.basename(absPath)}`.toUpperCase();
+                                      const errorLabel = `\u2714  Edited: ${path25.basename(absPath)}`;
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                       }
                                       const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                       const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                      yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
-`) };
+                                      yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}`) };
                                       thisIsFirstToolFeedback = false;
                                       toolResults.push({ role: "user", text: errorMsg });
                                       await incrementUsage("toolFailure");
@@ -17042,18 +17063,16 @@ ${tail}`;
 - Stats: [${verifiedLineCount2} lines, ${(verifiedSize2 / 1024).toFixed(1)} KB]
 ${ancestry2}- Content Preview:
 ${snippet2}`;
-                            console.log(result2);
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
-                          const feedbackLabel = `\u2714 ${action}: ${filePath || "..."}`;
+                          const feedbackLabel = `${filePath ? "\u2714" : "\u2718"} ${action}: ${filePath || "No File Changes"}`;
                           let terminalWidth = 115;
                           if (process.stdout.isTTY) {
                             terminalWidth = process.stdout.columns - 5 || 120;
                           }
                           const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                           const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                          yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}
-`) };
+                          yield { type: "visual_feedback", content: colorMainWords(`${thisIsFirstToolFeedback ? "\n" : ""}${boxMid}`) };
                           thisIsFirstToolFeedback = false;
                           const toolEnd2 = Date.now();
                           lastToolFinishedAt = toolEnd2;
@@ -17080,7 +17099,7 @@ ${snippet2}`;
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2718 ${action}: ${parseArgs(toolCall.args).path || "..."}`.toUpperCase();
+                            const deniedLabel = `\u2718 ${action}: ${parseArgs(toolCall.args).path || "..."}`;
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -17187,7 +17206,7 @@ ${snippet2}`;
                       }
                       const _sp = path27 ? path27.replace(/[\/\\]+$/, "") : null;
                       const displayPath = _sp && _sp !== "." ? `"${_isDir ? `${_sp}/*` : _sp}"` : "./";
-                      const postLabel = `\u2714  Searched: "${keyword}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
+                      const postLabel = `${keyword ? "\u2714" : "\u2718"}  Searched: "${keyword ? keyword : ""}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
                       if (process.stdout.isTTY) {
                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -17612,7 +17631,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
         })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path25.join(LOGS_DIR, "agent");
-        yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog}` };
+        yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog.includes("fetch failed") ? "Failed to Connect. Check your Internet Connection or Wait a moment" : errLog}` };
         if (!fs26.existsSync(agentErrDir)) fs26.mkdirSync(agentErrDir, { recursive: true });
         fs26.appendFileSync(path25.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
 
@@ -17761,18 +17780,19 @@ ${cleanResponse}
             const path27 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mRead\x1B[0m: ${path27}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
-            const path27 = parseArgs(toolCall.args).path || "";
+            const path27 = parseArgs(toolCall.args).path || null;
             const recurse = parseArgs(toolCall.args).recurse || 0;
-            label = `\u2714 \x1B[95mBrowsed\x1B[0m: ${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}`;
+            label = `${path27 ? "\u2714" : "\u2718"}  \x1B[95mBrowsed\x1B[0m: ${path27 ? `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}` : ""}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path27 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mCreated\x1B[0m: ${path27}`;
+            const path27 = parseArgs(toolCall.args).path || null;
+            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mCreated\x1B[0m: ${path27 ? `${path27}` : "No File Changes"}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path27 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mEdited\x1B[0m: ${path27}`;
+            const path27 = parseArgs(toolCall.args).path || null;
+            const content = parseArgs(toolCall.args).content || null;
+            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mEdited\x1B[0m: ${path27 ? `${path27}` : "No File Changes"}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
             const path27 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mIndexed\x1B[0m: ${path27}`;
+            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mIndexed\x1B[0m: ${path27 ? `${path27}` : "File Not Found"}`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;
@@ -17930,9 +17950,10 @@ function ResumeModal({ onSelect, onDelete, onClose, theme = "Dark" }) {
         width: "100%"
       },
       /* @__PURE__ */ React10.createElement(Box9, { flexGrow: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: isSelected ? colors.text : colors.textMuted, bold: isSelected }, isSelected ? "\u276F " : "  ", (() => {
-        if (chat2?.name && !chat2.name.startsWith("Session")) return chat2.name;
-        if (chat2?.prompt) return chat2.prompt;
-        return chat2?.name || id;
+        const cleanTag = (str) => (str || "").replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, "").trim();
+        if (chat2?.name && !chat2.name.startsWith("Session")) return cleanTag(chat2.name);
+        if (chat2?.prompt) return cleanTag(chat2.prompt);
+        return cleanTag(chat2?.name) || id;
       })(), /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, " [", dateStr, " \u2022 ", id, "]"))),
       isSelected && /* @__PURE__ */ React10.createElement(Box9, { flexShrink: 0 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.danger, bold: true }, "[X] DELETE "))
     );
@@ -22184,7 +22205,7 @@ Selection: ${val}`,
             title: "SELECT AI PROVIDER",
             items: [
               { label: "Google (Free/Paid)", value: "Google" },
-              { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
+              { label: "Nvidia (Free/Custom)", value: "NVIDIA" },
               { label: "DeepSeek (Paid)", value: "DeepSeek" },
               { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
@@ -22875,6 +22896,7 @@ Selection: ${val}`,
           ResolutionModal,
           {
             data: resolutionData,
+            theme: systemSettings.theme,
             onResolve: (val) => {
               setResolutionData(null);
               setActiveView("chat");
@@ -23138,7 +23160,7 @@ Selection: ${val}`,
     {
       items: [
         { label: "Google (Free/Paid)", value: "Google" },
-        { label: "Nvidia (Free/Paid)", value: "NVIDIA" },
+        { label: "Nvidia (Free/Custom)", value: "NVIDIA" },
         { label: "DeepSeek (Paid)", value: "DeepSeek" },
         { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
         { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" }
@@ -23400,20 +23422,25 @@ var init_app = __esm({
     packageJson = JSON.parse(fs28.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
-    ResolutionModal = ({ data, onResolve, onEdit }) => /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: "grey", padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white", bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, null, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, backgroundColor: "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { italic: true, color: "gray" }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "grey" }, "How would you like to proceed?")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React16.createElement(
-      CommandMenu,
-      {
-        title: "Select Action",
-        items: [
-          { label: "Send Anyway", value: "send" },
-          { label: "Edit Prompt", value: "edit" }
-        ],
-        onSelect: (val) => {
-          if (val === "send") onResolve(data);
-          else onEdit(data);
+    ResolutionModal = ({ data, onResolve, onEdit, theme = "Dark" }) => {
+      const colors = getThemeColors(theme);
+      return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, data.startsWith("/btw") ? "QUESTION" : "STEERING HINT", " RESOLUTION")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "The agent already finished the task before your ", data.startsWith("/btw") ? "question" : "hint", " was consumed.")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, backgroundColor: colors.cardBg || colors.codeBg || "#222", paddingX: 2, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { italic: true, color: colors.textMuted }, '"', data.replace("/btw", "").trim(), '"')), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textDim || colors.textMuted }, "How would you like to proceed?")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 0 }, /* @__PURE__ */ React16.createElement(
+        CommandMenu,
+        {
+          title: "Select Action",
+          items: [
+            { label: "Send Anyway", value: "send" },
+            { label: "Edit Prompt", value: "edit" }
+          ],
+          onSelect: (item) => {
+            const val = typeof item === "object" && item !== null ? item.value : item;
+            if (val === "send") onResolve(data);
+            else onEdit(data);
+          },
+          theme
         }
-      }
-    )));
+      )));
+    };
     getProjectFiles = /* @__PURE__ */ (() => {
       let cachedFiles = null;
       let lastScanTime = 0;

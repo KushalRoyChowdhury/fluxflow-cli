@@ -1091,7 +1091,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         const cmdMatch = msg.text.match(/COMMAND: (.*)/);
         const ptyMatch = msg.text.match(/PTY: (true|false)/);
         const outputMatch = msg.text.match(/OUTPUT: ([\s\S]*)/);
-        const cmd = cmdMatch ? cmdMatch[1] : 'Unknown';
+        const cmd = cmdMatch ? cmdMatch[1] : 'No Command';
         const isPty = ptyMatch ? ptyMatch[1] === 'true' : false;
         const outputList = outputMatch ? outputMatch[1] : '';
 

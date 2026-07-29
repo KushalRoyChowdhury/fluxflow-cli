@@ -389,9 +389,24 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         }
 
         // 2. Report the Removal (-)
+        const originalLineIdx = res.originalStartLine - 1;
+        const fullOrigLine = allLinesOriginal[originalLineIdx] || '';
         const oldLines = res.oldContent.split('\n');
+        
+        // Calculate leading indentation of the original line in file
+        const origIndentMatch = fullOrigLine.match(/^\s*/);
+        const origIndent = origIndentMatch ? origIndentMatch[0] : '';
+
         oldLines.forEach((line, i) => {
-            diffText += `-${res.originalStartLine + i}|${line}\n`;
+            let lineText = line;
+            if (i === 0) {
+                const lineIndentMatch = line.match(/^\s*/);
+                const lineIndent = lineIndentMatch ? lineIndentMatch[0] : '';
+                if (lineIndent.length < origIndent.length && fullOrigLine.includes(line.trim())) {
+                    lineText = origIndent + line.trimStart();
+                }
+            }
+            diffText += `-${res.originalStartLine + i}|${lineText}\n`;
         });
 
         // 3. Report the Addition (+) with Exact Anchoring

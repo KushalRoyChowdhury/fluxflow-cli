@@ -87,9 +87,13 @@ export default function ResumeModal({ onSelect, onDelete, onClose, theme = 'Dark
                                     <Text color={isSelected ? colors.text : colors.textMuted} bold={isSelected}>
                                         {isSelected ? '❯ ' : '  '}
                                         {(() => {
-                                            if (chat?.name && !chat.name.startsWith('Session')) return chat.name;
-                                            if (chat?.prompt) return chat.prompt;
-                                            return chat?.name || id;
+                                            const cleanTag = (str) => (str || '').replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, '').trim();
+                                            // Priority 1: Custom title set by Janitor/Memory Agent (anything not default Session ID)
+                                            if (chat?.name && !chat.name.startsWith('Session')) return cleanTag(chat.name);
+                                            // Priority 2: Latest user prompt preview
+                                            if (chat?.prompt) return cleanTag(chat.prompt);
+                                            // Priority 3: Fallback Session ID name
+                                            return cleanTag(chat?.name) || id;
                                         })()}
                                         <Text color={colors.textMuted}> [{dateStr} • {id}]</Text>
                                     </Text>

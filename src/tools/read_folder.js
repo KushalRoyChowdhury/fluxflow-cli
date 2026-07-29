@@ -43,7 +43,11 @@ const isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsW
  */
 export const read_folder = async (args) => {
     const parsed = parseArgs(args);
-    const targetPath = parsed.path || '.';
+    const targetPath = parsed.path || null;
+
+    if (!targetPath) {
+        return "ERROR: No directory path provided.";
+    }
 
     let recurseDepth = 0;
     if (parsed.recurse !== undefined && parsed.recurse !== null) {
@@ -67,7 +71,7 @@ export const read_folder = async (args) => {
 
         const stats = fs.statSync(absolutePath);
         if (!stats.isDirectory()) {
-            return `ERROR: Path [${targetPath}] is a file, not a directory. Use view_file instead.`;
+            return `ERROR: Path [${targetPath}] is a file, not a directory. Use ReadFile instead.`;
         }
 
         if (recurseDepth === 0) {

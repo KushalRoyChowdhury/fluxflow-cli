@@ -89,10 +89,19 @@ export const saveChat = async (id, name, messages) => {
             }
         } catch (e) { }
 
-        // Compute prompt from user messages, stripping timestamp metadata
+        // Compute prompt from user messages, stripping timestamp metadata and steering hint tags
         const extractPrompt = (msg) => {
-            if (!msg || !msg.text) return undefined;
-            const text = msg.text.replace(/\s*\n+\s*\[Prompted on:.*?\]/g, '').trim();
+            if (!msg) return undefined;
+            const rawText = typeof msg === 'string' ? msg : (msg.text || msg.content || '');
+            if (!rawText || typeof rawText !== 'string') return undefined;
+
+            let text = rawText
+                .replace(/\s*\n+\s*\[Prompted on:.*?\]/g, '')
+                .replace(/\[\/?(?:STEERING HINT|QUESTION)(?::\s*\w+)?\]/gi, '')
+                .trim();
+
+            if (!text) return undefined;
+
             const words = text.split(/\s+/);
             let prompt = undefined;
             if (words.length > 7) {
@@ -110,24 +119,26 @@ export const saveChat = async (id, name, messages) => {
         const firstUserMsg = userMessages[0];
         const latestUserMsg = userMessages[userMessages.length - 1];
 
+        const extractedLatest = extractPrompt(latestUserMsg);
+        const extractedFirst = extractPrompt(firstUserMsg);
+
         if (existingChat && existingChat.prompt) {
-            // Gacha: 95% chance to update prompt with latest user prompt
-            if (Math.random() < 0.95) {
-                prompt = extractPrompt(latestUserMsg) || existingChat.prompt;
+            // Gacha: 80% chance to update prompt with latest user prompt if valid, otherwise retain existing
+            if (Math.random() < 0.80 && extractedLatest) {
+                prompt = extractedLatest;
             } else {
                 prompt = existingChat.prompt;
             }
         } else {
-            // First save: lock onto the very first user prompt
-            prompt = extractPrompt(firstUserMsg);
+            // First save: lock onto the very first user prompt (or latest if first missing)
+            prompt = extractedFirst || extractedLatest;
         }
 
         // Defensive name selection:
         // 1. Provided name
         // 2. Existing name on disk
-        // 3. First user prompt as auto-title
-        // 4. Fallback to unique ID suffix
-        const finalName = name || (existingChat ? existingChat.name : prompt || `Session ${id.slice(-6)}`);
+        // 3. Default fallback to Session ID
+        const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
 
         // Save the messages to the separate chat file
         const chatFile = path.join(HISTORY_DIR, `${id}.json`);

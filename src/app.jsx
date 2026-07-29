@@ -222,35 +222,40 @@ const StatusSpinner = () => {
     return <Text color="magenta">{SPINNER_FRAMES[Math.floor(tick / 3) % SPINNER_FRAMES.length]}</Text>;
 };
 
-const ResolutionModal = ({ data, onResolve, onEdit }) => (
-    <Box flexDirection="column" borderStyle="round" borderColor="grey" padding={0} width="100%">
-        <Box paddingX={1}>
-            <Text color="white" bold underline>{data.startsWith('/btw') ? 'QUESTION' : 'STEERING HINT'} RESOLUTION</Text>
+const ResolutionModal = ({ data, onResolve, onEdit, theme = 'Dark' }) => {
+    const colors = getThemeColors(theme);
+    return (
+        <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
+            <Box paddingX={1}>
+                <Text color={colors.text} bold underline>{data.startsWith('/btw') ? 'QUESTION' : 'STEERING HINT'} RESOLUTION</Text>
+            </Box>
+            <Box paddingX={1} marginTop={1}>
+                <Text color={colors.text}>The agent already finished the task before your {data.startsWith('/btw') ? 'question' : 'hint'} was consumed.</Text>
+            </Box>
+            <Box marginTop={1} backgroundColor={colors.cardBg || colors.codeBg || '#222'} paddingX={2} width="100%">
+                <Text italic color={colors.textMuted}>"{data.replace('/btw', '').trim()}"</Text>
+            </Box>
+            <Box paddingX={1} marginTop={1}>
+                <Text color={colors.textDim || colors.textMuted}>How would you like to proceed?</Text>
+            </Box>
+            <Box marginTop={0}>
+                <CommandMenu
+                    title="Select Action"
+                    items={[
+                        { label: 'Send Anyway', value: 'send' },
+                        { label: 'Edit Prompt', value: 'edit' }
+                    ]}
+                    onSelect={(item) => {
+                        const val = typeof item === 'object' && item !== null ? item.value : item;
+                        if (val === 'send') onResolve(data);
+                        else onEdit(data);
+                    }}
+                    theme={theme}
+                />
+            </Box>
         </Box>
-        <Box paddingX={1} marginTop={1}>
-            <Text>The agent already finished the task before your {data.startsWith('/btw') ? 'question' : 'hint'} was consumed.</Text>
-        </Box>
-        <Box marginTop={1} backgroundColor="#222" paddingX={2} width="100%">
-            <Text italic color="gray">"{data.replace('/btw', '').trim()}"</Text>
-        </Box>
-        <Box paddingX={1} marginTop={1}>
-            <Text color="grey">How would you like to proceed?</Text>
-        </Box>
-        <Box marginTop={0}>
-            <CommandMenu
-                title="Select Action"
-                items={[
-                    { label: 'Send Anyway', value: 'send' },
-                    { label: 'Edit Prompt', value: 'edit' }
-                ]}
-                onSelect={(val) => {
-                    if (val === 'send') onResolve(data);
-                    else onEdit(data);
-                }}
-            />
-        </Box>
-    </Box>
-);
+    );
+};
 
 
 const parseAgentText = (text) => {
@@ -4255,7 +4260,7 @@ export default function App({ args = [] }) {
                         title="SELECT AI PROVIDER"
                         items={[
                             { label: 'Google (Free/Paid)', value: 'Google' },
-                            { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
+                            { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                             { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
@@ -5354,6 +5359,7 @@ export default function App({ args = [] }) {
                     <Box width="100%" alignItems="center" justifyContent="center">
                         <ResolutionModal
                             data={resolutionData}
+                            theme={systemSettings.theme}
                             onResolve={(val) => {
                                 setResolutionData(null);
                                 setActiveView('chat');
@@ -5783,7 +5789,7 @@ export default function App({ args = [] }) {
                                                 <CommandMenu
                                                     items={[
                                                         { label: 'Google (Free/Paid)', value: 'Google' },
-                                                        { label: 'Nvidia (Free/Paid)', value: 'NVIDIA' },
+                                                        { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
                                                         { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
                                                         { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                                                         { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },

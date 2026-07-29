@@ -119,40 +119,27 @@ export const search_keyword = async (args) => {
     // Normalise boolean-like flags
     const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';
     const regexExplicitlyFalse = regex === false || regex === 'false' || regex === 0 || regex === '0' || regex === 'no';
-    let matchRegex     = toBool(regex);
-    let matchSubstring = !matchRegex && toBool(subString);
+    const regexExplicitlyTrue = regex === true || regex === 'true' || regex === 1 || regex === '1' || regex === 'yes';
+    let matchSubstring = regexExplicitlyFalse && toBool(subString);
 
-    const hasRegexIndicators = /[|]/.test(keyword) || /\\([.*+?{}()|[\]\^$])/.test(keyword) || (() => {
-        // Detect raw regex metacharacters (not backslash-escaped) that are strongly indicative of regex intent.
-        // Avoid common false-positives like a standalone dot in file paths or simple punctuation.
-        // Strip backslash-escaped sequences first
-        const stripped = keyword.replace(/\\./g, '');
-        // Quantifiers: * + ? { }  Alternation: |  Groups: ( )  Char classes: [ ]  Anchors: ^$
-        // Require at least one strong indicator (excludes standalone dots which are too common)
-        return /[*+?{}()|]/.test(stripped) || /\[.*?\]/.test(stripped) || /^\^/.test(stripped) || /\$/.test(stripped);
-       })()
-    let isAutoRegex = true; // true, default
-    if (!matchRegex && !regexExplicitlyFalse && hasRegexIndicators) {
-        matchRegex = true;
-        isAutoRegex = true;
-    }
+    // Build search matchers
+    let regexPattern = null; // used for regex mode
+    let wordRegex = null;    // used for normal (whole-word) mode
+
     if (regexExplicitlyFalse) {
-        matchRegex = false;
-        isAutoRegex = false;
-    }
-
-    // Build search matcher
-    let regexPattern; // used for regex mode
-    let wordRegex;    // used for normal (whole-word) mode
-
-    if (matchRegex) {
+        if (!matchSubstring) {
+            wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
+        }
+    } else {
+        // If regex is not explicitly false (default or explicit true), search both regex & normal whole-word unless regex fails
         try {
             regexPattern = new RegExp(keyword, 'i');
         } catch (e) {
-            return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+            if (regexExplicitlyTrue) {
+                return `ERROR: Invalid regex pattern "${keyword}": ${e.message}`;
+            }
+            // If regex auto-failed and wasn't explicitly requested as true, fall back gracefully
         }
-    } else {
-        // Build a word-boundary regex for whole-word matching (case-insensitive)
         wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
     }
 
@@ -233,11 +220,11 @@ export const search_keyword = async (args) => {
                 const fileMatches = [];
 
                 for (let i = 0; i < lines.length; i++) {
-                    const matched = matchRegex
-                        ? regexPattern.test(lines[i])                                                               // regex mode
-                        : matchSubstring
-                            ? lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword) // substring + fuzzy fallback
-                            : wordRegex.test(lines[i]);                                                             // default: whole-word only (case-insensitive)
+                    const matched = regexExplicitlyFalse
+                        ? (matchSubstring
+                            ? (lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword))
+                            : (wordRegex && wordRegex.test(lines[i])))
+                        : ((regexPattern && regexPattern.test(lines[i])) || (wordRegex && wordRegex.test(lines[i])));
                     if (matched) {
                         fileMatches.push({ line: i + 1, content: lines[i].trim() });
                     }
@@ -269,7 +256,9 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
-        const modeLabel = matchRegex ? (isAutoRegex ? '(regex mode)' : '(keyword mode)') : matchSubstring ? '(subString mode)' : '';
+        const modeLabel = regexExplicitlyFalse
+            ? (matchSubstring ? '(subString mode)' : '(keyword mode)')
+            : (regexExplicitlyTrue ? '(regex mode)' : '(standard mode)');
 
         if (fileGroups.length === 0) {
             const zeroLocation = pathArgType === 'file'

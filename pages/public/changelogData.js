@@ -3,9 +3,21 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.13.5"]
+export const stableVersions = ["3.14.0"]
 
 export const changelogData = {
+    "3.14.0": {
+        "note": "",
+        "added": [],
+        "changed": [
+            "Improved UI stability.",
+            "Improved IDE Companion communication stability."
+        ],
+        "fixes": [
+            "Fixed occasional issues with agent stalling mid task.",
+            "Better UI feedback of the current tool state."
+        ]
+    },
     "3.13.5": {
         "note": "JULY 29.",
         "added": [

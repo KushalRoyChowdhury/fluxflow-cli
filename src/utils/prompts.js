@@ -137,7 +137,7 @@ ${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/fo
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && !isGemini))) ? `CRITICAL THINKING POLICY
-- Use <think> ... </think> before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}\n`}
+- Use <think> ... </think> for reasoning before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}\n`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 - Subtly Personalize with  RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ''}

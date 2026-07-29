@@ -3872,10 +3872,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 let label = '';
                                 if (normToolName === 'web_search') {
                                     const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args);
-                                    label = `✔  ${aiMode ? 'AI Search' : 'Searched'}: ${query}${aiMode === false ? ` → ${limit}` : ''}`;
+                                    label = `${query ? '✔' : '✘'}  ${aiMode ? 'AI Search' : 'Searched'}: ${query ? `${query}` : 'No Search Query'}${aiMode === false && query ? ` → ${limit}` : ''}`;
                                 } else if (normToolName === 'web_scrape') {
-                                    const url = parseArgs(toolCall.args).url || '...';
-                                    label = `✔  Visited: ${url}`;
+                                    const url = parseArgs(toolCall.args).url || null;
+                                    label = `${url ? '✔' : '✘'}  Visited: ${url ? url : 'No Source'}`;
                                 } else if (normToolName === 'view_file') {
                                     const { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(toolCall.args);
 
@@ -3901,27 +3901,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
                                     const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                                     if (isPdf || isOfficeFile) {
-                                        label = `✔  Analyzed: ${path.basename(targetPath)}`;
+                                        label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Analyzed: ${path.basename(targetPath)}` : 'Analyzed: File Not Found'}`;
                                     } else if (isImage) {
-                                        label = `✔  Processed: ${path.basename(targetPath)}`;
+                                        label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Processed: ${path.basename(targetPath)}` : 'Processed: File Not Found'}`;
                                     } else {
-                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${path.basename(targetPath)} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}`;
+                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${targetPath ? `${path.basename(targetPath)} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}` : 'File Not Found'}`;
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
-                                    const path = parseArgs(toolCall.args).path || '';
+                                    const path = parseArgs(toolCall.args).path || null;
                                     const recurse = parseArgs(toolCall.args).recurse || 0;
-                                    label = `✔  ${action}: ${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}`;
+                                    label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                    label = `✔  ${action}: ${parseArgs(toolCall.args).path || '...'}`;
+                                    const path = parseArgs(toolCall.args).path || null;
+                                    label = `${path ? '✔' : '✘'}  ${action}: ${path || 'No File Changes'}`;
                                 } else if (normToolName === 'write_pdf') {
-                                    label = `✔  Generated: ${parseArgs(toolCall.args).path || '...'}\n`;
+                                    const path = parseArgs(toolCall.args).path || null;
+                                    label = `${path ? '✔' : '✘'}  Generated: ${path || 'No PDF Generated'}`;
                                 } else if (normToolName === 'write_docx') {
-                                    label = `✔  Generated: ${parseArgs(toolCall.args).path || '...'}\n`;
+                                    const path = parseArgs(toolCall.args).path || null;
+                                    label = `${path ? '✔' : '✘'}  Generated: ${path || 'No Docx Generated'}`;
                                 } else if (normToolName === 'file_map') {
                                     const path = parseArgs(toolCall.args).path;
-                                    label = `${path ? '✔' : '✘'}  Indexed${path ? ': ' + path : ' File Not Found'}`;
+                                    label = `${path ? '✔' : '✘'}  Indexed: ${path ? '' + path : 'File Not Found'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
@@ -4136,7 +4139,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                         if (isViolating) {
                                             const denyMsg = `Access Denied. Prohibited from accessing external directories while "External Workspace Access" is disabled.`;
-                                            if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
+                                            if (settings.onExecStart) settings.onExecStart(command || 'No Command');
                                             yield { type: 'exec_start' };
                                             await new Promise(resolve => setTimeout(resolve, 50));
                                             if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
@@ -4148,7 +4151,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             continue;
                                         }
                                     }
-                                    if (settings.onExecStart) settings.onExecStart(command || 'Unknown');
+                                    if (settings.onExecStart) settings.onExecStart(command || 'No Command');
                                     yield { type: 'exec_start' };
                                 }
 
@@ -4385,7 +4388,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
-                                                                    const errorLabel = `✔  Edited: ${path.basename(absPath)}`.toUpperCase();
+                                                                    const errorLabel = `✔  Edited: ${path.basename(absPath)}`;
                                                                     // Get terminal physical width
                                                                     let terminalWidth = 115;
                                                                     if (process.stdout.isTTY) {
@@ -4393,7 +4396,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     }
                                                                     const boxWidth = Math.min(errorLabel.length + 4, terminalWidth);
                                                                     const boxMid = `${errorLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}`) };
                                                                     thisIsFirstToolFeedback = false;
 
                                                                     toolResults.push({ role: 'user', text: errorMsg });
@@ -4544,12 +4547,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 }
 
                                                 result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}`;
-                                                console.log(result);
+                                                // console.log(result);
                                             }
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const feedbackLabel = `✔ ${action}: ${filePath || '...'}`;
+                                            const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}: ${filePath || 'No File Changes'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -4557,7 +4560,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
                                             const boxWidth = Math.min(feedbackLabel.length + 4, terminalWidth);
                                             const boxMid = `${feedbackLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                            yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                            yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}`) };
                                             thisIsFirstToolFeedback = false;
 
                                             const toolEnd = Date.now();
@@ -4589,7 +4592,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path || '...'}`.toUpperCase();
+                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path || '...'}`;
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -4711,7 +4714,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const displayPath = _sp && _sp !== '.'
                                         ? `"${_isDir ? `${_sp}/*` : _sp}"`
                                         : './';
-                                    const postLabel = `✔  Searched: "${keyword}" in ${displayPath} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
 
                                     // Get terminal physical width
                                     let terminalWidth = 115;
@@ -5223,7 +5226,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
-        yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog}` };
+        yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
         fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}\n\n----------------------------------------------------------------------\n\n`);
 
@@ -5398,24 +5401,25 @@ CWD: ${process.cwd()}
             }
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
-                const path = parseArgs(toolCall.args).path || '';
+                const path = parseArgs(toolCall.args).path || null;
                 const recurse = parseArgs(toolCall.args).recurse || 0;
-                label = `✔ \x1b[95mBrowsed\x1b[0m: ${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}`;
+                label = `${path ? '✔' : '✘'}  \x1b[95mBrowsed\x1b[0m: ${path ? `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
-                const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mCreated\x1b[0m: ${path}`;
+                const path = parseArgs(toolCall.args).path || null;
+                label = `${path ? '✔' : '✘'} \x1b[95mCreated\x1b[0m: ${path ? `${path}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
-                const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mEdited\x1b[0m: ${path}`;
+                const path = parseArgs(toolCall.args).path || null;
+                const content = parseArgs(toolCall.args).content || null;
+                label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m: ${path ? `${path}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mIndexed\x1b[0m: ${path}`;
+                label = `${path ? '✔' : '✘'} \x1b[95mIndexed\x1b[0m: ${path ? `${path}` : 'File Not Found'}`;
             }
 
             else if (normalizedToolName === 'await') {
