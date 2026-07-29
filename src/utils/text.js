@@ -399,7 +399,10 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
 
         oldLines.forEach((line, i) => {
             let lineText = line;
-            if (i === 0) {
+            if (oldLines.length === 1 && fullOrigLine.trim().length > 0 && fullOrigLine.includes(line.trim())) {
+                // If model targeted a subword/fragment of a single line, report the full original line
+                lineText = fullOrigLine;
+            } else if (i === 0) {
                 const lineIndentMatch = line.match(/^\s*/);
                 const lineIndent = lineIndentMatch ? lineIndentMatch[0] : '';
                 if (lineIndent.length < origIndent.length && fullOrigLine.includes(line.trim())) {

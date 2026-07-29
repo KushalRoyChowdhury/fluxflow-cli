@@ -406,9 +406,11 @@ const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, th
             tableBuffer = [];
         }
         if (quoteBuffer.length > 0) {
+            const quoteWidth = columns - 6; // Account for border, padding, and outer box margins
+            const wrappedQuoteLines = quoteBuffer.flatMap(line => wrapText(line, quoteWidth).split('\n'));
             result.push(
                 <Box key={`quote-${key}`} borderStyle="bold" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={1} marginY={1} flexDirection="column">
-                    {quoteBuffer.map((line, qi) => (
+                    {wrappedQuoteLines.map((line, qi) => (
                         <InlineMarkdown key={qi} text={line} color={colors.textMuted} italic={italic} theme={theme} />
                     ))}
                 </Box>

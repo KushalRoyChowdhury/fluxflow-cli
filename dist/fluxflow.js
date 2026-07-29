@@ -2871,7 +2871,9 @@ var init_text = __esm({
         const origIndent = origIndentMatch ? origIndentMatch[0] : "";
         oldLines.forEach((line, i) => {
           let lineText = line;
-          if (i === 0) {
+          if (oldLines.length === 1 && fullOrigLine.trim().length > 0 && fullOrigLine.includes(line.trim())) {
+            lineText = fullOrigLine;
+          } else if (i === 0) {
             const lineIndentMatch = line.match(/^\s*/);
             const lineIndent = lineIndentMatch ? lineIndentMatch[0] : "";
             if (lineIndent.length < origIndent.length && fullOrigLine.includes(line.trim())) {
@@ -5645,8 +5647,10 @@ var init_ChatLayout = __esm({
           tableBuffer = [];
         }
         if (quoteBuffer.length > 0) {
+          const quoteWidth = columns - 6;
+          const wrappedQuoteLines = quoteBuffer.flatMap((line) => wrapText(line, quoteWidth).split("\n"));
           result.push(
-            /* @__PURE__ */ React4.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 1, marginY: 1, flexDirection: "column" }, quoteBuffer.map((line, qi) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: qi, text: line, color: colors.textMuted, italic, theme })))
+            /* @__PURE__ */ React4.createElement(Box3, { key: `quote-${key}`, borderStyle: "bold", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 1, marginY: 1, flexDirection: "column" }, wrappedQuoteLines.map((line, qi) => /* @__PURE__ */ React4.createElement(InlineMarkdown, { key: qi, text: line, color: colors.textMuted, italic, theme })))
           );
           quoteBuffer = [];
         }
@@ -6698,27 +6702,27 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 **TOOL USAGE POLICY:**
-- MAX 3 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 3+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use Ask immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**\n" : ""}
+- MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
+${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance.NEVER proceed blindly/end turn \u2190 ** MANDATORY **\n- FileMap \u2192 ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > FileMap/Full Read\n- No tool spamming\n- **Update/complete Todos from realtime progress EVERY TURN**\n" : ""}
 - COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST ask for path divergence, security or risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)
+1. [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
-2. [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0
-3. [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables
-4. [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="full lines", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2...
-5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports
-6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true
+1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : `No Multimodal support`}` : `Supports images/docs`}
+2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes
+3. [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables
+4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs
+5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
+6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
 7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASK STRINGS])]. Task list, no Markdown in arrays. Analyze request: if multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
+8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
 ${_cachedAdvanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
-Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly if needed.
+Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly
 1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
 Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.
 ` : ""}${enableSubAgents ? `
@@ -8222,7 +8226,7 @@ Check these first; These Files > Training Data. Safety rules apply
       const projectContextBlock = cachedProjectContextBlock;
       return `=== SYSTEM PROMPT ===
 Identity: Flux Flow. Sassy, CLI Agent
-${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable file/folder structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
+${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable project structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
 
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
@@ -8233,7 +8237,7 @@ ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || th
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `
 -- MEMORY RULES --
-- Subtly Personalize with  RELEVENT & CONTEXTUAL MEMORIES. Auto Saves` : ""}
+- Subtly Personalize with  RELEVENT CONTEXTUAL MEMORIES. Auto Saves` : ""}
 - RELATIVE TIME REFERENCE eg. few mins ago
 
 -- SECURITY RULES --
@@ -8242,7 +8246,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 -- CHAT FORMATTING --
 - GFM Markdown
 - Same Language as User Query
-- Before tool calls, emit one brief status line. After tool calls, emit no further text this turn
+- Before tool calls, emit one brief current update. After tool calls, emit no further text this turn
 - On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
@@ -17601,14 +17605,14 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
               if (toolResults.length < attemptedToolsCount) {
                 combinedText += `
 
-[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try failed calls again [/SYSTEM]`;
+[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper schema compliance & try failed calls again [/SYSTEM]`;
               }
               const binaryPart = toolResults.find((tr) => tr.binaryPart)?.binaryPart || null;
               modifiedHistory.push({ role: "user", text: combinedText, binaryPart });
             }
           } else {
             if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
-              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to execute some tools. Verify proper syntax compliance & try again [/SYSTEM]` });
+              modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to execute some tools. Verify proper schema compliance & try again [/SYSTEM]` });
             } else {
               modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task use [[END]]"}`} [/SYSTEM]` });
             }
@@ -17664,15 +17668,15 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
       const mergedSettings = { ...savedSettings, ...settings };
       const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const SUBAGENT_TOOL_DEFINITIONS = {
-        "readfile": '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
-        "readfolder": '- [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0',
-        "filemap": '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
-        "patchfile": '- [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF',
-        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
-        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true',
-        "websearch": '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)',
+        "readfile": '- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files',
+        "readfolder": '- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes',
+        "filemap": '- [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables',
+        "patchfile": '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
+        "writefile": '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
+        "searchkeyword": '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code',
+        "websearch": '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
         "webscrape": '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
-        "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
+        "ask": `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`
       };
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
 TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
@@ -17684,7 +17688,7 @@ TOOL POLICY:
 - FileMap \u2192 ReadFile for efficient file understanding
 - Need specific text ? SearchKeyword > Guessing/ReadFile
 - Huge files ? SearchKeyword > FileMap/Full Read
-- NO Terminal Access
+- NO Shell Access
 
 -- PROVIDED TOOLS --
 ${Object.values(SUBAGENT_TOOL_DEFINITIONS).join("\n")}

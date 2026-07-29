@@ -5201,14 +5201,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
                     const attemptedToolsCount = (toolActionableText.match(/\[tool:functions/g) || []).length;
                     if (toolResults.length < attemptedToolsCount) {
-                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper syntax compliance & try failed calls again [/SYSTEM]`;
+                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper schema compliance & try failed calls again [/SYSTEM]`;
                     }
                     const binaryPart = toolResults.find(tr => tr.binaryPart)?.binaryPart || null;
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });
                 }
             } else {
                 if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to execute some tools. Verify proper syntax compliance & try again [/SYSTEM]` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to execute some tools. Verify proper schema compliance & try again [/SYSTEM]` });
                 } else {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`} [/SYSTEM]` });
                 }
@@ -5263,23 +5263,23 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
 
     const SUBAGENT_TOOL_DEFINITIONS = {
-        'readfile': '- [tool:functions.ReadFile(path="...", startLine=number, endLine=number)]. View files',
+        'readfile': '- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files',
 
-        'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="0-4 optional")]. Detailed DIR stats including File Sizes. default recurse: 0',
+        'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes',
 
-        'filemap': '- [tool:functions.FileMap(path="path/file")]. Shows file structure, functions, class, import/export, variables',
+        'filemap': '- [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables',
 
-        'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="true optional", replaceContent1="...", newContent1="...", ...MAX 10)]. Surgical patch. allowMultiple: Replace all matches (default: false). Multiple patches same file? Use replaceContent2/newContent2... Unsure? ReadFile. MUST VERIFY DIFF',
+        'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
 
-        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. Verify Imports',
+        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
 
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory or filename", subString="true optional", regex="false for keyword, optional")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code. Defaults: subString=false, regex=true',
+        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. Project-wide search. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code',
 
-        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="true optional", limit=number)]. Limit 3-10 (aiMode ignores). Usage: unknown info/docs. aiMode: LLM search (default: false)',
+        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
 
         'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
 
-        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity Resolution. Mandatory Triggers: Path Divergence, Security, Risk Mitigation. ask >> finish/guess. Suggest best options; don't ask for preferences. 'option' SHOULD be short`
+        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`
 
     };
 
@@ -5293,7 +5293,7 @@ TOOL POLICY:
 - FileMap → ReadFile for efficient file understanding
 - Need specific text ? SearchKeyword > Guessing/ReadFile
 - Huge files ? SearchKeyword > FileMap/Full Read
-- NO Terminal Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
+- NO Shell Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
 - VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
 - **Escape quotes: \\" for code strings**
 - **Literal escapes: Double-escape sequences (e.g., \\\\n)**
