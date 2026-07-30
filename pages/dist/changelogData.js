@@ -9,7 +9,7 @@ export const changelogData = {
     "3.15.0": {
         "note": "JULY 31.",
         "added": [
-            "Added \"Dynamic Directory Awareness\" option (now defaulted to \'off\'). Previously Dynamic Directory was always enabled internally from release. Now turn it off to save on token costs & better cache efficiency (90%+ cache hit in testing). Turn it on to get exact same experience/token cost as before."
+            "Dynamic Directory Awareness\nAdded a toggle for ** Dynamic Directory Awareness**.\nThis used to be the default behavior, so turning it ** ON ** is nothing new—it works exactly like it always has.\nTurning it ** OFF ** switches to a cached directory snapshot, improving prompt cache efficiency.In testing, this increased cache hit rates by around ** 20 %**, with normal coding sessions often reaching ** 90 % + cache hits **, helping reduce token costs during long coding sessions.\nIf your workflow constantly creates, renames, or deletes files, just flip it back on and carry on."
         ],
         "changed": [],
         "fixes": []
