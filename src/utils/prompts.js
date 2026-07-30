@@ -40,7 +40,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     }
     if (!isMemoryEnabled) return '';
     const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-LOW, FOCUS: Chat Context > Recent) --\n${tempMemories}` : '';
-    return tempMemoriesStr ? `${tempMemoriesStr}\n` : '';
+    return tempMemoriesStr ? `${tempMemoriesStr}` : '';
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId) => {

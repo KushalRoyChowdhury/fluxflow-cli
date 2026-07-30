@@ -39,7 +39,8 @@ const DEFAULT_SETTINGS = {
         loadingPhrases: true,
         progressiveRendering: true,
         showTPMEstimate: false,
-        subAgents: true
+        subAgents: true,
+        dynamicDirAwareness: false
     },
     profileData: {
         name: null,

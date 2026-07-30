@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.14.0"]
+export const stableVersions = ["3.15.0"]
 
 export const changelogData = {
+    "3.15.0": {
+        "note": "JULY 31.",
+        "added": [
+            "Added \"Dynamic Directory Awareness\" option (now defaulted to \'off\'). Previously Dynamic Directory was always enabled internally from release. Now turn it off to save on token costs & better cache efficiency (90%+ cache hit in testing). Turn it on to get exact same experience/token cost as before."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "3.14.0": {
         "note": "JULY 30.",
         "added": [],

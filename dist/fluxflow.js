@@ -779,7 +779,8 @@ var init_settings = __esm({
         loadingPhrases: true,
         progressiveRendering: true,
         showTPMEstimate: false,
-        subAgents: true
+        subAgents: true,
+        dynamicDirAwareness: false
       },
       profileData: {
         name: null,
@@ -6714,7 +6715,7 @@ ${mode === "Flux" ? '- **Escape quotes: \\" for code strings **\n- ** Literal es
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
-2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes
+2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats & metadata
 3. [tool:functions.FileMap(path="file")]. Shows file structure
 4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
@@ -7511,6 +7512,7 @@ function SettingsMenu({
         return [
           { label: "Sub-Agents", value: "subAgents", status: systemSettings.subAgents !== false ? "ON" : "OFF" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
+          { label: "Dynamic Directory Awareness", value: "dynamicDirAwareness", status: systemSettings.dynamicDirAwareness ? "ON" : "OFF" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -7565,6 +7567,11 @@ function SettingsMenu({
         setActiveView("chat");
       }
     } else if (activeColumn === "items") {
+      const currentItem = currentItems[selectedItemIndex];
+      if (input === "?" && currentItem?.value === "dynamicDirAwareness") {
+        setActiveView("dynamicDirHelp");
+        return;
+      }
       if (key.upArrow) {
         setSelectedItemIndex((prev) => (prev - 1 + currentItems.length) % currentItems.length);
       } else if (key.downArrow) {
@@ -7702,6 +7709,16 @@ function SettingsMenu({
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
+    } else if (item.value === "dynamicDirAwareness") {
+      if (!systemSettings.dynamicDirAwareness) {
+        setActiveView("dynamicDirDanger");
+      } else {
+        setSystemSettings((s) => {
+          const newSysSettings = { ...s, dynamicDirAwareness: false };
+          saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+          return newSysSettings;
+        });
+      }
     } else if (item.value === "loadingPhrases") {
       setSystemSettings((s) => {
         const newSysSettings = { ...s, loadingPhrases: s.loadingPhrases === false ? true : false };
@@ -7825,7 +7842,7 @@ function SettingsMenu({
       );
     }
     return elements;
-  })() : /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, CATEGORIES[selectedCategoryIndex].desc), currentCatId === "exit" && /* @__PURE__ */ React7.createElement(React7.Fragment, null, /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 19, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited")), /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit)))))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 0, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, activeColumn === "categories" ? "\u25B2\u25BC Select Category \u2022 Enter/\u25BA to configure" : "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 \u25C4/ESC to go back"), activeColumn === "categories" && /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, CATEGORIES[selectedCategoryIndex].desc)));
+  })() : /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, CATEGORIES[selectedCategoryIndex].desc), currentCatId === "exit" && /* @__PURE__ */ React7.createElement(React7.Fragment, null, /* @__PURE__ */ React7.createElement(Box6, { key: "pty-notice", marginTop: 19, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text }, isPtyAvailable ? "\u2713 Advance Interactive Terminal Supported" : "\u26A0 Interactive Terminal is Limited")), /* @__PURE__ */ React7.createElement(Box6, { key: "memory-load-2026", paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Memory Load: ", currentMemory, "/", maxMemory, " ", memoryUnit)))))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 0, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, activeColumn === "categories" ? "\u25B2\u25BC Select Category \u2022 Enter/\u25BA to configure" : currentItems[selectedItemIndex]?.value === "dynamicDirAwareness" ? "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 ? HELP \u2022 \u25C4/ESC to go back" : "\u25B2\u25BC Select Option \u2022 Enter to Toggle \u2022 \u25C4/ESC to go back"), activeColumn === "categories" && /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, CATEGORIES[selectedCategoryIndex].desc)));
 }
 var themeOptions, CATEGORIES, getActivePreset, truncateCSV;
 var init_SettingsMenu = __esm({
@@ -8142,8 +8159,7 @@ var init_prompts = __esm({
       if (!isMemoryEnabled) return "";
       const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-LOW, FOCUS: Chat Context > Recent) --
 ${tempMemories}` : "";
-      return tempMemoriesStr ? `${tempMemoriesStr}
-` : "";
+      return tempMemoriesStr ? `${tempMemoriesStr}` : "";
     };
     getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini, chatId) => {
       let forcedReasoning = false;
@@ -13028,7 +13044,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path25, { normalize } from "path";
 import fs26 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, dirTreeCache, cachedChatId2, getCachedDirTree, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -13061,6 +13077,23 @@ var init_ai = __esm({
     RE_BACKSLASH_SLASH = /\\/g;
     client = null;
     globalSettings = {};
+    dirTreeCache = null;
+    cachedChatId2 = null;
+    getCachedDirTree = (fn, chatId, isDynamicDirAwareness) => {
+      if (isDynamicDirAwareness) {
+        dirTreeCache = null;
+        cachedChatId2 = chatId;
+        return fn();
+      }
+      if (cachedChatId2 !== chatId) {
+        dirTreeCache = null;
+        cachedChatId2 = chatId;
+      }
+      if (dirTreeCache === null) {
+        dirTreeCache = fn();
+      }
+      return dirTreeCache;
+    };
     colorMainWords = (label) => {
       if (!label) return label;
       return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
@@ -14302,16 +14335,17 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       }
     };
     getActiveToolContext = (text) => {
+      const cleanText = text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "").replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi, "");
       RE_TOOL_CALL_FUNC.lastIndex = 0;
       let match;
-      while ((match = RE_TOOL_CALL_FUNC.exec(text)) !== null) {
+      while ((match = RE_TOOL_CALL_FUNC.exec(cleanText)) !== null) {
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
         let isEscaped = false;
         let closed = false;
-        for (let i = startIdx; i < text.length; i++) {
-          const char = text[i];
+        for (let i = startIdx; i < cleanText.length; i++) {
+          const char = cleanText[i];
           if (!inString && (char === '"' || char === "'" || char === "`")) {
             inString = char;
             isEscaped = false;
@@ -14323,8 +14357,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             else if (char === ")") balance--;
             if (balance === 0) {
               let j = i + 1;
-              while (j < text.length && /\s/.test(text[j])) j++;
-              if (j < text.length && text[j] === "]") {
+              while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
+              if (j < cleanText.length && cleanText[j] === "]") {
                 closed = true;
                 RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                 break;
@@ -14335,7 +14369,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           else isEscaped = false;
         }
         if (!closed) {
-          return { inside: true, toolName: match[1], startIndex: match.index, args: text.substring(match.index + match[0].length) };
+          return { inside: true, toolName: match[1], startIndex: match.index, args: cleanText.substring(match.index + match[0].length) };
         }
       }
       return { inside: false };
@@ -15006,7 +15040,7 @@ Provide a consolidated summary of the entire session.`;
         const otherMemories = [...cachedSummaries, ...otherRawMemories].map((mem) => `- ${mem}`).join("\n");
         const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
         const mainUserMemories = persistentStorage.map((m) => `- ${m.memory}`).join("\n");
-        const isContext32k = (sessionStats?.tokens || 0) >= 12e3;
+        const isContext32k = (sessionStats?.tokens || 0) >= 1e4;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = (/* @__PURE__ */ new Date()).toLocaleString([], { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: true });
         const COLLAPSED_DIRS_GLOBAL = [
@@ -15283,12 +15317,12 @@ ${currentSummary}
 **CONTEXT SUMMARY OF PREVIOUS TURNS**
 ${currentSummary}
 ` : "";
-        let dirStructure = "CWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
-` + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = "\n**DIRECTORY STRUCTURE**\nCWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
+` + getCachedDirTree(() => getDirTree(process.cwd(), dynamicMaxDepth), chatId, systemSettings?.dynamicDirAwareness);
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-          ideBlock = "[ADDITIONAL IDE CONTEXT]\n";
+          ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
             const relFocused = path25.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
@@ -15561,13 +15595,14 @@ ${ideCtx.warnings}
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]
+        const firstUserMsg = `[METADATA, Chat Context > Metadata]
 Time: ${dateTimeStr}
-OS: ${osDetected}
-**DIRECTORY STRUCTURE**
-${dirStructure}${memoryPrompt}${ideBlock}
+OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${memoryPrompt}${ideBlock}
+[/METADATA]
 ${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
-${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+${taggedContextStr}[USER PROMPT]
+${cleanPromptForModel.trim()}
+[/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
@@ -15736,6 +15771,10 @@ ${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.t
               }
               targetModel = modelName;
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false, chatId);
+              if (!systemSettings?.dynamicDirAwareness) {
+                currentSystemInstruction += `
+${dirStructure.replace("\n**DIRECTORY STRUCTURE**", "\n**DIRECTORY STRUCTURE AT CONVERSATION START**")}`;
+              }
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
                 await new Promise((resolve) => setTimeout(resolve, 2500));
@@ -15789,7 +15828,7 @@ ${ideErr} [/ERROR]`;
               const currentStep = loop + 1;
               if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
                 lastUserMsg.parts[0].text += `
-[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
+[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
               }
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
@@ -17620,7 +17659,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
             if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
               modifiedHistory.push({ role: "user", text: `[SYSTEM] Failed to execute some tools. Verify proper schema compliance & try again [/SYSTEM]` });
             } else {
-              modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task use [[END]]"}`} [/SYSTEM]` });
+              modifiedHistory.push({ role: "user", text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? " OVER THINKING" : " LOOP"} DETECTED by Internal System${isThinkingLoop ? " for current EFFORT_LEVEL" : ""}. ${isThinkingLoop ? "If you have planned the task, prioritize execution/output" : "If you have finished your task provide a simple summary and end"}`} [/SYSTEM]` });
             }
             isThinkingLoop = false;
             isStutteringLoop = false;
@@ -22634,6 +22673,40 @@ Selection: ${val}`,
           return /* @__PURE__ */ React16.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 40 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, provider, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React16.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 36 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "\xBB ", modelName, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React16.createElement(Box14, { width: 31 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.candidateTokens || 0))))));
         })) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
+      case "dynamicDirDanger":
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true, underline: true }, "DYNAMIC DIRECTORY AWARENESS"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "Enabling this keeps the agent aware of filesystem state in real time, but may reduce prompt cache efficiency."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "\n", "RECOMMENDED SCENARIOS TO TURN ON:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Repo is small."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 The task benefits from real-time filesystem awareness."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Files are often created, renamed, or deleted."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You know exactly what you're signing up for."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You don't have conflicting decisions regarding token bills."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You want to see your wallet crying at 3am."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+          CommandMenu,
+          {
+            title: "Confirm Intent",
+            theme: systemSettings.theme,
+            items: [
+              { label: "Turn On Dynamic Directory Awareness", value: "on" },
+              { label: "Keep Off (Recommended)", value: "off" }
+            ],
+            onSelect: (item) => {
+              if (item.value === "on") {
+                setSystemSettings((s) => {
+                  const updated = { ...s, dynamicDirAwareness: true };
+                  saveSettings({ systemSettings: updated, apiTier, quotas });
+                  return updated;
+                });
+              }
+              setActiveView("settings");
+            }
+          }
+        )));
+      case "dynamicDirHelp":
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "DYNAMIC DIRECTORY AWARENESS \u2014 HELP & EXPLANATION"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "\n", "OFF (Default):"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Takes a static directory snapshot at conversation/session start and places it in System Context."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Prompt cache remains stable across user turns, saving tokens and money."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "\n", "ON:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Rescans and updates the directory's state dynamically on every single user turn."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Provides real-time filesystem awareness if files are continuously created, renamed, or removed."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Changes Prompt Context on each turn, invalidating part of prompt caches and increasing token usage."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
+          CommandMenu,
+          {
+            title: "Actions",
+            theme: systemSettings.theme,
+            items: [
+              { label: "Back to Settings", value: "back" }
+            ],
+            onSelect: () => setActiveView("settings")
+          }
+        )));
       case "autoExecDanger":
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true, underline: true }, "SECURITY WARNING: YOLO MODE"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "Turning this ON allows the agent to execute terminal commands automatically without requiring your approval for each step."), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text, bold: true }, "RISKS INVOLVED:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 The agent may execute destructive commands (rm -rf, etc.) by mistake unless specified in sandbox rules."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Unintended system changes if the agent hallucinates a path or command."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Reduced control over the agent's step-by-step decision making."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
           CommandMenu,

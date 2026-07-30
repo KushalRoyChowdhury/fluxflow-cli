@@ -44,6 +44,28 @@ let client = null;
 
 let globalSettings = {};
 
+let dirTreeCache = null;
+let cachedChatId = null;
+
+const getCachedDirTree = (fn, chatId, isDynamicDirAwareness) => {
+    if (isDynamicDirAwareness) {
+        dirTreeCache = null;
+        cachedChatId = chatId;
+        return fn();
+    }
+
+    if (cachedChatId !== chatId) {
+        dirTreeCache = null;
+        cachedChatId = chatId;
+    }
+
+    if (dirTreeCache === null) {
+        dirTreeCache = fn();
+    }
+
+    return dirTreeCache;
+};
+
 const colorMainWords = (label) => {
     if (!label) return label;
     return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
@@ -1518,17 +1540,22 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 };
 
 const getActiveToolContext = (text) => {
+    // Strip thinking blocks (<think>...</think> or active <think>...) so live tool sniffing ignores tool syntax drafted inside thinking
+    const cleanText = text
+        .replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '')
+        .replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi, '');
+
     RE_TOOL_CALL_FUNC.lastIndex = 0;
     let match;
-    while ((match = RE_TOOL_CALL_FUNC.exec(text)) !== null) {
+    while ((match = RE_TOOL_CALL_FUNC.exec(cleanText)) !== null) {
         const startIdx = match.index + match[0].length - 1; // Index of '('
         let balance = 0;
         let inString = null;
         let isEscaped = false;
         let closed = false;
 
-        for (let i = startIdx; i < text.length; i++) {
-            const char = text[i];
+        for (let i = startIdx; i < cleanText.length; i++) {
+            const char = cleanText[i];
             if (!inString && (char === '"' || char === "'" || char === '`')) {
                 inString = char;
                 isEscaped = false;
@@ -1542,8 +1569,8 @@ const getActiveToolContext = (text) => {
                 if (balance === 0) {
                     // Check for closing ']' after ')'
                     let j = i + 1;
-                    while (j < text.length && /\s/.test(text[j])) j++;
-                    if (j < text.length && text[j] === ']') {
+                    while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
+                    if (j < cleanText.length && cleanText[j] === ']') {
                         closed = true;
                         RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                         break;
@@ -1555,7 +1582,7 @@ const getActiveToolContext = (text) => {
         }
 
         if (!closed) {
-            return { inside: true, toolName: match[1], startIndex: match.index, args: text.substring(match.index + match[0].length) };
+            return { inside: true, toolName: match[1], startIndex: match.index, args: cleanText.substring(match.index + match[0].length) };
         }
     }
     return { inside: false };
@@ -2365,7 +2392,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
         const mainUserMemories = persistentStorage.map(m => `- ${m.memory}`).join('\n');
 
-        const isContext32k = (sessionStats?.tokens || 0) >= 12000;
+        const isContext32k = (sessionStats?.tokens || 0) >= 10000;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
         const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
 
@@ -2565,12 +2592,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS**\n${currentSummary}\n` : '';
 
-        let dirStructure = 'CWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getDirTree(process.cwd(), dynamicMaxDepth);
+        let dirStructure = '\n**DIRECTORY STRUCTURE**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getCachedDirTree(() => getDirTree(process.cwd(), dynamicMaxDepth), chatId, systemSettings?.dynamicDirAwareness);
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-            ideBlock = "[ADDITIONAL IDE CONTEXT]\n";
+            ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
             if (ideCtx.file_focused !== "none") {
                 const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
                 const relOpened = (ideCtx.opened_editors || []).map(p => {
@@ -2873,7 +2900,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}\n**DIRECTORY STRUCTURE**\n${dirStructure}${memoryPrompt}${ideBlock}\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
+
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
@@ -3098,6 +3126,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // We recalculate instructions every turn so the agent knows when it's hitting context limits
                     currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false, chatId);
 
+                    if (!systemSettings?.dynamicDirAwareness) {
+                        currentSystemInstruction += `\n${dirStructure.replace('\n**DIRECTORY STRUCTURE**', '\n**DIRECTORY STRUCTURE AT CONVERSATION START**')}`;
+                    }
+
+
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {
                         await new Promise(resolve => setTimeout(resolve, 2500)); // Buffer for IDE to parse the code
@@ -3157,11 +3190,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const stepThreshold = Math.floor(MAX_LOOPS * (mode === 'Flux' ? 0.98 : 0.8));
                     const currentStep = loop + 1;
                     if (currentStep >= stepThreshold && lastUserMsg && lastUserMsg.parts?.[0]) {
-                        lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue & use [[END]] quickly. [/SYSTEM]`;
+                        lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
                     }
 
-                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
                     const abortPromise = new Promise((_, reject) => {
@@ -5215,7 +5248,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
                     modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to execute some tools. Verify proper schema compliance & try again [/SYSTEM]` });
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task use [[END]]'}`} [/SYSTEM]` });
+                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/SYSTEM]` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;

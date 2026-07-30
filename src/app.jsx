@@ -5011,6 +5011,63 @@ export default function App({ args = [] }) {
                     </Box>
                 );
             }
+            case 'dynamicDirDanger':
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                        <Text color={colors.warning || "yellow"} bold underline>DYNAMIC DIRECTORY AWARENESS</Text>
+                        <Text marginTop={1} color={colors.text}>Enabling this keeps the agent aware of filesystem state in real time, but may reduce prompt cache efficiency.</Text>
+                        <Text color={colors.text}>{'\n'}RECOMMENDED SCENARIOS TO TURN ON:</Text>
+                        <Text color={colors.textMuted}>• Repo is small.</Text>
+                        <Text color={colors.textMuted}>• The task benefits from real-time filesystem awareness.</Text>
+                        <Text color={colors.textMuted}>• Files are often created, renamed, or deleted.</Text>
+                        <Text color={colors.textMuted}>• You know exactly what you're signing up for.</Text>
+                        <Text color={colors.textMuted}>• You don't have conflicting decisions regarding token bills.</Text>
+                        <Text color={colors.textMuted}>• You want to see your wallet crying at 3am.</Text>
+                        <Box marginTop={1}>
+                            <CommandMenu
+                                title="Confirm Intent"
+                                theme={systemSettings.theme}
+                                items={[
+                                    { label: 'Turn On Dynamic Directory Awareness', value: 'on' },
+                                    { label: 'Keep Off (Recommended)', value: 'off' }
+                                ]}
+                                onSelect={(item) => {
+                                    if (item.value === 'on') {
+                                        setSystemSettings(s => {
+                                            const updated = { ...s, dynamicDirAwareness: true };
+                                            saveSettings({ systemSettings: updated, apiTier, quotas });
+                                            return updated;
+                                        });
+                                    }
+                                    setActiveView('settings');
+                                }}
+                            />
+                        </Box>
+                    </Box>
+                );
+            case 'dynamicDirHelp':
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
+                        <Text color={colors.text} bold underline>DYNAMIC DIRECTORY AWARENESS — HELP & EXPLANATION</Text>
+                        <Text color={colors.text} bold>{'\n'}OFF (Default):</Text>
+                        <Text color={colors.textMuted}>• Takes a static directory snapshot at conversation/session start and places it in System Context.</Text>
+                        <Text color={colors.textMuted}>• Prompt cache remains stable across user turns, saving tokens and money.</Text>
+                        <Text color={colors.text} bold>{'\n'}ON:</Text>
+                        <Text color={colors.textMuted}>• Rescans and updates the directory's state dynamically on every single user turn.</Text>
+                        <Text color={colors.textMuted}>• Provides real-time filesystem awareness if files are continuously created, renamed, or removed.</Text>
+                        <Text color={colors.textMuted}>• Changes Prompt Context on each turn, invalidating part of prompt caches and increasing token usage.</Text>
+                        <Box marginTop={1}>
+                            <CommandMenu
+                                title="Actions"
+                                theme={systemSettings.theme}
+                                items={[
+                                    { label: 'Back to Settings', value: 'back' }
+                                ]}
+                                onSelect={() => setActiveView('settings')}
+                            />
+                        </Box>
+                    </Box>
+                );
             case 'autoExecDanger':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
