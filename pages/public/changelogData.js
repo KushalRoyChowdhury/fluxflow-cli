@@ -3,10 +3,10 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.15.1"]
+export const stableVersions = ["3.15.2"]
 
 export const changelogData = {
-    "3.15.1": {
+    "3.15.2": {
         "note": "JULY 31.",
         "added": [
             "Directory Tree Design\nAdded a **Directory Tree Design** setting under Settings > Others to switch between **Modern** (indentation-based) and **Classic** (box-drawing) tree representations.\n\n- **Modern**: Indentation based grouping. Reduces directory context prompt tokens by **~58%** while retaining 100% of files and depth.\n- **Classic (Deprecated)**: The legacy box-drawing tree structure, for models that prefer explicit tree characters (Uses relatively more tokens). Might get removed in future versions!"

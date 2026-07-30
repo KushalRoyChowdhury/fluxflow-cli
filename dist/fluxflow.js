@@ -15862,7 +15862,7 @@ ${cleanPromptForModel.trim()}
               currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false, chatId);
               if (!systemSettings?.dynamicDirAwareness) {
                 currentSystemInstruction += `
-${dirStructure.replace("\n**DIRECTORY STRUCTURE**", "\n**DIRECTORY STRUCTURE AT CONVERSATION START**")}`;
+${dirStructure.replace("\n**DIRECTORY STRUCTURE**", "\n**DIRECTORY STRUCTURE**")}`;
               }
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
@@ -16600,20 +16600,20 @@ ${ideErr} [/ERROR]`;
                       const action = normToolName === "list_files" ? "List" : "Browsed";
                       const path29 = parseArgs(toolCall.args).path || null;
                       const recurse = parseArgs(toolCall.args).recurse || 0;
-                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29 ? `${path29 === "." ? "./" : `${path29}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}`}` : "No Folder Selected"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29 ? `${path29 === "." ? "./" : `${path29.replaceAll("\\", "/")}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}`}` : "No Folder Selected"}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
                       const path29 = parseArgs(toolCall.args).path || null;
-                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29 || "No File Changes"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29.replaceAll("\\", "/") || "No File Changes"}`;
                     } else if (normToolName === "write_pdf") {
                       const path29 = parseArgs(toolCall.args).path || null;
-                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29 || "No PDF Generated"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29.replaceAll("\\", "/") || "No PDF Generated"}`;
                     } else if (normToolName === "write_docx") {
                       const path29 = parseArgs(toolCall.args).path || null;
-                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29 || "No Docx Generated"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29.replaceAll("\\", "/") || "No Docx Generated"}`;
                     } else if (normToolName === "file_map") {
                       const path29 = parseArgs(toolCall.args).path;
-                      label = `${path29 ? "\u2714" : "\u2718"}  Indexed: ${path29 ? "" + path29 : "File Not Found"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Indexed: ${path29.replaceAll("\\", "/") ? "" + path29 : "File Not Found"}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
@@ -17048,7 +17048,7 @@ ${ideErr} [/ERROR]`;
                                     if (successes.length === 0) {
                                       const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path27.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path27.basename(absPath)}`;
+                                      const errorLabel = `\u2714  Edited: ${path27.basename(absPath.replaceAll("\\", "/"))}`;
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -17203,7 +17203,7 @@ ${ancestry2}- Content Preview:
 ${snippet2}`;
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
-                          const feedbackLabel = `${filePath ? "\u2714" : "\u2718"} ${action}: ${filePath || "No File Changes"}`;
+                          const feedbackLabel = `${filePath ? "\u2714" : "\u2718"} ${action}: ${filePath.replaceAll("\\", "/") || "No File Changes"}`;
                           let terminalWidth = 115;
                           if (process.stdout.isTTY) {
                             terminalWidth = process.stdout.columns - 5 || 120;
@@ -17237,7 +17237,7 @@ ${snippet2}`;
                           }
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const action = normToolName === "write_file" ? "Write Cancelled" : "Edit Denied";
-                            const deniedLabel = `\u2718 ${action}: ${parseArgs(toolCall.args).path || "..."}`;
+                            const deniedLabel = `\u2718 ${action}: ${parseArgs(toolCall.args).path.replaceAll("\\", "/") || "..."}`;
                             let terminalWidth = 115;
                             if (process.stdout.isTTY) {
                               terminalWidth = process.stdout.columns - 5 || 120;
@@ -17344,7 +17344,7 @@ ${snippet2}`;
                       }
                       const _sp = path29 ? path29.replace(/[\/\\]+$/, "") : null;
                       const displayPath = _sp && _sp !== "." ? `"${_isDir ? `${_sp}/*` : _sp}"` : "./";
-                      const postLabel = `${keyword ? "\u2714" : "\u2718"}  Searched: "${keyword ? keyword : ""}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
+                      const postLabel = `${keyword ? "\u2714" : "\u2718"}  Searched: "${keyword ? keyword : ""}" in ${displayPath.replaceAll("\\", "/")} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
                       if (process.stdout.isTTY) {
                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -17918,24 +17918,24 @@ ${cleanResponse}
             const pArgs = parseArgs(toolCall.args);
             const keyword = pArgs.keyword || "";
             const keywordPath = pArgs.path || "";
-            label = `${keyword ? "\u2714" : "\u2718"} \x1B[95mSearched\x1B[0m: ${keyword || "No Query"}${keywordPath ? ` \u2192 ${keywordPath}` : ""}`;
+            label = `${keyword ? "\u2714" : "\u2718"} \x1B[95mSearched\x1B[0m: ${keyword || "No Query"}${keywordPath ? ` \u2192 ${keywordPath.replaceAll("\\", "/")}` : ""}`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
             const path29 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mRead\x1B[0m: ${path29}`;
+            label = `\u2714 \x1B[95mRead\x1B[0m: ${path29.replaceAll("\\", "/")}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
             const path29 = parseArgs(toolCall.args).path || null;
             const recurse = parseArgs(toolCall.args).recurse || 0;
-            label = `${path29 ? "\u2714" : "\u2718"}  \x1B[95mBrowsed\x1B[0m: ${path29 ? `${path29}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}` : ""}`;
+            label = `${path29 ? "\u2714" : "\u2718"}  \x1B[95mBrowsed\x1B[0m: ${path29 ? `${path29.replaceAll("\\", "/")}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}` : ""}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
             const path29 = parseArgs(toolCall.args).path || null;
-            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mCreated\x1B[0m: ${path29 ? `${path29}` : "No File Changes"}`;
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mCreated\x1B[0m: ${path29 ? `${path29.replaceAll("\\", "/")}` : "No File Changes"}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
             const path29 = parseArgs(toolCall.args).path || null;
             const content = parseArgs(toolCall.args).content || null;
-            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mEdited\x1B[0m: ${path29 ? `${path29}` : "No File Changes"}`;
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mEdited\x1B[0m: ${path29 ? `${path29.replaceAll("\\", "/")}` : "No File Changes"}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
             const path29 = parseArgs(toolCall.args).path || "";
-            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mIndexed\x1B[0m: ${path29 ? `${path29}` : "File Not Found"}`;
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mIndexed\x1B[0m: ${path29 ? `${path29.replaceAll("\\", "/")}` : "File Not Found"}`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;

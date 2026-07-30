@@ -3076,7 +3076,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false, chatId);
 
                     if (!systemSettings?.dynamicDirAwareness) {
-                        currentSystemInstruction += `\n${dirStructure.replace('\n**DIRECTORY STRUCTURE**', '\n**DIRECTORY STRUCTURE AT CONVERSATION START**')}`;
+                        currentSystemInstruction += `\n${dirStructure.replace('\n**DIRECTORY STRUCTURE**', '\n**DIRECTORY STRUCTURE**')}`;
                     }
 
 
@@ -3898,20 +3898,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
                                     const path = parseArgs(toolCall.args).path || null;
                                     const recurse = parseArgs(toolCall.args).recurse || 0;
-                                    label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? './' : `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
+                                    label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? './' : `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     const path = parseArgs(toolCall.args).path || null;
-                                    label = `${path ? '✔' : '✘'}  ${action}: ${path || 'No File Changes'}`;
+                                    label = `${path ? '✔' : '✘'}  ${action}: ${path.replaceAll('\\', '/') || 'No File Changes'}`;
                                 } else if (normToolName === 'write_pdf') {
                                     const path = parseArgs(toolCall.args).path || null;
-                                    label = `${path ? '✔' : '✘'}  Generated: ${path || 'No PDF Generated'}`;
+                                    label = `${path ? '✔' : '✘'}  Generated: ${path.replaceAll('\\', '/') || 'No PDF Generated'}`;
                                 } else if (normToolName === 'write_docx') {
                                     const path = parseArgs(toolCall.args).path || null;
-                                    label = `${path ? '✔' : '✘'}  Generated: ${path || 'No Docx Generated'}`;
+                                    label = `${path ? '✔' : '✘'}  Generated: ${path.replaceAll('\\', '/') || 'No Docx Generated'}`;
                                 } else if (normToolName === 'file_map') {
                                     const path = parseArgs(toolCall.args).path;
-                                    label = `${path ? '✔' : '✘'}  Indexed: ${path ? '' + path : 'File Not Found'}`;
+                                    label = `${path ? '✔' : '✘'}  Indexed: ${path.replaceAll('\\', '/') ? '' + path : 'File Not Found'}`;
                                 } else if (normToolName.toLowerCase() === 'search_keyword' || normToolName.toLowerCase() === 'todo') {
                                     label = '';
                                 } else if (normToolName.toLowerCase() === 'generate_image') {
@@ -4375,7 +4375,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                     const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path.basename(absPath)}].\n${failures.map(f => `  • ${f.error}`).join('\n')}`;
 
                                                                     // Visual Feedback
-                                                                    const errorLabel = `✔  Edited: ${path.basename(absPath)}`;
+                                                                    const errorLabel = `✔  Edited: ${path.basename(absPath.replaceAll('\\', '/'))}`;
                                                                     // Get terminal physical width
                                                                     let terminalWidth = 115;
                                                                     if (process.stdout.isTTY) {
@@ -4539,7 +4539,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             // Restore UI feedback
                                             const action = normToolName === 'write_file' ? 'Created' : 'Edited';
-                                            const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}: ${filePath || 'No File Changes'}`;
+                                            const feedbackLabel = `${filePath ? '✔' : '✘'} ${action}: ${filePath.replaceAll('\\', '/') || 'No File Changes'}`;
                                             // Get terminal physical width
                                             let terminalWidth = 115;
                                             if (process.stdout.isTTY) {
@@ -4579,7 +4579,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
                                                 const action = normToolName === 'write_file' ? 'Write Cancelled' : 'Edit Denied';
-                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path || '...'}`;
+                                                const deniedLabel = `✘ ${action}: ${parseArgs(toolCall.args).path.replaceAll('\\', '/') || '...'}`;
                                                 // Get terminal physical width
                                                 let terminalWidth = 115;
                                                 if (process.stdout.isTTY) {
@@ -4701,7 +4701,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     const displayPath = _sp && _sp !== '.'
                                         ? `"${_isDir ? `${_sp}/*` : _sp}"`
                                         : './';
-                                    const postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
 
                                     // Get terminal physical width
                                     let terminalWidth = 115;
@@ -5386,34 +5386,34 @@ CWD: ${process.cwd()}
                 const pArgs = parseArgs(toolCall.args);
                 const keyword = pArgs.keyword || '';
                 const keywordPath = pArgs.path || '';
-                label = `${keyword ? '✔' : '✘'} \x1b[95mSearched\x1b[0m: ${keyword || 'No Query'}${keywordPath ? ` → ${keywordPath}` : ''}`;
+                label = `${keyword ? '✔' : '✘'} \x1b[95mSearched\x1b[0m: ${keyword || 'No Query'}${keywordPath ? ` → ${keywordPath.replaceAll('\\', '/')}` : ''}`;
             }
 
             else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `✔ \x1b[95mRead\x1b[0m: ${path}`;
+                label = `✔ \x1b[95mRead\x1b[0m: ${path.replaceAll('\\', '/')}`;
             }
 
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
                 const path = parseArgs(toolCall.args).path || null;
                 const recurse = parseArgs(toolCall.args).recurse || 0;
-                label = `${path ? '✔' : '✘'}  \x1b[95mBrowsed\x1b[0m: ${path ? `${path}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
+                label = `${path ? '✔' : '✘'}  \x1b[95mBrowsed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
                 const path = parseArgs(toolCall.args).path || null;
-                label = `${path ? '✔' : '✘'} \x1b[95mCreated\x1b[0m: ${path ? `${path}` : 'No File Changes'}`;
+                label = `${path ? '✔' : '✘'} \x1b[95mCreated\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'update_file' || normalizedToolName === 'updatefile' || normalizedToolName === 'patchfile' || normalizedToolName === 'patch_file' || normalizedToolName === 'patchfile' || normalizedToolName === 'updatefile') {
                 const path = parseArgs(toolCall.args).path || null;
                 const content = parseArgs(toolCall.args).content || null;
-                label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m: ${path ? `${path}` : 'No File Changes'}`;
+                label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {
                 const path = parseArgs(toolCall.args).path || '';
-                label = `${path ? '✔' : '✘'} \x1b[95mIndexed\x1b[0m: ${path ? `${path}` : 'File Not Found'}`;
+                label = `${path ? '✔' : '✘'} \x1b[95mIndexed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'File Not Found'}`;
             }
 
             else if (normalizedToolName === 'await') {
