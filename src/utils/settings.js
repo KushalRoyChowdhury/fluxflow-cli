@@ -40,7 +40,8 @@ const DEFAULT_SETTINGS = {
         progressiveRendering: true,
         showTPMEstimate: false,
         subAgents: true,
-        dynamicDirAwareness: false
+        dynamicDirAwareness: false,
+        indentationTree: true
     },
     profileData: {
         name: null,

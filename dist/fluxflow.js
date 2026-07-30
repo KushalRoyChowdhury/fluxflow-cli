@@ -780,7 +780,8 @@ var init_settings = __esm({
         progressiveRendering: true,
         showTPMEstimate: false,
         subAgents: true,
-        dynamicDirAwareness: false
+        dynamicDirAwareness: false,
+        indentationTree: true
       },
       profileData: {
         name: null,
@@ -6707,25 +6708,25 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
 ${mode === "Flux" ? '- **Escape quotes: \\" for code strings **\n- ** Literal escapes: Double - escape sequences(e.g., \\\\n) **\n- ** File structure: Real newlines for code formatting**\n- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance \u2190 ** MANDATORY **\n- FileMap > ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > Full Read\n- **Update Todos from realtime progress EVERY TURN**\n' : ""}
 - COMMUNICATION TOOLS -
-1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
 - WEB TOOLS -
-1. [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
-2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
+- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
+- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
-2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats & metadata
-3. [tool:functions.FileMap(path="file")]. Shows file structure
-4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
-5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
-6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
+- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
+- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats & metadata
+- [tool:functions.FileMap(path="...")]. Shows file's code structure
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
+- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
+- [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
+- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n- [tool:functions.Await(time="integer 15-180")]. For waiting without exiting agent loop' : ""}
 ${_cachedAdvanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
 Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly
-1. [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
+- [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
 Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.
 ` : ""}${enableSubAgents ? `
 - SUB AGENT TOOLS -
@@ -6733,11 +6734,11 @@ Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no cat
 Invocations:
 - Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active
 - InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-1. [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
-2. [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks
-3. [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
-2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
+- [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
+- [agent:generalist.GetProgress(id="...")]. Check async task progress. If still running, continue your work. Wait exponentially longer between checks
+- [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+- [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
+- [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}`.trim();
     };
   }
@@ -7513,6 +7514,7 @@ function SettingsMenu({
           { label: "Sub-Agents", value: "subAgents", status: systemSettings.subAgents !== false ? "ON" : "OFF" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Dynamic Directory Awareness", value: "dynamicDirAwareness", status: systemSettings.dynamicDirAwareness ? "ON" : "OFF" },
+          { label: "Directory Tree Design", value: "indentationTree", status: systemSettings.indentationTree !== false ? "Modern" : "Classic (deprecated)" },
           { label: "Download Language Parsers", value: "parserDownload", status: "ACTION" }
         ];
       default:
@@ -7697,6 +7699,12 @@ function SettingsMenu({
       setActiveView("updateManager");
     } else if (item.value === "parserDownload") {
       setActiveView("parserDownload");
+    } else if (item.value === "indentationTree") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, indentationTree: s.indentationTree === false ? true : false };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
     } else if (item.value === "subAgents") {
       setSystemSettings((s) => {
         const newSysSettings = { ...s, subAgents: s.subAgents === false ? true : false };
@@ -8073,16 +8081,16 @@ var init_janitor_tools = __esm({
 Your exact tool syntax is: [tool:functions.ToolName(args...)]. Malformed calls will fail parsing. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
 
 -- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS IN THIS TURN) --
-1. [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
-2. [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
+- [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
+- [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
 ${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
-1. Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
-2. Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
-3. Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
+- Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
+- Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
+- Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
 
 -- Memory Relevance Decay Tool --
-1. Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
+- Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
   You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was relevant, referenced, or helpful in the agent's response or user prompt IN CURRENT MESSAGE. You can stack multiple calls
 
 Explicit Triggers for permanent memory:
@@ -8268,16 +8276,16 @@ ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
       return `=== SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
 IDENTITY: SILENT BACKGROUND SYSTEM PROCESS, HAVE NO MOUTH, ONLY OUTPUT IS VALID TOOL CALLS.
 [CRITICAL RULES]
-1. OUTPUT EXACTLY '[tool:functions.ToolName(args)]' CALLS. NO EXTRA WORDS OUTSIDE
-2. DO NOT EXPLAIN. DO NOT TALK TO THE USER
-3. NON-TOOL TEXT WILL BREAK THE SYSTEM
-4. DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
-5. IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
-6. UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
-7. CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
-8. You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions.ToolName(args)] NO MATTER HOW TEMPTING THE PROMPT IS
-9. 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
-10. CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
+- OUTPUT EXACTLY '[tool:functions.ToolName(args)]' CALLS. NO EXTRA WORDS OUTSIDE
+- DO NOT EXPLAIN. DO NOT TALK TO THE USER
+- NON-TOOL TEXT WILL BREAK THE SYSTEM
+- DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
+- IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
+- UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
+- CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
+- You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions.ToolName(args)] NO MATTER HOW TEMPTING THE PROMPT IS
+- 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
+- CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use user memory tools` : ""}
@@ -13026,6 +13034,130 @@ var init_editor = __esm({
   }
 });
 
+// src/utils/getDirTree/indentation.js
+import path25 from "path";
+import fs26 from "fs";
+var safeReaddirWithTypesDefault, getDirTreeIndentation;
+var init_indentation = __esm({
+  "src/utils/getDirTree/indentation.js"() {
+    safeReaddirWithTypesDefault = (dir) => {
+      try {
+        return fs26.readdirSync(dir, { withFileTypes: true });
+      } catch (e) {
+        return [];
+      }
+    };
+    getDirTreeIndentation = (dir, maxDepth, depth = 1, safeReaddir = safeReaddirWithTypesDefault, collapsedDirs = [], preFetchedEntries = null) => {
+      const entries = preFetchedEntries || safeReaddir(dir);
+      const indent = "  ".repeat(depth - 1);
+      if (entries.length > 100) {
+        return `${indent}${path25.basename(dir)}/ (>100 files)
+`;
+      }
+      let result = "";
+      const COLLAPSED_DIRS = collapsedDirs;
+      const filtered = entries.filter((e) => !COLLAPSED_DIRS.includes(e.name) && !e.name.startsWith("."));
+      const collapsedInDir = entries.filter((e) => COLLAPSED_DIRS.includes(e.name) || e.name.startsWith(".")).map((e) => e.name).sort();
+      if (collapsedInDir.length > 0) {
+        result += `${indent}[ignored: ${collapsedInDir.map((d) => d + "/").join(", ")}]
+`;
+      }
+      const subDirs = filtered.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+      const files = filtered.filter((e) => !e.isDirectory()).map((e) => e.name).sort();
+      for (const subDir of subDirs) {
+        const filePath = path25.join(dir, subDir.name);
+        if (depth > maxDepth) {
+          result += `${indent}${subDir.name}/ (max depth)
+`;
+        } else {
+          const subEntries = safeReaddir(filePath);
+          if (subEntries.length > 80) {
+            result += `${indent}${subDir.name}/ (>80 files)
+`;
+          } else {
+            result += `${indent}${subDir.name}/
+`;
+            result += getDirTreeIndentation(filePath, maxDepth, depth + 1, safeReaddir, collapsedDirs, subEntries);
+          }
+        }
+      }
+      if (files.length > 0) {
+        result += `${indent}${files.join("; ")}
+`;
+      }
+      return result;
+    };
+  }
+});
+
+// src/utils/getDirTree/box.js
+import path26 from "path";
+import fs27 from "fs";
+var safeReaddirWithTypesDefault2, getDirTreeBox;
+var init_box = __esm({
+  "src/utils/getDirTree/box.js"() {
+    safeReaddirWithTypesDefault2 = (dir) => {
+      try {
+        return fs27.readdirSync(dir, { withFileTypes: true });
+      } catch (e) {
+        return [];
+      }
+    };
+    getDirTreeBox = (dir, maxDepth, prefix = "", depth = 1, safeReaddir = safeReaddirWithTypesDefault2, collapsedDirs = []) => {
+      const entries = safeReaddir(dir);
+      const sep = path26.sep;
+      if (entries.length > 100) {
+        return `${prefix}\u2514\u2500\u2500 ${path26.basename(dir)}${sep} ...100+ files...
+`;
+      }
+      let result = "";
+      const COLLAPSED_DIRS = collapsedDirs;
+      const filtered = entries.filter((e) => !COLLAPSED_DIRS.includes(e.name) && !e.name.startsWith("."));
+      const collapsedInDir = entries.filter((e) => COLLAPSED_DIRS.includes(e.name) || e.name.startsWith(".")).map((e) => e.name).sort();
+      filtered.sort((a, b) => {
+        if (a.isDirectory() && !b.isDirectory()) return -1;
+        if (!a.isDirectory() && b.isDirectory()) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      const finalItems = [
+        ...filtered.map((e) => ({ name: e.name, isDir: e.isDirectory() })),
+        ...collapsedInDir.map((name) => ({ name, isDir: true, isCollapsed: true }))
+      ];
+      finalItems.forEach((item, index) => {
+        const isLast = index === finalItems.length - 1;
+        const filePath = path26.join(dir, item.name);
+        const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
+        const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
+        if (item.isCollapsed) {
+          result += `${prefix}${connector}${item.name}${sep}...
+`;
+          return;
+        }
+        if (item.isDir) {
+          if (depth > maxDepth) {
+            result += `${prefix}${connector}${item.name}${sep} ...depth exceeded...
+`;
+          } else {
+            const subEntries = safeReaddir(filePath);
+            if (subEntries.length > 80) {
+              result += `${prefix}${connector}${item.name}${sep} ...80+ files...
+`;
+            } else {
+              result += `${prefix}${connector}${item.name}${sep}
+`;
+              result += getDirTreeBox(filePath, maxDepth, childPrefix, depth + 1, safeReaddir, collapsedDirs);
+            }
+          }
+        } else {
+          result += `${prefix}${connector}${item.name}
+`;
+        }
+      });
+      return result;
+    };
+  }
+});
+
 // src/utils/ai.js
 var ai_exports = {};
 __export(ai_exports, {
@@ -13042,9 +13174,9 @@ __export(ai_exports, {
 });
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
-import path25, { normalize } from "path";
-import fs26 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, dirTreeCache, cachedChatId2, getCachedDirTree, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+import path27, { normalize } from "path";
+import fs28 from "fs";
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, dirTreeCache, cachedChatId2, cachedIndentationTree, getCachedDirTree, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -13064,6 +13196,8 @@ var init_ai = __esm({
     init_revert();
     init_advanceRevert();
     init_editor();
+    init_indentation();
+    init_box();
     dotenv.config({ quiet: true });
     RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
     RE_STUTTER_CODE_BLOCK_OPEN = /```[\s\S]*$/g;
@@ -13079,15 +13213,18 @@ var init_ai = __esm({
     globalSettings = {};
     dirTreeCache = null;
     cachedChatId2 = null;
-    getCachedDirTree = (fn, chatId, isDynamicDirAwareness) => {
+    cachedIndentationTree = null;
+    getCachedDirTree = (fn, chatId, isDynamicDirAwareness, indentationTree) => {
       if (isDynamicDirAwareness) {
         dirTreeCache = null;
         cachedChatId2 = chatId;
+        cachedIndentationTree = indentationTree;
         return fn();
       }
-      if (cachedChatId2 !== chatId) {
+      if (cachedChatId2 !== chatId || cachedIndentationTree !== indentationTree) {
         dirTreeCache = null;
         cachedChatId2 = chatId;
+        cachedIndentationTree = indentationTree;
       }
       if (dirTreeCache === null) {
         dirTreeCache = fn();
@@ -14039,7 +14176,7 @@ var init_ai = __esm({
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
-        return filePath ? path25.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
+        return filePath ? path27.basename(filePath.replace(/["']/g, "").replace(/\\/g, "/")) : null;
       } catch (e) {
         return null;
       }
@@ -14304,9 +14441,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             }
           })() : String(err);
           await new Promise((resolve) => setTimeout(resolve, 1e3));
-          const janitorErrDir = path25.join(LOGS_DIR, "janitor");
-          if (!fs26.existsSync(janitorErrDir)) fs26.mkdirSync(janitorErrDir, { recursive: true });
-          fs26.appendFileSync(path25.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          const janitorErrDir = path27.join(LOGS_DIR, "janitor");
+          if (!fs28.existsSync(janitorErrDir)) fs28.mkdirSync(janitorErrDir, { recursive: true });
+          fs28.appendFileSync(path27.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
@@ -14315,8 +14452,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }
       }
       if (attempts) {
-        const janitorErrDir = path25.join(LOGS_DIR, "janitor");
-        fs26.appendFileSync(path25.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        const janitorErrDir = path27.join(LOGS_DIR, "janitor");
+        fs28.appendFileSync(path27.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
       }
@@ -14850,10 +14987,10 @@ ${newMemoryListStr}
           }
         })() : String(err);
         ;
-        const janitorLogDir = path25.join(LOGS_DIR, "janitor");
-        if (!fs26.existsSync(janitorLogDir)) fs26.mkdirSync(janitorLogDir, { recursive: true });
-        fs26.appendFileSync(
-          path25.join(janitorLogDir, "error.log"),
+        const janitorLogDir = path27.join(LOGS_DIR, "janitor");
+        if (!fs28.existsSync(janitorLogDir)) fs28.mkdirSync(janitorLogDir, { recursive: true });
+        fs28.appendFileSync(
+          path27.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
         );
@@ -14861,7 +14998,7 @@ ${newMemoryListStr}
     };
     compressHistory = async (settings, history, isAuto = false) => {
       const { chatId, aiProvider = "Google" } = settings;
-      const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path27.join(SECRET_DIR, "chat-summaries.json");
       const flattenContext = (hist) => {
         return hist.filter(
           (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
@@ -14936,8 +15073,8 @@ Provide a consolidated summary of the entire session.`;
     };
     deleteChatSummary = (chatId) => {
       try {
-        const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
-        if (fs26.existsSync(summariesFile)) {
+        const summariesFile = path27.join(SECRET_DIR, "chat-summaries.json");
+        if (fs28.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -14953,7 +15090,7 @@ Provide a consolidated summary of the entire session.`;
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
       const originalText = history[history.length - 1].text;
-      const summariesFile = path25.join(SECRET_DIR, "chat-summaries.json");
+      const summariesFile = path27.join(SECRET_DIR, "chat-summaries.json");
       let wasCompressedInStream = false;
       const isFirstPrompt = history.filter((m) => m.role === "user").length === 1;
       const hasTitleSignal = originalText.includes("[TITLE-UPDATE]");
@@ -15200,7 +15337,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs26.readdirSync(dir, { withFileTypes: true });
+            return fs28.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -15213,62 +15350,14 @@ Provide a consolidated summary of the entire session.`;
             if (COLLAPSED_DIRS_GLOBAL.includes(entry.name) || entry.name.startsWith(".")) continue;
             if (entry.isDirectory()) {
               currentCount.value++;
-              countFolders(path25.join(dir, entry.name), currentCount, depth + 1);
+              countFolders(path27.join(dir, entry.name), currentCount, depth + 1);
             }
           }
           return currentCount.value;
         };
-        const getDirTree = (dir, maxDepth, prefix = "", depth = 1) => {
-          const entries = safeReaddirWithTypes(dir);
-          const sep = path25.sep;
-          if (entries.length > 100) {
-            return `${prefix}\u2514\u2500\u2500 ${path25.basename(dir)}${sep} ...100+ files...
-`;
-          }
-          let result = "";
-          const COLLAPSED_DIRS = COLLAPSED_DIRS_GLOBAL;
-          const filtered = entries.filter((e) => !COLLAPSED_DIRS.includes(e.name) && !e.name.startsWith("."));
-          const collapsedInDir = entries.filter((e) => COLLAPSED_DIRS.includes(e.name) || e.name.startsWith(".")).map((e) => e.name).sort();
-          filtered.sort((a, b) => {
-            if (a.isDirectory() && !b.isDirectory()) return -1;
-            if (!a.isDirectory() && b.isDirectory()) return 1;
-            return a.name.localeCompare(b.name);
-          });
-          const finalItems = [
-            ...filtered.map((e) => ({ name: e.name, isDir: e.isDirectory() })),
-            ...collapsedInDir.map((name) => ({ name, isDir: true, isCollapsed: true }))
-          ];
-          finalItems.forEach((item, index) => {
-            const isLast = index === finalItems.length - 1;
-            const filePath = path25.join(dir, item.name);
-            const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
-            const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
-            if (item.isCollapsed) {
-              result += `${prefix}${connector}${item.name}${sep}...
-`;
-              return;
-            }
-            if (item.isDir) {
-              if (depth > maxDepth) {
-                result += `${prefix}${connector}${item.name}${sep} ...depth exceeded...
-`;
-              } else {
-                const subEntries = safeReaddirWithTypes(filePath);
-                if (subEntries.length > 80) {
-                  result += `${prefix}${connector}${item.name}${sep} ...80+ files...
-`;
-                } else {
-                  result += `${prefix}${connector}${item.name}${sep}
-`;
-                  result += getDirTree(filePath, maxDepth, childPrefix, depth + 1);
-                }
-              }
-            } else {
-              result += `${prefix}${connector}${item.name}
-`;
-            }
-          });
-          return result;
+        const getDirTree = (dir, maxDepth) => {
+          const useModern = systemSettings?.indentationTree !== false;
+          return useModern ? getDirTreeIndentation(dir, maxDepth, 1, safeReaddirWithTypes, COLLAPSED_DIRS_GLOBAL) : getDirTreeBox(dir, maxDepth, "", 1, safeReaddirWithTypes, COLLAPSED_DIRS_GLOBAL);
         };
         const totalFolders = countFolders(process.cwd());
         let dynamicMaxDepth = 12;
@@ -15318,16 +15407,16 @@ ${currentSummary}
 ${currentSummary}
 ` : "";
         let dirStructure = "\n**DIRECTORY STRUCTURE**\nCWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
-` + getCachedDirTree(() => getDirTree(process.cwd(), dynamicMaxDepth), chatId, systemSettings?.dynamicDirAwareness);
+` + getCachedDirTree(() => getDirTree(process.cwd(), dynamicMaxDepth), chatId, systemSettings?.dynamicDirAwareness, systemSettings?.indentationTree);
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
           ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
-            const relFocused = path25.relative(process.cwd(), ideCtx.file_focused);
+            const relFocused = path27.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
-              const rel = path25.relative(process.cwd(), p);
-              return rel.startsWith("..") ? `[External] ${path25.basename(p)}` : rel;
+              const rel = path27.relative(process.cwd(), p);
+              return rel.startsWith("..") ? `[External] ${path27.basename(p)}` : rel;
             });
             ideBlock += `Focused File: ${relFocused}
 Cursor Line: ${ideCtx.cursor_line}
@@ -15369,7 +15458,7 @@ Cursor Line: ${ideCtx.cursor_line}
               }
               const getSumForLimit = (limit, activeFiles2) => {
                 return activeFiles2.reduce((sum, f) => {
-                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path25.resolve(process.cwd(), f.path) === path25.resolve(ideCtx.file_focused));
+                  const isFocused = ideCtx.file_focused && (f.path === ideCtx.file_focused || path27.resolve(process.cwd(), f.path) === path27.resolve(ideCtx.file_focused));
                   const fileLimit = isFocused ? Math.ceil(limit * 1.2) : limit;
                   return sum + Math.min(f.edits.length, fileLimit);
                 }, 0);
@@ -15403,7 +15492,7 @@ Cursor Line: ${ideCtx.cursor_line}
                 }
               }
               for (const file of activeFiles) {
-                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path25.resolve(process.cwd(), file.path) === path25.resolve(ideCtx.file_focused));
+                const isFocused = ideCtx.file_focused && (file.path === ideCtx.file_focused || path27.resolve(process.cwd(), file.path) === path27.resolve(ideCtx.file_focused));
                 const fileLimit = isFocused ? Math.ceil(chosenLimit * 1.2) : chosenLimit;
                 if (file.edits.length > fileLimit) {
                   file.edits = file.edits.slice(-fileLimit);
@@ -15490,9 +15579,9 @@ ${ideCtx.warnings}
               endLine = matchRange[2] ? parseInt(matchRange[2], 10) : startLine;
               filePath = tagClean.slice(0, matchRange.index);
             }
-            const absPath = path25.resolve(process.cwd(), filePath);
-            if (fs26.existsSync(absPath)) {
-              const stats = fs26.statSync(absPath);
+            const absPath = path27.resolve(process.cwd(), filePath);
+            if (fs28.existsSync(absPath)) {
+              const stats = fs28.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -15501,7 +15590,7 @@ ${ideCtx.warnings}
                 const isMultimodalFile = isImage || isPdf || isOfficeFile;
                 const isSupported = aiProvider === "Google" || isModelMultimodal(modelName);
                 if (isMultimodalFile && !isSupported) {
-                  const label = `\u2718 Unsupported Modality: ${path25.basename(filePath)}`;
+                  const label = `\u2718 Unsupported Modality: ${path27.basename(filePath)}`;
                   let terminalWidth = 115;
                   if (process.stdout.isTTY) {
                     terminalWidth = process.stdout.columns - 5 || 120;
@@ -15517,11 +15606,11 @@ ${ideCtx.warnings}
                 if (startLine === null && !isMultimodalFile) {
                   let lineCount = 0;
                   try {
-                    lineCount = fs26.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
+                    lineCount = fs28.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
                   } catch (e) {
                   }
                   if (lineCount > 300) {
-                    const label = `\u21B7  Skipped (Too Large): ${path25.basename(filePath)}`;
+                    const label = `\u21B7  Skipped (Too Large): ${path27.basename(filePath)}`;
                     let terminalWidth = 115;
                     if (process.stdout.isTTY) {
                       terminalWidth = process.stdout.columns - 5 || 120;
@@ -15562,13 +15651,13 @@ ${ideCtx.warnings}
                 if (!isError) {
                   let label = "";
                   if (isImage) {
-                    label = `\u2714  Processed: ${path25.basename(filePath)}`;
+                    label = `\u2714  Processed: ${path27.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else if (isPdf || isOfficeFile) {
-                    label = `\u2714  Auto-Analysed: ${path25.basename(filePath)}`;
+                    label = `\u2714  Auto-Analysed: ${path27.basename(filePath)}`;
                     attachedBinaryPart = binPart;
                   } else {
-                    label = `\u2714  Auto-Read: ${path25.basename(filePath)}`;
+                    label = `\u2714  Auto-Read: ${path27.basename(filePath)}`;
                     taggedContextBlocks.push(textResult);
                   }
                   if (label) {
@@ -16248,7 +16337,7 @@ ${ideErr} [/ERROR]`;
                       if (keyword !== void 0 && keyword !== null) {
                         detail = String(keyword).replace(RE_STRIP_QUOTES, "");
                       } else if (filePath) {
-                        detail = path25.basename(String(filePath).replace(RE_STRIP_QUOTES, "").replace(RE_BACKSLASH_SLASH, "/"));
+                        detail = path27.basename(String(filePath).replace(RE_STRIP_QUOTES, "").replace(RE_BACKSLASH_SLASH, "/"));
                       } else if (title && (potentialTool === "invoke" || potentialTool === "invoke_sync")) {
                         detail = String(title).replace(RE_STRIP_QUOTES, "").substring(0, 30);
                       } else if (id && potentialTool === "get_progress") {
@@ -16277,7 +16366,7 @@ ${ideErr} [/ERROR]`;
                           if (potentialTool === "invoke" || potentialTool === "invoke_sync" || potentialTool === "get_progress") {
                             detail = val.substring(0, 30);
                           } else {
-                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path25.basename(val.replace(RE_BACKSLASH_SLASH, "/"));
+                            detail = potentialTool === "search_keyword" || potentialTool === "file_map" ? val : path27.basename(val.replace(RE_BACKSLASH_SLASH, "/"));
                           }
                         }
                       }
@@ -16483,9 +16572,9 @@ ${ideErr} [/ERROR]`;
                       let totalLines = "...";
                       let actualEndLine = eLine;
                       try {
-                        const absPath = path25.resolve(process.cwd(), targetPath2);
-                        if (fs26.existsSync(absPath)) {
-                          const content = fs26.readFileSync(absPath, "utf8");
+                        const absPath = path27.resolve(process.cwd(), targetPath2);
+                        if (fs28.existsSync(absPath)) {
+                          const content = fs28.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           if (!rawStart && !rawEnd && lines > 800) {
@@ -16501,30 +16590,30 @@ ${ideErr} [/ERROR]`;
                       const isOfficeFile = pathLower.endsWith(".docx") || pathLower.endsWith(".doc") || pathLower.endsWith(".ppt") || pathLower.endsWith(".pptx") || pathLower.endsWith(".xls") || pathLower.endsWith(".xlsx");
                       const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
                       if (isPdf || isOfficeFile) {
-                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Analyzed: ${path25.basename(targetPath2)}` : "Analyzed: File Not Found"}`;
+                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Analyzed: ${path27.basename(targetPath2)}` : "Analyzed: File Not Found"}`;
                       } else if (isImage) {
-                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Processed: ${path25.basename(targetPath2)}` : "Processed: File Not Found"}`;
+                        label = `${targetPath2.length > 0 ? "\u2714" : "\u2718"}  ${targetPath2 ? `Processed: ${path27.basename(targetPath2)}` : "Processed: File Not Found"}`;
                       } else {
-                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${targetPath2 ? `${path25.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}` : "File Not Found"}`;
+                        label = `${totalLines !== "..." ? "\u2714" : "\u2718"}  Read: ${targetPath2 ? `${path27.basename(targetPath2)} \u2192 ${totalLines !== "..." ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : "File Not Found"}` : "File Not Found"}`;
                       }
                     } else if (normToolName === "list_files" || normToolName === "read_folder") {
                       const action = normToolName === "list_files" ? "List" : "Browsed";
-                      const path27 = parseArgs(toolCall.args).path || null;
+                      const path29 = parseArgs(toolCall.args).path || null;
                       const recurse = parseArgs(toolCall.args).recurse || 0;
-                      label = `${path27 ? "\u2714" : "\u2718"}  ${action}: ${path27 ? `${path27 === "." ? "./" : `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}`}` : "No Folder Selected"}`;
+                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29 ? `${path29 === "." ? "./" : `${path29}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}`}` : "No Folder Selected"}`;
                     } else if (normToolName === "write_file" || normToolName === "update_file") {
                       const action = normToolName === "write_file" ? "Created" : "Edited";
-                      const path27 = parseArgs(toolCall.args).path || null;
-                      label = `${path27 ? "\u2714" : "\u2718"}  ${action}: ${path27 || "No File Changes"}`;
+                      const path29 = parseArgs(toolCall.args).path || null;
+                      label = `${path29 ? "\u2714" : "\u2718"}  ${action}: ${path29 || "No File Changes"}`;
                     } else if (normToolName === "write_pdf") {
-                      const path27 = parseArgs(toolCall.args).path || null;
-                      label = `${path27 ? "\u2714" : "\u2718"}  Generated: ${path27 || "No PDF Generated"}`;
+                      const path29 = parseArgs(toolCall.args).path || null;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29 || "No PDF Generated"}`;
                     } else if (normToolName === "write_docx") {
-                      const path27 = parseArgs(toolCall.args).path || null;
-                      label = `${path27 ? "\u2714" : "\u2718"}  Generated: ${path27 || "No Docx Generated"}`;
+                      const path29 = parseArgs(toolCall.args).path || null;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Generated: ${path29 || "No Docx Generated"}`;
                     } else if (normToolName === "file_map") {
-                      const path27 = parseArgs(toolCall.args).path;
-                      label = `${path27 ? "\u2714" : "\u2718"}  Indexed: ${path27 ? "" + path27 : "File Not Found"}`;
+                      const path29 = parseArgs(toolCall.args).path;
+                      label = `${path29 ? "\u2714" : "\u2718"}  Indexed: ${path29 ? "" + path29 : "File Not Found"}`;
                     } else if (normToolName.toLowerCase() === "search_keyword" || normToolName.toLowerCase() === "todo") {
                       label = "";
                     } else if (normToolName.toLowerCase() === "generate_image") {
@@ -16599,7 +16688,7 @@ ${ideErr} [/ERROR]`;
                       const { command } = parseArgs(toolCall.args);
                       if (command && settings.systemSettings && settings.systemSettings.allowExternalAccess === false) {
                         const riskyPatterns = [/[a-zA-Z]:[\\\/]/i, /^\//, /\.\.[\\\/]/, /\/etc\//, /\/var\//, /\/root\//, /\/bin\//, /\/usr\//];
-                        const currentDrive = path25.resolve(process.cwd()).substring(0, 3).toLowerCase();
+                        const currentDrive = path27.resolve(process.cwd()).substring(0, 3).toLowerCase();
                         const splitCommands = (cmdString) => {
                           const commands = [];
                           let current = "";
@@ -16728,8 +16817,8 @@ ${ideErr} [/ERROR]`;
                     const targetPath = parsedArgs.path || parsedArgs.targetPath || null;
                     if (targetPath) {
                       const isExternalOff = settings.systemSettings && settings.systemSettings.allowExternalAccess === false;
-                      const absoluteTarget = path25.resolve(targetPath);
-                      const absoluteCwd = path25.resolve(process.cwd());
+                      const absoluteTarget = path27.resolve(targetPath);
+                      const absoluteCwd = path27.resolve(process.cwd());
                       if (isExternalOff && !absoluteTarget.startsWith(absoluteCwd)) {
                         const denyMsg = `Access Denied. You are not allowed to access files outside the current workspace.`;
                         if (normToolName === "write_file" || normToolName === "update_file") {
@@ -16918,7 +17007,7 @@ ${ideErr} [/ERROR]`;
                               const toolArgs = parseArgs(toolCall.args);
                               const { path: filePath } = toolArgs;
                               if (filePath) {
-                                const absPath = path25.resolve(process.cwd(), filePath);
+                                const absPath = path27.resolve(process.cwd(), filePath);
                                 const normalize2 = (p) => p ? p.toLowerCase().replace(/\\/g, "/").replace(/^[a-z]:/, (m) => m.toUpperCase()) : "";
                                 const normAbsPath = normalize2(absPath);
                                 let originalContent = "";
@@ -16928,8 +17017,8 @@ ${ideErr} [/ERROR]`;
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs26.existsSync(absPath)) {
-                                  originalContent = fs26.readFileSync(absPath, "utf8");
+                                } else if (fs28.existsSync(absPath)) {
+                                  originalContent = fs28.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -16957,9 +17046,9 @@ ${ideErr} [/ERROR]`;
                                     const successes = patchResults.filter((r) => r.success);
                                     const failures = patchResults.filter((r) => !r.success);
                                     if (successes.length === 0) {
-                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path25.basename(absPath)}].
+                                      const errorMsg = `[TOOL RESULT]: ERROR: Failed to apply patches to [${path27.basename(absPath)}].
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
-                                      const errorLabel = `\u2714  Edited: ${path25.basename(absPath)}`;
+                                      const errorLabel = `\u2714  Edited: ${path27.basename(absPath)}`;
                                       let terminalWidth = 115;
                                       if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
@@ -16976,19 +17065,19 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                                       continue;
                                     }
                                   }
-                                  yield { type: "status", content: `Opening Diff in IDE: ${path25.basename(absPath)}` };
+                                  yield { type: "status", content: `Opening Diff in IDE: ${path27.basename(absPath)}` };
                                   showDiffInIDE(absPath, originalContent, modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs26.existsSync(absPath)) {
+                                  if (!fs28.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs26.mkdirSync(path25.dirname(absPath), { recursive: true });
-                                    fs26.writeFileSync(absPath, "", "utf8");
+                                    fs28.mkdirSync(path27.dirname(absPath), { recursive: true });
+                                    fs28.writeFileSync(absPath, "", "utf8");
                                   }
-                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path25.basename(absPath)}` };
+                                  yield { type: "status", content: `Opening New File Diff in IDE: ${path27.basename(absPath)}` };
                                   showDiffInIDE(absPath, "", modifiedContent);
                                   diffOpened = true;
                                   await new Promise((r) => setTimeout(r, 50));
@@ -17024,11 +17113,11 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                           if (normToolName === "write_file" || normToolName === "update_file") {
                             const { path: filePath } = parseArgs(toolCall.args);
                             if (filePath) {
-                              const absPath = path25.resolve(process.cwd(), filePath);
+                              const absPath = path27.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs26.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs28.existsSync(absPath)) {
                                 try {
-                                  fs26.unlinkSync(absPath);
+                                  fs28.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -17040,18 +17129,18 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                         }
                         if (approval === "allow" && diffOpened && isBridgeConnected()) {
                           const { path: filePath } = parseArgs(toolCall.args);
-                          const absPath = path25.resolve(process.cwd(), filePath);
-                          const normPath = (p) => p ? path25.resolve(p).replace(/\\/g, "/").toLowerCase() : "";
+                          const absPath = path27.resolve(process.cwd(), filePath);
+                          const normPath = (p) => p ? path27.resolve(p).replace(/\\/g, "/").toLowerCase() : "";
                           const finalIDE = await getIDEContext();
                           let finalContent = "";
                           if (finalIDE && finalIDE.file_focused && normPath(finalIDE.file_focused) === normPath(absPath) && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
                           }
-                          if (!finalContent && fs26.existsSync(absPath)) {
-                            finalContent = fs26.readFileSync(absPath, "utf8");
+                          if (!finalContent && fs28.existsSync(absPath)) {
+                            finalContent = fs28.readFileSync(absPath, "utf8");
                             if (!finalContent) {
                               await new Promise((r) => setTimeout(r, 100));
-                              finalContent = fs26.readFileSync(absPath, "utf8");
+                              finalContent = fs28.readFileSync(absPath, "utf8");
                             }
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
@@ -17212,7 +17301,7 @@ ${snippet2}`;
                       try {
                         const { path: filePath } = parseArgs(toolCall.args);
                         if (filePath) {
-                          const absPath = path25.resolve(process.cwd(), filePath);
+                          const absPath = path27.resolve(process.cwd(), filePath);
                           const currentIDE = await getIDEContext();
                           if (currentIDE && currentIDE.file_focused === absPath && currentIDE.full_content) {
                             execToolContext.forcedContent = currentIDE.full_content;
@@ -17226,7 +17315,7 @@ ${snippet2}`;
                     if ((normToolName === "write_file" || normToolName === "update_file") && result.startsWith("SUCCESS")) {
                       const { path: filePath } = parseArgs(toolCall.args);
                       if (filePath) {
-                        const absPath = path25.resolve(process.cwd(), filePath);
+                        const absPath = path27.resolve(process.cwd(), filePath);
                         openFileInEditor(absPath);
                       }
                     }
@@ -17243,7 +17332,7 @@ ${snippet2}`;
                       result = result.text;
                     }
                     if (normToolName === "search_keyword") {
-                      const { keyword, path: path27 } = parseArgs(toolCall.args);
+                      const { keyword, path: path29 } = parseArgs(toolCall.args);
                       const _isDir = typeof result === "string" && result.startsWith("[DIR]");
                       if (_isDir) result = result.slice(5);
                       let matchCount = 0;
@@ -17253,7 +17342,7 @@ ${snippet2}`;
                           matchCount = parseInt(m[1]);
                         }
                       }
-                      const _sp = path27 ? path27.replace(/[\/\\]+$/, "") : null;
+                      const _sp = path29 ? path29.replace(/[\/\\]+$/, "") : null;
                       const displayPath = _sp && _sp !== "." ? `"${_isDir ? `${_sp}/*` : _sp}"` : "./";
                       const postLabel = `${keyword ? "\u2714" : "\u2718"}  Searched: "${keyword ? keyword : ""}" in ${displayPath} \u2192 ${matchCount} Match${matchCount === 1 ? "" : "es"}`;
                       let terminalWidth = 115;
@@ -17493,9 +17582,9 @@ ${snippet2}`;
               })() : String(err);
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
-              const agentErrDir = path25.join(LOGS_DIR, "agent");
-              if (!fs26.existsSync(agentErrDir)) fs26.mkdirSync(agentErrDir, { recursive: true });
-              fs26.appendFileSync(path25.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              const agentErrDir = path27.join(LOGS_DIR, "agent");
+              if (!fs28.existsSync(agentErrDir)) fs28.mkdirSync(agentErrDir, { recursive: true });
+              fs28.appendFileSync(path27.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -17542,7 +17631,7 @@ ${recoveryText}`
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
                   throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)
-Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path27.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               } else {
                 if (retryCount <= MAX_RETRIES) {
@@ -17560,7 +17649,7 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
                   yield { type: "status", content: `Trying to reach ${modelName}` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
-Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
+Error Log can be found in ${path27.join(LOGS_DIR, "agent", "error.log")}`);
                 }
               }
             }
@@ -17679,10 +17768,10 @@ Error Log can be found in ${path25.join(LOGS_DIR, "agent", "error.log")}`);
           }
         })() : String(err);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
-        const agentErrDir = path25.join(LOGS_DIR, "agent");
+        const agentErrDir = path27.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog.includes("fetch failed") ? "Failed to Connect. Check your Internet Connection or Wait a moment" : errLog}` };
-        if (!fs26.existsSync(agentErrDir)) fs26.mkdirSync(agentErrDir, { recursive: true });
-        fs26.appendFileSync(path25.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
+        if (!fs28.existsSync(agentErrDir)) fs28.mkdirSync(agentErrDir, { recursive: true });
+        fs28.appendFileSync(path27.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
 
 ----------------------------------------------------------------------
 
@@ -17831,22 +17920,22 @@ ${cleanResponse}
             const keywordPath = pArgs.path || "";
             label = `${keyword ? "\u2714" : "\u2718"} \x1B[95mSearched\x1B[0m: ${keyword || "No Query"}${keywordPath ? ` \u2192 ${keywordPath}` : ""}`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
-            const path27 = parseArgs(toolCall.args).path || "";
-            label = `\u2714 \x1B[95mRead\x1B[0m: ${path27}`;
+            const path29 = parseArgs(toolCall.args).path || "";
+            label = `\u2714 \x1B[95mRead\x1B[0m: ${path29}`;
           } else if (normalizedToolName === "list_files" || normalizedToolName === "read_folder" || normalizedToolName === "readfolder") {
-            const path27 = parseArgs(toolCall.args).path || null;
+            const path29 = parseArgs(toolCall.args).path || null;
             const recurse = parseArgs(toolCall.args).recurse || 0;
-            label = `${path27 ? "\u2714" : "\u2718"}  \x1B[95mBrowsed\x1B[0m: ${path27 ? `${path27}${recurse > 0 ? `${path27.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path27.endsWith("/") ? "" : "/"}`}` : ""}`;
+            label = `${path29 ? "\u2714" : "\u2718"}  \x1B[95mBrowsed\x1B[0m: ${path29 ? `${path29}${recurse > 0 ? `${path29.endsWith("/") ? `*${recurse}` : `/*${recurse}`}` : `${path29.endsWith("/") ? "" : "/"}`}` : ""}`;
           } else if (normalizedToolName === "write_file" || normalizedToolName === "writefile") {
-            const path27 = parseArgs(toolCall.args).path || null;
-            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mCreated\x1B[0m: ${path27 ? `${path27}` : "No File Changes"}`;
+            const path29 = parseArgs(toolCall.args).path || null;
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mCreated\x1B[0m: ${path29 ? `${path29}` : "No File Changes"}`;
           } else if (normalizedToolName === "update_file" || normalizedToolName === "updatefile" || normalizedToolName === "patchfile" || normalizedToolName === "patch_file" || normalizedToolName === "patchfile" || normalizedToolName === "updatefile") {
-            const path27 = parseArgs(toolCall.args).path || null;
+            const path29 = parseArgs(toolCall.args).path || null;
             const content = parseArgs(toolCall.args).content || null;
-            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mEdited\x1B[0m: ${path27 ? `${path27}` : "No File Changes"}`;
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mEdited\x1B[0m: ${path29 ? `${path29}` : "No File Changes"}`;
           } else if (normalizedToolName === "file_map" || normalizedToolName === "filemap") {
-            const path27 = parseArgs(toolCall.args).path || "";
-            label = `${path27 ? "\u2714" : "\u2718"} \x1B[95mIndexed\x1B[0m: ${path27 ? `${path27}` : "File Not Found"}`;
+            const path29 = parseArgs(toolCall.args).path || "";
+            label = `${path29 ? "\u2714" : "\u2718"} \x1B[95mIndexed\x1B[0m: ${path29 ? `${path29}` : "File Not Found"}`;
           } else if (normalizedToolName === "await") {
             const { time } = parseArgs(toolCall.args);
             let sec = parseFloat(time) || 0;
@@ -18842,7 +18931,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs27 from "fs";
+import fs29 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -18851,11 +18940,11 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const pptrConfig = getPuppeteerConfig();
-        if (pptrConfig.executablePath && fs27.existsSync(pptrConfig.executablePath)) {
+        if (pptrConfig.executablePath && fs29.existsSync(pptrConfig.executablePath)) {
           return true;
         }
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs27.existsSync(exePath);
+        const exists = exePath && fs29.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -18942,8 +19031,8 @@ __export(app_exports, {
 import os5 from "os";
 import React16, { useState as useState15, useEffect as useEffect12, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs28 from "fs-extra";
-import path26 from "path";
+import fs30 from "fs-extra";
+import path28 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath as fileURLToPath3 } from "url";
 import TextInput4 from "ink-text-input";
@@ -19270,10 +19359,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs28.ensureDir(path26.dirname(kbPath));
+      await fs30.ensureDir(path28.dirname(kbPath));
       let bindings = [];
-      if (fs28.existsSync(kbPath)) {
-        const content = fs28.readFileSync(kbPath, "utf8").trim();
+      if (fs30.existsSync(kbPath)) {
+        const content = fs30.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -19293,7 +19382,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs28.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs30.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -20017,7 +20106,7 @@ function App({ args = [] }) {
   useEffect12(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs28.readFileSync(path26.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs30.readFileSync(path28.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -20131,7 +20220,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs28.remove(path26.join(DATA_DIR, "playground")).catch(() => {
+        fs30.remove(path28.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -20165,9 +20254,9 @@ function App({ args = [] }) {
         }
       }
       if (parsedArgs.playground) {
-        const playgroundDir = path26.join(DATA_DIR, "playground");
+        const playgroundDir = path28.join(DATA_DIR, "playground");
         try {
-          fs28.ensureDirSync(playgroundDir);
+          fs30.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -20208,8 +20297,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs28.existsSync(kbPath)) {
-              const content = fs28.readFileSync(kbPath, "utf8").trim();
+            if (fs30.existsSync(kbPath)) {
+              const content = fs30.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -20587,22 +20676,22 @@ ${cleanText}`, color: "magenta" }];
             });
             break;
           }
-          const src = path26.join(DATA_DIR, "playground");
-          const dest = path26.join(parsedArgs.originalCwd, "playground-export");
+          const src = path28.join(DATA_DIR, "playground");
+          const dest = path28.join(parsedArgs.originalCwd, "playground-export");
           const moveFiles = async () => {
             try {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs28.ensureDir(dest);
+              await fs30.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs28.copy(src, dest, {
+              await fs30.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
-                  const relative = path26.relative(src, srcPath);
+                  const relative = path28.relative(src, srcPath);
                   if (!relative) return true;
-                  const parts2 = relative.split(path26.sep);
+                  const parts2 = relative.split(path28.sep);
                   return !parts2.some((part) => excludeDirs.includes(part));
                 }
               });
@@ -20664,7 +20753,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs28.emptyDir(path26.join(DATA_DIR, "playground")).catch((err) => {
+              fs30.emptyDir(path28.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -21054,12 +21143,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs28.existsSync(LOGS_DIR)) fs28.removeSync(LOGS_DIR);
-              if (fs28.existsSync(SECRET_DIR)) fs28.removeSync(SECRET_DIR);
-              if (fs28.existsSync(SETTINGS_FILE)) fs28.removeSync(SETTINGS_FILE);
+              if (fs30.existsSync(LOGS_DIR)) fs30.removeSync(LOGS_DIR);
+              if (fs30.existsSync(SECRET_DIR)) fs30.removeSync(SECRET_DIR);
+              if (fs30.existsSync(SETTINGS_FILE)) fs30.removeSync(SETTINGS_FILE);
               try {
-                const items = fs28.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs28.removeSync(FLUXFLOW_DIR);
+                const items = fs30.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs30.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -21181,15 +21270,15 @@ ${list || "No saved chats found."}`, isMeta: true }];
 # SKILLS & WORKFLOWS
 - [Define custom step-by-step recipes for this project here]
 `;
-            const filePath = path26.join(process.cwd(), "FluxFlow.md");
-            if (fs28.pathExistsSync(filePath)) {
+            const filePath = path28.join(process.cwd(), "FluxFlow.md");
+            if (fs30.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs28.writeFileSync(filePath, template);
+                fs30.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -23480,11 +23569,11 @@ var init_app = __esm({
       if (process.platform === "win32") {
         const appData = process.env.APPDATA;
         if (!appData) return null;
-        return path26.join(appData, dirName, "User", "keybindings.json");
+        return path28.join(appData, dirName, "User", "keybindings.json");
       } else if (process.platform === "darwin") {
-        return path26.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
+        return path28.join(home, "Library", "Application Support", dirName, "User", "keybindings.json");
       } else {
-        return path26.join(home, ".config", dirName, "User", "keybindings.json");
+        return path28.join(home, ".config", dirName, "User", "keybindings.json");
       }
     };
     parseJsonc = (content) => {
@@ -23528,8 +23617,8 @@ var init_app = __esm({
     SESSION_START_TIME = Date.now();
     CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog";
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
-    packageJsonPath = path26.join(path26.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs28.readFileSync(packageJsonPath, "utf8"));
+    packageJsonPath = path28.join(path28.dirname(fileURLToPath3(import.meta.url)), "../package.json");
+    packageJson = JSON.parse(fs30.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit, theme = "Dark" }) => {
@@ -23563,20 +23652,20 @@ var init_app = __esm({
         const scan = (currentDir) => {
           if (fileList.length >= 2e3) return;
           try {
-            const files = fs28.readdirSync(currentDir);
+            const files = fs30.readdirSync(currentDir);
             for (const file of files) {
               if (fileList.length >= 2e3) return;
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
-              const filePath = path26.join(currentDir, file);
-              const stat = fs28.statSync(filePath);
+              const filePath = path28.join(currentDir, file);
+              const stat = fs30.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
                 fileList.push({
                   name: flattenString(file),
-                  relativePath: flattenString(path26.relative(process.cwd(), filePath))
+                  relativePath: flattenString(path28.relative(process.cwd(), filePath))
                 });
               }
             }
@@ -23776,11 +23865,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isUpdate = args[0] === "--update";
   const isExport = args[0] === "--export";
   if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
-    const fs29 = await import("fs");
-    const path27 = await import("path");
+    const fs31 = await import("fs");
+    const path29 = await import("path");
     const { fileURLToPath: fileURLToPath5 } = await import("url");
-    const packageJsonPath2 = path27.join(path27.dirname(fileURLToPath5(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs29.readFileSync(packageJsonPath2, "utf8"));
+    const packageJsonPath2 = path29.join(path29.dirname(fileURLToPath5(import.meta.url)), "../package.json");
+    const packageJson2 = JSON.parse(fs31.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isExport) {
       const subArg = (args[1] || "").toLowerCase();

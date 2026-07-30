@@ -174,6 +174,7 @@ export default function SettingsMenu({
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Dynamic Directory Awareness', value: 'dynamicDirAwareness', status: systemSettings.dynamicDirAwareness ? 'ON' : 'OFF' },
+                    { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
                     { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
                 ];
             default:
@@ -365,6 +366,12 @@ export default function SettingsMenu({
             setActiveView('updateManager');
         } else if (item.value === 'parserDownload') {
             setActiveView('parserDownload');
+        } else if (item.value === 'indentationTree') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, indentationTree: s.indentationTree === false ? true : false };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
         } else if (item.value === 'subAgents') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, subAgents: s.subAgents === false ? true : false };
