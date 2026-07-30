@@ -3309,31 +3309,32 @@ var init_text = __esm({
       return result;
     };
     TOOL_LABELS = {
-      "write_file": "WriteFile",
-      "update_file": "UpdateFile",
-      "read_folder": "ReadFolder",
-      "view_file": "ViewFile",
-      "exec_command": "ExecuteCommand",
-      "web_search": "WebSearch",
-      "web_scrape": "ReadSite",
-      "search_keyword": "SearchKeyword",
-      "write_pdf": "CreatePDF",
-      "write_docx": "CreateDocument",
-      "generate_image": "GenerateImage",
-      // PascalCase Support
-      "WriteFile": "WriteFile",
-      "PatchFile": "PatchFile",
-      "ReadFolder": "ReadFolder",
-      "ReadFile": "ReadFile",
-      "Run": "RunCommand",
-      "WebSearch": "WebSearch",
-      "WebScrape": "WebScrape",
-      "SearchKeyword": "SearchKeyword",
-      "WritePDF": "WritePDF",
-      "WriteDoc": "WriteDoc",
-      "Memory": "Memory",
-      "Chat": "Chat",
-      "GenerateImage": "GenerateImage"
+      // DEPRECATED LABELS
+      // 'write_file': 'WriteFile',
+      // 'update_file': 'UpdateFile',
+      // 'read_folder': 'ReadFolder',
+      // 'view_file': 'ViewFile',
+      // 'exec_command': 'ExecuteCommand',
+      // 'web_search': 'WebSearch',
+      // 'web_scrape': 'ReadSite',
+      // 'search_keyword': 'SearchKeyword',
+      // 'write_pdf': 'CreatePDF',
+      // 'write_docx': 'CreateDocument',
+      // 'generate_image': 'GenerateImage',
+      // // PascalCase Support
+      // 'WriteFile': 'WriteFile',
+      // 'PatchFile': 'PatchFile',
+      // 'ReadFolder': 'ReadFolder',
+      // 'ReadFile': 'ReadFile',
+      // 'Run': 'RunCommand',
+      // 'WebSearch': 'WebSearch',
+      // 'WebScrape': 'WebScrape',
+      // 'SearchKeyword': 'SearchKeyword',
+      // 'WritePDF': 'WritePDF',
+      // 'WriteDoc': 'WriteDoc',
+      // 'Memory': 'Memory',
+      // 'Chat': 'Chat',
+      // 'GenerateImage': 'GenerateImage'
     };
     REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
     REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
@@ -6703,7 +6704,7 @@ Tool calls: ONLY use [tool:functions.ToolName(args)]
 
 **TOOL USAGE POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance \u2190 ** MANDATORY **\n- FileMap > ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > Full Read\n- **Update Todos from realtime progress EVERY TURN**\n" : ""}
+${mode === "Flux" ? '- **Escape quotes: \\" for code strings **\n- ** Literal escapes: Double - escape sequences(e.g., \\\\n) **\n- ** File structure: Real newlines for code formatting**\n- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**\n- Tool denied?Use `Ask` immediately for user guidance \u2190 ** MANDATORY **\n- FileMap > ReadFile for efficient file understanding\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > Full Read\n- **Update Todos from realtime progress EVERY TURN**\n' : ""}
 - COMMUNICATION TOOLS -
 1. [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
@@ -6712,13 +6713,13 @@ ${mode === "Flux" ? "- Same file, many edits? Prefer multi search-replace in Pat
 2. [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
-1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ``}` : `Supports images/docs`}
+1. [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 2. [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes
 3. [tool:functions.FileMap(path="file")]. Shows file structure
-4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST SNIPPETS/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+4. [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES/SUB-STRINGS. allowMultiple: Replace all matches. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
 5. [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 6. [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code
-7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD ONLY` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
+7. [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 8. [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks, or \`create + markDone\` to create completed tasks. **UPDATE EVERY TURN**${enableSubAgents ? '\n9. [tool:functions.Await(time="seconds")]. For waiting without exiting agent loop, 15s - 180s' : ""}
 ${_cachedAdvanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
@@ -6736,12 +6737,7 @@ Invocations:
 3. [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 1. [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 2. [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
-- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}
-
-- VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
-- **Escape quotes: \\" for code strings**
-- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
-- **File structure: Real newlines for code formatting**`.trim();
+- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}`.trim();
     };
   }
 });
@@ -10161,8 +10157,10 @@ var init_view_file = __esm({
       let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args);
       const sLine = parseInt(StartLine || start_line || startLine);
       const eLine = parseInt(EndLine || end_line || endLine);
-      const finalStart = sLine || 1;
-      const finalEnd = eLine || (sLine ? sLine + 800 : 800);
+      const startProvided = !isNaN(sLine);
+      const endProvided = !isNaN(eLine);
+      let finalStart = sLine || 1;
+      let finalEnd = eLine || (sLine ? sLine + 800 : 800);
       if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
       const absolutePath = path13.resolve(process.cwd(), targetPath);
       try {
@@ -10213,6 +10211,10 @@ var init_view_file = __esm({
         content = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const lines = content.split("\n");
         const totalLines = lines.length;
+        if (!startProvided && !endProvided && totalLines > 800) {
+          finalStart = 1;
+          finalEnd = 50;
+        }
         const start = Math.max(0, finalStart - 1);
         const end = Math.min(totalLines, finalEnd);
         const resultLines = lines.slice(start, end);
@@ -15286,7 +15288,7 @@ ${currentSummary}
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-          ideBlock = "[IDE CONTEXT]\n";
+          ideBlock = "[ADDITIONAL IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
             const relFocused = path25.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
@@ -15484,7 +15486,7 @@ ${ideCtx.warnings}
                     lineCount = fs26.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
                   } catch (e) {
                   }
-                  if (lineCount > 550) {
+                  if (lineCount > 300) {
                     const label = `\u21B7  Skipped (Too Large): ${path25.basename(filePath)}`;
                     let terminalWidth = 115;
                     if (process.stdout.isTTY) {
@@ -15498,9 +15500,9 @@ ${ideCtx.warnings}
                   }
                 }
                 const finalStart = startLine !== null ? startLine : 1;
-                let finalEnd = endLine !== null ? endLine : startLine !== null ? startLine : finalStart + 499;
-                if (finalEnd - finalStart > 500) {
-                  finalEnd = finalStart + 500;
+                let finalEnd = endLine !== null ? endLine : startLine !== null ? startLine : finalStart + 299;
+                if (finalEnd - finalStart > 300) {
+                  finalEnd = finalStart + 300;
                 }
                 const argsStr = `path=${JSON.stringify(filePath)}, startLine=${finalStart}, endLine=${finalEnd}`;
                 const result = await view_file(argsStr, { isMultiModal: isSupported });
@@ -15555,7 +15557,7 @@ ${ideCtx.warnings}
         }
         let taggedContextStr = "";
         if (taggedContextBlocks.length > 0) {
-          taggedContextStr = "[TAGGED FILE CONTENTS] Auto Read, System Provided Context for User Tagged Files\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED FILE CONTENTS]\n";
+          taggedContextStr = "[TAGGED FILE CONTENTS] Auto Read User Tagged files by System, No need to re-read\n" + taggedContextBlocks.join("\n\n") + "\n[/TAGGED FILE CONTENTS]\n";
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
@@ -16447,7 +16449,11 @@ ${ideErr} [/ERROR]`;
                           const content = fs26.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
-                          actualEndLine = Math.min(eLine, lines);
+                          if (!rawStart && !rawEnd && lines > 800) {
+                            actualEndLine = Math.min(50, lines);
+                          } else {
+                            actualEndLine = Math.min(eLine, lines);
+                          }
                         }
                       } catch (e) {
                       }
@@ -17780,6 +17786,11 @@ ${cleanResponse}
             label = `\u2714 \x1B[95mSearched\x1B[0m`;
           } else if (normalizedToolName === "web_scrape" || normalizedToolName === "webscrape") {
             label = `\u2714 \x1B[95mScraped\x1B[0m`;
+          } else if (normalizedToolName === "search_keyword" || normalizedToolName === "searchkeyword") {
+            const pArgs = parseArgs(toolCall.args);
+            const keyword = pArgs.keyword || "";
+            const keywordPath = pArgs.path || "";
+            label = `${keyword ? "\u2714" : "\u2718"} \x1B[95mSearched\x1B[0m: ${keyword || "No Query"}${keywordPath ? ` \u2192 ${keywordPath}` : ""}`;
           } else if (normalizedToolName === "view_file" || normalizedToolName === "viewfile" || normalizedToolName === "readfile") {
             const path27 = parseArgs(toolCall.args).path || "";
             label = `\u2714 \x1B[95mRead\x1B[0m: ${path27}`;
@@ -19895,6 +19906,19 @@ function App({ args = [] }) {
       }
     }
     if (key.tab && activeView === "chat") {
+      if (suggestions.length > 0) {
+        const nextMatch = suggestions[selectedIndex] || suggestions[0];
+        const parts = input.split(" ");
+        if (parts.length === 1) {
+          setInput(nextMatch.cmd + " ");
+        } else {
+          const parentParts = parts.slice(0, -1);
+          setInput(parentParts.join(" ") + " " + nextMatch.cmd + " ");
+        }
+        setSelectedIndex(0);
+        setInputKey((prev) => prev + 1);
+        return;
+      }
     }
     if (key.ctrl && inputText === "c" && activeView !== "exit") {
       if (input.length > 0) {

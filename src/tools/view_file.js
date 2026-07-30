@@ -9,12 +9,15 @@ import { parseArgs } from '../utils/arg_parser.js';
 export const view_file = async (args, context = {}) => {
     let { path: targetPath, StartLine, EndLine, start_line, end_line, startLine, endLine } = parseArgs(args);
 
-    // Normalize argument names and apply dynamic 800-line paging logic
+    // Normalize argument names and apply dynamic paging logic
     const sLine = parseInt(StartLine || start_line || startLine);
     const eLine = parseInt(EndLine || end_line || endLine);
 
-    const finalStart = sLine || 1;
-    const finalEnd = eLine || (sLine ? (sLine + 800) : 800);
+    const startProvided = !isNaN(sLine);
+    const endProvided = !isNaN(eLine);
+
+    let finalStart = sLine || 1;
+    let finalEnd = eLine || (sLine ? (sLine + 800) : 800);
 
     if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
     const absolutePath = path.resolve(process.cwd(), targetPath);
@@ -78,6 +81,13 @@ export const view_file = async (args, context = {}) => {
 
         const lines = content.split('\n');
         const totalLines = lines.length;
+
+        // If no start/end arguments given and file is large (>800 lines),
+        // show only the first 50 lines to avoid overwhelming context.
+        if (!startProvided && !endProvided && totalLines > 800) {
+            finalStart = 1;
+            finalEnd = 50;
+        }
 
         // Slice lines (adjusting for 1-based indexing)
         const start = Math.max(0, finalStart - 1);

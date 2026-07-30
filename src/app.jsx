@@ -1690,9 +1690,22 @@ export default function App({ args = [] }) {
             }
         }
 
-        // 3. Tab Completion (Retired - focus on Enter/Arrows)
+        // 3. Tab Completion — Accept suggestion like Enter does
         if (key.tab && activeView === 'chat') {
-            // Tab is now ignored for suggestions to prevent [object Object] errors
+            if (suggestions.length > 0) {
+                const nextMatch = suggestions[selectedIndex] || suggestions[0];
+                const parts = input.split(' ');
+                if (parts.length === 1) {
+                    setInput(nextMatch.cmd + ' ');
+                } else {
+                    // Replace the last part (the query) with the selected command
+                    const parentParts = parts.slice(0, -1);
+                    setInput(parentParts.join(' ') + ' ' + nextMatch.cmd + ' ');
+                }
+                setSelectedIndex(0);
+                setInputKey(prev => prev + 1);
+                return;
+            }
         }
 
         // 3. CTRL+C Protocol (Clear input OR Exit)

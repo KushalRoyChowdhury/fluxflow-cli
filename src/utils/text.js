@@ -392,7 +392,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         const originalLineIdx = res.originalStartLine - 1;
         const fullOrigLine = allLinesOriginal[originalLineIdx] || '';
         const oldLines = res.oldContent.split('\n');
-        
+
         // Calculate leading indentation of the original line in file
         const origIndentMatch = fullOrigLine.match(/^\s*/);
         const origIndent = origIndentMatch ? origIndentMatch[0] : '';
@@ -914,32 +914,35 @@ export const parseMessageToBlocks = (msg, columns) => {
 };
 
 export const TOOL_LABELS = {
-    'write_file': 'WriteFile',
-    'update_file': 'UpdateFile',
-    'read_folder': 'ReadFolder',
-    'view_file': 'ViewFile',
-    'exec_command': 'ExecuteCommand',
-    'web_search': 'WebSearch',
-    'web_scrape': 'ReadSite',
-    'search_keyword': 'SearchKeyword',
-    'write_pdf': 'CreatePDF',
-    'write_docx': 'CreateDocument',
-    'generate_image': 'GenerateImage',
 
-    // PascalCase Support
-    'WriteFile': 'WriteFile',
-    'PatchFile': 'PatchFile',
-    'ReadFolder': 'ReadFolder',
-    'ReadFile': 'ReadFile',
-    'Run': 'RunCommand',
-    'WebSearch': 'WebSearch',
-    'WebScrape': 'WebScrape',
-    'SearchKeyword': 'SearchKeyword',
-    'WritePDF': 'WritePDF',
-    'WriteDoc': 'WriteDoc',
-    'Memory': 'Memory',
-    'Chat': 'Chat',
-    'GenerateImage': 'GenerateImage'
+    // DEPRECATED LABELS
+
+    // 'write_file': 'WriteFile',
+    // 'update_file': 'UpdateFile',
+    // 'read_folder': 'ReadFolder',
+    // 'view_file': 'ViewFile',
+    // 'exec_command': 'ExecuteCommand',
+    // 'web_search': 'WebSearch',
+    // 'web_scrape': 'ReadSite',
+    // 'search_keyword': 'SearchKeyword',
+    // 'write_pdf': 'CreatePDF',
+    // 'write_docx': 'CreateDocument',
+    // 'generate_image': 'GenerateImage',
+
+    // // PascalCase Support
+    // 'WriteFile': 'WriteFile',
+    // 'PatchFile': 'PatchFile',
+    // 'ReadFolder': 'ReadFolder',
+    // 'ReadFile': 'ReadFile',
+    // 'Run': 'RunCommand',
+    // 'WebSearch': 'WebSearch',
+    // 'WebScrape': 'WebScrape',
+    // 'SearchKeyword': 'SearchKeyword',
+    // 'WritePDF': 'WritePDF',
+    // 'WriteDoc': 'WriteDoc',
+    // 'Memory': 'Memory',
+    // 'Chat': 'Chat',
+    // 'GenerateImage': 'GenerateImage'
 };
 
 // ============================================================================

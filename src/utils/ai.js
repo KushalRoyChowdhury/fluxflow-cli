@@ -2570,7 +2570,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-            ideBlock = "[IDE CONTEXT]\n";
+            ideBlock = "[ADDITIONAL IDE CONTEXT]\n";
             if (ideCtx.file_focused !== "none") {
                 const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
                 const relOpened = (ideCtx.opened_editors || []).map(p => {
@@ -2789,7 +2789,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             try {
                                 lineCount = fs.readFileSync(absPath, 'utf8').split(/\r\n|\r|\n/).length;
                             } catch (e) { }
-                            if (lineCount > 550) {
+                            if (lineCount > 300) {
                                 const label = `↷  Skipped (Too Large): ${path.basename(filePath)}`;
                                 let terminalWidth = 115;
                                 if (process.stdout.isTTY) {
@@ -2803,9 +2803,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
 
                         const finalStart = startLine !== null ? startLine : 1;
-                        let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 499);
-                        if (finalEnd - finalStart > 500) {
-                            finalEnd = finalStart + 500;
+                        let finalEnd = endLine !== null ? endLine : (startLine !== null ? startLine : finalStart + 299);
+                        if (finalEnd - finalStart > 300) {
+                            finalEnd = finalStart + 300;
                         }
 
                         const argsStr = `path=${JSON.stringify(filePath)}, startLine=${finalStart}, endLine=${finalEnd}`;
@@ -2866,7 +2866,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let taggedContextStr = '';
         if (taggedContextBlocks.length > 0) {
-            taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read, System Provided Context for User Tagged Files\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
+            taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read User Tagged files by System, No need to re-read\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
         }
 
         const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
@@ -3893,7 +3893,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             const content = fs.readFileSync(absPath, 'utf8');
                                             const lines = content.split('\n').length;
                                             totalLines = lines;
-                                            actualEndLine = Math.min(eLine, lines);
+                                            // Mirror view_file.js: if no start/end args and file >800 lines, show only 1-50
+                                            if (!rawStart && !rawEnd && lines > 800) {
+                                                actualEndLine = Math.min(50, lines);
+                                            } else {
+                                                actualEndLine = Math.min(eLine, lines);
+                                            }
                                         }
                                     } catch (e) { }
                                     const pathLower = (targetPath || '').toLowerCase();
@@ -5249,7 +5254,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if (systemSettings?.advanceRollback) {
             await AdvanceRevertManager.cleanup(chatId);
         }
-        // Clear IDE Context
+        // Clear Additional IDE Context
         await getIDEContext();
     }
     yield { type: 'status', content: null };
@@ -5393,6 +5398,13 @@ CWD: ${process.cwd()}
 
             else if (normalizedToolName === 'web_scrape' || normalizedToolName === 'webscrape') {
                 label = `✔ \x1b[95mScraped\x1b[0m`;
+            }
+
+            else if (normalizedToolName === 'search_keyword' || normalizedToolName === 'searchkeyword') {
+                const pArgs = parseArgs(toolCall.args);
+                const keyword = pArgs.keyword || '';
+                const keywordPath = pArgs.path || '';
+                label = `${keyword ? '✔' : '✘'} \x1b[95mSearched\x1b[0m: ${keyword || 'No Query'}${keywordPath ? ` → ${keywordPath}` : ''}`;
             }
 
             else if (normalizedToolName === 'view_file' || normalizedToolName === 'viewfile' || normalizedToolName === 'readfile') {
