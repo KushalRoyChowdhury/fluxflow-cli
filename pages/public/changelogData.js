@@ -3,13 +3,29 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.15.2"]
+export const stableVersions = ["3.16.0"]
 
 export const changelogData = {
+    "3.16.0": {
+        "note": "AUGUST 1.",
+        "added": [
+            "Deprecated `FileMap` tool in favor of recent advancements in `SearchKeywords`.",
+            "**Custom Model Selection for Subagents**\nYou can now pick any model from saved API-key providers for subagents. You may also override via environment variables: `SUBAGENT_MODEL` and `SUBAGENT_PROVIDER`. If only the model env is given, it defaults to the current active provider.",
+            "**Shell Tools for Subagents**\nSubagents can now use shell commands, allowing them to run tests, builds, and interact with the system directly."
+        ],
+        "changed": [
+            "Improved Instruction Tuning.",
+            "Improved DIFF rendering.",
+            "Improved in-memory prompt caching, boosting cache-hit ratios across providers.",
+            "Enhanced search tool for better codebase discovery and traversal.",
+            "Improved Syntax Highlighting."
+        ],
+        "fixes": []
+    },
     "3.15.2": {
         "note": "JULY 31.",
         "added": [
-            "Directory Tree Design\nAdded a **Directory Tree Design** setting under Settings > Others to switch between **Modern** (indentation-based) and **Classic** (box-drawing) tree representations.\n\n- **Modern**: Indentation based grouping. Reduces directory context prompt tokens by **~58%** while retaining 100% of files and depth.\n- **Classic (Deprecated)**: The legacy box-drawing tree structure, for models that prefer explicit tree characters (Uses relatively more tokens). Might get removed in future versions!"
+            "Directory Tree Design\nAdded a **Directory Tree Design** setting under Settings > Others to switch between **Modern** (indentation-based) and **Classic** (box-drawing) tree representations.\n\n- **Modern**: Indentation based grouping. Reduces directory context prompt tokens by **~58%** while retaining 100% of files and depth.\n- **Classic (Deprecated)**: The legacy box-drawing tree structure, for models that prefer explicit tree characters (Uses relatively more tokens). Might get removed in future versions based on further testing!"
         ],
         "changed": [],
         "fixes": []
@@ -604,7 +620,7 @@ export const changelogData = {
         ]
     },
     "2.4.0": {
-        "note": "EXPERIMENTAL support for NVIDIA API. Thank You for supporting.",
+        "note": "EXPERIMENTAL support for NVIDIA API.",
         "added": [
             "Added support for NVIDIA API with limited models to harness the free unlimited AI.",
             "Stable-ish models: Kimi 2.6 Reasoning, Stepfun 3.7 Flash, GLM 5.1.",

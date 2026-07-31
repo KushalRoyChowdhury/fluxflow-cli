@@ -12,7 +12,6 @@ Flux Flow provides a robust set of tools that allow the AI to interact with the 
 | **File System (Read/Write)** | ✅ | ❌ |
 | **Terminal Execution** | ✅ | ❌ |
 | **Search Keyword** | ✅ | ❌ |
-| **File Map** | ✅ | ❌ |
 | **Todo (Planning)** | ✅ | ❌ |
 | **Multi Agent (sync/async)** | ✅ | ❌ |
 | **EmergencyRollback\*** | ✅ | ❌ |
@@ -55,9 +54,6 @@ FluxFlow uses a transparent, string-based protocol for tool dispatching:
 - **Purpose**: Reads file content with support for line ranges.
 - **Multimodal**: Supports images and documents.
 
-### `FileMap`
-- **Purpose**: Shows file structure, dependencies, functions, and variable maps. More token-efficient than ReadFile.
-
 ### `ReadFolder`
 - **Purpose**: Provides detailed directory statistics.
 
@@ -71,6 +67,7 @@ FluxFlow uses a transparent, string-based protocol for tool dispatching:
 
 ### `SearchKeyword`
 - **Purpose**: Global project search for definitions or logic.
+- **Path Support**: Accepts direct files (`path="src/app.js"`), directories (`path="src/tools"`), or glob patterns (`path="src/**/*.js"` or `path="src/*.{js,ts}"`).
 
 ### `Run` (exec_command)
 - **Purpose**: Runs shell commands (PowerShell/CMD on Windows, Bash on Unix).

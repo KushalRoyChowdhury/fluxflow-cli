@@ -3,6 +3,8 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
 import { getThemeColors, THEMES } from '../utils/theme.js';
+import { getModels } from '../data/model_config.js';
+import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
 
 const themeOptions = [...Object.keys(THEMES), 'Mystery'];
@@ -86,6 +88,119 @@ export default function SettingsMenu({
     const [isSelectingTheme, setIsSelectingTheme] = useState(initialSelectingTheme);
     const [themeIndex, setThemeIndex] = useState(defaultIdx >= 0 ? defaultIdx : 0);
     const [initialTheme, setInitialTheme] = useState(systemSettings.theme || 'Dark');
+
+    const [isSelectingSubAgentModel, setIsSelectingSubAgentModel] = useState(false);
+    const [subAgentModelIndex, setSubAgentModelIndex] = useState(0);
+    const [subAgentScrollOffset, setSubAgentScrollOffset] = useState(0);
+    const [subAgentSearchQuery, setSubAgentSearchQuery] = useState('');
+    const [subAgentFocusMode, setSubAgentFocusMode] = useState('list'); // 'search' or 'list'
+    const [activeProviderKeys, setActiveProviderKeys] = useState({});
+
+    useEffect(() => {
+        const checkKeys = async () => {
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+            const keyMap = {};
+            for (const p of providers) {
+                try {
+                    const k = await getProviderAPIKey(p);
+                    if (k) keyMap[p] = true;
+                } catch (e) {}
+            }
+            setActiveProviderKeys(keyMap);
+        };
+        checkKeys();
+    }, []);
+
+    const allSubAgentItems = React.useMemo(() => {
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+        const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
+        const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
+
+        const items = [
+            { label: 'Default (use the current model)', value: 'Default', isHeader: false },
+            { label: envLabel, value: 'ENV', isHeader: false }
+        ];
+
+        // Primary: current active provider first
+        const activeTier = quotas?.providerTiers?.[aiProvider] || apiTier || 'Free';
+        const currentModels = getModels(aiProvider, activeTier) || [];
+        if (currentModels.length > 0) {
+            items.push({ label: `── ${aiProvider.toUpperCase()}${activeTier !== 'Free' ? ` (${activeTier})` : ''} ──`, isHeader: true });
+            currentModels.forEach(m => {
+                const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
+                if (name && !name.trim().startsWith('---') && !name.startsWith('\n---')) {
+                    items.push({ label: name, value: name, isHeader: false, provider: aiProvider });
+                }
+            });
+        }
+
+        // Other providers with saved keys
+        for (const p of ALL_PROVIDERS) {
+            if (p === aiProvider) continue;
+            if (activeProviderKeys[p]) {
+                const tier = quotas?.providerTiers?.[p] || 'Free';
+                const models = getModels(p, tier) || [];
+                if (models.length > 0) {
+                    items.push({ label: `── ${p.toUpperCase()}${tier !== 'Free' ? ` (${tier})` : ''} ──`, isHeader: true });
+                    models.forEach(m => {
+                        const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
+                        if (name && !name.trim().startsWith('---') && !name.startsWith('\n---')) {
+                            items.push({ label: name, value: name, isHeader: false, provider: p });
+                        }
+                    });
+                }
+            }
+        }
+
+        return items;
+    }, [aiProvider, apiTier, quotas, activeProviderKeys]);
+
+    const availableModels = React.useMemo(() => {
+        if (!subAgentSearchQuery.trim()) return allSubAgentItems;
+        const q = subAgentSearchQuery.trim().toLowerCase();
+
+        const filtered = [];
+        let currentHeader = null;
+
+        for (const item of allSubAgentItems) {
+            if (item.isHeader) {
+                currentHeader = item;
+            } else {
+                const matches = item.label.toLowerCase().includes(q) || (item.value && item.value.toLowerCase().includes(q));
+                if (matches) {
+                    if (currentHeader && !filtered.includes(currentHeader)) {
+                        filtered.push(currentHeader);
+                    }
+                    filtered.push(item);
+                }
+            }
+        }
+        return filtered;
+    }, [allSubAgentItems, subAgentSearchQuery]);
+
+    // Reset cursor & scroll offset to top whenever search query changes
+    useEffect(() => {
+        if (isSelectingSubAgentModel) {
+            let firstValid = availableModels.findIndex(item => !item.isHeader);
+            setSubAgentModelIndex(firstValid >= 0 ? firstValid : 0);
+            setSubAgentScrollOffset(0);
+        }
+    }, [subAgentSearchQuery]);
+
+    // Keep subAgentModelIndex valid when availableModels changes
+    useEffect(() => {
+        if (isSelectingSubAgentModel) {
+            if (availableModels.length === 0) {
+                setSubAgentModelIndex(0);
+                setSubAgentScrollOffset(0);
+                return;
+            }
+            if (subAgentModelIndex >= availableModels.length || availableModels[subAgentModelIndex]?.isHeader) {
+                let firstValid = availableModels.findIndex(item => !item.isHeader);
+                setSubAgentModelIndex(firstValid >= 0 ? firstValid : 0);
+            }
+        }
+    }, [availableModels, isSelectingSubAgentModel]);
 
     const [currentMemory, setCurrentMemory] = useState(0);
     const [maxMemory, setMaxMemory] = useState(0);
@@ -172,10 +287,11 @@ export default function SettingsMenu({
             case 'other':
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
+                    { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Dynamic Directory Awareness', value: 'dynamicDirAwareness', status: systemSettings.dynamicDirAwareness ? 'ON' : 'OFF' },
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
-                    { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' }
+                    // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
                 return [];
@@ -186,6 +302,73 @@ export default function SettingsMenu({
     const currentItems = getCategoryItems(currentCatId);
 
     useInput((input, key) => {
+        if (isSelectingSubAgentModel) {
+            if (key.tab) {
+                setSubAgentFocusMode(prev => prev === 'search' ? 'list' : 'search');
+                return;
+            }
+
+            if (subAgentFocusMode === 'search') {
+                if (key.escape) {
+                    setIsSelectingSubAgentModel(false);
+                } else if (key.downArrow || key.return) {
+                    setSubAgentFocusMode('list');
+                } else if (key.backspace || key.delete) {
+                    setSubAgentSearchQuery(q => q.slice(0, -1));
+                } else if (input && !key.ctrl && !key.meta && input.length === 1) {
+                    setSubAgentSearchQuery(q => q + input);
+                }
+                return;
+            }
+
+            if (key.upArrow) {
+                setSubAgentModelIndex(prev => {
+                    if (availableModels.length === 0) return 0;
+                    let next = (prev - 1 + availableModels.length) % availableModels.length;
+                    let count = 0;
+                    while (availableModels[next]?.isHeader && count < availableModels.length) {
+                        next = (next - 1 + availableModels.length) % availableModels.length;
+                        count++;
+                    }
+                    return next;
+                });
+            } else if (key.downArrow) {
+                setSubAgentModelIndex(prev => {
+                    if (availableModels.length === 0) return 0;
+                    let next = (prev + 1) % availableModels.length;
+                    let count = 0;
+                    while (availableModels[next]?.isHeader && count < availableModels.length) {
+                        next = (next + 1) % availableModels.length;
+                        count++;
+                    }
+                    return next;
+                });
+            } else if (key.return) {
+                const selectedOpt = availableModels[subAgentModelIndex];
+                if (selectedOpt && !selectedOpt.isHeader) {
+                    setSystemSettings(s => {
+                        const isDefault = selectedOpt.value === 'Default';
+                        const newSysSettings = {
+                            ...s,
+                            CustomSubAgent: !isDefault,
+                            SubAgentModel: selectedOpt.value,
+                            SubAgentProvider: isDefault ? '' : (selectedOpt.provider || '')
+                        };
+                        saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                        return newSysSettings;
+                    });
+                    setIsSelectingSubAgentModel(false);
+                }
+            } else if (key.escape) {
+                setIsSelectingSubAgentModel(false);
+            } else if (input && !key.ctrl && !key.meta && input.length === 1) {
+                // Quick jump to search if typing while in list mode
+                setSubAgentSearchQuery(q => q + input);
+                setSubAgentFocusMode('search');
+            }
+            return;
+        }
+
         if (isSelectingTheme) {
             if (key.upArrow) {
                 const nextIdx = (themeIndex - 1 + themeOptions.length) % themeOptions.length;
@@ -378,6 +561,11 @@ export default function SettingsMenu({
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
+        } else if (item.value === 'subAgentModel') {
+            const currentSubAgentModel = (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default';
+            const curIdx = availableModels.findIndex(m => m.value === currentSubAgentModel);
+            setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
+            setIsSelectingSubAgentModel(true);
         } else if (item.value === 'preserveThinking') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
@@ -422,6 +610,105 @@ export default function SettingsMenu({
     };
 
     const colors = getThemeColors(systemSettings.theme);
+
+    if (isSelectingSubAgentModel) {
+        const currentSavedModel = (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default';
+
+        // Proper Viewport Scroll Logic:
+        // Keep window fixed while cursor moves inside [offset, offset + VISIBLE_COUNT - 1]
+        const VISIBLE_COUNT = 15;
+        let startIndex = subAgentScrollOffset;
+        if (subAgentModelIndex < startIndex) {
+            startIndex = subAgentModelIndex;
+        } else if (subAgentModelIndex >= startIndex + VISIBLE_COUNT) {
+            startIndex = subAgentModelIndex - VISIBLE_COUNT + 1;
+        }
+        startIndex = Math.max(0, Math.min(startIndex, Math.max(0, availableModels.length - VISIBLE_COUNT)));
+
+        if (startIndex !== subAgentScrollOffset) {
+            setSubAgentScrollOffset(startIndex);
+        }
+
+        const visibleItems = availableModels.slice(startIndex, startIndex + VISIBLE_COUNT);
+
+        return (
+            <Box flexDirection="column" borderStyle="round" borderColor={colors.border} padding={1} width="100%" minHeight={32}>
+                {/* Title */}
+                <Box marginBottom={1} flexDirection="row" justifyContent="space-between">
+                    <Text color={colors.text} bold underline>
+                        Select Sub-Agent Model:
+                    </Text>
+                    {availableModels.length > 0 && (
+                        <Text color="gray">
+                            {subAgentModelIndex + 1}/{availableModels.length}
+                        </Text>
+                    )}
+                </Box>
+
+                {/* Search Bar */}
+                <Box
+                    borderStyle="single"
+                    borderColor={subAgentFocusMode === 'search' ? colors.primary || 'cyan' : 'gray'}
+                    paddingX={1}
+                    marginBottom={1}
+                >
+                    <Text color={subAgentFocusMode === 'search' ? colors.primary || 'cyan' : 'gray'} bold>
+                        🔍 Search: {' '}
+                    </Text>
+                    <Text color={colors.text}>
+                        {subAgentSearchQuery}
+                    </Text>
+                    {subAgentFocusMode === 'search' && (
+                        <Text color={colors.primary || 'cyan'}>█</Text>
+                    )}
+                    {!subAgentSearchQuery && subAgentFocusMode !== 'search' && (
+                        <Text color="gray" italic>(Press TAB or type to filter models...)</Text>
+                    )}
+                </Box>
+
+                {/* Windowed Item List */}
+                <Box flexDirection="column" flexGrow={1} height={VISIBLE_COUNT}>
+                    {visibleItems.length > 0 ? (
+                        visibleItems.map((opt, idx) => {
+                            const actualIndex = startIndex + idx;
+                            if (opt.isHeader) {
+                                return (
+                                    <Box key={`hdr-${actualIndex}`} paddingX={1}>
+                                        <Text color="gray" bold underline>{opt.label}</Text>
+                                    </Box>
+                                );
+                            }
+
+                            const isSelected = subAgentModelIndex === actualIndex && subAgentFocusMode === 'list';
+                            const isSaved = currentSavedModel === opt.value;
+                            return (
+                                <Box key={`item-${opt.value}-${actualIndex}`} paddingX={1} backgroundColor={isSelected ? colors.highlightBg : undefined}>
+                                    <Text color={isSelected ? colors.text : colors.textDim} bold={isSelected}>
+                                        {isSelected ? '❯ ' : '  '}{opt.label}
+                                        {isSaved ? <Text color={colors.primary || 'cyan'} italic> (active)</Text> : ''}
+                                    </Text>
+                                </Box>
+                            );
+                        })
+                    ) : (
+                        <Box paddingX={1}>
+                            <Text color="gray" italic>No models matching "{subAgentSearchQuery}"</Text>
+                        </Box>
+                    )}
+                </Box>
+
+                {/* Footer Navigation */}
+                <Box paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
+                    <Text color="gray" italic>
+                        TAB to switch search/list • ▲▼ Navigate • ENTER to Select • ESC to Cancel
+                    </Text>
+                    <Text color={subAgentFocusMode === 'search' ? colors.primary || 'cyan' : 'gray'} bold>
+                        [{subAgentFocusMode.toUpperCase()} MODE]
+                    </Text>
+                </Box>
+            </Box>
+        );
+    }
 
     if (isSelectingTheme) {
         const previewThemeName = themeOptions[themeIndex];

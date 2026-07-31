@@ -1,3 +1,5 @@
+// ⚠️ DEPRECATED — Removed from system prompt. SearchKeyword now handles path-scoped, regex, fuzzy search.
+// ⚠️ Implementation remains for rollback/audit. Model can no longer invoke this tool.
 import fs from 'fs-extra';
 import path from 'path';
 import { createRequire } from 'module';

@@ -439,7 +439,7 @@ const MarkdownText = React.memo(({ text, color, columns = 80, italic = false, th
             }
             // Horizontal Rule
             if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
-                result.push(<Box key={i} marginY={1} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor={colors.borderMuted} />);
+                result.push(<Box key={i} marginY={0} borderStyle="single" borderTop borderBottom={false} borderLeft={false} borderRight={false} width="100%" borderColor={colors.borderMuted} />);
                 return;
             }
 
@@ -544,16 +544,10 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
     const renderInlineDiff = () => {
         // Case A: Pure completely brand new line block layout
         if (isPureUnpairedBlock) {
-            const blockColor = isRemoval ? colors.diffRemovalHighlightColor : colors.diffAdditionHighlightColor;
             const textBgColor = isRemoval ? colors.diffRemovalHighlightBg : colors.diffAdditionHighlightBg;
-            const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
-                    {wrappedLines.map((wl, idx) => (
-                        <Box key={idx}>
-                            {renderHighlightedLine(wl, extension, blockColor, textBgColor)}
-                        </Box>
-                    ))}
+                    {renderHighlightedLine(wrapText(content, columns - 15), extension, undefined, textBgColor)}
                 </Box>
             );
         }
@@ -562,59 +556,183 @@ const DiffLine = React.memo(({ line, pairContent, parentText, columns = 80, exte
         if (!(isRemoval || isAddition) || words.length === 0 || !hasInlineChange) {
             const textColor = isRemoval ? colors.diffRemovalText : (isAddition ? colors.diffAdditionText : colors.textMuted);
             const textBgColor = undefined;
-            const wrappedLines = wrapText(content, columns - 15).split('\n');
             return (
                 <Box flexDirection="column">
-                    {wrappedLines.map((wl, idx) => (
-                        <Box key={idx}>
-                            {renderHighlightedLine(wl, extension, textColor, textBgColor)}
-                        </Box>
-                    ))}
+                    {renderHighlightedLine(wrapText(content, columns - 15), extension, textColor, textBgColor)}
                 </Box>
             );
         }
 
-        // Case C: Surgical inline changes with high-contrast normal-weight coloring 🎯
+        // Case C: Surgical inline changes with high-contrast normal-weight coloring & smart word wrapping 🎯
+        const maxLen = Math.max(10, columns - 15);
+        const wrappedLines = wrapText(content, maxLen).split('\n');
+
+        const validWords = [];
+        words.forEach((part, idx) => {
+            const isWhitespace = /^\s+$/.test(part.value);
+            if (isRemoval) {
+                const isSurroundedByRemoval = (words[idx - 1]?.removed) || (words[idx + 1]?.removed);
+                if (part.removed || (isWhitespace && isSurroundedByRemoval)) {
+                    validWords.push({ text: part.value, isHighlight: true });
+                } else if (!part.added) {
+                    validWords.push({ text: part.value, isHighlight: false });
+                }
+            } else if (isAddition) {
+                const isSurroundedByAddition = (words[idx - 1]?.added) || (words[idx + 1]?.added);
+                if (part.added || (isWhitespace && isSurroundedByAddition)) {
+                    validWords.push({ text: part.value, isHighlight: true });
+                } else if (!part.removed) {
+                    validWords.push({ text: part.value, isHighlight: false });
+                }
+            }
+        });
+
+        if (wrappedLines.length <= 1) {
+            return (
+                <Text wrap="wrap">
+                    {validWords.map((part, idx) => {
+                        if (isRemoval) {
+                            if (part.isHighlight) {
+                                return (
+                                    <React.Fragment key={idx}>
+                                        {renderHighlightedLine(part.text, extension, colors.diffRemovalHighlightColor, colors.diffRemovalHighlightBg)}
+                                    </React.Fragment>
+                                );
+                            }
+                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.diffRemovalText)}</React.Fragment>;
+                        }
+                        if (isAddition) {
+                            if (part.isHighlight) {
+                                return (
+                                    <React.Fragment key={idx}>
+                                        {renderHighlightedLine(part.text, extension, colors.diffAdditionHighlightColor, colors.diffAdditionHighlightBg)}
+                                    </React.Fragment>
+                                );
+                            }
+                            return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.diffAdditionText)}</React.Fragment>;
+                        }
+                        return <React.Fragment key={idx}>{renderHighlightedLine(part.text, extension, colors.textMuted)}</React.Fragment>;
+                    })}
+                </Text>
+            );
+        }
+
+        let wordIdx = 0;
+        let charIdx = 0;
+
+        const leadingSpaceMatch = content.match(/^(\s*)/);
+        const indent = leadingSpaceMatch ? leadingSpaceMatch[1] : '';
+        const cappedIndent = indent.substring(0, Math.min(indent.length, 8));
+
+        const lineSpans = wrappedLines.map((wl, lineIdx) => {
+            const spans = [];
+            let lineTextToMatch = wl;
+
+            if (lineIdx > 0 && cappedIndent && wl.startsWith(cappedIndent)) {
+                const currentAvail = validWords[wordIdx] ? validWords[wordIdx].text.substring(charIdx) : '';
+                if (!currentAvail.startsWith(cappedIndent)) {
+                    spans.push({ text: cappedIndent, isHighlight: false });
+                    lineTextToMatch = wl.substring(cappedIndent.length);
+                }
+            }
+
+            let neededLength = lineTextToMatch.length;
+
+            while (neededLength > 0 && wordIdx < validWords.length) {
+                const vw = validWords[wordIdx];
+                const avail = vw.text.length - charIdx;
+
+                if (avail <= 0) {
+                    wordIdx++;
+                    charIdx = 0;
+                    continue;
+                }
+
+                const takeLen = Math.min(neededLength, avail);
+                spans.push({
+                    text: vw.text.substring(charIdx, charIdx + takeLen),
+                    isHighlight: vw.isHighlight
+                });
+
+                charIdx += takeLen;
+                neededLength -= takeLen;
+
+                if (charIdx >= vw.text.length) {
+                    wordIdx++;
+                    charIdx = 0;
+                }
+            }
+
+            while (wordIdx < validWords.length) {
+                const vw = validWords[wordIdx];
+                const rem = vw.text.substring(charIdx);
+                if (/^\s+$/.test(rem)) {
+                    wordIdx++;
+                    charIdx = 0;
+                } else if (rem.startsWith(' ') || rem.startsWith('\t')) {
+                    let skipCount = 0;
+                    while (skipCount < rem.length && (rem[skipCount] === ' ' || rem[skipCount] === '\t')) {
+                        skipCount++;
+                    }
+                    charIdx += skipCount;
+                    if (charIdx >= vw.text.length) {
+                        wordIdx++;
+                        charIdx = 0;
+                    }
+                    break;
+                } else {
+                    break;
+                }
+            }
+
+            return spans;
+        });
+
+        if (wordIdx < validWords.length) {
+            const lastSpans = lineSpans[lineSpans.length - 1];
+            while (wordIdx < validWords.length) {
+                const vw = validWords[wordIdx];
+                lastSpans.push({
+                    text: vw.text.substring(charIdx),
+                    isHighlight: vw.isHighlight
+                });
+                wordIdx++;
+                charIdx = 0;
+            }
+        }
+
         return (
-            <Text wrap="anywhere">
-                {words.map((part, idx) => {
-                    const isWhitespace = /^\s+$/.test(part.value);
-
-                    // 🔴 REMOVAL ROW TREATMENT
-                    if (isRemoval) {
-                        const isSurroundedByRemoval = (words[idx - 1]?.removed) || (words[idx + 1]?.removed);
-
-                        if (part.removed || (isWhitespace && isSurroundedByRemoval)) {
-                            return (
-                                <Text key={idx} color={colors.diffRemovalHighlightColor} backgroundColor={colors.diffRemovalHighlightBg}>
-                                    {part.value}
-                                </Text>
-                            );
-                        }
-                        if (part.added) return null;
-
-                        return <Text key={idx} color={colors.diffRemovalText}>{part.value}</Text>;
-                    }
-
-                    // 🟢 ADDITION ROW TREATMENT
-                    if (isAddition) {
-                        const isSurroundedByAddition = (words[idx - 1]?.added) || (words[idx + 1]?.added);
-
-                        if (part.added || (isWhitespace && isSurroundedByAddition)) {
-                            return (
-                                <Text key={idx} color={colors.diffAdditionHighlightColor} backgroundColor={colors.diffAdditionHighlightBg}>
-                                    {part.value}
-                                </Text>
-                            );
-                        }
-                        if (part.removed) return null;
-
-                        return <Text key={idx} color={colors.diffAdditionText}>{part.value}</Text>;
-                    }
-
-                    return <Text key={idx} color={colors.textMuted}>{part.value}</Text>;
-                })}
-            </Text>
+            <Box flexDirection="column">
+                {lineSpans.map((spans, lIdx) => (
+                    <Box key={lIdx}>
+                        <Text wrap="wrap">
+                            {spans.map((part, sIdx) => {
+                                if (isRemoval) {
+                                    if (part.isHighlight) {
+                                        return (
+                                            <React.Fragment key={sIdx}>
+                                                {renderHighlightedLine(part.text, extension, colors.diffRemovalHighlightColor, colors.diffRemovalHighlightBg)}
+                                            </React.Fragment>
+                                        );
+                                    }
+                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.diffRemovalText)}</React.Fragment>;
+                                }
+                                if (isAddition) {
+                                    if (part.isHighlight) {
+                                        return (
+                                            <React.Fragment key={sIdx}>
+                                                {renderHighlightedLine(part.text, extension, colors.diffAdditionHighlightColor, colors.diffAdditionHighlightBg)}
+                                            </React.Fragment>
+                                        );
+                                    }
+                                    return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.diffAdditionText)}</React.Fragment>;
+                                }
+                                return <React.Fragment key={sIdx}>{renderHighlightedLine(part.text, extension, colors.textMuted)}</React.Fragment>;
+                            })}
+                        </Text>
+                    </Box>
+                ))}
+            </Box>
         );
     };
 

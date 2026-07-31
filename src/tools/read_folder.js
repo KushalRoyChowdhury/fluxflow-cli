@@ -37,9 +37,21 @@ const EXCLUDED_DIRS = new Set([
 
 const isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsWith('.pnpm');
 
+const formatMtime = (d) => {
+    try {
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${mm}-${dd} ${hh}:${min}`;
+    } catch {
+        return 'N/A';
+    }
+};
+
 /**
  * Read Folder Tool
- * Provides detailed statistics for files in a directory, with optional recursion up to depth 5.
+ * Provides detailed statistics for files in a directory, with optional recursion up to depth 3.
  */
 export const read_folder = async (args) => {
     const parsed = parseArgs(args);
@@ -49,18 +61,18 @@ export const read_folder = async (args) => {
         return "ERROR: No directory path provided.";
     }
 
-    let recurseDepth = 0;
+    let recurseDepth = 1;
     if (parsed.recurse !== undefined && parsed.recurse !== null) {
         if (typeof parsed.recurse === 'number') {
             recurseDepth = parsed.recurse;
         } else if (typeof parsed.recurse === 'boolean') {
-            recurseDepth = parsed.recurse ? 1 : 0;
+            recurseDepth = parsed.recurse ? 2 : 1;
         } else {
             const val = parseInt(String(parsed.recurse).trim(), 10);
-            recurseDepth = isNaN(val) ? 0 : val;
+            recurseDepth = isNaN(val) ? 1 : val;
         }
     }
-    recurseDepth = Math.max(0, Math.min(5, recurseDepth));
+    recurseDepth = Math.max(1, Math.min(3, recurseDepth));
 
     const absolutePath = path.resolve(process.cwd(), targetPath);
 
@@ -74,7 +86,7 @@ export const read_folder = async (args) => {
             return `ERROR: Path [${targetPath}] is a file, not a directory. Use ReadFile instead.`;
         }
 
-        if (recurseDepth === 0) {
+        if (recurseDepth === 1) {
             const files = fs.readdirSync(absolutePath);
             const totalItems = files.length;
             const maxDisplay = 150;
@@ -90,8 +102,8 @@ export const read_folder = async (args) => {
                     info = {
                         name: file,
                         type: fStats.isDirectory() ? 'directory' : 'file',
-                        size: (fStats.size / 1024).toFixed(1) + ' KB',
-                        mtime: fStats.mtime.toLocaleString()
+                        size: (fStats.size / 1024).toFixed(1) + 'KB',
+                        mtime: formatMtime(fStats.mtime)
                     };
                 } catch (e) {
                     info.type = 'inaccessible';
@@ -101,125 +113,120 @@ export const read_folder = async (args) => {
             }
 
             const formatted = folderData.map(f => {
-                const indicator = f.type === 'directory' ? '📁' : f.type === 'file' ? '📄' : '❓';
                 if (f.type === 'directory') {
-                    return `${indicator} ${f.name} - [DIR] - [Modified: ${f.mtime}]`;
+                    return `${f.name}/`;
                 }
-                return `${indicator} ${f.name} - [Size: ${f.size}] - [Modified: ${f.mtime}]`;
+                return `${f.name} (${f.size}, ${f.mtime})`;
             }).join('\n');
 
             let footer = `\n\n(Total items in folder: ${totalItems})`;
             if (totalItems > maxDisplay) {
-                footer = `\n\n⚠️ TRUNCATED: Showing first ${maxDisplay} of ${totalItems} items.`;
+                footer = `\n\nTRUNCATED: Showing first ${maxDisplay} of ${totalItems} items.`;
             }
 
             files.length = 0;
             displayItems.length = 0;
             folderData.length = 0;
 
-            // fs.writeFileSync("DEBUG.txt", `Detailed folder stats for [${targetPath}]:\n\n${formatted}${footer}`);
+            // fs.writeFileSync("DEBUG-NORMAL.txt", `Detailed folder stats for [${targetPath}]:\n\n${formatted}${footer}`);
             return `Detailed folder stats for [${targetPath}]:\n\n${formatted}${footer}`;
         }
 
-        // Recursive tree traversal (recurseDepth 1..5)
+        // Recursive tree traversal (recurseDepth 1..3)
         let totalDirectories = 0;
         let totalFiles = 0;
         let totalItemsScanned = 0;
         const maxTotalItems = 500;
         let truncated = false;
 
-        const buildTree = (dirPath, currentDepth, prefix = '') => {
-            if (currentDepth > recurseDepth + 1 || truncated) return [];
+        const buildTree = (dirPath, currentDepth, depth = 1) => {
+            if (currentDepth > recurseDepth || truncated) return [];
 
             let entries = [];
             try {
                 entries = fs.readdirSync(dirPath);
             } catch (e) {
-                return [`${prefix}⚠️ [Inaccessible Directory]`];
+                const indent = '  '.repeat(depth - 1);
+                return [`${indent}[Inaccessible Directory]`];
             }
 
-            // Sort directories first, then files
-            const sortedEntries = [];
+            const subDirs = [];
+            const fileEntries = [];
+
             for (const name of entries) {
                 const fullPath = path.join(dirPath, name);
                 let isDir = false;
                 try {
                     isDir = fs.statSync(fullPath).isDirectory();
                 } catch (e) {}
-                sortedEntries.push({ name, fullPath, isDir });
+                if (isDir) {
+                    subDirs.push({ name, fullPath });
+                } else {
+                    fileEntries.push({ name, fullPath });
+                }
             }
-            sortedEntries.sort((a, b) => {
-                if (a.isDir && !b.isDir) return -1;
-                if (!a.isDir && b.isDir) return 1;
-                return a.name.localeCompare(b.name);
-            });
+
+            subDirs.sort((a, b) => a.name.localeCompare(b.name));
+            fileEntries.sort((a, b) => a.name.localeCompare(b.name));
 
             const lines = [];
-            const count = sortedEntries.length;
+            const indent = '  '.repeat(depth - 1);
 
-            for (let i = 0; i < count; i++) {
+            // 1. Process directories
+            for (const subDir of subDirs) {
                 if (totalItemsScanned >= maxTotalItems) {
                     truncated = true;
-                    lines.push(`${prefix}⚠️ [Truncated - Maximum item limit reached (${maxTotalItems})]`);
+                    lines.push(`${indent}[Truncated - Maximum item limit reached (${maxTotalItems})]`);
                     break;
                 }
-
-                const item = sortedEntries[i];
-                const isLast = i === count - 1;
-                const connector = isLast ? '└── ' : '├── ';
-                const childPrefix = prefix + (isLast ? '    ' : '│   ');
-
                 totalItemsScanned++;
+                totalDirectories++;
 
-                let itemType = 'unknown';
-                let sizeStr = 'N/A';
-                let mtimeStr = 'N/A';
+                lines.push(`${indent}${subDir.name}/`);
 
-                try {
-                    const fStats = fs.statSync(item.fullPath);
-                    if (fStats.isDirectory()) {
-                        itemType = 'directory';
-                        mtimeStr = fStats.mtime.toLocaleString();
-                        totalDirectories++;
-                    } else {
-                        itemType = 'file';
-                        sizeStr = (fStats.size / 1024).toFixed(1) + ' KB';
-                        mtimeStr = fStats.mtime.toLocaleString();
-                        totalFiles++;
-                    }
-                } catch (e) {
-                    itemType = 'inaccessible';
-                }
-
-                const indicator = itemType === 'directory' ? '📁' : itemType === 'file' ? '📄' : '❓';
-                let lineText = '';
-                if (itemType === 'directory') {
-                    lineText = `${prefix}${connector}${indicator} ${item.name} - [DIR] - [Modified: ${mtimeStr}]`;
-                } else {
-                    lineText = `${prefix}${connector}${indicator} ${item.name} - [Size: ${sizeStr}] - [Modified: ${mtimeStr}]`;
-                }
-
-                lines.push(lineText);
-
-                if (itemType === 'directory' && currentDepth <= recurseDepth && !isExcludedDir(item.name)) {
-                    const childLines = buildTree(item.fullPath, currentDepth + 1, childPrefix);
+                if (currentDepth < recurseDepth && !isExcludedDir(subDir.name)) {
+                    const childLines = buildTree(subDir.fullPath, currentDepth + 1, depth + 1);
                     lines.push(...childLines);
                 }
+            }
+
+            // 2. Process files compactly horizontally
+            const formattedFiles = [];
+            for (const file of fileEntries) {
+                if (totalItemsScanned >= maxTotalItems) {
+                    truncated = true;
+                    lines.push(`${indent}[Truncated - Maximum item limit reached (${maxTotalItems})]`);
+                    break;
+                }
+                totalItemsScanned++;
+                totalFiles++;
+
+                let sizeStr = 'N/A';
+                try {
+                    const fStats = fs.statSync(file.fullPath);
+                    sizeStr = (fStats.size / 1024).toFixed(1) + 'KB';
+                } catch (e) {}
+
+                formattedFiles.push(`${file.name} (${sizeStr})`);
+            }
+
+            if (formattedFiles.length > 0) {
+                lines.push(`${indent}${formattedFiles.join('; ')}`);
             }
 
             return lines;
         };
 
-        const treeLines = buildTree(absolutePath, 1, '');
+        const treeLines = buildTree(absolutePath, 1, 1);
         const formattedTree = treeLines.join('\n');
 
         let footer = `\n\n(Total items scanned: ${totalItemsScanned}, Directories: ${totalDirectories}, Files: ${totalFiles})`;
         if (truncated) {
-            footer = `\n\n⚠️ TRUNCATED: Scan capped at ${maxTotalItems} items. (Directories: ${totalDirectories}, Files: ${totalFiles})`;
+            footer = `\n\nTRUNCATED: Scan capped at ${maxTotalItems} items. (Directories: ${totalDirectories}, Files: ${totalFiles})`;
         }
 
-        // fs.writeFileSync("DEBUG.txt", `Detailed directory tree for [${targetPath}] (recurse depth: ${recurseDepth}):\n\n${formattedTree}${footer}`);
-        return `Detailed directory tree for [${targetPath}] (recurse depth: ${recurseDepth}):\n\n${formattedTree}${footer}`;
+        // fs.writeFileSync("DEBUG-RECURSE.txt", `Detailed directory tree for [${targetPath}] (Recursive depth: ${recurseDepth}):\n\n${formattedTree}${footer}`);
+        return `Detailed directory tree for [${targetPath}] (recursive depth: ${recurseDepth}):\n\n${formattedTree}${footer}`;
 
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

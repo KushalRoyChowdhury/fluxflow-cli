@@ -1,6 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
+import fg from 'fast-glob';
 import { parseArgs } from '../utils/arg_parser.js';
+import fsSync from 'fs';
 
 /**
  * Helper function to recursively scan a directory for files,
@@ -47,54 +49,89 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
 }
 
 /**
- * Normalize a string for fuzzy comparison:
- * lowercase, strip all non-alphanumeric chars (punctuation, quotes, etc.), collapse whitespace.
+ * Normalize and tokenize a string for code-aware fuzzy comparison:
+ * Splits on camelCase, snake_case, punctuation, and whitespace.
  */
-function normStr(s) {
-    return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+function tokenizeStr(s, isKeyword = false) {
+    if (!s) return [];
+    // Split camelCase boundaries (e.g. "searchKeyword" -> "search Keyword")
+    const decamelized = s.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+    // Replace non-alphanumeric with spaces and extract lowercase tokens
+    const tokens = decamelized.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean);
+    if (isKeyword && tokens.length > 1) {
+        // When keyword has multiple words (e.g. "/ vrson"), filter out 1-char noise tokens like "/" or "a"
+        const filtered = tokens.filter(t => t.length > 1);
+        return filtered.length > 0 ? filtered : tokens;
+    }
+    return tokens;
 }
 
 /**
  * Levenshtein distance between two strings (capped early for performance).
  */
-function levenshtein(a, b) {
+function levenshtein(a, b, cap = Infinity) {
     if (a === b) return 0;
     if (a.length === 0) return b.length;
     if (b.length === 0) return a.length;
-    const cap = Math.floor(Math.max(a.length, b.length) / 2) + 1; // max tolerated distance
-    const dp = Array.from({ length: a.length + 1 }, (_, i) => i);
-    for (let j = 1; j <= b.length; j++) {
-        let prev = dp[0];
-        dp[0] = j;
-        for (let i = 1; i <= a.length; i++) {
-            const tmp = dp[i];
-            dp[i] = b[j - 1] === a[i - 1]
-                ? prev
-                : 1 + Math.min(prev, dp[i], dp[i - 1]);
-            prev = tmp;
+    if (Math.abs(a.length - b.length) > cap) return cap + 1;
+
+    let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        let nextRow = [i];
+        let minInRow = i;
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            const dist = Math.min(
+                nextRow[j - 1] + 1, // insertion
+                row[j] + 1,        // deletion
+                row[j - 1] + cost  // substitution
+            );
+            nextRow.push(dist);
+            if (dist < minInRow) minInRow = dist;
         }
-        if (Math.min(...dp) > cap) return cap + 1; // bail early
+        row = nextRow;
+        if (minInRow > cap) return cap + 1;
     }
-    return dp[a.length];
+    return row[b.length];
 }
 
 /**
- * Fuzzy match: every token of the normalized keyword must find a "close enough"
- * word in the normalized line.
- * Tolerance: 0 for 1-2 char tokens, 1 for 3-5 chars, 2 for 6+ chars.
+ * Dynamic proportional threshold for allowed edit distance.
  */
+function getMaxEditDistance(len) {
+    if (len <= 2) return 0;
+    if (len <= 5) return 1;
+    if (len <= 10) return 2;
+    return Math.min(3, Math.floor(len * 0.25));
+}
+
 function fuzzyMatch(line, keyword) {
-    const normLine = normStr(line);
-    const lineWords = normLine.split(' ');
-    const kwTokens = normStr(keyword).split(' ').filter(Boolean);
+    if (!line || !keyword) return false;
+    const normLine = line.toLowerCase();
+    const normKw = keyword.toLowerCase();
 
-    // First: fast path – if normalized keyword is a substring, accept immediately
-    if (normLine.includes(normStr(keyword))) return true;
+    // 1. Direct substring check (fastest path)
+    if (normLine.includes(normKw)) return true;
 
-    // Second: every keyword token must find a close-enough word on the line
-    return kwTokens.every(token => {
-        const maxDist = token.length <= 2 ? 0 : token.length <= 5 ? 1 : 2;
-        return lineWords.some(word => levenshtein(token, word) <= maxDist);
+    const lineWords = normLine.split(/[^a-z0-9]+/).filter(w => w.length > 0);
+    const kwTokens = normKw.split(/[^a-z0-9]+/).filter(t => t.length > 1 || (normKw.length === 1 && t.length > 0));
+
+    if (kwTokens.length === 0) return false;
+
+    // 2. Every non-trivial token in the keyword must find a close match in lineWords
+    return kwTokens.every(kwToken => {
+        const maxDist = kwToken.length <= 2 ? 0 : (kwToken.length <= 5 ? 1 : 2);
+
+        for (const lineWord of lineWords) {
+            // A) Exact substring within lineWord (e.g. "files" in "getFilesRecursively")
+            if (lineWord.includes(kwToken)) return true;
+
+            // B) Levenshtein match for tokens of length >= 3
+            if (kwToken.length >= 3 && lineWord.length >= 3 && Math.abs(lineWord.length - kwToken.length) <= maxDist) {
+                if (levenshtein(kwToken, lineWord, maxDist) <= maxDist) return true;
+            }
+        }
+        return false;
     });
 }
 
@@ -102,17 +139,16 @@ function fuzzyMatch(line, keyword) {
  * Search Keyword Tool
  * Searches for a specific keyword in the current workspace natively without shell commands.
  *
- * @param {string}  keyword            - The keyword/word (or regex pattern) to search for.
- * @param {string}  [path]             - Optional: restrict search to a specific file or directory.
- *                                       If a file path is given, only that file is searched.
- *                                       If a directory path is given (trailing slash optional),
- *                                       all files inside that directory are searched recursively.
- * @param {boolean} [subString=false]  - When true, matches any substring (with fuzzy fallback).
- * @param {boolean} [regex=false]      - When true, treats keyword as a regex pattern (case-insensitive).
- *                                       Takes priority over subString mode.
+ * @param {string}  keyword          - The keyword/word (or regex pattern) to search for.
+ * @param {string}  [path]           - Optional: restrict search to a specific file or directory.
+ *                                     If a file path is given, only that file is searched.
+ *                                     If a directory path is given (trailing slash optional),
+ *                                     all files inside that directory are searched recursively.
+ * @param {boolean} [fuzzy=false]    - When true, enables typo-tolerant fuzzy matching.
+ * @param {boolean} [regex=false]    - When true, treats keyword as a regex pattern (case-insensitive).
  */
 export const search_keyword = async (args) => {
-    const { keyword: rawKeyword, path: pathArg, subString, regex } = parseArgs(args);
+    const { keyword: rawKeyword, path: pathArg, fuzzy, subString, regex } = parseArgs(args);
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
 
@@ -120,14 +156,14 @@ export const search_keyword = async (args) => {
     const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';
     const regexExplicitlyFalse = regex === false || regex === 'false' || regex === 0 || regex === '0' || regex === 'no';
     const regexExplicitlyTrue = regex === true || regex === 'true' || regex === 1 || regex === '1' || regex === 'yes';
-    let matchSubstring = regexExplicitlyFalse && toBool(subString);
+    const isFuzzy = toBool(fuzzy) || toBool(subString);
 
     // Build search matchers
     let regexPattern = null; // used for regex mode
     let wordRegex = null;    // used for normal (whole-word) mode
 
     if (regexExplicitlyFalse) {
-        if (!matchSubstring) {
+        if (!isFuzzy) {
             wordRegex = new RegExp(`(?<![\\w])${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i');
         }
     } else {
@@ -185,25 +221,79 @@ export const search_keyword = async (args) => {
     try {
         let filesToSearch = [];
         const rootDir = process.cwd();
-        let pathArgType = null; // 'file' | 'dir' | null
+        let pathArgType = null; // 'file' | 'dir' | 'glob' | null
 
         if (pathArg) {
-            // Strip trailing slash so both "src/utils" and "src/utils/" work
-            const normalised = pathArg.replace(/[\/\\]+$/, '');
-            const fullPath = path.resolve(rootDir, normalised);
-            try {
-                const stat = await fs.stat(fullPath);
-                if (stat.isDirectory()) {
-                    pathArgType = 'dir';
-                    filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
-                } else if (stat.isFile()) {
-                    pathArgType = 'file';
-                    filesToSearch.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
-                } else {
-                    return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
+            const isGlob = fg.isDynamicPattern(pathArg) || /[*?{}[\]()|+]/.test(pathArg);
+            if (isGlob) {
+                pathArgType = 'glob';
+                const posixPath = pathArg.replace(/\\/g, '/');
+                const globExcludes = excludes.map(ex => ex.startsWith('.') ? `**/*${ex}` : `**/${ex}/**`);
+                
+                const hasRegexSyntax = /[\(\)\|]|\.\*/.test(posixPath);
+                let matchedPaths = [];
+                if (!hasRegexSyntax) {
+                    try {
+                        matchedPaths = await fg(posixPath, {
+                            cwd: rootDir,
+                            ignore: globExcludes,
+                            dot: true,
+                            onlyFiles: true,
+                            absolute: false
+                        });
+                    } catch {
+                        matchedPaths = [];
+                    }
                 }
-            } catch {
-                return `ERROR: Path not found: ${pathArg}`;
+
+                // If fast-glob was skipped or returned 0 matches and path has regex syntax, fallback to RegExp file filtering
+                if (matchedPaths.length === 0 && (hasRegexSyntax || fg.isDynamicPattern(posixPath))) {
+                    // Extract static base directory before regex characters
+                    const baseDirMatch = posixPath.match(/^([^\*\?\(\)\|\[\]\s]+)\//);
+                    const scanDir = (baseDirMatch && !/[\*\?\(\)\|\[\]]/.test(baseDirMatch[1]))
+                        ? path.resolve(rootDir, baseDirMatch[1])
+                        : rootDir;
+                    const allFiles = await getFilesRecursively(scanDir, excludes, rootDir);
+                    
+                    try {
+                        let cleanRegexStr = posixPath.replace(/^\.\//, '');
+                        // Fix common model regex path patterns like `.*read_folder.*/.js` or `.*/.js` where `.*/.` was meant to match `.js` or `/\w+\.js`
+                        cleanRegexStr = cleanRegexStr.replace(/\.\*\/(\\\.|[^\/])/g, '.*$1');
+                        if (!cleanRegexStr.startsWith('^') && !cleanRegexStr.startsWith('.*')) {
+                            cleanRegexStr = `.*${cleanRegexStr}`;
+                        }
+                        const pathRegex = new RegExp(cleanRegexStr.endsWith('$') ? cleanRegexStr : `${cleanRegexStr}$`, 'i');
+                        filesToSearch = allFiles.filter(f => {
+                            const rel = f.relativePath.replace(/\\/g, '/');
+                            return pathRegex.test(rel);
+                        });
+                    } catch {
+                        filesToSearch = [];
+                    }
+                } else {
+                    filesToSearch = matchedPaths.map(relP => ({
+                        fullPath: path.resolve(rootDir, relP),
+                        relativePath: relP
+                    }));
+                }
+            } else {
+                // Strip trailing slash so both "src/utils" and "src/utils/" work
+                const normalised = pathArg.replace(/[\/\\]+$/, '');
+                const fullPath = path.resolve(rootDir, normalised);
+                try {
+                    const stat = await fs.stat(fullPath);
+                    if (stat.isDirectory()) {
+                        pathArgType = 'dir';
+                        filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
+                    } else if (stat.isFile()) {
+                        pathArgType = 'file';
+                        filesToSearch.push({ fullPath, relativePath: path.relative(rootDir, fullPath) });
+                    } else {
+                        return `ERROR: Path is neither a file nor a directory: ${pathArg}`;
+                    }
+                } catch {
+                    return `ERROR: Path not found: ${pathArg}`;
+                }
             }
         } else {
             filesToSearch = await getFilesRecursively(rootDir, excludes);
@@ -220,11 +310,11 @@ export const search_keyword = async (args) => {
                 const fileMatches = [];
 
                 for (let i = 0; i < lines.length; i++) {
-                    const matched = regexExplicitlyFalse
-                        ? (matchSubstring
-                            ? (lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword))
-                            : (wordRegex && wordRegex.test(lines[i])))
-                        : ((regexPattern && regexPattern.test(lines[i])) || (wordRegex && wordRegex.test(lines[i])));
+                    const matched = isFuzzy
+                        ? (lines[i].toLowerCase().includes(keyword.toLowerCase()) || fuzzyMatch(lines[i], keyword))
+                        : (regexExplicitlyFalse
+                            ? (wordRegex && wordRegex.test(lines[i]))
+                            : ((regexPattern && regexPattern.test(lines[i])) || (wordRegex && wordRegex.test(lines[i]))));
                     if (matched) {
                         fileMatches.push({ line: i + 1, content: lines[i].trim() });
                     }
@@ -256,18 +346,18 @@ export const search_keyword = async (args) => {
             global.gc();
         }
 
-        const modeLabel = regexExplicitlyFalse
-            ? (matchSubstring ? '(subString mode)' : '(keyword mode)')
-            : (regexExplicitlyTrue ? '(regex mode)' : '(standard mode)');
+        const modeLabel = isFuzzy
+            ? '(fuzzy mode)'
+            : (regexExplicitlyTrue ? '(regex mode)' : (regexExplicitlyFalse ? '(keyword mode)' : '(standard mode)'));
 
         if (fileGroups.length === 0) {
             const zeroLocation = pathArgType === 'file'
                 ? ` in '${pathArg}'`
-                : pathArgType === 'dir'
+                : (pathArgType === 'dir' || pathArgType === 'glob')
                     ? ` in '${pathArg}'`
                     : '. Try to specify files';
-            const dirPrefix = pathArgType === 'dir' ? '[DIR]' : '';
-            return `${dirPrefix}Found 0 matches of '${keyword}'${zeroLocation}${modeLabel ? ` ${modeLabel}` : ''}`;
+            const dirPrefix = pathArgType === 'dir' ? '[DIR]' : (pathArgType === 'glob' ? '[GLOB]' : '');
+            return `${dirPrefix}${dirPrefix ? ' ' : ''}Found 0 matches of '${keyword}'${zeroLocation}${modeLabel ? ` ${modeLabel}` : ''}`;
         }
 
         const ml = modeLabel ? ` ${modeLabel}` : '';
@@ -276,20 +366,18 @@ export const search_keyword = async (args) => {
         let outputHeader;
         if (pathArgType === 'file') {
             outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}'${ml}:`;
-        } else if (pathArgType === 'dir') {
+        } else if (pathArgType === 'dir' || pathArgType === 'glob') {
             outputHeader = `Found ${matchCount} of '${keyword}' in '${pathArg}' across ${fileCount}${ml}:`;
         } else {
             outputHeader = `Found ${matchCount} of '${keyword}' across ${fileCount}${ml}:`;
         }
-        const dirPrefix = pathArgType === 'dir' ? '[DIR]' : '';
-        let output = `${dirPrefix}${outputHeader}\n\n`;
+        const dirPrefix = pathArgType === 'dir' ? '[DIR]' : (pathArgType === 'glob' ? '[GLOB]' : '');
+        let output = `${dirPrefix}${dirPrefix ? ' ' : ''}${outputHeader}\n\n`;
 
         for (const group of fileGroups) {
             output += `${group.path}\n`;
-            for (let i = 0; i < group.matches.length; i++) {
-                const isLast = i === group.matches.length - 1;
-                const prefix = isLast ? '└──' : '├──';
-                output += `${prefix} ${group.matches[i].line}: ${group.matches[i].content}\n`;
+            for (const m of group.matches) {
+                output += `  ${m.line}: ${m.content}\n`;
             }
             output += '\n';
         }

@@ -25,6 +25,7 @@ import { AdvanceRevertManager } from './advanceRevert.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 import { getDirTreeIndentation } from './getDirTree/indentation.js';
 import { getDirTreeBox } from './getDirTree/box.js';
+import { isPsAvailable } from '../data/main_tools.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -46,30 +47,7 @@ let client = null;
 
 let globalSettings = {};
 
-let dirTreeCache = null;
-let cachedChatId = null;
-let cachedIndentationTree = null;
-
-const getCachedDirTree = (fn, chatId, isDynamicDirAwareness, indentationTree) => {
-    if (isDynamicDirAwareness) {
-        dirTreeCache = null;
-        cachedChatId = chatId;
-        cachedIndentationTree = indentationTree;
-        return fn();
-    }
-
-    if (cachedChatId !== chatId || cachedIndentationTree !== indentationTree) {
-        dirTreeCache = null;
-        cachedChatId = chatId;
-        cachedIndentationTree = indentationTree;
-    }
-
-    if (dirTreeCache === null) {
-        dirTreeCache = fn();
-    }
-
-    return dirTreeCache;
-};
+let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
@@ -1242,7 +1220,9 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     // fs.writeFileSync('test.txt', originalTextProcessed);
     // replace the consecutive newlines and literal escaped \n\n with clean formatting
     agentRes = agentRes.replace(/\r?\n\r?\n/g, '\n').replace(/\n\n/g, '\n').replace(/\\n\\n/g, '').trim();
-    let userPrompt = `[METADATA] Current date and Time: ${new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', hour12: true })}
+    const now1223 = new Date();
+    const dateTimeStr1223 = `${now1223.getFullYear()}-${now1223.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(now1223.getDate()).padStart(2, '0')}, ${now1223.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    let userPrompt = `[METADATA] Current date and Time: ${dateTimeStr1223}
 
 [USER]: ${originalTextProcessed.substring(0, USER_CONTEXT_LENGTH)}\n${originalTextProcessed.length > USER_CONTEXT_LENGTH ? '... (truncated) ...\n\n' : ''}
 [AGENT (current turn)]: ${agentRes}`
@@ -1797,6 +1777,15 @@ const translateKimiToolCalls = (text) => {
     return result;
 };
 
+const REGEX_PLACEHOLDER_ARG = /(?:path|query|url|keyword|command|method|title|task|id)\s*=\s*['"`]?\s*\.\.\.\s*['"`]?/i;
+const REGEX_PLACEHOLDER_VAL = /^['"`]?\s*\.\.\.\s*['"`]?$/;
+
+const isPlaceholderVal = (val) => {
+    if (val === undefined || val === null) return false;
+    const str = String(val).trim();
+    return str === '...' || str === '…' || REGEX_PLACEHOLDER_VAL.test(str);
+};
+
 const detectToolCalls = (text) => {
     if (!text) return [];
     const translatedText = translateKimiToolCalls(text);
@@ -1853,11 +1842,28 @@ const detectToolCalls = (text) => {
         if (endIdx !== -1) {
             const finalArgsText = cleanText.substring(startIdx + 1, closingParenIdx);
             const finalFullMatch = cleanText.substring(match.index, endIdx + 1);
-            results.push({
-                fullMatch: finalFullMatch,
-                toolName: toolName.trim(),
-                args: finalArgsText.trim()
-            });
+
+            // Filter out dummy/placeholder tool calls where path, query, url, keyword, command, method, title, task, or id is '...'
+            const parsed = parseArgs(finalArgsText);
+            const hasPlaceholderArg =
+                isPlaceholderVal(parsed.path) ||
+                isPlaceholderVal(parsed.query) ||
+                isPlaceholderVal(parsed.url) ||
+                isPlaceholderVal(parsed.keyword) ||
+                isPlaceholderVal(parsed.command) ||
+                isPlaceholderVal(parsed.method) ||
+                isPlaceholderVal(parsed.title) ||
+                isPlaceholderVal(parsed.task) ||
+                isPlaceholderVal(parsed.id) ||
+                REGEX_PLACEHOLDER_ARG.test(finalArgsText);
+
+            if (!hasPlaceholderArg) {
+                results.push({
+                    fullMatch: finalFullMatch,
+                    toolName: toolName.trim(),
+                    args: finalArgsText.trim()
+                });
+            }
             toolRegex.lastIndex = endIdx + 1;
         }
     }
@@ -2098,7 +2104,7 @@ Chats to process:
             prompt += `[Chat ID: ${id}]\n`;
             if (oldSummary) {
                 prompt += `- Existing Summary: "${oldSummary}"\n`;
-                prompt += `-- New Memories to integrate:\n${newMemoryListStr}\n\n`;
+                prompt += `\n-- New Memories to integrate:\n${newMemoryListStr}\n\n`;
             } else {
                 prompt += `-- Individual Memories:\n${newMemoryListStr}\n\n`;
             }
@@ -2399,7 +2405,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const isContext32k = (sessionStats?.tokens || 0) >= 10000;
         const memoryPrompt = getMemoryPrompt(otherMemories, mainUserMemories, isMemoryEnabled, isContext32k);
-        const dateTimeStr = new Date().toLocaleString([], { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+        const day = String(now.getDate()).padStart(2, '0');
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        const dateTimeStr = `${year}-${month}-${day}, ${timeStr}`;
 
         const COLLAPSED_DIRS_GLOBAL = [
             // --- The OG Clutter ---
@@ -2541,7 +2552,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const activeSummaryBlock = (currentSummary && !hasExistingTurnsAfterCompression) ? `\n[SYSTEM METADATA]\n**CONTEXT SUMMARY OF PREVIOUS TURNS**\n${currentSummary}\n` : '';
 
-        let dirStructure = '\n**DIRECTORY STRUCTURE**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getCachedDirTree(() => getDirTree(process.cwd(), dynamicMaxDepth), chatId, systemSettings?.dynamicDirAwareness, systemSettings?.indentationTree);
+        const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
+        const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
+        const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
+        let dirStructure = isSysInstructionCached ? '' : ('\n**DIRECTORY STRUCTURE**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getDirTree(process.cwd(), dynamicMaxDepth));
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -3071,14 +3085,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     */
 
-                    // [DYNAMIC CONTEXT ADAPTATION WITH MEMORIES]
-                    // We recalculate instructions every turn so the agent knows when it's hitting context limits
-                    currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false, chatId);
+                    // [SYSTEM INSTRUCTION CACHING]
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+                    let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
+                    if (isCacheHit) {
+                        currentSystemInstruction = systemInstructionCache.value;
+                    } else {
+                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false, chatId);
 
-                    if (!systemSettings?.dynamicDirAwareness) {
-                        currentSystemInstruction += `\n${dirStructure.replace('\n**DIRECTORY STRUCTURE**', '\n**DIRECTORY STRUCTURE**')}`;
+                        if (!systemSettings?.dynamicDirAwareness) {
+                            currentSystemInstruction += `\n${dirStructure.replace('\n**DIRECTORY STRUCTURE**', '\n**DIRECTORY STRUCTURE**')}`;
+                        }
+                        systemInstructionCache.key = sysInstructionCacheKey;
+                        systemInstructionCache.value = currentSystemInstruction;
                     }
-
 
                     const lastUserMsg = contents[contents.length - 1];
                     if (isBridgeConnected() & loop > 0) {
@@ -3143,7 +3163,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
-                    // fs.writeFileSync(`contents.txt`, `${currentSystemInstruction}\n\n${firstUserMsg}`);
+                    // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"} ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
                     const abortPromise = new Promise((_, reject) => {
@@ -3897,8 +3917,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
                                     const path = parseArgs(toolCall.args).path || null;
-                                    const recurse = parseArgs(toolCall.args).recurse || 0;
-                                    label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? './' : `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
+                                    const recurse = parseArgs(toolCall.args).recurse || 1;
+                                    label = `${path ? '✔' : '✘'}  ${action}: ${path ? `${path === '.' ? `./${recurse > 1 ? '*' : ''}` : `${path.replaceAll('\\', '/')}${recurse > 1 ? `${path.endsWith('/') ? `*` : `/*`}` : `${path.endsWith('/') ? '' : '/'}`}`}` : 'No Folder Selected'}`;
                                 } else if (normToolName === 'write_file' || normToolName === 'update_file') {
                                     const action = normToolName === 'write_file' ? 'Created' : 'Edited';
                                     const path = parseArgs(toolCall.args).path || null;
@@ -3960,7 +3980,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         'Panicking Softly',
                                         'Rethinking Career Choices',
                                         'Loading Cat Videos',
-                                        'Giving Up Entirely',
 
                                         // --- The New Chaos Pack ---
                                         'Summoning Braincell #2',
@@ -4687,9 +4706,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 if (normToolName === 'search_keyword') {
                                     const { keyword, path } = parseArgs(toolCall.args);
-                                    // Detect and strip the hidden [DIR] token emitted by search_keyword
+                                    // Detect and strip the hidden [DIR] or [GLOB] token emitted by search_keyword
+                                    const _isGlob = typeof result === 'string' && result.startsWith('[GLOB]');
+                                    if (_isGlob) result = result.slice(6).trimStart();
                                     const _isDir = typeof result === 'string' && result.startsWith('[DIR]');
-                                    if (_isDir) result = result.slice(5); // strip "[DIR]"
+                                    if (_isDir) result = result.slice(5).trimStart();
                                     let matchCount = 0;
                                     if (result) {
                                         const m = result.match(/Found (\d+) match/i);
@@ -4699,7 +4720,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const _sp = path ? path.replace(/[\/\\]+$/, '') : null;
                                     const displayPath = _sp && _sp !== '.'
-                                        ? `"${_isDir ? `${_sp}/*` : _sp}"`
+                                        ? `"${_isGlob ? path : (_isDir ? `${_sp}/*` : _sp)}"`
                                         : './';
                                     const postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
 
@@ -5247,28 +5268,107 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null) => {
     const savedSettings = await loadSettings();
     const mergedSettings = { ...savedSettings, ...settings };
-    const targetModel = model || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
+    const envSubagentModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
+    const envSubagentProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-    const SUBAGENT_TOOL_DEFINITIONS = {
-        'readfile': '- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files',
+    const subagentNow = new Date();
+    const time = `${subagentNow.getFullYear()}-${subagentNow.toLocaleString('en-US', { month: 'short' }).toUpperCase()}-${String(subagentNow.getDate()).padStart(2, '0')}, ${subagentNow.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }).replace(':', '-')}`;
 
-        'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes',
-
-        'filemap': '- [tool:functions.FileMap(path="file")]. Shows file structure, functions, class, import/export, variables',
-
-        'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
-
-        'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
-
-        'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, target directory/filename", subString="bool optional, default: false", regex="bool optional, default: auto")]. path limits scope to a file/dir. Find definitions/logic without full reads. Locate relevant code',
-
-        'websearch': '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
-
-        'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
-
-        'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`
-
+    const normalizeProvider = (pStr) => {
+        if (!pStr) return null;
+        const lower = pStr.toLowerCase();
+        if (lower === 'google') return 'Google';
+        if (lower === 'deepseek') return 'DeepSeek';
+        if (lower === 'openrouter') return 'OpenRouter';
+        if (lower === 'nvidia') return 'NVIDIA';
+        if (lower === 'mistral') return 'Mistral';
+        return null;
     };
+
+    const envSubagentProvider = normalizeProvider(envSubagentProviderRaw);
+
+    const configuredSubAgentModel = mergedSettings?.systemSettings?.CustomSubAgent ? mergedSettings?.systemSettings?.SubAgentModel : null;
+    const configuredSubAgentProvider = mergedSettings?.systemSettings?.CustomSubAgent ? mergedSettings?.systemSettings?.SubAgentProvider : null;
+
+    let subAgentCustomModel = null;
+    if (configuredSubAgentModel === 'ENV') {
+        subAgentCustomModel = envSubagentModel;
+        if (envSubagentModel && envSubagentProvider) {
+            mergedSettings.aiProvider = envSubagentProvider;
+        }
+    } else if (configuredSubAgentModel && configuredSubAgentModel !== 'Default') {
+        subAgentCustomModel = configuredSubAgentModel;
+        if (configuredSubAgentProvider) {
+            mergedSettings.aiProvider = configuredSubAgentProvider;
+        }
+    } else if (envSubagentModel) {
+        if (envSubagentProvider) {
+            mergedSettings.aiProvider = envSubagentProvider;
+        }
+    }
+
+    if (mergedSettings.aiProvider) {
+        const providerApiKey = await getProviderAPIKey(mergedSettings.aiProvider);
+        if (providerApiKey) {
+            mergedSettings.apiKey = providerApiKey;
+        }
+    }
+
+    // Helper to validate and block dangerous/destructive commands for subagents
+    const isSubagentCommandAllowed = (cmdString) => {
+        if (!cmdString || typeof cmdString !== 'string') return { allowed: true };
+
+        const DANGEROUS_PATTERNS = [
+            // Destructive file deletion / formatting
+            /rm\s+-[rf]{1,2}\s+[\/*.]/i,
+            /rmdir\s+\/[sq]/i,
+            /del\s+\/[fsq]/i,
+            /\bformat\b\s+[a-z]:/i,
+            /mkfs/i,
+            /dd\s+if=/i,
+            // System shutdown / reboot / killall
+            /\b(shutdown|reboot|poweroff|init\s+0|init\s+6)\b/i,
+            // Low level disk / raw write / partition / chmod dangerous
+            /chmod\s+(-R\s+)?777\s+[\/*.]/i,
+            /chown\s+(-R\s+)?root/i,
+            // Dangerous git force / reset operations on remote / system
+            /git\s+push\s+.*--force/i,
+            /git\s+clean\s+-fdx/i,
+            // System-level privilege escalation
+            /\bsudo\s+su\b/i,
+            /\bsu\s+-\b/i
+        ];
+
+        for (const pattern of DANGEROUS_PATTERNS) {
+            if (pattern.test(cmdString)) {
+                return { allowed: false, reason: `Blocked potentially destructive or unsafe command pattern: "${pattern.source}"` };
+            }
+        }
+        return { allowed: true };
+    };
+
+    const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
+    const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+
+    // const SUBAGENT_TOOL_DEFINITIONS = {
+    //     'readfile': '- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files',
+
+    //     'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes',
+
+    //     'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
+
+    //     'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
+
+    //     'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code',
+
+    //     'websearch': '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
+
+    //     'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
+
+    //     'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`,
+
+    //     'run': `- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`
+    // };
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
 TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
@@ -5277,11 +5377,26 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 TOOL POLICY:
 - MAX 3 TOOL CALLS PER TURN
 - Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**
-- FileMap → ReadFile for efficient file understanding
-- Need specific text ? SearchKeyword > Guessing/ReadFile
-- Huge files ? SearchKeyword > FileMap/Full Read
-- NO Shell Access\n\n-- PROVIDED TOOLS --\n${Object.values(SUBAGENT_TOOL_DEFINITIONS).join('\n')}\n
-- VERIFY TOOL RESULT CONTENTS. Fix errors. No hallucinations
+- Need specific text OR huge file ? SearchKeyword > ReadFile
+- Tool denied? Use \`Ask\` immediately for user guidance ← **MANDATORY**
+- Restricted Shell Access, NO DELETION
+
+**PROVIDED TOOLS**
+-- Communication with USER --
+- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+
+-- Web Tools --
+- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
+- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
+
+-- Workspace Tools --
+- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
+- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES. allowMultiple: Replace all matches ONLY WHERE SURE. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
+- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user
+
 - **Escape quotes: \\" for code strings**
 - **Literal escapes: Double-escape sequences (e.g., \\\\n)**
 - **File structure: Real newlines for code formatting**`.trim();
@@ -5293,15 +5408,14 @@ Your task is: "${task}"
 ${providedToolsSection.trimEnd()}
 
 -- THINKING GUIDANCE --
-NO EXPLICIT THINKING REQUIRED. FOCUS ON COMPLETING THE TASK DIRECTLY
-
+NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
 Keep main focus on tools and task, not chatting
-Once you have fully completed the task, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
+On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
 
 CWD: ${process.cwd()}
+Current Time: ${time}
 === END SYSTEM PROMPT ===`;
 
-    // Current Time: ${new Date().toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2').replace(':', '-')}\n
 
     const subagentHistory = [
         { role: 'user', text: `Complete this task: ${task}` }
@@ -5372,14 +5486,28 @@ CWD: ${process.cwd()}
                 continue;
             }
 
+            // Command safety validation for subagents (groundwork for terminal execution)
+            if (normalizedToolName === 'exec_command' || normalizedToolName === 'execcommand' || normalizedToolName === 'run') {
+                const cmdArg = parseArgs(toolCall.args).command || '';
+                const cmdCheck = isSubagentCommandAllowed(cmdArg);
+                if (!cmdCheck.allowed) {
+                    const blockMsg = `ERROR: [SECURITY RESTRICTION] Subagent execution blocked command: ${cmdCheck.reason}`;
+                    if (logCallback) logCallback(`[Blocked Command] ${cmdArg} - ${cmdCheck.reason}\n`);
+                    toolResultsStr += `${blockMsg}\n\n`;
+                    continue;
+                }
+            }
+
             // fs.writeFileSync("SUBAGENT-DEBUG.txt", normalizedToolName);
             let label = '';
             if (normalizedToolName === 'web_search' || normalizedToolName === 'websearch') {
-                label = `✔ \x1b[95mSearched\x1b[0m`;
+                const query = parseArgs(toolCall.args).query || '';
+                label = `✔ \x1b[95mSearched\x1b[0m: ${query}`;
             }
 
             else if (normalizedToolName === 'web_scrape' || normalizedToolName === 'webscrape') {
-                label = `✔ \x1b[95mScraped\x1b[0m`;
+                const url = parseArgs(toolCall.args).url || '';
+                label = `✔ \x1b[95mScraped\x1b[0m: ${url}`;
             }
 
             else if (normalizedToolName === 'search_keyword' || normalizedToolName === 'searchkeyword') {
@@ -5397,7 +5525,7 @@ CWD: ${process.cwd()}
             else if (normalizedToolName === 'list_files' || normalizedToolName === 'read_folder' || normalizedToolName === 'readfolder') {
                 const path = parseArgs(toolCall.args).path || null;
                 const recurse = parseArgs(toolCall.args).recurse || 0;
-                label = `${path ? '✔' : '✘'}  \x1b[95mBrowsed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
+                label = `${path ? '✔' : '✘'} \x1b[95mBrowsed\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}${recurse > 0 ? `${path.endsWith('/') ? `*${recurse}` : `/*${recurse}`}` : `${path.endsWith('/') ? '' : '/'}`}` : ''}`;
             }
 
             else if (normalizedToolName === 'write_file' || normalizedToolName === 'writefile') {
@@ -5409,6 +5537,11 @@ CWD: ${process.cwd()}
                 const path = parseArgs(toolCall.args).path || null;
                 const content = parseArgs(toolCall.args).content || null;
                 label = `${path ? '✔' : '✘'} \x1b[95mEdited\x1b[0m: ${path ? `${path.replaceAll('\\', '/')}` : 'No File Changes'}`;
+            }
+
+            else if (normalizedToolName === 'exec_command' || normalizedToolName === 'execcommand' || normalizedToolName === 'run') {
+                const command = parseArgs(toolCall.args).command || null;
+                label = `${command ? '✔' : '✘'} \x1b[95mExecuted\x1b[0m: ${command ? command.slice(0, 100) + (command.length > 100 ? '...' : '') : 'No Command'}`;
             }
 
             else if (normalizedToolName === 'file_map' || normalizedToolName === 'filemap') {

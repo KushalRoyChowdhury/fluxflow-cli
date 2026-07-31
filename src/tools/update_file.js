@@ -12,7 +12,7 @@ export const update_file = async (args, context = {}) => {
     const parsed = parseArgs(args);
     const targetPath = parsed.path;
 
-    if (!targetPath) return 'ERROR: Missing "path" argument for update_file.';
+    if (!targetPath) return 'ERROR: Missing "path" argument for PatchFile.';
 
     // Extract replacement pairs using shared utility
     const { patchPairs, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(parsed);
@@ -30,7 +30,7 @@ export const update_file = async (args, context = {}) => {
 
     try {
         if (!fs.existsSync(absolutePath)) {
-            return `ERROR: File [${targetPath}] does not exist. Use write_file instead.`;
+            return `ERROR: File [${targetPath}] does not exist. Use WriteFile instead.`;
         }
 
         let diskContent = context.forcedContent || fs.readFileSync(absolutePath, 'utf8');

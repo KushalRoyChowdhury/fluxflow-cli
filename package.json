@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "3.15.2",
-    "date": "2026-07-31",
+    "version": "3.16.0",
+    "date": "2026-08-01",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era.",
     "keywords": [
         "ai",
@@ -41,13 +41,14 @@
     },
     "scripts": {
         "start": "tsx ./src/cli.jsx",
-        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv"
+        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --outfile=./dist/fluxflow.js --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv --external:fast-glob"
     },
     "dependencies": {
         "@google/genai": "^1.52.0",
         "chalk": "^5.6.2",
         "diff": "^9.0.0",
         "dotenv": "^17.4.2",
+        "fast-glob": "^3.3.3",
         "fs-extra": "^11.3.4",
         "gradient-string": "^3.0.0",
         "html-to-docx": "^1.8.0",

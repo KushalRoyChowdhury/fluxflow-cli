@@ -717,6 +717,125 @@ export default function App({ args = [] }) {
             clearInterval(memInterval);
         };
     }, []);
+
+    // [SUB-AGENT MODEL STARTUP CHECK] Validate configured sub-agent model against current provider / saved keys / ENV
+    useEffect(() => {
+        const checkSubAgentModelOnStartup = async () => {
+            try {
+                const settings = await loadSettings();
+                const sysSettings = settings?.systemSettings || {};
+                const customSubAgent = sysSettings.CustomSubAgent;
+                const configuredModel = sysSettings.SubAgentModel;
+
+                if (!customSubAgent || !configuredModel || configuredModel === 'Default') {
+                    return;
+                }
+
+                const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
+                const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
+
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+                const normalizeProvider = (pStr) => {
+                    if (!pStr) return null;
+                    const lower = pStr.toLowerCase();
+                    if (lower === 'google') return 'Google';
+                    if (lower === 'deepseek') return 'DeepSeek';
+                    if (lower === 'openrouter') return 'OpenRouter';
+                    if (lower === 'nvidia') return 'NVIDIA';
+                    if (lower === 'mistral') return 'Mistral';
+                    return null;
+                };
+
+                const envProvider = normalizeProvider(envProviderRaw);
+
+                if (envModel && !envProvider) {
+                    const currentActiveProv = settings.aiProvider || aiProvider || 'Google';
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, {
+                            id: 'subagent-env-noprov-' + Date.now(),
+                            role: 'system',
+                            text: `[SUBAGENT CONFIG] SUBAGENT_MODEL found in ENV but SUBAGENT_PROVIDER is missing/invalid. Active provider (${currentActiveProv}) will be used.`,
+                            isMeta: true
+                        }];
+                    });
+                }
+
+                if (configuredModel === 'ENV') {
+                    if (!envModel) {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, {
+                                id: 'subagent-model-noenv-' + Date.now(),
+                                role: 'system',
+                                text: 'No SubAgent model is found in ENV, Using Deafult until changed',
+                                isMeta: true
+                            }];
+                        });
+                    }
+                    return;
+                }
+
+                const currentProvider = settings.aiProvider || aiProvider || 'Google';
+                const currentTier = settings.apiTier || apiTier || 'Free';
+                const quotasObj = settings.quotas || quotas || {};
+
+                const availableModelNamesSet = new Set();
+
+                // Add current provider models
+                const currentModelsRaw = getModels(currentProvider, currentTier) || [];
+                currentModelsRaw.forEach(m => {
+                    const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
+                    if (name) availableModelNamesSet.add(name);
+                });
+
+                // Add models from other providers that have saved keys
+                for (const p of ALL_PROVIDERS) {
+                    try {
+                        const key = await getProviderAPIKey(p);
+                        if (key) {
+                            const tier = quotasObj?.providerTiers?.[p] || 'Free';
+                            const pModels = getModels(p, tier) || [];
+                            pModels.forEach(m => {
+                                const name = typeof m === 'string' ? m : (m.cmd || m.name || m.id || String(m));
+                                if (name) availableModelNamesSet.add(name);
+                            });
+                        }
+                    } catch (e) {}
+                }
+
+                const isModelAvailable = availableModelNamesSet.has(configuredModel);
+
+                if (envModel) {
+                    if (envModel !== configuredModel) {
+                        setMessages(prev => {
+                            setCompletedIndex(prev.length + 1);
+                            return [...prev, {
+                                id: 'subagent-model-env-' + Date.now(),
+                                role: 'system',
+                                text: 'Current Seleted Sub-Agent model is not available in this provider. Using model from ENV unless changed.',
+                                isMeta: true
+                            }];
+                        });
+                    }
+                } else if (!isModelAvailable) {
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, {
+                            id: 'subagent-model-err-' + Date.now(),
+                            role: 'system',
+                            text: 'Current Seleted Sub-Agent model is not available in this provider. Using Default until changed',
+                            isMeta: true
+                        }];
+                    });
+                }
+            } catch (err) {
+                // Silently ignore load errors
+            }
+        };
+
+        checkSubAgentModelOnStartup();
+    }, []);
     // Parse CLI startup arguments
     const parsedArgs = useMemo(() => {
         const parsed = {};

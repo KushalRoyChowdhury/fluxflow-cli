@@ -40,6 +40,9 @@ const DEFAULT_SETTINGS = {
         progressiveRendering: true,
         showTPMEstimate: false,
         subAgents: true,
+        CustomSubAgent: false,
+        SubAgentModel: 'Default',
+        SubAgentProvider: '',
         dynamicDirAwareness: false,
         indentationTree: true
     },
