@@ -9,7 +9,7 @@ export const changelogData = {
     "3.16.2": {
         "note": "AUGUST 2.",
         "added": [
-            "Added a new \"/\" command `/truncate` to truncate all SUCCESS tool result to save context keeping conversation intact.\n**Use Case difference between `/compress` & `/truncate`:**\n• \n...wonder where the difference is? It's right here 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/) 👈."
+            "Added a new \"/\" command `/truncate` for trimming successful tool executions.\n**Note:**\nThis command is irreversable and can't be undone. Once tool results are deleted the agant can't revrse chnages. **Use with Caution.**\n\n**Use Case difference between `/compress` & `/truncate`:**\n• \n*...wonder where the difference is? It's right here* 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/) 👈."
         ],
         "changed": [],
         "fixes": []
