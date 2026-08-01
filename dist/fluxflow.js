@@ -52,13 +52,14 @@ __export(paths_exports, {
   SETTINGS_FILE: () => SETTINGS_FILE,
   TEMP_MEM_CHAT_FILE: () => TEMP_MEM_CHAT_FILE,
   TEMP_MEM_FILE: () => TEMP_MEM_FILE,
-  USAGE_FILE: () => USAGE_FILE
+  USAGE_FILE: () => USAGE_FILE,
+  USAGE_FILE_OLD: () => USAGE_FILE_OLD
 });
 import os from "os";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, HISTORY_DIR, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, LEDGER_ADVANCE_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
+var FLUXFLOW_DIR, SETTINGS_FILE, externalDir, DATA_DIR, LOGS_DIR, SECRET_DIR, HISTORY_FILE, HISTORY_DIR, USAGE_FILE_OLD, USAGE_FILE, MEMORIES_FILE, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, BACKUPS_DIR, LEDGER_FILE, LEDGER_ADVANCE_FILE, ACTIVE_TX_FILE, PATHS_FILE, CONTEXT_FILE, PARSER_DIR;
 var init_paths = __esm({
   "src/utils/paths.js"() {
     FLUXFLOW_DIR = path.join(os.homedir(), ".fluxflow");
@@ -96,7 +97,8 @@ var init_paths = __esm({
     SECRET_DIR = path.join(DATA_DIR, "secret");
     HISTORY_FILE = path.join(SECRET_DIR, "history.json");
     HISTORY_DIR = path.join(SECRET_DIR, "history");
-    USAGE_FILE = path.join(FLUXFLOW_DIR, "usage.json");
+    USAGE_FILE_OLD = path.join(FLUXFLOW_DIR, "usage.json");
+    USAGE_FILE = path.join(SECRET_DIR, "usage.json");
     MEMORIES_FILE = path.join(SECRET_DIR, "memories.json");
     TEMP_MEM_FILE = path.join(SECRET_DIR, "memory-temp.json");
     TEMP_MEM_CHAT_FILE = path.join(SECRET_DIR, "temp-memory-chat.json");
@@ -9187,24 +9189,11 @@ var init_history = __esm({
 // src/utils/usage.js
 import fs10 from "fs-extra";
 import path9 from "path";
-import os3 from "os";
-var getLocalBackupPath, BACKUP_FILE, generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
+var generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
   "src/utils/usage.js"() {
     init_paths();
     init_crypto();
-    getLocalBackupPath = () => {
-      if (process.platform === "win32") {
-        const localAppData = process.env.LOCALAPPDATA || path9.join(os3.homedir(), "AppData", "Local");
-        return path9.join(localAppData, "FxFl", "backups", "backup.json");
-      }
-      if (process.platform === "darwin") {
-        return path9.join(os3.homedir(), "Library", "Application Support", "FxFl", "backups", "backup.json");
-      }
-      const xdgDataHome = process.env.XDG_DATA_HOME || path9.join(os3.homedir(), ".local", "share");
-      return path9.join(xdgDataHome, "fxfl", "backups", "backup.json");
-    };
-    BACKUP_FILE = getLocalBackupPath();
     generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
     cachedUsage = null;
     writeTimeout = null;
@@ -9239,10 +9228,16 @@ var init_usage = __esm({
       return purged;
     };
     loadUsageFromFile = async () => {
-      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const today2 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      try {
+        if (!await fs10.exists(USAGE_FILE) && await fs10.exists(USAGE_FILE_OLD)) {
+          await fs10.ensureDir(path9.dirname(USAGE_FILE));
+          await fs10.move(USAGE_FILE_OLD, USAGE_FILE);
+        }
+      } catch (err) {
+      }
       const tempFile = USAGE_FILE + ".tmp";
       let primaryData = null;
-      let backupData = null;
       try {
         if (await fs10.exists(tempFile)) {
           const rawContent = (await fs10.readFile(tempFile, "utf8")).trim();
@@ -9284,44 +9279,7 @@ var init_usage = __esm({
         } catch (err) {
         }
       }
-      try {
-        if (await fs10.exists(BACKUP_FILE)) {
-          const rawContent = (await fs10.readFile(BACKUP_FILE, "utf8")).trim();
-          if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
-            backupData = JSON.parse(rawContent);
-          } else {
-            backupData = JSON.parse(decryptAes(rawContent));
-          }
-        }
-      } catch (err) {
-      }
-      let resolvedData = null;
-      if (primaryData && backupData) {
-        if (primaryData.saveId !== backupData.saveId) {
-          resolvedData = primaryData;
-          try {
-            await fs10.ensureDir(path9.dirname(BACKUP_FILE));
-            await fs10.copy(USAGE_FILE, BACKUP_FILE);
-          } catch (e) {
-          }
-        } else {
-          resolvedData = primaryData;
-        }
-      } else if (primaryData && !backupData) {
-        resolvedData = primaryData;
-        try {
-          await fs10.ensureDir(path9.dirname(BACKUP_FILE));
-          await fs10.copy(USAGE_FILE, BACKUP_FILE);
-        } catch (e) {
-        }
-      } else if (!primaryData && backupData) {
-        resolvedData = backupData;
-        try {
-          await fs10.ensureDir(path9.dirname(USAGE_FILE));
-          await fs10.copy(BACKUP_FILE, USAGE_FILE);
-        } catch (e) {
-        }
-      }
+      let resolvedData = primaryData;
       if (resolvedData) {
         const stats = resolvedData.stats || { ...defaultStats };
         const mergedStats = { ...defaultStats, ...stats };
@@ -9329,28 +9287,32 @@ var init_usage = __esm({
           mergedStats.imageCalls = [];
         }
         const history = resolvedData.history || {};
-        if (resolvedData.date === today) {
+        const purgedHistory = purgeOldHistory(history, today2);
+        if (Object.keys(history).length !== Object.keys(purgedHistory).length) {
+          isDirty = true;
+        }
+        if (resolvedData.date === today2) {
           return {
             ...resolvedData,
             stats: mergedStats,
-            history
+            history: purgedHistory
           };
         } else {
           const oldDate = resolvedData.date;
           const oldStats = mergedStats;
-          const updatedHistory = { ...history };
+          const updatedHistory = { ...purgedHistory };
           if (oldDate) {
             updatedHistory[oldDate] = oldStats;
           }
           return {
-            date: today,
+            date: today2,
             stats: { ...defaultStats },
-            history: purgeOldHistory(updatedHistory, today)
+            history: purgeOldHistory(updatedHistory, today2)
           };
         }
       }
       return {
-        date: today,
+        date: today2,
         stats: { ...defaultStats },
         history: {}
       };
@@ -9433,7 +9395,10 @@ var init_usage = __esm({
               mergedHistory[dateKey] = diskData.history[dateKey];
             }
           }
-          cachedUsage.history = mergedHistory;
+          cachedUsage.history = purgeOldHistory(mergedHistory, cachedUsage.date || today);
+        } else if (cachedUsage && cachedUsage.history) {
+          const today2 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+          cachedUsage.history = purgeOldHistory(cachedUsage.history, today2);
         }
         cachedUsage.saveId = generateSaveId();
         const tempFile = USAGE_FILE + ".tmp";
@@ -9443,11 +9408,6 @@ var init_usage = __esm({
         await fs10.fsync(fd);
         await fs10.close(fd);
         await fs10.rename(tempFile, USAGE_FILE);
-        try {
-          await fs10.ensureDir(path9.dirname(BACKUP_FILE));
-          await fs10.copy(USAGE_FILE, BACKUP_FILE);
-        } catch (backupErr) {
-        }
         isDirty = false;
         lastWriteTime = Date.now();
       } catch (e) {
@@ -9466,6 +9426,9 @@ var init_usage = __esm({
     };
     initUsage = async () => {
       cachedUsage = await loadUsageFromFile();
+      if (isDirty) {
+        queueFlush();
+      }
     };
     forceFlushUsage = async () => {
       if (writeTimeout) {
@@ -9475,10 +9438,10 @@ var init_usage = __esm({
       await flushUsage();
     };
     getDailyUsage = async () => {
-      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const today2 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (!cachedUsage) {
         cachedUsage = await loadUsageFromFile();
-      } else if (cachedUsage.date !== today) {
+      } else if (cachedUsage.date !== today2) {
         const oldDate = cachedUsage.date;
         const oldStats = cachedUsage.stats;
         const history = cachedUsage.history || {};
@@ -9486,9 +9449,9 @@ var init_usage = __esm({
           history[oldDate] = oldStats;
         }
         cachedUsage = {
-          date: today,
+          date: today2,
           stats: { ...defaultStats },
-          history: purgeOldHistory(history, today)
+          history: purgeOldHistory(history, today2)
         };
         isDirty = true;
         await flushUsage();
@@ -9499,15 +9462,15 @@ var init_usage = __esm({
       return cachedUsage.stats;
     };
     getMonthlyUsage = async () => {
-      const today = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+      const today2 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       if (!cachedUsage) {
         cachedUsage = await loadUsageFromFile();
       }
-      if (cachedUsage.date !== today) {
+      if (cachedUsage.date !== today2) {
         await getDailyUsage();
       }
       const history = cachedUsage.history || {};
-      const purgedHistory = purgeOldHistory(history, today);
+      const purgedHistory = purgeOldHistory(history, today2);
       cachedUsage.history = purgedHistory;
       const todayStats = cachedUsage.stats || { ...defaultStats };
       const summed = { ...defaultStats };
@@ -9604,17 +9567,17 @@ var init_usage = __esm({
       queueFlush();
     };
     getCustomPeriodUsage = async (resetDay = 1) => {
-      const today = /* @__PURE__ */ new Date();
-      const todayStr = today.toISOString().split("T")[0];
+      const today2 = /* @__PURE__ */ new Date();
+      const todayStr = today2.toISOString().split("T")[0];
       if (!cachedUsage) {
         cachedUsage = await loadUsageFromFile();
       }
       if (cachedUsage.date !== todayStr) {
         await getDailyUsage();
       }
-      let startYear = today.getFullYear();
-      let startMonth = today.getMonth();
-      const todayDay = today.getDate();
+      let startYear = today2.getFullYear();
+      let startMonth = today2.getMonth();
+      const todayDay = today2.getDate();
       if (todayDay < resetDay) {
         startMonth -= 1;
         if (startMonth < 0) {
@@ -9928,14 +9891,14 @@ var init_usage = __esm({
 });
 
 // src/utils/puppeteer_helper.js
-import os4 from "os";
+import os3 from "os";
 import path10 from "path";
 import fs11 from "fs";
 import { createRequire } from "module";
 import { fileURLToPath as fileURLToPath2 } from "url";
 function getPuppeteerConfig() {
-  const platform = os4.platform();
-  const arch = os4.arch();
+  const platform = os3.platform();
+  const arch = os3.arch();
   let pptrPlatform = "";
   let execName = "";
   let subDir = "";
@@ -10272,6 +10235,7 @@ ${finalResults}`;
 import puppeteer2 from "puppeteer";
 import fs13 from "fs";
 import path12 from "path";
+import TurndownService from "turndown";
 var web_scrape;
 var init_web_scrape = __esm({
   "src/tools/web_scrape.js"() {
@@ -10329,15 +10293,20 @@ var init_web_scrape = __esm({
                   el.removeAttribute(attrName);
                 }
               }
-              if ((el.tagName === "SPAN" || el.tagName === "DIV" || el.tagName === "SECTION") && el.attributes.length === 0) {
-                if (el.tagName === "SPAN" || el.tagName === "DIV" && el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
+            });
+            while (document.querySelector("div, span")) {
+              document.querySelectorAll("div, span").forEach((el) => {
+                if (el.parentNode) {
                   el.replaceWith(...el.childNodes);
                 }
-              }
+              });
+            }
+            document.querySelectorAll("br").forEach((br) => {
+              br.replaceWith(document.createTextNode("\n\n"));
             });
             const pruneEmpty = () => {
               let found = false;
-              document.querySelectorAll("*:not(br)").forEach((el) => {
+              document.querySelectorAll("*").forEach((el) => {
                 if (el.childNodes.length === 0 && !el.innerText.trim()) {
                   el.remove();
                   found = true;
@@ -10349,11 +10318,17 @@ var init_web_scrape = __esm({
             return document.body.innerHTML;
           });
           if (!htmlContent) throw new Error("EMPTY_RENDER_RESULT");
-          const cleanedHtml = htmlContent.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim().substring(0, 5e4);
+          const cleanedHtml = htmlContent.replace(/<br\s*\/?>/gi, "\n\n").replace(/[ \t]+/g, " ").replace(/>[ \t]+</g, "><").replace(/\n\s+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+          const turndownService = new TurndownService({
+            headingStyle: "atx",
+            codeBlockStyle: "fenced"
+          });
+          const rawMarkdown = turndownService.turndown(cleanedHtml).replace(/\.\s*\n/g, "\n").replace(/ +/g, " ").replace(/\t/g, "  ").replace(/\n\s+/g, "\n").replace(/\n{3,}/g, "\n\n");
+          const markdown = rawMarkdown.substring(0, 5e4);
           await browser.close();
-          return `CLEANED HTML FROM [${url}]:
+          return `Markdown parsed from [${url}]:
 
-${cleanedHtml}${htmlContent.length > 5e4 ? "\n\n[TRUNCATED AT 50K CHARS]" : ""}`;
+${markdown}${rawMarkdown.length > 5e4 ? "\n\n[TRUNCATED AT 50K CHARS]" : ""}`;
         } catch (err) {
           lastError = err;
           if (browser) await browser.close();
@@ -10553,7 +10528,7 @@ var init_view_file = __esm({
         const end = Math.min(totalLines, finalEnd);
         const resultLines = lines.slice(start, end);
         const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines}).`;
-        const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line}`).join("\n");
+        const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line.trimEnd()}`).join("\n");
         return `${header}
 
 ${code}`;
@@ -19503,7 +19478,7 @@ var app_exports = {};
 __export(app_exports, {
   default: () => App
 });
-import os5 from "os";
+import os4 from "os";
 import React16, { useState as useState15, useEffect as useEffect12, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
 import fs30 from "fs-extra";
@@ -19531,6 +19506,7 @@ function App({ args = [] }) {
   const [showBridgePromo, setShowBridgePromo] = useState15(false);
   const [promoSelectedIndex, setPromoSelectedIndex] = useState15(0);
   const suggestionOffsetRef = useRef4(0);
+  const maxScrollRef = useRef4(0);
   const persistedModelRef = useRef4(null);
   const activeStreamingMsgRef = useRef4(null);
   const [renderTick, setRenderTick] = useState15(0);
@@ -20018,6 +19994,7 @@ function App({ args = [] }) {
   const [monthlyUsage, setMonthlyUsage] = useState15(null);
   const [customPeriodUsage, setCustomPeriodUsage] = useState15(null);
   const [statsMode, setStatsMode] = useState15("daily");
+  const [statsScrollOffset, setStatsScrollOffset] = useState15(0);
   const PLAYGROUND_CHAT_ID = "flow-playground";
   const [chatId, setChatId] = useState15(args.includes("--playground") ? PLAYGROUND_CHAT_ID : generateChatId());
   useEffect12(() => {
@@ -20192,7 +20169,7 @@ function App({ args = [] }) {
   useEffect12(() => setEscPressCount(0), [input]);
   const [messages, rawSetMessages] = useState15(() => {
     const logoMsg = { id: "logo-" + Date.now(), role: "system", isLogo: true, isMeta: true };
-    const isHomeDir = process.cwd() === os5.homedir();
+    const isHomeDir = process.cwd() === os4.homedir();
     const isSystemDir = (() => {
       const cwd = process.cwd().toLowerCase();
       if (process.platform === "win32") {
@@ -20219,7 +20196,7 @@ function App({ args = [] }) {
         id: "home-warning",
         role: "system",
         text: `[SECURITY ALERT] HOME DIRECTORY DETECTED`,
-        subText: `You are currently in ${os5.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
+        subText: `You are currently in ${os4.homedir()}. Working here is high-risk as the agent may modify system-sensitive configurations. Please open FluxFlow in project folder.`,
         isHomeWarning: true
       });
     }
@@ -20398,10 +20375,20 @@ function App({ args = [] }) {
           if (prev === "modelBreakdown") return "daily";
           return prev === "daily" ? "monthly" : "daily";
         });
+        setStatsScrollOffset(0);
         return;
       }
       if (key.space || inputText === " ") {
         setStatsMode((prev) => prev === "modelBreakdown" ? "daily" : "modelBreakdown");
+        setStatsScrollOffset(0);
+        return;
+      }
+      if (key.upArrow) {
+        setStatsScrollOffset((prev) => Math.max(0, prev - 1));
+        return;
+      }
+      if (key.downArrow) {
+        setStatsScrollOffset((prev) => Math.min(maxScrollRef.current, prev + 1));
         return;
       }
     }
@@ -23196,13 +23183,13 @@ Selection: ${val}`,
         const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
         let resetInfo = "";
         if (quotas.resetMode === "Custom") {
-          const today = /* @__PURE__ */ new Date();
+          const today2 = /* @__PURE__ */ new Date();
           const resetDay = quotas.resetDay || 1;
-          let resetMonth = today.getMonth();
-          if (today.getDate() >= resetDay) {
+          let resetMonth = today2.getMonth();
+          if (today2.getDate() >= resetDay) {
             resetMonth += 1;
           }
-          const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
+          const resetDate = new Date(today2.getFullYear(), resetMonth, resetDay);
           const monthName = resetDate.toLocaleString("default", { month: "short" });
           resetInfo = `${monthName}-${resetDay}`;
         }
@@ -23334,10 +23321,62 @@ Selection: ${val}`,
         const imageCreditsLabel = statsMode === "monthly" ? "Image Credits:" : "Image Credits:";
         const codeChangesLabel = statsMode === "monthly" ? "Code Changes:" : "Code Changes:";
         const toolCallsLabel = statsMode === "monthly" ? "Tool Calls:" : "Tool Calls:";
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), !monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0 ? /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "No model token usage recorded in the last 30 days.")) : Object.entries(monthlyUsage.models).map(([provider, models]) => {
-          const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-          return /* @__PURE__ */ React16.createElement(Box14, { key: provider, flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 40 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, provider, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, formatTokens(providerTotalTokens))), Object.entries(models).map(([modelName, stats]) => /* @__PURE__ */ React16.createElement(Box14, { key: modelName, flexDirection: "column", marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 36 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "\xBB ", modelName, ":")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.tokens || 0))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)))), (stats.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 5 }, /* @__PURE__ */ React16.createElement(Box14, { width: 31 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.cachedTokens))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 32 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(stats.candidateTokens || 0))))));
-        })) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, marginTop: 1, italic: true }, "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
+        const maxRows = Math.max(4, (stdout?.rows || terminalSize?.rows || 24) - 15);
+        const renderLeaderRow = (key, leftText, rightText, leftColor, rightColor, indent = 0, isBold = false) => {
+          const cols = stdout?.columns || terminalSize?.columns || 80;
+          const boxWidth = Math.min(125, cols - 2);
+          const lineWidth = Math.max(20, boxWidth - 6);
+          const maxLeftLen = Math.max(5, lineWidth - indent - rightText.length - 5);
+          let cleanLeftText = leftText;
+          if (cleanLeftText.length > maxLeftLen) {
+            cleanLeftText = cleanLeftText.substring(0, maxLeftLen - 1) + "\u2026";
+          }
+          const dotsCount = Math.max(2, lineWidth - indent - cleanLeftText.length - rightText.length - 2);
+          const dotsStr = " " + ".".repeat(dotsCount) + " ";
+          const indentStr = " ".repeat(indent);
+          return /* @__PURE__ */ React16.createElement(Box14, { key, width: lineWidth }, /* @__PURE__ */ React16.createElement(Text16, { wrap: "truncate" }, /* @__PURE__ */ React16.createElement(Text16, null, indentStr), /* @__PURE__ */ React16.createElement(Text16, { color: leftColor, bold: isBold }, cleanLeftText), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, dotsStr), /* @__PURE__ */ React16.createElement(Text16, { color: rightColor, bold: isBold }, rightText)));
+        };
+        const breakdownRows = [];
+        if (!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) {
+          breakdownRows.push(
+            /* @__PURE__ */ React16.createElement(Box14, { key: "empty", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "No model token usage recorded in the last 30 days."))
+          );
+        } else {
+          Object.entries(monthlyUsage.models).forEach(([provider, models], pIdx) => {
+            const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
+            if (pIdx > 0) {
+              breakdownRows.push(/* @__PURE__ */ React16.createElement(Box14, { key: `space-prov-${provider}` }, /* @__PURE__ */ React16.createElement(Text16, null, " ")));
+            }
+            breakdownRows.push(
+              renderLeaderRow(`prov-${provider}`, `${provider}:`, formatTokens(providerTotalTokens), colors.primary, colors.text, 0, true)
+            );
+            Object.entries(models).forEach(([modelName, stats], mIdx) => {
+              if (mIdx > 0) {
+                breakdownRows.push(/* @__PURE__ */ React16.createElement(Box14, { key: `space-mod-${provider}-${modelName}` }, /* @__PURE__ */ React16.createElement(Text16, null, " ")));
+              }
+              breakdownRows.push(
+                renderLeaderRow(`mod-${provider}-${modelName}`, `\xBB ${modelName}:`, formatTokens(stats.tokens || 0), colors.secondary, colors.text, 2, true)
+              );
+              breakdownRows.push(
+                renderLeaderRow(`in-${provider}-${modelName}`, "\xBB Input Tokens:", formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)), colors.textMuted, colors.text, 5, false)
+              );
+              if ((stats.cachedTokens || 0) > 0) {
+                breakdownRows.push(
+                  renderLeaderRow(`cache-${provider}-${modelName}`, "\xBB Cached:", formatTokens(stats.cachedTokens), colors.textMuted, colors.text, 7, false)
+                );
+              }
+              breakdownRows.push(
+                renderLeaderRow(`out-${provider}-${modelName}`, "\xBB Output Tokens:", formatTokens(stats.candidateTokens || 0), colors.textMuted, colors.text, 5, false)
+              );
+            });
+          });
+        }
+        const totalRows = breakdownRows.length;
+        const maxScroll = Math.max(0, totalRows - maxRows);
+        maxScrollRef.current = maxScroll;
+        const effectiveScroll = Math.min(statsScrollOffset, maxScroll);
+        const visibleRows = breakdownRows.slice(effectiveScroll, effectiveScroll + maxRows);
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 3, paddingY: 1, paddingBottom: 0, width: Math.min(125, (stdout?.columns || 100) - 2) }, statsMode === "modelBreakdown" ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "30-DAY MODEL TOKEN BREAKDOWN"), totalRows > maxRows && /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true }, "[", effectiveScroll + 1, "-", Math.min(totalRows, effectiveScroll + maxRows), " of ", totalRows, "] \u25B2\u25BC")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", height: maxRows, marginTop: 1 }, visibleRows)) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "SESSION TELEMETRY")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Session Duration:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(Date.now() - SESSION_START_TIME))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionAgentCalls)), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB API Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionApiTime))), /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Tool Time:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatMsDuration(sessionToolTime))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionBackgroundCalls)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tokens Consumed:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Active Context:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionStats.tokens))), sessionTotalTokens > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalTokens - sessionTotalCandidateTokens))), sessionTotalCachedTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCachedTokens))), sessionTotalCandidateTokens > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(sessionTotalCandidateTokens)))), sessionImageCount > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Images Made:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, sessionImageCount)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Image Credits:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((sessionImageCredits || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Code Changes (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", runtimeSession.linesAdded), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", runtimeSession.linesRemoved))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Tool Calls (Sess):")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, runtimeSession.toolSuccess + runtimeSession.toolFailure + runtimeSession.toolDenied, " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", runtimeSession.toolSuccess), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", runtimeSession.toolDenied), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", runtimeSession.toolFailure), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, trackerTitle), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, timeLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatDuration(u?.duration || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Model Requests:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.agent || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, "Memory Agent:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u?.background || 0)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, tokensLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u?.tokens || 0))), (u?.tokens || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Input Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0)))), (u?.cachedTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Box14, { width: 21 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Cached:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.cachedTokens))), (u?.candidateTokens || 0) > 0 && /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2 }, /* @__PURE__ */ React16.createElement(Box14, { width: 23 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\xBB Output Tokens:")), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, formatTokens(u.candidateTokens)))), (u?.imageCalls?.length || 0) > 0 && /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imagesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, u.imageCalls.length)), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, imageCreditsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, Number(((u.imageCalls.reduce((sum, c) => sum + c.cost, 0) || 0) * 1e3).toFixed(0)), " credits"))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, codeChangesLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "+", u?.linesAdded || 0), " ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "-", u?.linesRemoved || 0))), /* @__PURE__ */ React16.createElement(Box14, null, /* @__PURE__ */ React16.createElement(Box14, { width: 25 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary }, toolCallsLabel)), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, (u?.toolSuccess || 0) + (u?.toolFailure || 0) + (u?.toolDenied || 0), " ( "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green" }, "\u2714 ", u?.toolSuccess || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow" }, "\u{1F6C7} ", u?.toolDenied || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.danger || "red" }, "\u2718 ", u?.toolFailure || 0), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " )")))), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "\n", "(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)"));
       }
       case "dynamicDirDanger":
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", bold: true, underline: true }, "DYNAMIC DIRECTORY AWARENESS"), /* @__PURE__ */ React16.createElement(Text16, { marginTop: 1, color: colors.text }, "Enabling this keeps the agent aware of filesystem state in real time, but may reduce prompt cache efficiency."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "\n", "RECOMMENDED SCENARIOS TO TURN ON:"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Repo is small."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 The task benefits from real-time filesystem awareness."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 Files are often created, renamed, or deleted."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You know exactly what you're signing up for."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You don't have conflicting decisions regarding token bills."), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "\u2022 You want to see your wallet crying at 3am."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
@@ -24142,7 +24181,7 @@ var init_app = __esm({
     };
     getKeybindingsPath = (ideName) => {
       const dirName = getIDEDirName(ideName);
-      const home = os5.homedir();
+      const home = os4.homedir();
       if (process.platform === "win32") {
         const appData = process.env.APPDATA;
         if (!appData) return null;
@@ -24401,10 +24440,10 @@ var init_app = __esm({
 // src/cli.jsx
 import { spawn as spawn3 } from "child_process";
 import { fileURLToPath as fileURLToPath4 } from "url";
-import os6 from "os";
+import os5 from "os";
 import dotenv2 from "dotenv";
 dotenv2.config({ quiet: true });
-var totalSystemRamBytes = os6.totalmem();
+var totalSystemRamBytes = os5.totalmem();
 var totalSystemRamMB = totalSystemRamBytes / (1024 * 1024);
 var SAFETY_MARGIN = 0.5;
 var calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);

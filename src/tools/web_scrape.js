@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
+import TurndownService from 'turndown';
 import { LOGS_DIR } from '../utils/paths.js';
 import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
 
@@ -81,20 +82,26 @@ export const web_scrape = async (args) => {
                             el.removeAttribute(attrName);
                         }
                     }
-
-                    // Flatten spans and other non-semantic wrappers that now have no attributes
-                    if ((el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'SECTION') && el.attributes.length === 0) {
-                        // If it's a small wrapper, we can often flatten it
-                        if (el.tagName === 'SPAN' || (el.tagName === 'DIV' && el.childNodes.length === 1 && el.childNodes[0].nodeType === Node.TEXT_NODE)) {
-                             el.replaceWith(...el.childNodes);
-                        }
-                    }
                 });
 
-                // 4. Prune empty elements (except br)
+                // Unwrap all <div> and <span> tags entirely
+                while (document.querySelector('div, span')) {
+                    document.querySelectorAll('div, span').forEach(el => {
+                        if (el.parentNode) {
+                            el.replaceWith(...el.childNodes);
+                        }
+                    });
+                }
+
+                // Replace <br> elements with \n\n text nodes
+                document.querySelectorAll('br').forEach(br => {
+                    br.replaceWith(document.createTextNode('\n\n'));
+                });
+
+                // 4. Prune empty elements
                 const pruneEmpty = () => {
                     let found = false;
-                    document.querySelectorAll('*:not(br)').forEach(el => {
+                    document.querySelectorAll('*').forEach(el => {
                         if (el.childNodes.length === 0 && !el.innerText.trim()) {
                             el.remove();
                             found = true;
@@ -109,21 +116,30 @@ export const web_scrape = async (args) => {
 
             if (!htmlContent) throw new Error("EMPTY_RENDER_RESULT");
 
-            // 7. Clean and Truncate HTML
+            // 7. Clean and Convert HTML to Markdown
             const cleanedHtml = htmlContent
-                .replace(/\s+/g, ' ')      // Collapse whitespace
-                .replace(/>\s+</g, '><')   // Remove space between tags
-                .trim()
-                .substring(0, 50000);     // Increased limit for rich HTML context
+                .replace(/<br\s*\/?>/gi, '\n\n')
+                .replace(/[ \t]+/g, ' ')      // Collapse horizontal whitespace
+                .replace(/>[ \t]+</g, '><')   // Remove space between tags
+                .replace(/\n\s+/g, '\n')      // Clean whitespace after newlines
+                .replace(/\n{3,}/g, '\n\n')   // Limit consecutive newlines to double newline
+                .trim();
 
-            // // Log for audit
-            // const toolLogDir = path.join(LOGS_DIR, 'tools');
-            // if (!fs.existsSync(toolLogDir)) fs.mkdirSync(toolLogDir, { recursive: true });
-            // fs.appendFileSync(path.join(toolLogDir, 'search-scraped.log'), `PUPPETEER ${new Date().toLocaleString()} - URL: [${url}]. Length: ${cleanedHtml.length}.\n Content:\n${cleanedHtml}${htmlContent.length > 30000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}\n\n--------------------------------------------------------\n\n\n`);
+            const turndownService = new TurndownService({
+                headingStyle: 'atx',
+                codeBlockStyle: 'fenced'
+            });
+            const rawMarkdown = turndownService.turndown(cleanedHtml)
+                .replace(/\.\s*\n/g, '\n')
+                .replace(/ +/g, ' ')
+                .replace(/\t/g, '  ')
+                .replace(/\n\s+/g, '\n')
+                .replace(/\n{3,}/g, '\n\n');
+            const markdown = rawMarkdown.substring(0, 50000);
 
             await browser.close();
-            // fs.writeFileSync('scraped.html', cleanedHtml);
-            return `CLEANED HTML FROM [${url}]:\n\n${cleanedHtml}${htmlContent.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`;
+            // fs.writeFileSync('scraped.md', `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`);
+            return `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`;
 
         } catch (err) {
             lastError = err;

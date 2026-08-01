@@ -95,7 +95,7 @@ export const view_file = async (args, context = {}) => {
         const resultLines = lines.slice(start, end);
 
         const header = `File: [${targetPath}] (Showing lines ${start + 1}-${end} of ${totalLines}).`;
-        const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line}`).join('\n');
+        const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line.trimEnd()}`).join('\n');
 
         return `${header}\n\n${code}`;
     } catch (err) {

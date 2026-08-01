@@ -572,6 +572,7 @@ export default function App({ args = [] }) {
     const [showBridgePromo, setShowBridgePromo] = useState(false);
     const [promoSelectedIndex, setPromoSelectedIndex] = useState(0);
     const suggestionOffsetRef = useRef(0);
+    const maxScrollRef = useRef(0);
     const persistedModelRef = useRef(null);
     const activeStreamingMsgRef = useRef(null);
     const [renderTick, setRenderTick] = useState(0);
@@ -1120,6 +1121,7 @@ export default function App({ args = [] }) {
     const [monthlyUsage, setMonthlyUsage] = useState(null);
     const [customPeriodUsage, setCustomPeriodUsage] = useState(null);
     const [statsMode, setStatsMode] = useState('daily');
+    const [statsScrollOffset, setStatsScrollOffset] = useState(0);
     const PLAYGROUND_CHAT_ID = 'flow-playground';
     const [chatId, setChatId] = useState(args.includes('--playground') ? PLAYGROUND_CHAT_ID : generateChatId());
 
@@ -1580,10 +1582,20 @@ export default function App({ args = [] }) {
                     if (prev === 'modelBreakdown') return 'daily';
                     return prev === 'daily' ? 'monthly' : 'daily';
                 });
+                setStatsScrollOffset(0);
                 return;
             }
             if (key.space || inputText === ' ') {
                 setStatsMode(prev => prev === 'modelBreakdown' ? 'daily' : 'modelBreakdown');
+                setStatsScrollOffset(0);
+                return;
+            }
+            if (key.upArrow) {
+                setStatsScrollOffset(prev => Math.max(0, prev - 1));
+                return;
+            }
+            if (key.downArrow) {
+                setStatsScrollOffset(prev => Math.min(maxScrollRef.current, prev + 1));
                 return;
             }
         }
@@ -4930,50 +4942,94 @@ export default function App({ args = [] }) {
                 const imageCreditsLabel = statsMode === 'monthly' ? 'Image Credits:' : 'Image Credits:';
                 const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes:' : 'Code Changes:';
                 const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls:' : 'Tool Calls:';
+
+                const maxRows = Math.max(4, (stdout?.rows || terminalSize?.rows || 24) - 15); // [MAX ROWS FOR 30 DAY MODEL BREAKDOWN]
+                const renderLeaderRow = (key, leftText, rightText, leftColor, rightColor, indent = 0, isBold = false) => {
+                    const cols = stdout?.columns || terminalSize?.columns || 80;
+                    const boxWidth = Math.min(125, cols - 2);
+                    const lineWidth = Math.max(20, boxWidth - 6);
+
+                    const maxLeftLen = Math.max(5, lineWidth - indent - rightText.length - 5);
+                    let cleanLeftText = leftText;
+                    if (cleanLeftText.length > maxLeftLen) {
+                        cleanLeftText = cleanLeftText.substring(0, maxLeftLen - 1) + '…';
+                    }
+
+                    const dotsCount = Math.max(2, lineWidth - indent - cleanLeftText.length - rightText.length - 2);
+                    const dotsStr = ' ' + '.'.repeat(dotsCount) + ' ';
+                    const indentStr = ' '.repeat(indent);
+
+                    return (
+                        <Box key={key} width={lineWidth}>
+                            <Text wrap="truncate">
+                                <Text>{indentStr}</Text>
+                                <Text color={leftColor} bold={isBold}>{cleanLeftText}</Text>
+                                <Text color={colors.textMuted} dimColor>{dotsStr}</Text>
+                                <Text color={rightColor} bold={isBold}>{rightText}</Text>
+                            </Text>
+                        </Box>
+                    );
+                };
+
+                const breakdownRows = [];
+                if (!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) {
+                    breakdownRows.push(
+                        <Box key="empty" marginTop={1}>
+                            <Text color={colors.textMuted} italic>No model token usage recorded in the last 30 days.</Text>
+                        </Box>
+                    );
+                } else {
+                    Object.entries(monthlyUsage.models).forEach(([provider, models], pIdx) => {
+                        const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
+                        if (pIdx > 0) {
+                            breakdownRows.push(<Box key={`space-prov-${provider}`}><Text>{' '}</Text></Box>);
+                        }
+                        breakdownRows.push(
+                            renderLeaderRow(`prov-${provider}`, `${provider}:`, formatTokens(providerTotalTokens), colors.primary, colors.text, 0, true)
+                        );
+                        Object.entries(models).forEach(([modelName, stats], mIdx) => {
+                            if (mIdx > 0) {
+                                breakdownRows.push(<Box key={`space-mod-${provider}-${modelName}`}><Text>{' '}</Text></Box>);
+                            }
+                            breakdownRows.push(
+                                renderLeaderRow(`mod-${provider}-${modelName}`, `» ${modelName}:`, formatTokens(stats.tokens || 0), colors.secondary, colors.text, 2, true)
+                            );
+                            breakdownRows.push(
+                                renderLeaderRow(`in-${provider}-${modelName}`, '» Input Tokens:', formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)), colors.textMuted, colors.text, 5, false)
+                            );
+                            if ((stats.cachedTokens || 0) > 0) {
+                                breakdownRows.push(
+                                    renderLeaderRow(`cache-${provider}-${modelName}`, '» Cached:', formatTokens(stats.cachedTokens), colors.textMuted, colors.text, 7, false)
+                                );
+                            }
+                            breakdownRows.push(
+                                renderLeaderRow(`out-${provider}-${modelName}`, '» Output Tokens:', formatTokens(stats.candidateTokens || 0), colors.textMuted, colors.text, 5, false)
+                            );
+                        });
+                    });
+                }
+
+                const totalRows = breakdownRows.length;
+                const maxScroll = Math.max(0, totalRows - maxRows);
+                maxScrollRef.current = maxScroll;
+                const effectiveScroll = Math.min(statsScrollOffset, maxScroll);
+                const visibleRows = breakdownRows.slice(effectiveScroll, effectiveScroll + maxRows);
+
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
                         {statsMode === 'modelBreakdown' ? (
                             <Box flexDirection="column">
-                                <Text color={colors.text} bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
-                                {(!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) ? (
-                                    <Box marginTop={1}>
-                                        <Text color={colors.textMuted} italic>No model token usage recorded in the last 30 days.</Text>
-                                    </Box>
-                                ) : (
-                                    Object.entries(monthlyUsage.models).map(([provider, models]) => {
-                                        const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-                                        return (
-                                            <Box key={provider} flexDirection="column" marginTop={1}>
-                                                <Box>
-                                                    <Box width={40}><Text color={colors.primary} bold>{provider}:</Text></Box>
-                                                    <Text color={colors.text} bold>{formatTokens(providerTotalTokens)}</Text>
-                                                </Box>
-                                                {Object.entries(models).map(([modelName, stats]) => (
-                                                    <Box key={modelName} flexDirection="column" marginLeft={4} marginTop={1}>
-                                                        <Box>
-                                                            <Box width={36}><Text color={colors.secondary}>» {modelName}:</Text></Box>
-                                                            <Text color={colors.text}>{formatTokens(stats.tokens || 0)}</Text>
-                                                        </Box>
-                                                        <Box marginLeft={4}>
-                                                            <Box width={32}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
-                                                            <Text color={colors.text}>{formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0))}</Text>
-                                                        </Box>
-                                                        {(stats.cachedTokens || 0) > 0 && (
-                                                            <Box marginLeft={5}>
-                                                                <Box width={31}><Text color={colors.textMuted}>» Cached:</Text></Box>
-                                                                <Text color={colors.text}>{formatTokens(stats.cachedTokens)}</Text>
-                                                            </Box>
-                                                        )}
-                                                        <Box marginLeft={4}>
-                                                            <Box width={32}><Text color={colors.textMuted}>» Output Tokens:</Text></Box>
-                                                            <Text color={colors.text}>{formatTokens(stats.candidateTokens || 0)}</Text>
-                                                        </Box>
-                                                    </Box>
-                                                ))}
-                                            </Box>
-                                        );
-                                    })
-                                )}
+                                <Box justifyContent="space-between">
+                                    <Text color={colors.text} bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
+                                    {totalRows > maxRows && (
+                                        <Text color={colors.textMuted} dimColor>
+                                            [{effectiveScroll + 1}-{Math.min(totalRows, effectiveScroll + maxRows)} of {totalRows}] ▲▼
+                                        </Text>
+                                    )}
+                                </Box>
+                                <Box flexDirection="column" height={maxRows} marginTop={1}>
+                                    {visibleRows}
+                                </Box>
                             </Box>
                         ) : (
                             <>
@@ -5126,7 +5182,7 @@ export default function App({ args = [] }) {
                             </>
                         )}
 
-                        <Text color={colors.textMuted} dimColor marginTop={1} italic>(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
+                        <Text color={colors.textMuted} dimColor italic>{'\n'}(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
                     </Box>
                 );
             }

@@ -1,22 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
-import os from 'os';
-import { USAGE_FILE } from './paths.js';
+import { USAGE_FILE, USAGE_FILE_OLD } from './paths.js';
 import { encryptAes, decryptAes } from './crypto.js';
-
-const getLocalBackupPath = () => {
-    if (process.platform === 'win32') {
-        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-        return path.join(localAppData, 'FxFl', 'backups', 'backup.json');
-    }
-    if (process.platform === 'darwin') {
-        return path.join(os.homedir(), 'Library', 'Application Support', 'FxFl', 'backups', 'backup.json');
-    }
-    const xdgDataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
-    return path.join(xdgDataHome, 'fxfl', 'backups', 'backup.json');
-};
-
-const BACKUP_FILE = getLocalBackupPath();
 
 const generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
@@ -61,9 +46,16 @@ const purgeOldHistory = (history, todayStr) => {
 const loadUsageFromFile = async () => {
     const today = new Date().toISOString().split('T')[0];
 
+    // Migration: If new secret USAGE_FILE doesn't exist but USAGE_FILE_OLD exists, move it over
+    try {
+        if (!(await fs.exists(USAGE_FILE)) && (await fs.exists(USAGE_FILE_OLD))) {
+            await fs.ensureDir(path.dirname(USAGE_FILE));
+            await fs.move(USAGE_FILE_OLD, USAGE_FILE);
+        }
+    } catch (err) { }
+
     const tempFile = USAGE_FILE + '.tmp';
     let primaryData = null;
-    let backupData = null;
 
     // A. Check for pending .tmp write recovery first (Self-Healing Loop)
     try {
@@ -110,47 +102,7 @@ const loadUsageFromFile = async () => {
         } catch (err) { }
     }
 
-    // 2. Try reading backup redundancy file
-    try {
-        if (await fs.exists(BACKUP_FILE)) {
-            const rawContent = (await fs.readFile(BACKUP_FILE, 'utf8')).trim();
-            if (rawContent.startsWith('{') || rawContent.startsWith('[')) {
-                backupData = JSON.parse(rawContent);
-            } else {
-                backupData = JSON.parse(decryptAes(rawContent));
-            }
-        }
-    } catch (err) { }
-
-    let resolvedData = null;
-
-    if (primaryData && backupData) {
-        // Both exist - Check for saveId mismatch (meaning the backup copy was interrupted/missed)
-        if (primaryData.saveId !== backupData.saveId) {
-            // Primary is written first, so it is assumed newer. Fallback copy to restore alignment.
-            resolvedData = primaryData;
-            try {
-                await fs.ensureDir(path.dirname(BACKUP_FILE));
-                await fs.copy(USAGE_FILE, BACKUP_FILE);
-            } catch (e) { }
-        } else {
-            resolvedData = primaryData;
-        }
-    } else if (primaryData && !backupData) {
-        // Backup got wiped or is missing - Copy primary to backup
-        resolvedData = primaryData;
-        try {
-            await fs.ensureDir(path.dirname(BACKUP_FILE));
-            await fs.copy(USAGE_FILE, BACKUP_FILE);
-        } catch (e) { }
-    } else if (!primaryData && backupData) {
-        // Primary got wiped or deleted - Restore from backup redundancy!
-        resolvedData = backupData;
-        try {
-            await fs.ensureDir(path.dirname(USAGE_FILE));
-            await fs.copy(BACKUP_FILE, USAGE_FILE);
-        } catch (e) { }
-    }
+    let resolvedData = primaryData;
 
     if (resolvedData) {
         const stats = resolvedData.stats || { ...defaultStats };
@@ -160,17 +112,22 @@ const loadUsageFromFile = async () => {
         }
 
         const history = resolvedData.history || {};
+        const purgedHistory = purgeOldHistory(history, today);
+
+        if (Object.keys(history).length !== Object.keys(purgedHistory).length) {
+            isDirty = true;
+        }
 
         if (resolvedData.date === today) {
             return {
                 ...resolvedData,
                 stats: mergedStats,
-                history: history
+                history: purgedHistory
             };
         } else {
             const oldDate = resolvedData.date;
             const oldStats = mergedStats;
-            const updatedHistory = { ...history };
+            const updatedHistory = { ...purgedHistory };
             if (oldDate) {
                 updatedHistory[oldDate] = oldStats;
             }
@@ -278,7 +235,10 @@ const flushUsage = async () => {
                     mergedHistory[dateKey] = diskData.history[dateKey];
                 }
             }
-            cachedUsage.history = mergedHistory;
+            cachedUsage.history = purgeOldHistory(mergedHistory, cachedUsage.date || today);
+        } else if (cachedUsage && cachedUsage.history) {
+            const today = new Date().toISOString().split('T')[0];
+            cachedUsage.history = purgeOldHistory(cachedUsage.history, today);
         }
 
         // Append unique save ID to verify alignment during boot sequence
@@ -296,13 +256,7 @@ const flushUsage = async () => {
         // Atomic rename to commit change
         await fs.rename(tempFile, USAGE_FILE);
 
-        // Mirror changes to encrypted backup redundancy directory
-        try {
-            await fs.ensureDir(path.dirname(BACKUP_FILE));
-            await fs.copy(USAGE_FILE, BACKUP_FILE);
-        } catch (backupErr) {
-            // Silently ignore backup write failure to avoid blocking app flow
-        }
+
 
         isDirty = false;
         lastWriteTime = Date.now();
@@ -331,6 +285,9 @@ const queueFlush = () => {
  */
 export const initUsage = async () => {
     cachedUsage = await loadUsageFromFile();
+    if (isDirty) {
+        queueFlush();
+    }
 };
 
 /**

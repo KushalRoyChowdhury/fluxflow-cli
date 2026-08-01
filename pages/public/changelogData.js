@@ -3,9 +3,18 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.16.0"]
+export const stableVersions = ["3.16.1"]
 
 export const changelogData = {
+    "3.16.1": {
+        "note": "AUGUST 1.",
+        "added": [],
+        "changed": [
+            "Improved few UI Components.",
+            "Re-worked on Agent's Web Scraper tool.\n(~40% more Token Efficiency with +20% Information Density)",
+        ],
+        "fixes": []
+    },
     "3.16.0": {
         "note": "AUGUST 1.",
         "added": [
