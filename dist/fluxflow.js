@@ -15348,10 +15348,18 @@ ${newMemoryListStr}
       const summariesFile = path27.join(SECRET_DIR, "chat-summaries.json");
       const flattenContext = (hist) => {
         return hist.filter(
-          (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
+          (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !m.isTerminalRecord && !(m.text && m.text.includes("[TERMINAL_RECORD]")) && !String(m.id).startsWith("welcome")
         ).map((m) => {
-          const role = m.text?.startsWith("[TOOL RESULT]") ? "TOOL" : m.role === "agent" ? "AGENT" : "USER";
-          return `[${role}]: ${m.text}`;
+          const rawText = m.fullText || m.text || "";
+          const isToolResult = m.role === "system" || rawText.startsWith("[TOOL RESULT]:") || m.text && m.text.startsWith("[TOOL RESULT]:");
+          let text = rawText;
+          if (isToolResult && (rawText.includes("[TOOL RESULT]:") || m.text && m.text.includes("[TOOL RESULT]:"))) {
+            text = "[TOOL RESULT]: ...truncated for summary";
+          } else {
+            text = text.replace(/(\[(?:tool|agent):[a-zA-Z0-9_\.]+)\([\s\S]*?\)(\])/g, "$1(...)$2");
+          }
+          const role = isToolResult ? "TOOL" : m.role === "agent" ? "AGENT" : "USER";
+          return `[${role}]: ${text}`;
         }).join("\n\n");
       };
       const runCondenser = async (flattenedText2, oldSummary2) => {

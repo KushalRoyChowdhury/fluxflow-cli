@@ -3,15 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.16.2"]
+export const stableVersions = ["3.16.3"]
 
 export const changelogData = {
-    "3.16.2": {
+    "3.16.3": {
         "note": "AUGUST 2.",
         "added": [
             "Added a new \"/\" command `/truncate` for trimming successful tool executions.\n**Note:**\nThis command is irreversable and can't be undone. Once tool results are deleted the agant can't revrse chnages. **Use with Caution.**\n\n**Use Case difference between `/compress` & `/truncate`:**\n• \n*...wonder where the difference is? It's right here* 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/) 👈."
         ],
-        "changed": [],
+        "changed": [
+            "Improved speed and accuracy of `/compress`."
+        ],
         "fixes": []
     },
     "3.16.1": {
