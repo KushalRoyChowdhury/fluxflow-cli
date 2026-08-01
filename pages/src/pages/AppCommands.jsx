@@ -24,6 +24,7 @@ export default function AppCommands() {
                 <li><strong><code>/chats</code></strong> — Lists all saved chat sessions.</li>
                 <li><strong><code>/export</code></strong> — Exports the current chat transcript to a <code>.txt</code> file in your workspace.</li>
                 <li><strong><code>/compress</code></strong> — Summarizes and compresses the active chat history to free up context tokens.</li>
+                <li><strong><code>/truncate</code></strong> — Truncates tool results in the active chat history sent to the model, saves 60% tokens on standard agentic workflow while keeping the conversation nuances.</li>
                 <li><strong><code>/revert</code></strong> — Opens the high-fidelity checkpoint viewer to rollback codebase changes to a previous state.</li>
                 <li><strong><code>/quit</code></strong> — Safely exits and shuts down FluxFlow.</li>
             </ul>

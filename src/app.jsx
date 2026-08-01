@@ -2311,6 +2311,7 @@ export default function App({ args = [] }) {
         { cmd: '/resume', desc: 'Load previous session' },
         { cmd: '/clear', desc: 'Clear terminal screen' },
         { cmd: '/compress', desc: 'Summarize and compress chat history' },
+        { cmd: '/truncate', desc: 'Truncate tool results in chat history' },
         { cmd: '/revert', desc: 'Revert codebase back to a checkpoint' },
         { cmd: '/gemini', desc: 'Get a happy message from Gemini CLI' },
         { cmd: '/save', desc: 'Force save current chat' },
@@ -3266,6 +3267,43 @@ export default function App({ args = [] }) {
                     runCompress();
                     break;
                 }
+                case '/truncate': {
+                    setInput('');
+                    let truncatedCount = 0;
+                    setMessages(prev => {
+                        const updatedMessages = prev.map(m => {
+                            const fullTextStr = m.fullText || m.text || '';
+                            if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
+                                return m;
+                            }
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...Result Truncated by System on User Request')) {
+                                return m;
+                            }
+                            truncatedCount++;
+                            if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
+                                return {
+                                    ...m,
+                                    fullText: '[TOOL RESULT]: SUCCESS: ...Result Truncated by System on User Request'
+                                };
+                            }
+                            return {
+                                ...m,
+                                fullText: '[TOOL RESULT]: ...Result Truncated by System on User Request'
+                            };
+                        });
+
+                        const finalMsgs = [...updatedMessages, {
+                            id: Date.now(),
+                            role: 'system',
+                            text: `[SYSTEM] Truncated ${truncatedCount} tool result(s) in chat history.`,
+                            isMeta: true
+                        }];
+                        saveChat(chatId, null, finalMsgs);
+                        setCompletedIndex(finalMsgs.length);
+                        return finalMsgs;
+                    });
+                    break;
+                }
                 case '/help': {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
@@ -3324,6 +3362,8 @@ export default function App({ args = [] }) {
                             m.role !== 'think' &&
                             !m.isVisualFeedback &&
                             !m.isMeta &&
+                            !m.isTerminalRecord &&
+                            !(m.text && m.text.includes('[TERMINAL_RECORD]')) &&
                             !String(m.id).startsWith('welcome')
                         );
 
@@ -3374,9 +3414,7 @@ export default function App({ args = [] }) {
                                 const isResult = tm.role === 'system' && (
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
-                                    tm.text?.startsWith('ERROR:') ||
-                                    tm.text?.startsWith('[TERMINAL_RECORD]') ||
-                                    tm.isTerminalRecord
+                                    tm.text?.startsWith('ERROR:')
                                 );
 
                                 const emitRole = isResult ? 'system' : 'agent';

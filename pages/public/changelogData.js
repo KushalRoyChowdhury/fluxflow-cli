@@ -3,15 +3,23 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.16.1"]
+export const stableVersions = ["3.16.2"]
 
 export const changelogData = {
+    "3.16.2": {
+        "note": "AUGUST 2.",
+        "added": [
+            "Added a new \"/\" command `/truncate` to truncate all SUCCESS tool result to save context keeping conversation intact.\n**Use Case difference between `/compress` & `/truncate`:**\n• \n...wonder where the difference is? It's right here 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/) 👈."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "3.16.1": {
         "note": "AUGUST 1.",
         "added": [],
         "changed": [
-            "Improved few UI Components.",
-            "Re-worked on Agent's Web Scraper tool.\n(~40% more Token Efficiency with +20% Information Density)",
+            "Improved a few UI components.",
+            "Reworked the Agent's Web Scraper tool.\n(~40% more token efficiency with +20% information density)"
         ],
         "fixes": []
     },

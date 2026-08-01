@@ -97,6 +97,8 @@ export const getCleanGroupedLength = (rawHistory) => {
             m.role !== 'think' &&
             !m.isVisualFeedback &&
             !m.isMeta &&
+            !m.isTerminalRecord &&
+            !(m.text && m.text.includes('[TERMINAL_RECORD]')) &&
             !String(m.id).startsWith('welcome')
         )
         .map((m, idx, arr) => {
@@ -150,9 +152,7 @@ export const getCleanGroupedLength = (rawHistory) => {
                 const isResult = tm.role === 'system' && (
                     tm.text?.startsWith('[TOOL RESULT]') ||
                     tm.text?.startsWith('SUCCESS:') ||
-                    tm.text?.startsWith('ERROR:') ||
-                    tm.text?.startsWith('[TERMINAL_RECORD]') ||
-                    tm.isTerminalRecord
+                    tm.text?.startsWith('ERROR:')
                 );
 
                 if (tm.role === 'agent') {
@@ -2555,7 +2555,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
         const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
-        let dirStructure = isSysInstructionCached ? '' : ('\n**DIRECTORY STRUCTURE**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ''}` + '\n' + getDirTree(process.cwd(), dynamicMaxDepth));
+        let dirStructure = isSysInstructionCached ? '' : ('\n**DIRECTORY STRUCTURE**\nCWD: ' + process.cwd() + `${isPlayground ? ' [PLAYGROUND MODE]' : ''}` + '\n' + getDirTree(process.cwd(), dynamicMaxDepth));
 
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -2863,7 +2863,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
+        const firstUserMsg = `[METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `WARNING: CWD Mismatch! Previous Path: "${lastCwd}" WRITE the change in chat to aviod path mismatch later\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {

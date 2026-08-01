@@ -6107,6 +6107,7 @@ var init_ChatLayout = __esm({
           { cmd: "/quit", desc: "Exit and shutdown Flux" },
           { cmd: "/help", desc: "Show all available commands" },
           { cmd: "/compress", desc: "Summarize and compress chat history" },
+          { cmd: "/truncate", desc: "Truncate tool results in chat history" },
           { cmd: "/clear", desc: "Clear terminal screen" },
           { cmd: "/resume", desc: "Load previous session" },
           { cmd: "/revert", desc: "Revert codebase to checkpoint" },
@@ -13601,7 +13602,7 @@ var init_ai = __esm({
     TERMINATION_SIGNAL = false;
     getCleanGroupedLength = (rawHistory) => {
       const preprocessed = rawHistory.filter(
-        (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
+        (m) => (m.role === "user" || m.role === "agent" || m.role === "system") && m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !m.isTerminalRecord && !(m.text && m.text.includes("[TERMINAL_RECORD]")) && !String(m.id).startsWith("welcome")
       ).map((m, idx, arr) => {
         let text = m.fullText || m.text || "";
         if (m.role === "user" && idx < arr.length - 1) {
@@ -13647,7 +13648,7 @@ var init_ai = __esm({
           turnMessages.forEach((tm) => {
             const textLower = (tm.text || "").toLowerCase();
             const hasTool = textLower.includes("tool:functions.") || textLower.includes("agent:generalist.");
-            const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:") || tm.text?.startsWith("[TERMINAL_RECORD]") || tm.isTerminalRecord);
+            const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:"));
             if (tm.role === "agent") {
               if (hasTool) {
                 toolCalls.push(tm.text);
@@ -15760,7 +15761,7 @@ ${currentSummary}
         const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
         const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
-        let dirStructure = isSysInstructionCached ? "" : "\n**DIRECTORY STRUCTURE**\nCWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}${cwdMismatch ? ` (WARNING: CWD Mismatch! Previous Path: ${lastCwd})` : ""}
+        let dirStructure = isSysInstructionCached ? "" : "\n**DIRECTORY STRUCTURE**\nCWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}
 ` + getDirTree(process.cwd(), dynamicMaxDepth);
         const ideCtx = await getIDEContext();
         let ideBlock = "";
@@ -16040,7 +16041,8 @@ ${ideCtx.warnings}
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
         const firstUserMsg = `[METADATA, Chat Context > Metadata]
 Time: ${dateTimeStr}
-OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${memoryPrompt}${ideBlock}
+OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `WARNING: CWD Mismatch! Previous Path: "${lastCwd}" WRITE the change in chat to aviod path mismatch later
+` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
 ${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
 ${taggedContextStr}[USER PROMPT]
@@ -21015,6 +21017,7 @@ function App({ args = [] }) {
     { cmd: "/resume", desc: "Load previous session" },
     { cmd: "/clear", desc: "Clear terminal screen" },
     { cmd: "/compress", desc: "Summarize and compress chat history" },
+    { cmd: "/truncate", desc: "Truncate tool results in chat history" },
     { cmd: "/revert", desc: "Revert codebase back to a checkpoint" },
     { cmd: "/gemini", desc: "Get a happy message from Gemini CLI" },
     { cmd: "/save", desc: "Force save current chat" },
@@ -21947,6 +21950,42 @@ ${list || "No saved chats found."}`, isMeta: true }];
           runCompress();
           break;
         }
+        case "/truncate": {
+          setInput("");
+          let truncatedCount = 0;
+          setMessages((prev) => {
+            const updatedMessages = prev.map((m) => {
+              const fullTextStr = m.fullText || m.text || "";
+              if (!fullTextStr.startsWith("[TOOL RESULT]:")) {
+                return m;
+              }
+              if (fullTextStr.startsWith("[TOOL RESULT]: ERROR") || fullTextStr.startsWith("[TOOL RESULT]: DENIED") || fullTextStr.includes("...Result Truncated by System on User Request")) {
+                return m;
+              }
+              truncatedCount++;
+              if (fullTextStr.startsWith("[TOOL RESULT]: SUCCESS")) {
+                return {
+                  ...m,
+                  fullText: "[TOOL RESULT]: SUCCESS: ...Result Truncated by System on User Request"
+                };
+              }
+              return {
+                ...m,
+                fullText: "[TOOL RESULT]: ...Result Truncated by System on User Request"
+              };
+            });
+            const finalMsgs = [...updatedMessages, {
+              id: Date.now(),
+              role: "system",
+              text: `[SYSTEM] Truncated ${truncatedCount} tool result(s) in chat history.`,
+              isMeta: true
+            }];
+            saveChat(chatId, null, finalMsgs);
+            setCompletedIndex(finalMsgs.length);
+            return finalMsgs;
+          });
+          break;
+        }
         case "/help": {
           setMessages((prev) => {
             setCompletedIndex(prev.length + 1);
@@ -22006,7 +22045,7 @@ ${timestamp}` };
         let isFirstPacket = true;
         try {
           const rawHistory = [...messages, userMessage].filter(
-            (m) => m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !String(m.id).startsWith("welcome")
+            (m) => m.role !== "think" && !m.isVisualFeedback && !m.isMeta && !m.isTerminalRecord && !(m.text && m.text.includes("[TERMINAL_RECORD]")) && !String(m.id).startsWith("welcome")
           );
           const cleanHistoryForAI = [];
           const preprocessed = rawHistory.map((m, idx) => {
@@ -22048,7 +22087,7 @@ ${timestamp}` };
                 i++;
               }
               turnMessages.forEach((tm) => {
-                const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:") || tm.text?.startsWith("[TERMINAL_RECORD]") || tm.isTerminalRecord);
+                const isResult = tm.role === "system" && (tm.text?.startsWith("[TOOL RESULT]") || tm.text?.startsWith("SUCCESS:") || tm.text?.startsWith("ERROR:"));
                 const emitRole = isResult ? "system" : "agent";
                 const rawText = (tm.text || "").trim();
                 if (!rawText) return;
@@ -24541,6 +24580,7 @@ Usage: fluxflow --export error`);
   /clear                                   Clear terminal screen
   /resume                                  Load previous session
   /compress                                Summarize and compress chat history
+  /truncate                                Truncate tool results in chat history
   /revert                                  Revert codebase back to a checkpoint
   /save                                    Force save current chat
   /export [chat|logs]                      Export chat session or system error logs
