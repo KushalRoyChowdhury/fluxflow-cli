@@ -3276,19 +3276,19 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...Result Truncated by System on User Request')) {
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...Result Truncated by System on User Command')) {
                                 return m;
                             }
                             truncatedCount++;
                             if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
                                 return {
                                     ...m,
-                                    fullText: '[TOOL RESULT]: SUCCESS: ...Result Truncated by System on User Request'
+                                    fullText: '[TOOL RESULT]: SUCCESS: ...Result Truncated by System on User Command'
                                 };
                             }
                             return {
                                 ...m,
-                                fullText: '[TOOL RESULT]: ...Result Truncated by System on User Request'
+                                fullText: '[TOOL RESULT]: ...Result Truncated by System on User Command'
                             };
                         });
 

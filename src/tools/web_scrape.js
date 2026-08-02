@@ -4,6 +4,7 @@ import path from 'path';
 import TurndownService from 'turndown';
 import { LOGS_DIR } from '../utils/paths.js';
 import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
+import { gfm } from 'turndown-plugin-gfm';
 
 /**
  * Advanced Web Scraping Tool (Puppeteer Powered)
@@ -60,8 +61,8 @@ export const web_scrape = async (args) => {
 
             // 6. Deep Semantic Extraction: High-signal HTML
             let htmlContent = await page.evaluate(() => {
-                // 1. Remove absolute junk (Keeping buttons for CTAs, but removing images as they are token-heavy)
-                const junk = document.querySelectorAll('script, style, nav, footer, header, noscript, svg, canvas, iframe, ad, .ads, link, meta, img');
+                // 1. Remove absolute junk (Keeping navigation, headers, footers, buttons for CTAs, but removing images as they are token-heavy)
+                const junk = document.querySelectorAll('script, style, noscript, svg, canvas, iframe, ad, .ads, link, meta, img');
                 junk.forEach(el => el.remove());
 
                 // 2. Strip comments
@@ -129,6 +130,7 @@ export const web_scrape = async (args) => {
                 headingStyle: 'atx',
                 codeBlockStyle: 'fenced'
             });
+            turndownService.use(gfm);
             const rawMarkdown = turndownService.turndown(cleanedHtml)
                 .replace(/\.\s*\n/g, '\n')
                 .replace(/ +/g, ' ')
@@ -138,13 +140,12 @@ export const web_scrape = async (args) => {
             const markdown = rawMarkdown.substring(0, 50000);
 
             await browser.close();
-            // fs.writeFileSync('scraped.md', `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`);
+            // fs.writeFileSync(`scraped.md`, `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`);
             return `Markdown parsed from [${url}]:\n\n${markdown}${rawMarkdown.length > 50000 ? '\n\n[TRUNCATED AT 50K CHARS]' : ''}`;
 
         } catch (err) {
             lastError = err;
             if (browser) await browser.close();
-            fs.writeFileSync(path.join(LOGS_DIR, "web_tools", "scrape", "standard_mode", "ERROR.txt"), err.message);
             if (attempt < maxRetries) {
                 const backoff = Math.pow(2, attempt) * 1000;
                 await new Promise(r => setTimeout(r, backoff));
