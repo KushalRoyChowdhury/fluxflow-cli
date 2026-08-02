@@ -16047,9 +16047,10 @@ ${ideCtx.warnings}
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
-        const firstUserMsg = `[METADATA, Chat Context > Metadata]
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]
 Time: ${dateTimeStr}
-OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `WARNING: CWD Mismatch! Previous Path: "${lastCwd}" WRITE the change in chat to aviod path mismatch later
+OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `
+WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
 ${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
