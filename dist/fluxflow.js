@@ -6811,9 +6811,16 @@ var init_main_tools = __esm({
 Tool calls: ONLY use [tool:functions.ToolName(args)]
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
-**CRITICAL TOOL USAGE RULES:**
+**TOOL CALLS POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? '- **Escape quotes: \\" for code strings **\n- ** Literal escapes: Double - escape sequences(e.g., \\\\n) **\n- ** File structure: Real newlines for code formatting**\n- SAME file, MULTIPLE edits? Use ONE PatchFile call with up to 15 blocks \u2190 **PRIORITY**\n- Tool denied? Use `Ask` immediately for user guidance \u2190 **MANDATORY**\n- Need specific text ? SearchKeyword > Guessing/ReadFile\n- Huge files ? SearchKeyword > Full Read\n- **Update Todos from realtime progress every turn when created**\n' : ""}
+${mode === "Flux" ? `- Escape quotes: \\" for code strings
+- Double-escape literal sequences (eg. \\\\n)
+- Use real newlines for code formatting
+- SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
+- Tool denied? Ask for guidance \u2190 MANDATORY
+- Need text or huge files? SearchKeyword > Full Read
+- Update Todos from realtime progress each turn
+` : ""}
 - COMMUNICATION WITH USER -
 - [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
 
@@ -6823,23 +6830,22 @@ ${mode === "Flux" ? '- **Escape quotes: \\" for code strings **\n- ** Literal es
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES. allowMultiple: Replace all matches ONLY WHEN SURE. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Last resort. Minimize recursion
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
-- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code
-- [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
+- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
+- [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
 - [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**${enableSubAgents ? '\n- [tool:functions.Await(time="integer 15-180")]. For waiting without exiting agent loop' : ""}
 ${_cachedAdvanceRollback ? `
 - EMERGENCY SAFETY TOOLS -
-Info: \`initial\` = user prompt for current task. Revert \`id\` = turn BEFORE the disaster tool (e.g. disaster:\`turn_3\` \u2192 revert:\`turn_2\`). Reason explicitly
-- [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace to a checkpoint in THIS agent loop.
-Use ONLY for catastrophic/codebase corruption. Before ending loop, verify no catastrophe. \`id\` not required with \`getCheckPoint\`.
+Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` \u2192 revert: \`turn_2\`). Reason explicitly
+- [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace in THIS agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`id\` omitted for \`getCheckpoint\`
 ` : ""}${enableSubAgents ? `
 - SUB AGENT TOOLS -
 **PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
 Invocations:
-- Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active, meantime, do your OWN work
-- InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
+\u2022 Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active, meantime, do your OWN work
+\u2022 InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
 - [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
 - [agent:generalist.GetProgress(id="...")]. Poll \`getProgress\` sparingly (exp backoff Await); **NO IMMEDIATE FIRST POLL**
 - [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
@@ -8425,11 +8431,11 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT LEVEL: HIGH\nChallenge assumptions. Verify before concluding\nPrefer the simplest correct solution\nAssess architecture, scalability & trade-offs\nVerify dependencies, regressions, failure modes & modularity\nPlan implementation: files, modules, interfaces & tests\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
-      High: "EFFORT LEVEL: HIGH\nThink in a rigorous monologue\nPrefer the simplest correct solution\nAssess architecture, performance & maintainability\nVerify error handling, assumptions, edge cases, dependencies & regressions\nPlan: files, functions, logic & interactions\nRULES:\n- Continuous analytical flow\n- Verify via first principles\n- Actively seek failure paths\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Full technical verification",
-      Medium: "EFFORT LEVEL: MEDIUM\nThink in a focused, technical monologue\nFind the simplest solution meeting requirements\nScan for missing error handling, invalid assumptions, edge cases & dependencies\nVerify cohesive, modular changes\nOutline changes: files, functions & key logic\nRULES:\n- Clean logical flow\n- Efficient, deliberate, implementation-focused\n- Verify imports & system stability, avoid syntax errors, recheck tool results\n- MANDATORY THINKING: Brief verification for technical tasks/greetings",
-      Minimal: "EFFORT LEVEL: LOW\nThink in a quick, focused monologue. Verify Basics:\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results",
-      Off: "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results"
+      xHigh: "EFFORT: HIGH\nChallenge assumptions, verify before concluding, prefer the simplest correct solution, assess architecture, scalability & trade-offs, verify dependencies, regressions, failure modes & modular design, plan: files, modules, interfaces & tests\nRULES:\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
+      High: "EFFORT: HIGH\nRigorous thinking, prefer the simplest correct solution, assess architecture, performance & maintainability, verify error handling, assumptions, edge cases, dependencies & regressions, plan: files, functions, logic & interactions\nRULES:\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
+      Medium: "EFFORT: MEDIUM\nFocused, technical thinking, find the simplest solution meeting requirements, check error handling, assumptions, edge cases & dependencies, verify cohesive, modular changes, outline: files, functions & key logic\nRULES:\nLogical, implementation-focused, efficient, deliberate, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Brief verification for technical tasks/greetings",
+      Minimal: "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors",
+      Off: "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nverify imports, tool results & system stability; avoid syntax errors"
     };
   }
 });
@@ -8505,11 +8511,11 @@ ${tempMemories}` : "";
           "Max": "HIGH"
         };
         thinkingConfig = thinking_prompts_default["xHigh"];
-        thinkingConfig = thinkingConfig.replace("EFFORT LEVEL: HIGH", `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace("\n- MANDATORY THINKING: Full technical verification", "");
+        thinkingConfig = thinkingConfig.replace("EFFORT: HIGH", `EFFORT: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace("\nMANDATORY: Full technical verification", "");
         if (thinkingLevel === "Fast") {
-          thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results";
+          thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nVerify imports, tool results & system stability; avoid syntax errors";
         } else if (thinkingLevel === "Low") {
-          thinkingConfig = "EFFORT LEVEL: LOW\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results";
+          thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors";
         }
       }
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
@@ -8557,7 +8563,10 @@ Check these first; These Files > Training Data. Safety rules apply
       const projectContextBlock = cachedProjectContextBlock;
       return `=== SYSTEM PROMPT ===
 Identity: Flux Flow. Sassy, CLI Agent
-${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable project structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
+${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
+
+- RESOLVE FILES AND PATHS FROM THE PROVIDED DIRECTORY STRUCTURE
+- USE RELATIVE TIME REFERENCE eg. few mins ago
 
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
@@ -8565,9 +8574,6 @@ ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || th
 - Use <think> ... </think> for reasoning before responding, even with simple queries/greetings
 ` : ""}` : `${thinkingConfig}
 `}
-- **USE PROVIDED DIRECTORY STRUCTURE FOR FILES/PATHS**
-- RELATIVE TIME REFERENCE eg. few mins ago
-
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `
 -- MEMORY RULES --
@@ -8579,7 +8585,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
 - Same Language as User Query
-- Before tool calls, emit one brief current update. After tool calls, emit no further text this turn
+- Before tool calls, briefly state intent. After, emit no chat
 - On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
@@ -16053,7 +16059,7 @@ OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwd
 WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(...)] [/SYSTEM]
 ${taggedContextStr}[USER PROMPT]
 ${cleanPromptForModel.trim()}
 [/USER PROMPT]`.trim();
@@ -18249,11 +18255,14 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- MAX 3 TOOL CALLS PER TURN
-- Same file, many edits? Prefer multi search-replace in Patch \u2190 **HIGHLY RECOMMENDED**
-- Need specific text OR huge file ? SearchKeyword > ReadFile
-- Tool denied? Use \`Ask\` immediately for user guidance \u2190 **MANDATORY**
-- Restricted Shell Access, NO DELETION
+- Escape quotes: \\" for code strings
+- Double-escape literal sequences (eg. \\\\n)
+- Use real newlines for code formatting
+- SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
+- Tool denied? Ask for guidance \u2190 MANDATORY
+- Need text or huge files? SearchKeyword > Full Read
+- Update Todos from realtime progress each turn
+- Restricted Shell Access, No Deletion
 
 **PROVIDED TOOLS**
 -- Communication with USER --
@@ -18264,16 +18273,12 @@ TOOL POLICY:
 - [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 -- Workspace Tools --
-- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code
+- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES. allowMultiple: Replace all matches ONLY WHERE SURE. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
-- [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-
-- **Escape quotes: \\" for code strings**
-- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
-- **File structure: Real newlines for code formatting**`.trim();
+- [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"

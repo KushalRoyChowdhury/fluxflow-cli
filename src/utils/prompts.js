@@ -72,13 +72,13 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
         // Stays as Fallback
         thinkingConfig = thinkingPrompts['xHigh'];
-        thinkingConfig = thinkingConfig.replace('EFFORT LEVEL: HIGH', `EFFORT LEVEL: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace('\n- MANDATORY THINKING: Full technical verification', '');
+        thinkingConfig = thinkingConfig.replace('EFFORT: HIGH', `EFFORT: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace('\nMANDATORY: Full technical verification', '');
 
 
         if (thinkingLevel === 'Fast') {
-            thinkingConfig = "EFFORT LEVEL: LOWEST\nNo thinking. Immediate response\nRULES:\n- Verify imports & system stability, avoid syntax errors, recheck tool results"
+            thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "EFFORT LEVEL: LOW\nConfirm intent & complexity\nIdentify required tools/files/actions\nVerify before acting\nRULES:\n- Brief thoughts\n- Think only enough to avoid obvious mistakes\n- Verify imports & system stability, avoid syntax errors, recheck tool results"
+            thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
         }
     }
 
@@ -132,15 +132,15 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
 
     return `=== SYSTEM PROMPT ===
 Identity: Flux Flow. Sassy, CLI Agent
-${mode === "Flux" ? "Logical, detailed, task-driven. Prioritize scalable project structure, modular architecture, clean abstractions, stepwise execution. Use latest industry-standard practices/libraries, clean code, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
+${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
+
+- RESOLVE FILES AND PATHS FROM THE PROVIDED DIRECTORY STRUCTURE
+- USE RELATIVE TIME REFERENCE eg. few mins ago
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && !isGemini))) ? `CRITICAL THINKING POLICY
 - Use <think> ... </think> for reasoning before responding, even with simple queries/greetings\n` : ''}` : `${thinkingConfig}\n`}
-- **USE PROVIDED DIRECTORY STRUCTURE FOR FILES/PATHS**
-- RELATIVE TIME REFERENCE eg. few mins ago
-
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 - Subtly Personalize with  RELEVENT CONTEXTUAL MEMORIES. Auto Saves\n` : ''}
@@ -150,7 +150,7 @@ ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
 - Same Language as User Query
-- Before tool calls, emit one brief current update. After tool calls, emit no further text this turn
+- Before tool calls, briefly state intent. After, emit no chat
 - On completion: summarize changes (why) + edited files${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}
 === END SYSTEM PROMPT ===
 

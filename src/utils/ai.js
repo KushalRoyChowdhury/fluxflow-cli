@@ -2873,7 +2873,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema. eg: [tool:functions.ReadFolder(path=".")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(...)] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -3173,7 +3173,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
 
                     // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
-                    // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"} ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
+                    // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
                     const abortPromise = new Promise((_, reject) => {
@@ -5385,11 +5385,14 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- MAX 3 TOOL CALLS PER TURN
-- Same file, many edits? Prefer multi search-replace in Patch ← **HIGHLY RECOMMENDED**
-- Need specific text OR huge file ? SearchKeyword > ReadFile
-- Tool denied? Use \`Ask\` immediately for user guidance ← **MANDATORY**
-- Restricted Shell Access, NO DELETION
+- Escape quotes: \\" for code strings
+- Double-escape literal sequences (eg. \\\\n)
+- Use real newlines for code formatting
+- SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
+- Tool denied? Ask for guidance ← MANDATORY
+- Need text or huge files? SearchKeyword > Full Read
+- Update Todos from realtime progress each turn
+- Restricted Shell Access, No Deletion
 
 **PROVIDED TOOLS**
 -- Communication with USER --
@@ -5400,16 +5403,12 @@ TOOL POLICY:
 - [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 -- Workspace Tools --
-- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code
+- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patchs, TARGET SMALLEST LINES. allowMultiple: Replace all matches ONLY WHERE SURE. Use replaceContent2/newContent2... for multi blocks. Verify DIFFs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
-- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user
-
-- **Escape quotes: \\" for code strings**
-- **Literal escapes: Double-escape sequences (e.g., \\\\n)**
-- **File structure: Real newlines for code formatting**`.trim();
+- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
     const systemInstruction = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
