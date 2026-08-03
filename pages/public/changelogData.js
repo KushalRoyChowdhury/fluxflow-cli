@@ -10,10 +10,7 @@ export const changelogData = {
         "note": "AUGUST 3.",
         "added": [],
         "changed": [
-            "**Significant Improvements to Sub-Agent Architecture**",
-            "**Bi-directional Communication:** Sub-Agents can now communicate with the main agent and user without losing context, allowing for more natural and interactive workflows.",
-            "**Proactive State Context Passing:** Sub-Agents context are now injected when relevant, reducing the need for manual context requests by main agent.",
-            "**Rich Turn State Information:** Enhanced turn state management with detailed information about each turn, enabling better workflow tracking and debugging."
+            "**Significant Improvements to Sub-Agent Architecture**\n\n**Bi-directional Communication:** Sub-Agents can now communicate with the main agent and user without losing context, allowing for more natural and interactive workflows.\n**Proactive State Context Passing:** Sub-Agents context are now injected when relevant, reducing the need for manual context requests by main agent.\n**Rich Turn State Information:** Enhanced turn state management with detailed information about each turn, enabling better workflow tracking and debugging."
         ],
         "fixes": [
             "Reduced false positives of tool calling while chatting.",
