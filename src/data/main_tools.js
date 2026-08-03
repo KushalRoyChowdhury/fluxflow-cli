@@ -23,8 +23,8 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     }
     return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(args)]
-**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")]
+**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 **TOOL CALLS POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 4+, Run: max 1 or 2 consecutive)' : ''}
@@ -45,24 +45,25 @@ ${mode === 'Flux' ? `- Escape quotes: \\" for code strings
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : ''}` : `Supports images/docs`}
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Last resort. Minimize recursion
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**${enableSubAgents ? '\n- [tool:functions.Await(time="integer 15-180")]. For waiting without exiting agent loop' : ''}
+- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**
 ${_cachedAdvanceRollback ? `
-- EMERGENCY SAFETY TOOLS -
+- EMERGENCY TOOLS -
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
 - [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace in THIS agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`id\` omitted for \`getCheckpoint\`\n` : ''}${enableSubAgents ? `
 - SUB AGENT TOOLS -
 **PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
 Invocations:
-• Invoke (async/background, ≤7 parallel). Parallelize long tasks. NEVER repeat while active, meantime, do your OWN work
+• Invoke (async/background, ≤7 parallel). Parallelize long tasks. May take time
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
-- [agent:generalist.GetProgress(id="...")]. Poll \`getProgress\` sparingly (exp backoff Await); **NO IMMEDIATE FIRST POLL**
-- [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ''}`.trim()
+- [tool:functions.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
+- [tool:functions.Await(id="...", timeout="integer seconds, default: 120")]. Event-driven wait
+- [tool:functions.GetProgress(id="...")]. Poll \`getProgress\` sparingly; NO initial poll. Work or await. Never end while subagent runs
+- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ''}`.trim()
 :
 
 

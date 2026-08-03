@@ -2570,7 +2570,7 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var flattenString, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, cleanSignals, clearBlocksCache;
+var flattenString, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, isInsideBacktick, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, bypassBacktick, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
@@ -3345,12 +3345,20 @@ var init_text = __esm({
     };
     REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
     REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
+    isInsideBacktick = (str, idx) => {
+      let inCode = false;
+      for (let i = 0; i < idx; i++) {
+        if (str[i] === "`") inCode = !inCode;
+      }
+      return inCode;
+    };
     REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
     REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
+    bypassBacktick = false;
     cleanSignals = (text) => {
       if (!text) return text;
-      let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, "");
+      let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) => !bypassBacktick && isInsideBacktick(str, offset) ? match : "");
       const trigger = "tool:functions.";
       const subagentTrigger = "agent:generalist.";
       if (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger)) {
@@ -3365,6 +3373,35 @@ var init_text = __esm({
             triggerIdxToUse = subagentIdx;
           }
           if (triggerIdxToUse === -1) break;
+          if (!bypassBacktick && isInsideBacktick(result, triggerIdxToUse)) {
+            const searchFrom = triggerIdxToUse + currentTrigger.length;
+            const nextTool = lowerResult.indexOf(trigger, searchFrom);
+            const nextAgent = lowerResult.indexOf(subagentTrigger, searchFrom);
+            if (nextTool === -1 && nextAgent === -1) break;
+            let safeIdx = -1;
+            let searchPos = 0;
+            while (true) {
+              const tIdx = lowerResult.indexOf(trigger, searchPos);
+              const aIdx = lowerResult.indexOf(subagentTrigger, searchPos);
+              let candidate = -1;
+              let candidateTrigger = trigger;
+              if (tIdx === -1 && aIdx === -1) break;
+              if (tIdx === -1 || aIdx !== -1 && aIdx < tIdx) {
+                candidate = aIdx;
+                candidateTrigger = subagentTrigger;
+              } else {
+                candidate = tIdx;
+              }
+              if (!isInsideBacktick(result, candidate)) {
+                safeIdx = candidate;
+                currentTrigger = candidateTrigger;
+                break;
+              }
+              searchPos = candidate + candidateTrigger.length;
+            }
+            if (safeIdx === -1) break;
+            triggerIdxToUse = safeIdx;
+          }
           let startIdx = triggerIdxToUse;
           let hasOuterBracket = false;
           let k = triggerIdxToUse - 1;
@@ -6808,8 +6845,8 @@ var init_main_tools = __esm({
       }
       return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(args)]
-**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")]
+**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 **TOOL CALLS POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
@@ -6830,25 +6867,26 @@ ${mode === "Flux" ? `- Escape quotes: \\" for code strings
 
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Last resort. Minimize recursion
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**${enableSubAgents ? '\n- [tool:functions.Await(time="integer 15-180")]. For waiting without exiting agent loop' : ""}
+- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**
 ${_cachedAdvanceRollback ? `
-- EMERGENCY SAFETY TOOLS -
+- EMERGENCY TOOLS -
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` \u2192 revert: \`turn_2\`). Reason explicitly
 - [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace in THIS agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`id\` omitted for \`getCheckpoint\`
 ` : ""}${enableSubAgents ? `
 - SUB AGENT TOOLS -
 **PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
 Invocations:
-\u2022 Invoke (async/background, \u22647 parallel). Parallelize long tasks. NEVER repeat while active, meantime, do your OWN work
+\u2022 Invoke (async/background, \u22647 parallel). Parallelize long tasks. May take time
 \u2022 InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- [agent:generalist.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
-- [agent:generalist.GetProgress(id="...")]. Poll \`getProgress\` sparingly (exp backoff Await); **NO IMMEDIATE FIRST POLL**
-- [agent:generalist.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+- [tool:functions.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
+- [tool:functions.Await(id="...", timeout="integer seconds, default: 120")]. Event-driven wait
+- [tool:functions.GetProgress(id="...")]. Poll \`getProgress\` sparingly; NO initial poll. Work or await. Never end while subagent runs
+- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 - [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
 - WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}`.trim();
@@ -8565,7 +8603,7 @@ Check these first; These Files > Training Data. Safety rules apply
 Identity: Flux Flow. Sassy, CLI Agent
 ${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
 
-- RESOLVE FILES AND PATHS FROM THE PROVIDED DIRECTORY STRUCTURE
+- USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION
 - USE RELATIVE TIME REFERENCE eg. few mins ago
 
 -- THINKING GUIDANCE --
@@ -8585,7 +8623,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
 - Same Language as User Query
-- Before tool calls, briefly state intent. After, emit no chat
+- After tool calls emit no chat in this turn
 - On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
@@ -12493,10 +12531,33 @@ var init_invokeSync = __esm({
 });
 
 // src/utils/subagent_state.js
-var subagentProgress;
+var subagent_state_exports = {};
+__export(subagent_state_exports, {
+  addPendingNudge: () => addPendingNudge,
+  clearPendingNudges: () => clearPendingNudges,
+  consumePendingNudges: () => consumePendingNudges,
+  pendingSubagentNudges: () => pendingSubagentNudges,
+  subagentProgress: () => subagentProgress
+});
+var subagentProgress, pendingSubagentNudges, addPendingNudge, consumePendingNudges, clearPendingNudges;
 var init_subagent_state = __esm({
   "src/utils/subagent_state.js"() {
     subagentProgress = [];
+    pendingSubagentNudges = [];
+    addPendingNudge = (msg) => {
+      if (msg) {
+        pendingSubagentNudges.push(msg);
+      }
+    };
+    consumePendingNudges = () => {
+      if (pendingSubagentNudges.length === 0) return [];
+      const nudges = [...pendingSubagentNudges];
+      pendingSubagentNudges = [];
+      return nudges;
+    };
+    clearPendingNudges = () => {
+      pendingSubagentNudges = [];
+    };
   }
 });
 
@@ -12528,13 +12589,24 @@ var init_invoke = __esm({
         }
       }
       const taskId = `subagent-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
+      let _resolveCompletion = null;
+      let _rejectCompletion = null;
+      const completionPromise = new Promise((res, rej) => {
+        _resolveCompletion = res;
+        _rejectCompletion = rej;
+      });
       const taskEntry = {
         id: taskId,
         title: title || task.substring(0, 30),
         task,
         status: "running",
+        startedAt: Date.now(),
         lastChunkTime: Date.now(),
         wps: 0,
+        questions: [],
+        completionPromise,
+        _resolveCompletion,
+        _rejectCompletion,
         progress: []
         // Array of arrays containing logs for each turn
       };
@@ -12547,6 +12619,32 @@ var init_invoke = __esm({
       const subagentContext = {
         ...context,
         taskId,
+        onAskMain: async (questionText, optionsObj) => {
+          const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
+          let questionResolver = null;
+          const qPromise = new Promise((resolve) => {
+            questionResolver = resolve;
+          });
+          const qEntry = {
+            id: questionId,
+            question: questionText,
+            options: optionsObj,
+            answered: false,
+            answer: null,
+            askedAt: Date.now(),
+            _resolve: questionResolver
+          };
+          taskEntry.questions.push(qEntry);
+          taskEntry.status = "waiting";
+          if (context.onSubagentUpdate) {
+            context.onSubagentUpdate();
+          }
+          addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"
+Respond using tool: [tool:functions.Answer(id="${taskId}", answer="...")]
+[/SYSTEM]`);
+          const answer = await qPromise;
+          return answer;
+        },
         onVisualFeedback: (feedbackLabel) => {
           taskEntry.lastChunkTime = Date.now();
           const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, "");
@@ -12608,16 +12706,22 @@ var init_invoke = __esm({
         if (context.onSubagentUpdate) {
           context.onSubagentUpdate();
         }
-      }).then((finalAnswer) => {
-        if (taskEntry.status === "cancelled") return;
-        currentTurnLogs.push(`[SUBAGENT SUCCESS] Final Answer:
-${finalAnswer}`);
-        taskEntry.progress.push([...currentTurnLogs]);
+      }, true).then((finalAnswer) => {
+        if (taskEntry.status === "cancelled") {
+          if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(finalAnswer);
+          return;
+        }
+        if (currentTurnLogs.length > 0) {
+          taskEntry.progress.push([...currentTurnLogs]);
+          currentTurnLogs = [];
+        }
         taskEntry.status = "completed";
         taskEntry.finalAnswer = finalAnswer;
         if (context.onSubagentUpdate) {
           context.onSubagentUpdate();
         }
+        addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" (id: ${taskId}) has FINISHED. Call GetProgress(id="${taskId}") to see the final result. [/SYSTEM]`);
+        if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(finalAnswer);
       }).catch(async (err) => {
         const { isTerminationSignaled: isTerminationSignaled2 } = await init_ai().then(() => ai_exports);
         const isCancelled = err.message === "Subagent task was cancelled." || taskEntry.status === "cancelled" || isTerminationSignaled2();
@@ -12628,6 +12732,7 @@ ${finalAnswer}`);
           if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
           }
+          if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(null);
           return;
         }
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
@@ -12637,6 +12742,8 @@ ${finalAnswer}`);
         if (context.onSubagentUpdate) {
           context.onSubagentUpdate();
         }
+        addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" (id: ${taskId}) FAILED with error: ${err.message}. [/SYSTEM]`);
+        if (taskEntry._rejectCompletion) taskEntry._rejectCompletion(err);
       });
       return `SUCCESS: Background subagent started. Task ID: ${taskId}`;
     };
@@ -12664,14 +12771,47 @@ var init_getProgress = __esm({
       output += `Title: ${task.title}
 `;
       output += `Task: ${task.task}
+`;
+      if (task.startedAt) {
+        const elapsedSec = Math.floor((Date.now() - task.startedAt) / 1e3);
+        output += `Elapsed Time: ${elapsedSec}s
+`;
+      }
+      output += `Turns Completed: ${task.progress.length}
+`;
+      if (task.status === "running" || task.status === "waiting") {
+        if (task.currentTool) output += `Current Tool: ${task.currentTool}
+`;
+        if (task.wps > 0) output += `WPS: ${task.wps}
+`;
+      }
+      if (task.questions && task.questions.length > 0) {
+        const pending = task.questions.filter((q) => !q.answered);
+        if (pending.length > 0) {
+          output += `
+**PENDING QUESTION**
+`;
+          pending.forEach((q) => {
+            output += `"${q.question}"
+`;
+            if (q.options && Object.keys(q.options).length > 0) {
+              output += `Options: ${JSON.stringify(q.options)}
+`;
+            }
+          });
+          output += `Respond using tool: [tool:functions.Answer(id="${task.id}", answer="...")]
 
 `;
-      output += `Progress Log:
+        }
+      }
+      output += `
+Progress Log:
 `;
       task.progress.forEach((turnLogs, index) => {
         output += `--- Turn ${index + 1} ---
 `;
-        const processedLogs = turnLogs.map((log) => {
+        const filteredLogs = turnLogs.filter((log) => !log.startsWith("[SUBAGENT SUCCESS]"));
+        const processedLogs = filteredLogs.map((log) => {
           if (log.startsWith("[Subagent Response]")) {
             const header = "[Subagent Response]";
             const body = log.substring(header.length);
@@ -12746,7 +12886,7 @@ ${task.finalAnswer}
         output += `Failure Error: ${task.error}
 `;
       }
-      const sanitized = output.trim().replace(/\[TOOL RESULT\]/gi, "TOOL RESULT:");
+      const sanitized = output.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim().replace(/\[TOOL RESULT\]/gi, "TOOL RESULT:");
       return sanitized;
     };
   }
@@ -12784,37 +12924,9 @@ var init_cancel = __esm({
 });
 
 // src/tools/await.js
-var awaitTool;
 var init_await = __esm({
   "src/tools/await.js"() {
     init_arg_parser();
-    awaitTool = async (args, context = {}) => {
-      const parsed = parseArgs(args);
-      const timeStr = parsed.time;
-      if (!timeStr) {
-        return 'ERROR: Missing "time" argument for await.';
-      }
-      let seconds = parseFloat(timeStr);
-      if (isNaN(seconds)) {
-        return `ERROR: Invalid time value "${timeStr}". Must be a number.`;
-      }
-      if (seconds < 10) {
-        seconds = 10;
-      } else if (seconds > 180) {
-        seconds = 180;
-      }
-      const formatTime = (s) => {
-        if (s >= 60) {
-          const m = Math.floor(s / 60);
-          const rem = s % 60;
-          return `${m}m${rem > 0 ? ` ${rem}s` : ""}`;
-        }
-        return `${s}s`;
-      };
-      const formatted = formatTime(seconds);
-      await new Promise((resolve) => setTimeout(resolve, seconds * 1e3));
-      return `SUCCESS: Waited for ${formatted}${seconds > 180 ? " (Max: 180s)" : ""}${seconds < 10 ? " (Min: 10s)" : ""}.`;
-    };
   }
 });
 
@@ -13169,6 +13281,120 @@ Tools Used: ${toolsStr}
   }
 });
 
+// src/tools/awaitSubagent.js
+var awaitSubagent;
+var init_awaitSubagent = __esm({
+  "src/tools/awaitSubagent.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    awaitSubagent = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const id = parsed.id;
+      let timeoutSec = parseInt(parsed.timeout || parsed.time || "120", 10);
+      if (isNaN(timeoutSec) || timeoutSec <= 0) timeoutSec = 120;
+      if (timeoutSec > 300) timeoutSec = 300;
+      if (!id) {
+        if (parsed.time) {
+          await new Promise((resolve) => setTimeout(resolve, timeoutSec * 1e3));
+          return `SUCCESS: Waited for ${timeoutSec}s.`;
+        }
+        return 'ERROR: Missing "id" argument for Await.';
+      }
+      const task = subagentProgress.find((t) => t.id === id);
+      if (!task) {
+        return `ERROR: Subagent task with ID [${id}] not found.`;
+      }
+      if (task.status === "completed") {
+        return `SUCCESS: Subagent task [${id}] completed.
+Final Answer:
+${task.finalAnswer || "(No output)"}`;
+      }
+      if (task.status === "failed") {
+        return `ERROR: Subagent task [${id}] failed.
+Error: ${task.error || "Unknown error"}`;
+      }
+      if (task.status === "cancelled") {
+        return `INFO: Subagent task [${id}] was cancelled.`;
+      }
+      let timeoutId;
+      const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+          resolve({ type: "timeout" });
+        }, timeoutSec * 1e3);
+      });
+      try {
+        const result = await Promise.race([
+          task.completionPromise.then(() => ({ type: "completion" })),
+          timeoutPromise
+        ]);
+        clearTimeout(timeoutId);
+        if (result.type === "timeout") {
+          return `TIMEOUT: Subagent task [${id}] is still running (status: ${task.status.toUpperCase()}) after ${timeoutSec}s. You can continue other work or call Await again.`;
+        }
+        if (task.status === "completed") {
+          return `SUCCESS: Subagent task [${id}] completed.
+Final Answer:
+${task.finalAnswer || "(No output)"}`;
+        } else if (task.status === "failed") {
+          return `ERROR: Subagent task [${id}] failed.
+Error: ${task.error || "Unknown error"}`;
+        } else if (task.status === "cancelled") {
+          return `INFO: Subagent task [${id}] was cancelled.`;
+        } else {
+          return `INFO: Subagent task [${id}] status changed to ${task.status.toUpperCase()}.`;
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        return `ERROR: Exception while awaiting subagent [${id}]: ${err.message}`;
+      }
+    };
+  }
+});
+
+// src/tools/answerSubagent.js
+var answerSubagent;
+var init_answerSubagent = __esm({
+  "src/tools/answerSubagent.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    answerSubagent = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const id = parsed.id;
+      const answer = parsed.answer || parsed.response;
+      if (!id) {
+        return 'ERROR: Missing "id" argument for Answer.';
+      }
+      if (!answer) {
+        return 'ERROR: Missing "answer" argument for Answer.';
+      }
+      const task = subagentProgress.find((t) => t.id === id);
+      if (!task) {
+        return `ERROR: Subagent task with ID [${id}] not found.`;
+      }
+      if (!task.questions || task.questions.length === 0) {
+        return `INFO: Subagent task [${id}] has no pending questions.`;
+      }
+      const pending = task.questions.filter((q) => !q.answered);
+      if (pending.length === 0) {
+        return `INFO: Subagent task [${id}] has no unanswered questions.`;
+      }
+      pending.forEach((q) => {
+        q.answered = true;
+        q.answer = answer;
+        q.answeredAt = Date.now();
+        if (q._resolve) {
+          q._resolve(answer);
+        }
+      });
+      task.status = "running";
+      if (context.onSubagentUpdate) {
+        context.onSubagentUpdate();
+      }
+      return `SUCCESS: Answer provided to subagent task [${id}]. Subagent execution resumed.`;
+    };
+  }
+});
+
 // src/utils/tools.js
 var TOOL_MAP, dispatchTool;
 var init_tools = __esm({
@@ -13197,6 +13423,8 @@ var init_tools = __esm({
     init_cancel();
     init_await();
     init_emergency_rollback();
+    init_awaitSubagent();
+    init_answerSubagent();
     TOOL_MAP = {
       web_search,
       web_scrape,
@@ -13219,8 +13447,12 @@ var init_tools = __esm({
       invoke,
       getProgress,
       cancel,
+      awaitSubagent,
+      answerSubagent,
       invoke_sync: invokeSync,
       get_progress: getProgress,
+      await_subagent: awaitSubagent,
+      answer_subagent: answerSubagent,
       ask: ask_user,
       // PascalCase Normalizations for Token Efficiency
       Ask: ask_user,
@@ -13245,14 +13477,12 @@ var init_tools = __esm({
       addMemoryScore: addMemScore,
       AddMemoryScore: addMemScore,
       FileMap: file_map,
-      Todo: todo,
-      TODO: todo,
-      InvokeSync: invokeSync,
-      Invoke: invoke,
-      GetProgress: getProgress,
-      Cancel: cancel,
-      await: awaitTool,
-      Await: awaitTool,
+      answer: answerSubagent,
+      Answer: answerSubagent,
+      AnswerSubagent: answerSubagent,
+      await: awaitSubagent,
+      Await: awaitSubagent,
+      AwaitSubagent: awaitSubagent,
       EmergencyRollback: emergency_rollback,
       emergency_rollback
     };
@@ -13521,6 +13751,7 @@ __export(ai_exports, {
   deleteChatSummary: () => deleteChatSummary,
   getAIStream: () => getAIStream,
   getCleanGroupedLength: () => getCleanGroupedLength,
+  getGoogleClient: () => getGoogleClient,
   initAI: () => initAI,
   isModelMultimodal: () => isModelMultimodal,
   isTerminationSignaled: () => isTerminationSignaled,
@@ -13532,7 +13763,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path26, { normalize } from "path";
 import fs27 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, bypassBacktick2, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -13563,15 +13794,27 @@ var init_ai = __esm({
     RE_STUTTER_WORD_BOUNDARY = /^[^\w]+|[^\w]+$/g;
     RE_STUTTER_NON_ALNUM = /[^a-z0-9]/gi;
     RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    RE_TOOL_CALL_ANY = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
     RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
     RE_STRIP_QUOTES = /["']/g;
     RE_BACKSLASH_SLASH = /\\/g;
+    RE_STRIP_THINK_CLOSED = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi;
+    RE_STRIP_THINK_OPEN = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi;
+    RE_STRIP_THINK_SIMPLE = /(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi;
+    RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi;
+    RE_BACKTICK_SPAN = /`[^`]*`/g;
+    RE_BACKTICK_OPEN = /`[^`]*$/;
+    RE_KIMI_TOOL_CALL = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
+    RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+    RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
+    RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
+    bypassBacktick2 = false;
     client = null;
     globalSettings = {};
     systemInstructionCache = { key: null, value: null };
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -14496,12 +14739,14 @@ var init_ai = __esm({
       "generate_image": "Generating",
       "todo": "Planning",
       "Todo": "Planning",
-      "invoke_sync": "Generalist",
-      "invoke": "Generalist",
+      "invoke_sync": "Sub-Agent Working",
+      "invoke": "Starting Agent",
       "get_progress": "Checking Progress",
       "cancel": "Cancelling",
       "await": "Waiting",
-      "EmergencyRollback": "Don't Panic. Lookin' into it"
+      "EmergencyRollback": "Don't Panic. Lookin' into it",
+      "answer": "Answering Sub-Agent",
+      "Answer": "Answering Sub-Agent"
     };
     getToolDetail = (toolName, argsStr) => {
       try {
@@ -14518,6 +14763,12 @@ var init_ai = __esm({
       } catch (e) {
         return null;
       }
+    };
+    getGoogleClient = (apiKey) => {
+      if (apiKey) {
+        return new GoogleGenAI({ apiKey });
+      }
+      return client;
     };
     runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
       const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
@@ -14657,7 +14908,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                 const firstResult2 = await iterator2.next();
                 return { iterator: iterator2, firstResult: firstResult2 };
               } else {
-                const stream = await client.models.generateContentStream({
+                const googleClient = getGoogleClient(apiKey);
+                const stream = await googleClient.models.generateContentStream({
                   model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue("janitor_default") : getFallbackValue("gemma_janitor_fallback_google")),
                   contents: janitorContents,
                   config: {
@@ -14812,16 +15064,17 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       }
     };
     getActiveToolContext = (text) => {
-      const cleanText = text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "").replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi, "");
+      const cleanText = text.replace(RE_STRIP_THINK_CLOSED, "").replace(RE_STRIP_THINK_OPEN, "");
+      const scanText = bypassBacktick2 ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
       RE_TOOL_CALL_FUNC.lastIndex = 0;
       let match;
-      while ((match = RE_TOOL_CALL_FUNC.exec(cleanText)) !== null) {
+      while ((match = RE_TOOL_CALL_FUNC.exec(scanText)) !== null) {
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
         let isEscaped = false;
         let closed = false;
-        for (let i = startIdx; i < cleanText.length; i++) {
+        for (let i = startIdx; i < scanText.length; i++) {
           const char = cleanText[i];
           if (!inString && (char === '"' || char === "'" || char === "`")) {
             inString = char;
@@ -14834,8 +15087,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
             else if (char === ")") balance--;
             if (balance === 0) {
               let j = i + 1;
-              while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
-              if (j < cleanText.length && cleanText[j] === "]") {
+              while (j < scanText.length && /\s/.test(scanText[j])) j++;
+              if (j < scanText.length && scanText[j] === "]") {
                 closed = true;
                 RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                 break;
@@ -14852,13 +15105,14 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       return { inside: false };
     };
     getContextSafeText = (text, stripThoughts = true) => {
-      const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+      const toolRegex = RE_TOOL_CALL_FUNC;
+      toolRegex.lastIndex = 0;
       let result = "";
       let lastIdx = 0;
       let match;
       while ((match = toolRegex.exec(text)) !== null) {
         const before = text.substring(lastIdx, match.index);
-        result += stripThoughts ? before.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, "") : before;
+        result += stripThoughts ? before.replace(RE_STRIP_THINK_SIMPLE, "") : before;
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
@@ -14904,12 +15158,13 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }
       }
       if (lastIdx < text.length) {
-        result += stripThoughts ? text.substring(lastIdx).replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, "") : text.substring(lastIdx);
+        result += stripThoughts ? text.substring(lastIdx).replace(RE_STRIP_THINK_SIMPLE, "") : text.substring(lastIdx);
       }
       return result;
     };
     contextSafeReplace = (text, regex, replacement) => {
-      const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+      const toolRegex = RE_TOOL_CALL_FUNC;
+      toolRegex.lastIndex = 0;
       let result = "";
       let lastIdx = 0;
       let match;
@@ -14992,8 +15247,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       const toPascalCase = (str) => {
         return str.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join("");
       };
-      const kimiRegex = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
-      let result = text.replace(kimiRegex, (match, toolName, argsJsonStr) => {
+      RE_KIMI_TOOL_CALL.lastIndex = 0;
+      let result = text.replace(RE_KIMI_TOOL_CALL, (match, toolName, argsJsonStr) => {
         let parsedArgs = "";
         try {
           const argsObj = JSON.parse(argsJsonStr.trim());
@@ -15006,7 +15261,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           }
         } catch (e) {
           const pairs = [];
-          const pairRegex = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+          const pairRegex = RE_KIMI_JSON_PAIR;
+          pairRegex.lastIndex = 0;
           let pMatch;
           while ((pMatch = pairRegex.exec(argsJsonStr)) !== null) {
             const key = pMatch[1];
@@ -15023,8 +15279,10 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         const normToolName = PASCAL_MAP[cleanKey] || toPascalCase(toolName);
         return `[tool:functions.${normToolName}(${parsedArgs})]`;
       });
-      result = result.replace(/<\|\s*tool_calls_section_begin\s*\|>/gi, "");
-      result = result.replace(/<\|\s*tool_calls_section_end\s*\|>/gi, "");
+      RE_KIMI_SECTION_BEGIN.lastIndex = 0;
+      RE_KIMI_SECTION_END.lastIndex = 0;
+      result = result.replace(RE_KIMI_SECTION_BEGIN, "");
+      result = result.replace(RE_KIMI_SECTION_END, "");
       return result;
     };
     REGEX_PLACEHOLDER_ARG = /(?:path|query|url|keyword|command|method|title|task|id)\s*=\s*['"`]?\s*\.\.\.\s*['"`]?/i;
@@ -15037,18 +15295,21 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
     detectToolCalls = (text) => {
       if (!text) return [];
       const translatedText = translateKimiToolCalls(text);
-      const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, "");
+      RE_STRIP_THINK_FULL.lastIndex = 0;
+      const cleanText = translatedText.replace(RE_STRIP_THINK_FULL, "");
       const results = [];
-      const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+      const scanText = bypassBacktick2 ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
+      const toolRegex = RE_TOOL_CALL_ANY;
+      toolRegex.lastIndex = 0;
       let match;
-      while ((match = toolRegex.exec(cleanText)) !== null) {
+      while ((match = toolRegex.exec(scanText)) !== null) {
         const toolName = match[1];
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
         let inString = null;
         let endIdx = -1;
         let closingParenIdx = -1;
-        for (let i = startIdx; i < cleanText.length; i++) {
+        for (let i = startIdx; i < scanText.length; i++) {
           const char = cleanText[i];
           if (inString) {
             if (char === inString) {
@@ -15070,8 +15331,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
               if (balance === 0) {
                 closingParenIdx = i;
                 let j = i + 1;
-                while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
-                if (j < cleanText.length && cleanText[j] === "]") {
+                while (j < scanText.length && /\s/.test(scanText[j])) j++;
+                if (j < scanText.length && scanText[j] === "]") {
                   endIdx = j;
                   break;
                 }
@@ -15126,7 +15387,6 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           }
         };
       }
-      return client;
     };
     generateSimpleContent = async (settings, model, contents, systemInstruction, thinkingLevel = "Fast", temperature = 0.75, usageKey = "agent") => {
       return withRetry(async () => {
@@ -15153,7 +15413,8 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
           } else if (aiProvider === "NVIDIA") {
             stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else {
-            const genStream = await client.models.generateContentStream({
+            const googleClient = getGoogleClient(apiKey);
+            const genStream = await googleClient.models.generateContentStream({
               model,
               contents: normalizedContents,
               config: {
@@ -16058,7 +16319,7 @@ OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwd
 WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(...)] [/SYSTEM]
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(arg1="value1")] [/SYSTEM]
 ${taggedContextStr}[USER PROMPT]
 ${cleanPromptForModel.trim()}
 [/USER PROMPT]`.trim();
@@ -16093,9 +16354,30 @@ ${cleanPromptForModel.trim()}
             yield { type: "status", content: "Working" };
           }
           if (TERMINATION_SIGNAL) {
+            try {
+              const { clearPendingNudges: clearPendingNudges2 } = await Promise.resolve().then(() => (init_subagent_state(), subagent_state_exports));
+              clearPendingNudges2();
+            } catch (e) {
+            }
             yield { type: "status", content: "Request Cancelled" };
             yield { type: "text", content: "\n\n\x1B[33m\u24D8 Request Cancelled\x1B[0m" };
             break;
+          }
+          try {
+            const { consumePendingNudges: consumePendingNudges2 } = await Promise.resolve().then(() => (init_subagent_state(), subagent_state_exports));
+            const pendingNudges = consumePendingNudges2();
+            if (pendingNudges && pendingNudges.length > 0) {
+              const combinedNudge = pendingNudges.join("\n\n");
+              if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
+                modifiedHistory[modifiedHistory.length - 1].text += `
+
+${combinedNudge}`;
+              } else {
+                modifiedHistory.push({ role: "user", text: combinedNudge });
+              }
+              yield { type: "status", content: "Subagent Update" };
+            }
+          } catch (e) {
           }
           if (steeringCallback) {
             const hint = await steeringCallback();
@@ -16358,7 +16640,8 @@ ${ideErr} [/ERROR]`;
                 );
                 stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
               } else {
-                const apiCallPromise = client.models.generateContentStream({
+                const googleClient = getGoogleClient(settings?.apiKey);
+                const apiCallPromise = googleClient.models.generateContentStream({
                   model: targetModel || "gemini-3-flash-preview",
                   contents: activeContents,
                   config: {
@@ -16699,19 +16982,19 @@ ${ideErr} [/ERROR]`;
                       "getProgress": "get_progress",
                       "GetProgress": "get_progress",
                       "Cancel": "cancel",
-                      "await": "await",
-                      "Await": "await"
+                      "Await": "await",
+                      "Answer": "answer"
                     };
                     const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                     const partialArgs = toolContext.args || "";
                     let detail = null;
-                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map", "invoke", "invoke_sync", "get_progress", "await"].includes(potentialTool)) {
+                    if (["write_file", "update_file", "view_file", "read_folder", "write_pdf", "write_docx", "search_keyword", "generate_image", "file_map", "invoke", "invoke_sync", "get_progress", "await", "answer"].includes(potentialTool)) {
                       const pArgs = parseArgs(partialArgs);
                       const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                       const keyword = pArgs.keyword;
                       const title = pArgs.title || pArgs.task;
                       const id = pArgs.id || pArgs.taskId;
-                      const timeVal = pArgs.time;
+                      const timeVal = pArgs.timeout || pArgs.time;
                       if (keyword !== void 0 && keyword !== null) {
                         detail = String(keyword).replace(RE_STRIP_QUOTES, "");
                       } else if (filePath) {
@@ -16778,17 +17061,19 @@ ${ideErr} [/ERROR]`;
                           "Ask": "User Input Required",
                           "Memory": "Updating Memory",
                           "GenerateImage": "Generating",
-                          "InvokeSync": "Generalist Working",
-                          "invoke_sync": "Generalist Working",
-                          "Invoke": "Generalist Working",
-                          "invoke": "Generalist Working",
+                          "InvokeSync": "Sub-Agent Working",
+                          "invoke_sync": "Sub-Agent Working",
+                          "Invoke": "Working",
+                          "invoke": "Working",
                           "GetProgress": "Checking Progress",
                           "get_progress": "Checking Progress",
                           "Cancel": "Stopping Generalist",
                           "cancel": "Stopping Generalist",
                           "Await": "Waiting",
                           "await": "Waiting",
-                          "EmergencyRollback": "Rolling the Ball"
+                          "EmergencyRollback": "Rolling the Ball",
+                          "Answer": "Answering Sub-Agent",
+                          "answer": "Answering Sub-Agent"
                         };
                         const toolTitle = TOOL_TITLES[potentialTool] || "Working";
                         process.stdout.write(`\x1B]0;${toolTitle}...\x07`);
@@ -16920,14 +17205,20 @@ ${ideErr} [/ERROR]`;
                       "generate_image": "generate_image",
                       "todo": "todo",
                       "Todo": "todo",
-                      "invoke": "invoke",
+                      "Invoke": "invoke",
                       "InvokeSync": "invoke_sync",
                       "getProgress": "get_progress",
                       "GetProgress": "get_progress",
+                      "Await": "await",
+                      "await": "await",
+                      "AwaitSubagent": "await",
+                      "awaitSubagent": "await",
+                      "Answer": "answer",
+                      "answer": "answer",
+                      "AnswerSubagent": "answer",
+                      "answerSubagent": "answer",
                       "Cancel": "cancel",
                       "cancel": "cancel",
-                      "await": "await",
-                      "Await": "await",
                       "EmergencyRollback": "EmergencyRollback"
                     };
                     const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
@@ -17013,10 +17304,9 @@ ${ideErr} [/ERROR]`;
                       const { method } = parseArgs(toolCall.args);
                       label = method === "forceRevert" ? "" : "\u2714  Rollback Point Checked";
                     } else if (normToolName === "await" || normToolName === "Await") {
-                      const { time } = parseArgs(toolCall.args);
-                      let sec = parseFloat(time) || 0;
-                      if (sec < 10) sec = 10;
-                      if (sec > 180) sec = 180;
+                      const { time, timeout } = parseArgs(toolCall.args);
+                      let sec = parseFloat(timeout || time) || 0;
+                      if (!sec) sec = 120;
                       const formatTime = (s) => {
                         if (s >= 60) {
                           const m = Math.floor(s / 60);
@@ -17055,6 +17345,8 @@ ${ideErr} [/ERROR]`;
                       ];
                       let randomVibe = existentialVibes[Math.floor(Math.random() * existentialVibes.length)];
                       label = `\u2714  ${randomVibe} \u2192 ${formatTime(sec)}`;
+                    } else if (normToolName === "Answer" || normToolName === "answer") {
+                      label = "\u2714  Resolved Sub-Agent Query";
                     } else if (normToolName === "exec_command" || normToolName === "ask") {
                       label = "";
                     } else {
@@ -17983,7 +18275,7 @@ ${snippet2}`;
                   const waitTime = Math.min(1e3 * Math.pow(2, inStreamRetryCount - 1), 24e3);
                   if (turnText.trim().length > 0) {
                     modifiedHistory.push({ role: "agent", text: turnText });
-                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
+                    const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> BEFORE CHAT OUTPUT\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
                     if (toolResults.length > 0) {
                       toolResults.forEach((tr, idx) => {
                         if (idx === toolResults.length - 1) {
@@ -18176,7 +18468,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
       }
       yield { type: "status", content: null };
     };
-    runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null) => {
+    runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null, isAsync = false) => {
       const savedSettings = await loadSettings();
       const mergedSettings = { ...savedSettings, ...settings };
       const envSubagentModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
@@ -18250,8 +18542,8 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
       const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
-**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(arg1="value1")]
+**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 TOOL POLICY:
 - Escape quotes: \\" for code strings
@@ -18262,10 +18554,12 @@ TOOL POLICY:
 - Need text or huge files? SearchKeyword > Full Read
 - Update Todos from realtime progress each turn
 - Restricted Shell Access, No Deletion
+- ONLY valid tools and syntax defined below are allowed
 
 **PROVIDED TOOLS**
--- Communication with USER --
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+-- Communication Tools --
+- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::description", ...MAX 4)]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ""}
 
 -- Web Tools --
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -18278,7 +18572,7 @@ TOOL POLICY:
 - [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
-      const systemInstruction = `=== START SYSTEM PROMPT ===
+      const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
 
@@ -18318,7 +18612,7 @@ Current Time: ${time}
           parts: [{ text: m.text }]
         }));
         if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
-        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstruction, "Fast");
+        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, "Fast");
         const responseText = response.text || "";
         const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, "").trim();
         finalAnswer = cleanResponse;
@@ -18330,6 +18624,8 @@ ${cleanResponse}
         if (toolCalls.length === 0) {
           break;
         }
+        const askMainCalls = toolCalls.filter((tc) => tc.toolName.toLowerCase() === "askmain" || tc.toolName.toLowerCase() === "ask_main");
+        let processedAskMainInTurn = false;
         let toolResultsStr = "";
         for (const toolCall of toolCalls) {
           if (TERMINATION_SIGNAL) {
@@ -18346,6 +18642,39 @@ ${cleanResponse}
             }
           }
           const normalizedToolName = toolCall.toolName.toLowerCase();
+          if (normalizedToolName === "askmain" || normalizedToolName === "ask_main") {
+            if (processedAskMainInTurn) continue;
+            processedAskMainInTurn = true;
+            let questionText = "";
+            let optionsObj = {};
+            if (askMainCalls.length === 1) {
+              const pArgs = parseArgs(askMainCalls[0].args);
+              questionText = pArgs.question || askMainCalls[0].args;
+              optionsObj = pArgs;
+            } else {
+              questionText = askMainCalls.map((tc, idx) => {
+                const pArgs = parseArgs(tc.args);
+                return `Q${idx + 1}: ${pArgs.question || tc.args}`;
+              }).join("\n");
+              optionsObj = {};
+            }
+            if (settings.onAskMain) {
+              if (logCallback) logCallback(`[Executing Tool] AskMain("${questionText}")...`);
+              const answer = await settings.onAskMain(questionText, optionsObj);
+              if (logCallback) logCallback(`[Tool Result]
+Answer from Main Agent: ${answer}
+`);
+              toolResultsStr += `[TOOL RESULT for AskMain]: Answer from Main Agent: ${answer}
+
+`;
+              await incrementUsage("toolSuccess");
+            } else {
+              toolResultsStr += `[TOOL RESULT for AskMain]: ERROR: Main agent communication channel not available.
+
+`;
+            }
+            continue;
+          }
           const allowed = allowedTools ? allowedTools.some((t) => t.toLowerCase() === normalizedToolName) : true;
           if (!allowed) {
             const errorMsg = `ERROR: Tool [${toolCall.toolName}] is not in the allowed tools list for this subagent.`;
@@ -22601,10 +22930,27 @@ Selection: ${val}`,
               commitActiveStreamingMessage();
               inThinkMode = true;
               thinkConsumedInTurn = true;
-              let thinkStartText = afterText.replace(/<(think|thought)>/gi, "");
               currentThinkId = "think-" + Date.now();
               activeStreamingMsgRef.current = { id: currentThinkId, role: "think", text: "", isStreaming: true, startTime: Date.now() };
-              appendStreamText(thinkStartText);
+              if (afterText.match(/<\/(think|thought)>/i)) {
+                const parts = afterText.split(/<\/(think|thought)>/i);
+                const rawThinkContent = parts[0] || "";
+                const thinkContent = rawThinkContent.replace(/^<(think|thought)>/i, "");
+                const agentContent = parts.slice(2).join("").replace(/<\/?(think|thought)>/gi, "");
+                activeStreamingMsgRef.current.text = flattenString(thinkContent);
+                const startTime = activeStreamingMsgRef.current.startTime || Date.now();
+                activeStreamingMsgRef.current.duration = Date.now() - startTime;
+                commitActiveStreamingMessage();
+                inThinkMode = false;
+                currentAgentId = "agent-" + Date.now();
+                activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: "", isStreaming: true };
+                if (agentContent) {
+                  appendStreamText(agentContent);
+                }
+              } else {
+                let thinkStartText = afterText.replace(/^<(think|thought)>/gi, "");
+                appendStreamText(thinkStartText);
+              }
               continue;
             }
             if ((chunkLower.includes("</think>") || chunkLower.includes("</thought>")) && activeStreamingMsgRef.current?.role === "think") {

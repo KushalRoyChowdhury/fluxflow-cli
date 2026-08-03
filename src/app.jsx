@@ -3984,10 +3984,32 @@ export default function App({ args = [] }) {
 
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
-                            let thinkStartText = afterText.replace(/<(think|thought)>/gi, '');
                             currentThinkId = 'think-' + Date.now();
                             activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() };
-                            appendStreamText(thinkStartText);
+
+                            // If this chunk also contains the closing tag </think> or </thought>
+                            if (afterText.match(/<\/(think|thought)>/i)) {
+                                const parts = afterText.split(/<\/(think|thought)>/i);
+                                const rawThinkContent = parts[0] || '';
+                                const thinkContent = rawThinkContent.replace(/^<(think|thought)>/i, '');
+                                // Regex split with capturing group puts captured tag at odd indices, so text after tag is at index 2+
+                                const agentContent = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
+
+                                activeStreamingMsgRef.current.text = flattenString(thinkContent);
+                                const startTime = activeStreamingMsgRef.current.startTime || Date.now();
+                                activeStreamingMsgRef.current.duration = Date.now() - startTime;
+                                commitActiveStreamingMessage();
+
+                                inThinkMode = false;
+                                currentAgentId = 'agent-' + Date.now();
+                                activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
+                                if (agentContent) {
+                                    appendStreamText(agentContent);
+                                }
+                            } else {
+                                let thinkStartText = afterText.replace(/^<(think|thought)>/gi, '');
+                                appendStreamText(thinkStartText);
+                            }
                             continue;
                         }
 

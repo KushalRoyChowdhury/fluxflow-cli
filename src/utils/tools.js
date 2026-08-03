@@ -22,6 +22,8 @@ import { getProgress } from '../tools/getProgress.js';
 import { cancel } from '../tools/cancel.js';
 import { awaitTool } from '../tools/await.js';
 import { emergency_rollback } from '../tools/emergency_rollback.js';
+import { awaitSubagent } from '../tools/awaitSubagent.js';
+import { answerSubagent } from '../tools/answerSubagent.js';
 
 
 const TOOL_MAP = {
@@ -46,8 +48,12 @@ const TOOL_MAP = {
     invoke,
     getProgress,
     cancel,
+    awaitSubagent,
+    answerSubagent,
     invoke_sync: invokeSync,
     get_progress: getProgress,
+    await_subagent: awaitSubagent,
+    answer_subagent: answerSubagent,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency
@@ -73,14 +79,12 @@ const TOOL_MAP = {
     addMemoryScore: addMemScore,
     AddMemoryScore: addMemScore,
     FileMap: file_map,
-    Todo: todo,
-    TODO: todo,
-    InvokeSync: invokeSync,
-    Invoke: invoke,
-    GetProgress: getProgress,
-    Cancel: cancel,
-    await: awaitTool,
-    Await: awaitTool,
+    answer: answerSubagent,
+    Answer: answerSubagent,
+    AnswerSubagent: answerSubagent,
+    await: awaitSubagent,
+    Await: awaitSubagent,
+    AwaitSubagent: awaitSubagent,
     EmergencyRollback: emergency_rollback,
     emergency_rollback: emergency_rollback
 };

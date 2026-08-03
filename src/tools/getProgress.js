@@ -17,12 +17,38 @@ export const getProgress = async (args, context = {}) => {
 
     let output = `Subagent Task Status: ${task.status.toUpperCase()}\n`;
     output += `Title: ${task.title}\n`;
-    output += `Task: ${task.task}\n\n`;
-    output += `Progress Log:\n`;
+    output += `Task: ${task.task}\n`;
+    if (task.startedAt) {
+        const elapsedSec = Math.floor((Date.now() - task.startedAt) / 1000);
+        output += `Elapsed Time: ${elapsedSec}s\n`;
+    }
+    output += `Turns Completed: ${task.progress.length}\n`;
+    if (task.status === 'running' || task.status === 'waiting') {
+        if (task.currentTool) output += `Current Tool: ${task.currentTool}\n`;
+        if (task.wps > 0) output += `WPS: ${task.wps}\n`;
+    }
+
+    if (task.questions && task.questions.length > 0) {
+        const pending = task.questions.filter(q => !q.answered);
+        if (pending.length > 0) {
+            output += `\n**PENDING QUESTION**\n`;
+            pending.forEach((q) => {
+                output += `"${q.question}"\n`;
+                if (q.options && Object.keys(q.options).length > 0) {
+                    output += `Options: ${JSON.stringify(q.options)}\n`;
+                }
+            });
+            output += `Respond using tool: [tool:functions.Answer(id="${task.id}", answer="...")]\n\n`;
+        }
+    }
+
+    output += `\nProgress Log:\n`;
+
 
     task.progress.forEach((turnLogs, index) => {
         output += `--- Turn ${index + 1} ---\n`;
-        const processedLogs = turnLogs.map(log => {
+        const filteredLogs = turnLogs.filter(log => !log.startsWith('[SUBAGENT SUCCESS]'));
+        const processedLogs = filteredLogs.map(log => {
             if (log.startsWith('[Subagent Response]')) {
                 const header = '[Subagent Response]';
                 const body = log.substring(header.length);
@@ -99,7 +125,12 @@ export const getProgress = async (args, context = {}) => {
         output += `Failure Error: ${task.error}\n`;
     }
 
-    // fs.writeFileSync("progress.txt", output.trim());
-    const sanitized = output.trim().replace(/\[TOOL RESULT\]/gi, 'TOOL RESULT:');
+    // Replace Windows CRLF and clamp 3+ consecutive newlines to max \n\n (max one blank line)
+    const sanitized = output
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+        .replace(/\[TOOL RESULT\]/gi, 'TOOL RESULT:');
+
     return sanitized;
 };

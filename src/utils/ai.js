@@ -37,11 +37,25 @@ const RE_STUTTER_WORD_BOUNDARY     = /^[^\w]+|[^\w]+$/g;
 const RE_STUTTER_NON_ALNUM         = /[^a-z0-9]/gi;
 
 // ─── Live Streaming / Tool Sniffing – pre-compiled regexes ───
-const RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_FUNC      = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_ANY       = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 const RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
-const RE_STRIP_QUOTES = /["']/g;
-const RE_BACKSLASH_SLASH = /\\/g;
+const RE_STRIP_QUOTES        = /["']/g;
+const RE_BACKSLASH_SLASH     = /\\/g;
+const RE_STRIP_THINK_CLOSED  = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi;
+const RE_STRIP_THINK_OPEN    = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi;
+const RE_STRIP_THINK_SIMPLE  = /(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi;
+const RE_STRIP_THINK_FULL    = /(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi;
+const RE_BACKTICK_SPAN       = /`[^`]*`/g;
+const RE_BACKTICK_OPEN       = /`[^`]*$/;  // unclosed span — handles streaming (closing backtick not yet received)
+const RE_KIMI_TOOL_CALL      = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
+const RE_KIMI_JSON_PAIR      = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+const RE_KIMI_SECTION_BEGIN  = /<\|\s*tool_calls_section_begin\s*\|>/gi;
+const RE_KIMI_SECTION_END    = /<\|\s*tool_calls_section_end\s*\|>/gi;
 
+// Set to true for models that wrap tool calls in backticks (e.g. `[tool:functions.Foo(...)]`)
+// so the backtick-skip logic is bypassed and they are still executed.
+let bypassBacktick = false;
 
 let client = null;
 
@@ -51,7 +65,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -1120,12 +1134,14 @@ const TOOL_LABELS = {
     'generate_image': 'Generating',
     'todo': 'Planning',
     'Todo': 'Planning',
-    'invoke_sync': 'Generalist',
-    'invoke': 'Generalist',
+    'invoke_sync': 'Sub-Agent Working',
+    'invoke': 'Starting Agent',
     'get_progress': 'Checking Progress',
     'cancel': 'Cancelling',
     'await': 'Waiting',
     'EmergencyRollback': 'Don\'t Panic. Lookin\' into it',
+    'answer': 'Answering Sub-Agent',
+    'Answer': 'Answering Sub-Agent'
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -1144,6 +1160,13 @@ const getToolDetail = (toolName, argsStr) => {
     } catch (e) {
         return null;
     }
+};
+
+export const getGoogleClient = (apiKey) => {
+    if (apiKey) {
+        return new GoogleGenAI({ apiKey });
+    }
+    return client;
 };
 
 export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, history, callbacks = {}) => {
@@ -1329,7 +1352,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
                     } else {
-                        const stream = await client.models.generateContentStream({
+                        const googleClient = getGoogleClient(apiKey);
+                        const stream = await googleClient.models.generateContentStream({
                             model: janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')),
                             contents: janitorContents,
                             config: {
@@ -1527,19 +1551,26 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 const getActiveToolContext = (text) => {
     // Strip thinking blocks (<think>...</think> or active <think>...) so live tool sniffing ignores tool syntax drafted inside thinking
     const cleanText = text
-        .replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '')
-        .replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi, '');
+        .replace(RE_STRIP_THINK_CLOSED, '')
+        .replace(RE_STRIP_THINK_OPEN, '');
+
+    // Blank out backtick-delimited inline-code spans (equal-length spaces) so that
+    // tool triggers written inside backticks are invisible to the regex while all
+    // character offsets remain valid for subsequent index math.
+    const scanText = bypassBacktick ? cleanText : cleanText
+        .replace(RE_BACKTICK_SPAN, (m) => ' '.repeat(m.length))
+        .replace(RE_BACKTICK_OPEN,  (m) => ' '.repeat(m.length));
 
     RE_TOOL_CALL_FUNC.lastIndex = 0;
     let match;
-    while ((match = RE_TOOL_CALL_FUNC.exec(cleanText)) !== null) {
+    while ((match = RE_TOOL_CALL_FUNC.exec(scanText)) !== null) {
         const startIdx = match.index + match[0].length - 1; // Index of '('
         let balance = 0;
         let inString = null;
         let isEscaped = false;
         let closed = false;
 
-        for (let i = startIdx; i < cleanText.length; i++) {
+        for (let i = startIdx; i < scanText.length; i++) {
             const char = cleanText[i];
             if (!inString && (char === '"' || char === "'" || char === '`')) {
                 inString = char;
@@ -1554,8 +1585,8 @@ const getActiveToolContext = (text) => {
                 if (balance === 0) {
                     // Check for closing ']' after ')'
                     let j = i + 1;
-                    while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
-                    if (j < cleanText.length && cleanText[j] === ']') {
+                    while (j < scanText.length && /\s/.test(scanText[j])) j++;
+                    if (j < scanText.length && scanText[j] === ']') {
                         closed = true;
                         RE_TOOL_CALL_FUNC.lastIndex = j + 1;
                         break;
@@ -1574,14 +1605,15 @@ const getActiveToolContext = (text) => {
 };
 
 const getContextSafeText = (text, stripThoughts = true) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = RE_TOOL_CALL_FUNC;
+    toolRegex.lastIndex = 0;
     let result = '';
     let lastIdx = 0;
     let match;
 
     while ((match = toolRegex.exec(text)) !== null) {
         const before = text.substring(lastIdx, match.index);
-        result += stripThoughts ? before.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '') : before;
+        result += stripThoughts ? before.replace(RE_STRIP_THINK_SIMPLE, '') : before;
 
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
@@ -1632,13 +1664,14 @@ const getContextSafeText = (text, stripThoughts = true) => {
     }
 
     if (lastIdx < text.length) {
-        result += stripThoughts ? text.substring(lastIdx).replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi, '') : text.substring(lastIdx);
+        result += stripThoughts ? text.substring(lastIdx).replace(RE_STRIP_THINK_SIMPLE, '') : text.substring(lastIdx);
     }
     return result;
 };
 
 const contextSafeReplace = (text, regex, replacement) => {
-    const toolRegex = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+    const toolRegex = RE_TOOL_CALL_FUNC;
+    toolRegex.lastIndex = 0;
     let result = '';
     let lastIdx = 0;
     let match;
@@ -1735,9 +1768,8 @@ const translateKimiToolCalls = (text) => {
             .join('');
     };
 
-    const kimiRegex = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
-
-    let result = text.replace(kimiRegex, (match, toolName, argsJsonStr) => {
+    RE_KIMI_TOOL_CALL.lastIndex = 0;
+    let result = text.replace(RE_KIMI_TOOL_CALL, (match, toolName, argsJsonStr) => {
         let parsedArgs = '';
         try {
             const argsObj = JSON.parse(argsJsonStr.trim());
@@ -1752,7 +1784,8 @@ const translateKimiToolCalls = (text) => {
             }
         } catch (e) {
             const pairs = [];
-            const pairRegex = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+            const pairRegex = RE_KIMI_JSON_PAIR;
+            pairRegex.lastIndex = 0;
             let pMatch;
             while ((pMatch = pairRegex.exec(argsJsonStr)) !== null) {
                 const key = pMatch[1];
@@ -1771,8 +1804,10 @@ const translateKimiToolCalls = (text) => {
         return `[tool:functions.${normToolName}(${parsedArgs})]`;
     });
 
-    result = result.replace(/<\|\s*tool_calls_section_begin\s*\|>/gi, '');
-    result = result.replace(/<\|\s*tool_calls_section_end\s*\|>/gi, '');
+    RE_KIMI_SECTION_BEGIN.lastIndex = 0;
+    RE_KIMI_SECTION_END.lastIndex = 0;
+    result = result.replace(RE_KIMI_SECTION_BEGIN, '');
+    result = result.replace(RE_KIMI_SECTION_END, '');
 
     return result;
 };
@@ -1790,12 +1825,20 @@ const detectToolCalls = (text) => {
     if (!text) return [];
     const translatedText = translateKimiToolCalls(text);
     // Strip any thinking blocks first to ensure no tool calls are detected inside them
-    const cleanText = translatedText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
+    RE_STRIP_THINK_FULL.lastIndex = 0;
+    const cleanText = translatedText.replace(RE_STRIP_THINK_FULL, '');
     const results = [];
-    const toolRegex = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+    // Replace backtick-delimited inline-code spans with spaces of equal length so that
+    // tool triggers written inside backticks (e.g. `[tool:functions.foo()]`) are ignored
+    // while all character offsets remain valid for subsequent index math.
+    const scanText = bypassBacktick ? cleanText : cleanText
+        .replace(RE_BACKTICK_SPAN, (m) => ' '.repeat(m.length))
+        .replace(RE_BACKTICK_OPEN, (m) => ' '.repeat(m.length));
+    const toolRegex = RE_TOOL_CALL_ANY;
+    toolRegex.lastIndex = 0;
 
     let match;
-    while ((match = toolRegex.exec(cleanText)) !== null) {
+    while ((match = toolRegex.exec(scanText)) !== null) {
         const toolName = match[1];
         const startIdx = match.index + match[0].length - 1; // Index of '('
 
@@ -1804,7 +1847,7 @@ const detectToolCalls = (text) => {
         let endIdx = -1;
         let closingParenIdx = -1;
 
-        for (let i = startIdx; i < cleanText.length; i++) {
+        for (let i = startIdx; i < scanText.length; i++) {
             const char = cleanText[i];
 
             if (inString) {
@@ -1829,8 +1872,8 @@ const detectToolCalls = (text) => {
                         closingParenIdx = i;
                         // Look for closing ']'
                         let j = i + 1;
-                        while (j < cleanText.length && /\s/.test(cleanText[j])) j++;
-                        if (j < cleanText.length && cleanText[j] === ']') {
+                        while (j < scanText.length && /\s/.test(scanText[j])) j++;
+                        if (j < scanText.length && scanText[j] === ']') {
                             endIdx = j;
                             break;
                         }
@@ -1912,8 +1955,6 @@ export const initAI = (apiKey, settings = {}) => {
             }
         };
     }
-
-    return client;
 };
 
 /**
@@ -1951,7 +1992,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
             } else if (aiProvider === 'NVIDIA') {
                 stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
-                const genStream = await client.models.generateContentStream({
+                const googleClient = getGoogleClient(apiKey);
+                const genStream = await googleClient.models.generateContentStream({
                     model: model,
                     contents: normalizedContents,
                     config: {
@@ -2873,7 +2915,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(...)] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(arg1="value1")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -2917,12 +2959,29 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 yield { type: 'status', content: 'Working' };
             }
             if (TERMINATION_SIGNAL) {
+                try {
+                    const { clearPendingNudges } = await import('./subagent_state.js');
+                    clearPendingNudges();
+                } catch (e) {}
                 yield { type: 'status', content: 'Request Cancelled' };
                 yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
                 break;
             }
 
-            // Here.. LOL.. Seeing THIS??!!! **LOOOL**
+            // Check for pending Subagent Notifications / Nudges
+            try {
+                const { consumePendingNudges } = await import('./subagent_state.js');
+                const pendingNudges = consumePendingNudges();
+                if (pendingNudges && pendingNudges.length > 0) {
+                    const combinedNudge = pendingNudges.join('\n\n');
+                    if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
+                        modifiedHistory[modifiedHistory.length - 1].text += `\n\n${combinedNudge}`;
+                    } else {
+                        modifiedHistory.push({ role: 'user', text: combinedNudge });
+                    }
+                    yield { type: 'status', content: 'Subagent Update' };
+                }
+            } catch (e) {}
 
             // Check for incoming Steering Hints
             if (steeringCallback) {
@@ -3238,7 +3297,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                         stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
                     } else {
-                        const apiCallPromise = client.models.generateContentStream({
+                        const googleClient = getGoogleClient(settings?.apiKey);
+                        const apiCallPromise = googleClient.models.generateContentStream({
                             model: targetModel || "gemini-3-flash-preview",
                             contents: activeContents,
                             config: {
@@ -3608,20 +3668,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'await': 'await', 'Await': 'await'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
 
                                 // [PEEK LOGIC] - Try to extract detail from partial strings (File Tools & Search)
                                 let detail = null;
-                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await'].includes(potentialTool)) {
+                                if (['write_file', 'update_file', 'view_file', 'read_folder', 'write_pdf', 'write_docx', 'search_keyword', 'generate_image', 'file_map', 'invoke', 'invoke_sync', 'get_progress', 'await', 'answer'].includes(potentialTool)) {
                                     const pArgs = parseArgs(partialArgs);
                                     const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
                                     const keyword = pArgs.keyword;
                                     const title = pArgs.title || pArgs.task;
                                     const id = pArgs.id || pArgs.taskId;
-                                    const timeVal = pArgs.time;
+                                    const timeVal = pArgs.timeout || pArgs.time;
 
                                     if (keyword !== undefined && keyword !== null) {
                                         detail = String(keyword).replace(RE_STRIP_QUOTES, '');
@@ -3693,17 +3753,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'Ask': 'User Input Required',
                                             'Memory': 'Updating Memory',
                                             'GenerateImage': 'Generating',
-                                            'InvokeSync': 'Generalist Working',
-                                            'invoke_sync': 'Generalist Working',
-                                            'Invoke': 'Generalist Working',
-                                            'invoke': 'Generalist Working',
+                                            'InvokeSync': 'Sub-Agent Working',
+                                            'invoke_sync': 'Sub-Agent Working',
+                                            'Invoke': 'Working',
+                                            'invoke': 'Working',
                                             'GetProgress': 'Checking Progress',
                                             'get_progress': 'Checking Progress',
                                             'Cancel': 'Stopping Generalist',
                                             'cancel': 'Stopping Generalist',
                                             'Await': 'Waiting',
                                             'await': 'Waiting',
-                                            'EmergencyRollback': 'Rolling the Ball'
+                                            'EmergencyRollback': 'Rolling the Ball',
+                                            'Answer': 'Answering Sub-Agent',
+                                            'answer': 'Answering Sub-Agent'
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -3871,7 +3933,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'cancel': 'cancel', 'await': 'await', 'Await': 'await', 'EmergencyRollback': 'EmergencyRollback'
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -3964,10 +4026,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     // forceRevert feedback is shown post-execution (see below), getCheckpoint is immediate
                                     label = method === 'forceRevert' ? '' : '✔  Rollback Point Checked';
                                 } else if (normToolName === 'await' || normToolName === 'Await') {
-                                    const { time } = parseArgs(toolCall.args);
-                                    let sec = parseFloat(time) || 0;
-                                    if (sec < 10) sec = 10;
-                                    if (sec > 180) sec = 180;
+                                    const { time, timeout } = parseArgs(toolCall.args);
+                                    let sec = parseFloat(timeout || time) || 0;
+                                    if (!sec) sec = 120;
                                     const formatTime = (s) => {
                                         if (s >= 60) {
                                             const m = Math.floor(s / 60);
@@ -4012,7 +4073,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     let randomVibe = existentialVibes[Math.floor(Math.random() * existentialVibes.length)];
 
                                     label = `✔  ${randomVibe} → ${formatTime(sec)}`;
-                                } else if (normToolName === 'exec_command' || normToolName === 'ask') {
+                                } else if (normToolName === 'Answer' || normToolName === 'answer') {
+                                    label = '✔  Resolved Sub-Agent Query';
+                                }
+                                else if (normToolName === 'exec_command' || normToolName === 'ask') {
                                     label = '';
                                 } else {
                                     label = `Executed: ${toolCall.toolName}`;
@@ -5049,7 +5113,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (turnText.trim().length > 0) {
                                 modifiedHistory.push({ role: 'agent', text: turnText });
 
-                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> if opened before outputting user response\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
+                                const recoveryText = "[SYSTEM]\n- SEAMLESS CONTINUATION: Resume immediately. Pick up from last words with zero gap/disruption\n- NO REPETITION: Do not repeat any text already written\n- NO RE-THINK: Do not restart or open <think> if reasoning already started. Continue the thinking and close thinking block </think> BEFORE CHAT OUTPUT\n- MID-TOOL SAFETY: If cutoff was mid-tool call, restart that tool call from start\n- STEALTH: Do not mention/apologize for cutoff [/SYSTEM]";
 
                                 if (toolResults.length > 0) {
                                     // Merge recovery prompt into the last tool result to avoid consecutive user roles
@@ -5275,7 +5339,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
 
 
-export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null) => {
+export const runSubagent = async (task, settings, model = null, allowedTools = null, maxTurns = 50, logCallback = null, isAsync = false) => {
     const savedSettings = await loadSettings();
     const mergedSettings = { ...savedSettings, ...settings };
     const envSubagentModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
@@ -5360,29 +5424,9 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
-    // const SUBAGENT_TOOL_DEFINITIONS = {
-    //     'readfile': '- [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files',
-
-    //     'readfolder': '- [tool:functions.ReadFolder(path="...", recurse="integer 0-4 optional, default: 0")]. Detailed DIR stats including File Sizes',
-
-    //     'patchfile': '- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX 15)]. Surgical patch. allowMultiple: Replace all matches. Multiple patches same file? Use replaceContent2/newContent2... Verify DIFFs',
-
-    //     'writefile': '- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS',
-
-    //     'searchkeyword': '- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path limits search scope. Find definitions/logic without full reads. Locate relevant code',
-
-    //     'websearch': '- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search',
-
-    //     'webscrape': '- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api',
-
-    //     'ask': `- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short`,
-
-    //     'run': `- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`
-    // };
-
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(args)]
-**NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED**
+TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(arg1="value1")]
+**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 TOOL POLICY:
 - Escape quotes: \\" for code strings
@@ -5393,10 +5437,12 @@ TOOL POLICY:
 - Need text or huge files? SearchKeyword > Full Read
 - Update Todos from realtime progress each turn
 - Restricted Shell Access, No Deletion
+- ONLY valid tools and syntax defined below are allowed
 
 **PROVIDED TOOLS**
--- Communication with USER --
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+-- Communication Tools --
+- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::description", ...MAX 4)]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 -- Web Tools --
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -5410,7 +5456,7 @@ TOOL POLICY:
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
-    const systemInstruction = `=== START SYSTEM PROMPT ===
+    const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent
 Your task is: "${task}"
 
@@ -5457,7 +5503,7 @@ Current Time: ${time}
 
         if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
 
-        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstruction, 'Fast');
+        const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, 'Fast');
         const responseText = response.text || '';
         const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
         finalAnswer = cleanResponse;
@@ -5470,6 +5516,10 @@ Current Time: ${time}
         if (toolCalls.length === 0) {
             break;
         }
+
+        // If subagent called AskMain multiple times in the same turn, combine them
+        const askMainCalls = toolCalls.filter(tc => tc.toolName.toLowerCase() === 'askmain' || tc.toolName.toLowerCase() === 'ask_main');
+        let processedAskMainInTurn = false;
 
         let toolResultsStr = '';
         for (const toolCall of toolCalls) {
@@ -5487,6 +5537,40 @@ Current Time: ${time}
                 }
             }
             const normalizedToolName = toolCall.toolName.toLowerCase();
+
+            // Handle AskMain
+            if (normalizedToolName === 'askmain' || normalizedToolName === 'ask_main') {
+                if (processedAskMainInTurn) continue; // Already processed all AskMain calls in this turn
+                processedAskMainInTurn = true;
+
+                let questionText = '';
+                let optionsObj = {};
+
+                if (askMainCalls.length === 1) {
+                    const pArgs = parseArgs(askMainCalls[0].args);
+                    questionText = pArgs.question || askMainCalls[0].args;
+                    optionsObj = pArgs;
+                } else {
+                    // Combine multiple AskMain calls into Q1, Q2, etc.
+                    questionText = askMainCalls.map((tc, idx) => {
+                        const pArgs = parseArgs(tc.args);
+                        return `Q${idx + 1}: ${pArgs.question || tc.args}`;
+                    }).join('\n');
+                    optionsObj = {};
+                }
+
+                if (settings.onAskMain) {
+                    if (logCallback) logCallback(`[Executing Tool] AskMain("${questionText}")...`);
+                    const answer = await settings.onAskMain(questionText, optionsObj);
+                    if (logCallback) logCallback(`[Tool Result]\nAnswer from Main Agent: ${answer}\n`);
+                    toolResultsStr += `[TOOL RESULT for AskMain]: Answer from Main Agent: ${answer}\n\n`;
+                    await incrementUsage('toolSuccess');
+                } else {
+                    toolResultsStr += `[TOOL RESULT for AskMain]: ERROR: Main agent communication channel not available.\n\n`;
+                }
+                continue;
+            }
+
             const allowed = allowedTools ? allowedTools.some(t => t.toLowerCase() === normalizedToolName) : true;
             if (!allowed) {
                 const errorMsg = `ERROR: Tool [${toolCall.toolName}] is not in the allowed tools list for this subagent.`;

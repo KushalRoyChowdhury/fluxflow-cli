@@ -1,6 +1,6 @@
-import { subagentProgress } from '../utils/subagent_state.js';
+import { subagentProgress, addPendingNudge } from '../utils/subagent_state.js';
 import { parseArgs } from '../utils/arg_parser.js';
-// import fs from 'fs';
+import fs from 'fs';
 
 export const invoke = async (args, context = {}) => {
     const { runSubagent } = await import('../utils/ai.js');
@@ -30,13 +30,25 @@ export const invoke = async (args, context = {}) => {
 
     const taskId = `subagent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    let _resolveCompletion = null;
+    let _rejectCompletion = null;
+    const completionPromise = new Promise((res, rej) => {
+        _resolveCompletion = res;
+        _rejectCompletion = rej;
+    });
+
     const taskEntry = {
         id: taskId,
         title: title || task.substring(0, 30),
         task: task,
         status: 'running',
+        startedAt: Date.now(),
         lastChunkTime: Date.now(),
         wps: 0,
+        questions: [],
+        completionPromise,
+        _resolveCompletion,
+        _rejectCompletion,
         progress: [] // Array of arrays containing logs for each turn
     };
 
@@ -57,6 +69,35 @@ export const invoke = async (args, context = {}) => {
     const subagentContext = {
         ...context,
         taskId: taskId,
+        onAskMain: async (questionText, optionsObj) => {
+            const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            let questionResolver = null;
+            const qPromise = new Promise((resolve) => {
+                questionResolver = resolve;
+            });
+
+            const qEntry = {
+                id: questionId,
+                question: questionText,
+                options: optionsObj,
+                answered: false,
+                answer: null,
+                askedAt: Date.now(),
+                _resolve: questionResolver
+            };
+
+            taskEntry.questions.push(qEntry);
+            taskEntry.status = 'waiting';
+            if (context.onSubagentUpdate) {
+                context.onSubagentUpdate();
+            }
+
+            // Nudge main agent with complete Answer tool call syntax (JIT injection saves turn tokens)
+            addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" is WAITING FOR YOUR INPUT: "${questionText}"\nRespond using tool: [tool:functions.Answer(id="${taskId}", answer="...")]\n[/SYSTEM]`);
+
+            const answer = await qPromise;
+            return answer;
+        },
         onVisualFeedback: (feedbackLabel) => {
             taskEntry.lastChunkTime = Date.now();
             const clean = feedbackLabel.replace(/\x1b\[[0-9;]*m/g, '');
@@ -126,15 +167,22 @@ export const invoke = async (args, context = {}) => {
         if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
         }
-    }).then((finalAnswer) => {
-        if (taskEntry.status === 'cancelled') return;
-        currentTurnLogs.push(`[SUBAGENT SUCCESS] Final Answer:\n${finalAnswer}`);
-        taskEntry.progress.push([...currentTurnLogs]);
+    }, true).then((finalAnswer) => {
+        if (taskEntry.status === 'cancelled') {
+            if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(finalAnswer);
+            return;
+        }
+        if (currentTurnLogs.length > 0) {
+            taskEntry.progress.push([...currentTurnLogs]);
+            currentTurnLogs = [];
+        }
         taskEntry.status = 'completed';
         taskEntry.finalAnswer = finalAnswer;
         if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
         }
+        addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" (id: ${taskId}) has FINISHED. Call GetProgress(id="${taskId}") to see the final result. [/SYSTEM]`);
+        if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(finalAnswer);
     }).catch(async (err) => {
         const { isTerminationSignaled } = await import('../utils/ai.js');
         const isCancelled = err.message === 'Subagent task was cancelled.' || taskEntry.status === 'cancelled' || isTerminationSignaled();
@@ -145,6 +193,7 @@ export const invoke = async (args, context = {}) => {
             if (context.onSubagentUpdate) {
                 context.onSubagentUpdate();
             }
+            if (taskEntry._resolveCompletion) taskEntry._resolveCompletion(null);
             return;
         }
         currentTurnLogs.push(`[SUBAGENT FAILURE] Error: ${err.message}`);
@@ -154,6 +203,8 @@ export const invoke = async (args, context = {}) => {
         if (context.onSubagentUpdate) {
             context.onSubagentUpdate();
         }
+        addPendingNudge(`[SYSTEM] Background subagent "${taskEntry.title}" (id: ${taskId}) FAILED with error: ${err.message}. [/SYSTEM]`);
+        if (taskEntry._rejectCompletion) taskEntry._rejectCompletion(err);
     });
 
     return `SUCCESS: Background subagent started. Task ID: ${taskId}`;

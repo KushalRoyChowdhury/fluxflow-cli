@@ -951,16 +951,28 @@ export const TOOL_LABELS = {
 // ============================================================================
 const REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
+// Helper: returns true when `idx` in `str` falls inside a backtick-delimited inline code span
+const isInsideBacktick = (str, idx) => {
+    let inCode = false;
+    for (let i = 0; i < idx; i++) {
+        if (str[i] === '`') inCode = !inCode;
+    }
+    return inCode;
+};
 const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
+
+// Set to true for models that wrap tool calls in backticks so the backtick-skip logic is bypassed.
+export let bypassBacktick = false;
 
 export const cleanSignals = (text) => {
     if (!text) return text;
 
     let result = text
         .replace(REGEX_INITIAL_THINK, '</think>')
-        .replace(REGEX_INITIAL_TOOL, '');
+        .replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
+            (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
 
     const trigger = 'tool:functions.';
     const subagentTrigger = 'agent:generalist.';
@@ -980,6 +992,38 @@ export const cleanSignals = (text) => {
                 triggerIdxToUse = subagentIdx;
             }
             if (triggerIdxToUse === -1) break;
+
+            // Skip tool calls that are inside backtick inline-code spans
+            if (!bypassBacktick && isInsideBacktick(result, triggerIdxToUse)) {
+                // Advance past this occurrence so we don't loop forever
+                const searchFrom = triggerIdxToUse + currentTrigger.length;
+                const nextTool = lowerResult.indexOf(trigger, searchFrom);
+                const nextAgent = lowerResult.indexOf(subagentTrigger, searchFrom);
+                // If there are no more triggers outside of backticks we can bail
+                if (nextTool === -1 && nextAgent === -1) break;
+                // Otherwise the next iteration will pick them up naturally; just continue
+                // but we need to skip: temporarily remove/re-check by breaking the inner
+                // search — the safest way is to replace only up to the backtick span so
+                // subsequent indexOf calls skip what we already checked.
+                // We do this by shifting the search with a sentinel: not modifying result,
+                // just advance search pointer via a slice-and-restore trick.
+                // Simpler: collect all non-backtick trigger positions up front.
+                let safeIdx = -1;
+                let searchPos = 0;
+                while (true) {
+                    const tIdx = lowerResult.indexOf(trigger, searchPos);
+                    const aIdx = lowerResult.indexOf(subagentTrigger, searchPos);
+                    let candidate = -1;
+                    let candidateTrigger = trigger;
+                    if (tIdx === -1 && aIdx === -1) break;
+                    if (tIdx === -1 || (aIdx !== -1 && aIdx < tIdx)) { candidate = aIdx; candidateTrigger = subagentTrigger; }
+                    else { candidate = tIdx; }
+                    if (!isInsideBacktick(result, candidate)) { safeIdx = candidate; currentTrigger = candidateTrigger; break; }
+                    searchPos = candidate + candidateTrigger.length;
+                }
+                if (safeIdx === -1) break;
+                triggerIdxToUse = safeIdx;
+            }
 
             let startIdx = triggerIdxToUse;
             let hasOuterBracket = false;

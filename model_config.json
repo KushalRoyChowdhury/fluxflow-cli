@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260801,
+    "release": 20260803,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -363,7 +363,7 @@
                     {
                         "cmd": "google/diffusiongemma-26b-a4b-it",
                         "multimodal": false,
-                        "desc": "Mega Fast [EXPERIMENTAL]"
+                        "desc": "Mega Fast"
                     },
                     {
                         "cmd": "\n--- Mistral Models ---",
@@ -495,7 +495,7 @@
                     {
                         "cmd": "google/diffusiongemma-26b-a4b-it",
                         "multimodal": false,
-                        "desc": "Mega Fast [EXPERIMENTAL]"
+                        "desc": "Mega Fast"
                     },
                     {
                         "cmd": "\n--- Mistral Models ---",
