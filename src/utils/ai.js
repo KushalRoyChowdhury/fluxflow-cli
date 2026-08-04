@@ -3050,13 +3050,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         }
                     }
                     // Convert current history to GenAI format (Recalculated every retry to pick up recovery turns)
+                    // [TOOL CALL WRAPPER STRIPPER]
+                    // Detect and remove XML/YAML/fence wrappers around our [tool:...] format,
+                    // so the model only sees the raw tool call on the next turn.
+                    const stripToolCallWrappers = (text) => {
+                        if (!text || !text.includes('[tool:')) return text;
+                        // Strip XML-style wrappers: <tag>...[tool:...]...</tag>
+                        text = text.replace(/<(\w+)(?:[^>]*)>\s*(\[tool:[^\]]*\](?:[\s\S]*?))?\s*<\/\1>/gi, (match, tagName, innerContent) => {
+                            if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
+                            return match;
+                        });
+                        // Strip YAML/fence wrappers: ```tool ... [tool:...] ... ```
+                        text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+                            if (inner.includes('[tool:')) return inner.trim();
+                            return match;
+                        });
+                        return text;
+                    };
                     const contents = modifiedHistory
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
                             let text = msg.text || '';
+                            text = stripToolCallWrappers(text);  // <-- Strip wrappers before any other processing
                             if (msg.role === 'agent') {
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
-                                // text = text.replaceAll('<think>', '[Previous Thoughts: ').replaceAll('</think>', ']');
                                 text = text.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
                             }
                             const parts = [{ text }];

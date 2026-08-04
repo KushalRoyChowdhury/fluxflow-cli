@@ -149,7 +149,7 @@ ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
-- Same Language as User Query
+- Language: ENGLISH only
 - Finish all chatting before tool calls${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}
 === END SYSTEM PROMPT ===
 

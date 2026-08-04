@@ -8704,7 +8704,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
-- Same Language as User Query
+- Language: ENGLISH only
 - Finish all chatting before tool calls${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
@@ -16532,8 +16532,21 @@ ${combinedNudge}`;
                   accumulatedContext = "";
                 }
               }
+              const stripToolCallWrappers = (text) => {
+                if (!text || !text.includes("[tool:")) return text;
+                text = text.replace(/<(\w+)(?:[^>]*)>\s*(\[tool:[^\]]*\](?:[\s\S]*?))?\s*<\/\1>/gi, (match2, tagName, innerContent) => {
+                  if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
+                  return match2;
+                });
+                text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match2, inner) => {
+                  if (inner.includes("[tool:")) return inner.trim();
+                  return match2;
+                });
+                return text;
+              };
               const contents = modifiedHistory.filter((msg) => (msg.role === "user" || msg.role === "agent" || msg.role === "system") && !String(msg.id).startsWith("welcome") && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith("[TERMINAL_RECORD]"))).map((msg, idx, arr) => {
                 let text = msg.text || "";
+                text = stripToolCallWrappers(text);
                 if (msg.role === "agent") {
                   text = text.replace(/\[turn:\s*finish\]/gi, "").replace(/\[\[END\]\]/gi, "").trim();
                   text = text.replaceAll("\x1B[33m\u24D8 Request Cancelled\x1B[0m", "*User Cancelled Response Generation*");
