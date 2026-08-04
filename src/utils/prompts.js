@@ -150,8 +150,7 @@ ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
 - Same Language as User Query
-- After tool calls emit no chat in this turn
-- On completion: summarize changes (why) + edited files${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}
+- Finish all chatting before tool calls${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();

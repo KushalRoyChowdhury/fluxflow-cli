@@ -25,7 +25,7 @@ export const getProgress = async (args, context = {}) => {
     output += `Turns Completed: ${task.progress.length}\n`;
     if (task.status === 'running' || task.status === 'waiting') {
         if (task.currentTool) output += `Current Tool: ${task.currentTool}\n`;
-        if (task.wps > 0) output += `WPS: ${task.wps}\n`;
+        if (task.wps > 0) output += `TPS: ${task.wps}\n`;
     }
 
     if (task.questions && task.questions.length > 0) {
@@ -34,9 +34,6 @@ export const getProgress = async (args, context = {}) => {
             output += `\n**PENDING QUESTION**\n`;
             pending.forEach((q) => {
                 output += `"${q.question}"\n`;
-                if (q.options && Object.keys(q.options).length > 0) {
-                    output += `Options: ${JSON.stringify(q.options)}\n`;
-                }
             });
             output += `Respond using tool: [tool:functions.Answer(id="${task.id}", answer="...")]\n\n`;
         }

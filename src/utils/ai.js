@@ -5429,20 +5429,16 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- Escape quotes: \\" for code strings
-- Double-escape literal sequences (eg. \\\\n)
-- Use real newlines for code formatting
+- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
-- Tool denied? Ask for guidance ← MANDATORY
 - Need text or huge files? SearchKeyword > Full Read
-- Update Todos from realtime progress each turn
 - Restricted Shell Access, No Deletion
 - ONLY valid tools and syntax defined below are allowed
 
 **PROVIDED TOOLS**
 -- Communication Tools --
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
-${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::description", ...MAX 4)]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep titles short
+${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 -- Web Tools --
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -5452,7 +5448,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::descript
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
@@ -5501,7 +5497,7 @@ Current Time: ${time}
             parts: [{ text: m.text }]
         }));
 
-        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
+        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}]...`);
 
         const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, 'Fast');
         const responseText = response.text || '';
@@ -5544,24 +5540,21 @@ Current Time: ${time}
                 processedAskMainInTurn = true;
 
                 let questionText = '';
-                let optionsObj = {};
 
                 if (askMainCalls.length === 1) {
                     const pArgs = parseArgs(askMainCalls[0].args);
                     questionText = pArgs.question || askMainCalls[0].args;
-                    optionsObj = pArgs;
                 } else {
                     // Combine multiple AskMain calls into Q1, Q2, etc.
                     questionText = askMainCalls.map((tc, idx) => {
                         const pArgs = parseArgs(tc.args);
                         return `Q${idx + 1}: ${pArgs.question || tc.args}`;
                     }).join('\n');
-                    optionsObj = {};
                 }
 
                 if (settings.onAskMain) {
                     if (logCallback) logCallback(`[Executing Tool] AskMain("${questionText}")...`);
-                    const answer = await settings.onAskMain(questionText, optionsObj);
+                    const answer = await settings.onAskMain(questionText);
                     if (logCallback) logCallback(`[Tool Result]\nAnswer from Main Agent: ${answer}\n`);
                     toolResultsStr += `[TOOL RESULT for AskMain]: Answer from Main Agent: ${answer}\n\n`;
                     await incrementUsage('toolSuccess');

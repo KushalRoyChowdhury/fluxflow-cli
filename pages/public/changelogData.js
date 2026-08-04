@@ -3,9 +3,18 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.17.0"]
+export const stableVersions = ["3.18.0"]
 
 export const changelogData = {
+    "3.18.0": {
+        "note": "AUGUST 4.",
+        "added": [],
+        "changed": [
+            "**Significant Improvements in File Edit tool**\n• Reduce Error rate in patches.\n• Improve token efficiency.\n• Improved handling of complex escape sequences.",
+            "Improve natural communication between Agent & Sub-Agents."
+        ],
+        "fixes": []
+    },
     "3.17.0": {
         "note": "AUGUST 3.",
         "added": [],

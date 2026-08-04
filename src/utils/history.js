@@ -75,7 +75,6 @@ export const saveChat = async (id, name, messages) => {
         const existingChat = history[id];
 
         // [CLEANUP] Filter out ephemeral messages (like update notices or transient meta alerts)
-        // These should only exist in the live UI session.
         let persistentMessages = (messages || []).filter(m =>
             !m.isUpdateNotification &&
             (!m.isMeta || (m.text && m.text.includes('Request Cancelled')))
@@ -140,7 +139,7 @@ export const saveChat = async (id, name, messages) => {
         // 3. Default fallback to Session ID
         const finalName = name || (existingChat ? existingChat.name : `Session ${id.slice(-6)}`);
 
-        // Save the messages to the separate chat file
+        // Save the history to the separate chat file
         const chatFile = path.join(HISTORY_DIR, `${id}.json`);
         writeEncryptedJson(chatFile, persistentMessages);
 
@@ -285,8 +284,13 @@ const parseCustomDate = (dateStr) => {
     const timePart = parts[1] || "";
     const ampm = parts[2] || "";
 
-    const dateNums = datePart.split(/[-/.]/).map(Number);
+    const dateNums = datePart.split(/[-\/.]/).map(Number);
     if (dateNums.length !== 3) return null;
+
+    // Detect locale preference to decide month-first vs day-first for ambiguous dates
+    let locale = 'en';
+    try { locale = Intl.DateTimeFormat().resolvedOptions().locale || 'en'; } catch {}
+    const isDayFirst = !/^en[-_]?us$|^en$/.test(locale?.toLowerCase());
 
     let year, month, day;
     if (dateNums[0] > 1000) {
@@ -302,12 +306,21 @@ const parseCustomDate = (dateStr) => {
             day = dateNums[1];
             month = dateNums[0];
         } else {
-            month = dateNums[0];
-            day = dateNums[1];
+            // Both fields <=12 — resolve using locale day-first preference
+            if (isDayFirst) {
+                day = dateNums[0];
+                month = dateNums[1];
+            } else {
+                month = dateNums[0];
+                day = dateNums[1];
+            }
         }
     } else {
         return null;
     }
+
+    // Basic sanity: month 1-12, day 1-31
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
 
     let hours = 0, minutes = 0, seconds = 0;
     if (timePart) {
@@ -362,19 +375,23 @@ const cleanupLogFile = async (filePath) => {
         const threshold = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
         const now = Date.now();
         const keptEntries = [];
-        const timestampRegex = /(\d{1,4}[-/.]\d{1,4}[-/.]\d{1,4}(?:,\s*|\s+)?(?:\d{1,2}:\d{2}:\d{2}(?:\s*[aApP][mM])?)?)/;
+        const timestampRegex = /(\d{1,4}[-\/.]\d{1,4}[-\/.]\d{1,4}(?:,\s*|\s+)?(?:\d{1,2}:\d{2}:\d{2}(?:\s*[aApP][mM])?)?)/;
 
         for (const entry of entries) {
-            const entryText = entry.header + (entry.body.length > 0 ? '\n' + entry.body.join('\n') : '');
-            const match = entryText.match(timestampRegex);
+            const isLogEntry = entryStartRegex.test(entry.header);
 
-            if (match) {
-                const timeMs = parseCustomDate(match[1]);
-                if (timeMs && (now - timeMs) > threshold) {
-                    // Expired entry - skip writing it back
-                    continue;
+            if (isLogEntry) {
+                const headerMatch = entry.header.match(timestampRegex);
+                if (headerMatch) {
+                    const timeMs = parseCustomDate(headerMatch[1]);
+                    if (timeMs && (now - timeMs) > threshold) {
+                        // Expired log entry — skip writing it back
+                        continue;
+                    }
                 }
             }
+
+            const entryText = entry.header + (entry.body.length > 0 ? '\n' + entry.body.join('\n') : '');
             keptEntries.push(entryText);
         }
 

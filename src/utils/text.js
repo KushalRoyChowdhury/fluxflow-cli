@@ -146,6 +146,69 @@ export const parsePatchPairs = (args) => {
     return { patchPairs, allowMultiple };
 };
 
+/**
+ * Generates a fuzzy regex permissive towards escaping variations:
+ * Handles \ vs \\ vs \\\\, escaped vs unescaped quotes, AND control chars (\n, \r, \t)
+ * that may have been unescaped to LF/CR/TAB by JSON tool argument parsing.
+ */
+export const buildEscapeFuzzyRegex = (content_to_replace) => {
+    if (!content_to_replace) return null;
+
+    let pattern = '';
+    let i = 0;
+    const len = content_to_replace.length;
+
+    while (i < len) {
+        const char = content_to_replace[i];
+
+        if (char === '\\') {
+            // Consume consecutive backslashes and match 0 or more backslashes in target
+            while (i < len && content_to_replace[i] === '\\') {
+                i++;
+            }
+            pattern += '\\\\*';
+        } else if (char === '\n') {
+            // Real LF/CRLF/CR or literal \n / \r in target file
+            pattern += '(?:\\r?\\n|\\\\*n|\\\\*r|\\s*)';
+            i++;
+        } else if (char === '\r') {
+            // Real CR or literal \r in target file
+            pattern += '(?:\\r|\\\\*r)?';
+            i++;
+        } else if (char === '\t') {
+            // Real TAB or literal \t in target file
+            pattern += '(?:\\t|\\\\*t|\\s*)';
+            i++;
+        } else if (char === '"' || char === "'" || char === '`') {
+            // Prepend optional backslash match for quotes if not already preceded by backslashes
+            if (!pattern.endsWith('\\\\*')) {
+                pattern += '\\\\*';
+            }
+            pattern += char;
+            i++;
+        } else if (/[.*+?^${}()|[\]]/.test(char)) {
+            pattern += '\\' + char;
+            i++;
+        } else if (/\s/.test(char)) {
+            // Other whitespace (spaces, etc.)
+            while (i < len && /\s/.test(content_to_replace[i]) && content_to_replace[i] !== '\n' && content_to_replace[i] !== '\r' && content_to_replace[i] !== '\t') {
+                i++;
+            }
+            pattern += '\\s*';
+        } else {
+            pattern += char;
+            i++;
+        }
+    }
+
+    if (!pattern) return null;
+    try {
+        return new RegExp(pattern, 'g');
+    } catch (e) {
+        return null;
+    }
+};
+
 export const applyPatches = (content, patches, options = {}) => {
     const allowMultiple = typeof options === 'boolean' ? options : !!(options && options.allowMultiple);
     let currentFileContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -203,8 +266,48 @@ export const applyPatches = (content, patches, options = {}) => {
     const patchMatches = [];
     for (let i = 0; i < patches.length; i++) {
         const pair = patches[i];
-        const content_to_replace = strip(pair.replace || '');
+        const rawReplace = (pair.replace || '').trim();
         const content_to_add = strip(pair.new || '');
+
+        // --- LINE-ANCHORED PATCH SUPPORT (^LINE:startLine..endLine$) ---
+        if (rawReplace.startsWith('^LINE:') && rawReplace.endsWith('$')) {
+            const body = rawReplace.slice(6, -1).trim();
+            const parts = body.split('..');
+            const startLine = parseInt(parts[0]);
+            const endLine = parts[1] !== undefined ? parseInt(parts[1]) : startLine;
+
+            if (!isNaN(startLine) && !isNaN(endLine)) {
+                const fileLines = currentFileContent.split('\n');
+
+                if (startLine < 1 || startLine > fileLines.length || endLine < startLine || endLine > fileLines.length) {
+                    patchMatches.push({
+                        index: i,
+                        success: false,
+                        error: `Block ${i + 1}: Line range ^LINE:${startLine}..${endLine}$ out of bounds (file has ${fileLines.length} lines).`
+                    });
+                    continue;
+                }
+
+                const slicedLines = fileLines.slice(startLine - 1, endLine);
+                const firstMatchContent = slicedLines.join('\n');
+
+                let startPos = 0;
+                for (let k = 0; k < startLine - 1; k++) {
+                    startPos += fileLines[k].length + 1;
+                }
+
+                patchMatches.push({
+                    index: i,
+                    success: true,
+                    startPos,
+                    firstMatchContent,
+                    content_to_add
+                });
+                continue;
+            }
+        }
+
+        const content_to_replace = strip(pair.replace || '');
 
         if (content_to_replace === '' && content_to_add === '') {
             patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Empty replace and add content.` });
@@ -228,7 +331,14 @@ export const applyPatches = (content, patches, options = {}) => {
             }
         }
 
-        const matches = [...currentFileContent.matchAll(matchRegex)];
+        let matches = [...currentFileContent.matchAll(matchRegex)];
+        if (matches.length === 0 && content_to_replace !== '') {
+            const escapeFuzzyRegex = buildEscapeFuzzyRegex(content_to_replace);
+            if (escapeFuzzyRegex) {
+                matches = [...currentFileContent.matchAll(escapeFuzzyRegex)];
+            }
+        }
+
         if (matches.length === 0) {
             patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Could not find match.` });
             continue;

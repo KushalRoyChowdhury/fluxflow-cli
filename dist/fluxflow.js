@@ -2570,7 +2570,7 @@ var init_build = __esm({
 
 // src/utils/text.js
 import os2 from "os";
-var flattenString, wrapText, formatTokens, truncatePath, parsePatchPairs, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, isInsideBacktick, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, bypassBacktick, cleanSignals, clearBlocksCache;
+var flattenString, wrapText, formatTokens, truncatePath, parsePatchPairs, buildEscapeFuzzyRegex, applyPatches, generateHighFidelityDiff, parseLineInfo, getSimilarity, alignChangeGroup, blocksCache, streamingBlocksCache, MAX_CACHE_SIZE, CHUNK_SIZE, indexBlockIntoMap, parseMessageToBlocks, TOOL_LABELS, REGEX_INITIAL_THINK, REGEX_INITIAL_TOOL, isInsideBacktick, REGEX_CLEAN_SIGNALS, REGEX_ARROWS_ALL, REGEX_TOOLS, bypassBacktick, cleanSignals, clearBlocksCache;
 var init_text = __esm({
   "src/utils/text.js"() {
     init_paths();
@@ -2677,6 +2677,53 @@ var init_text = __esm({
       }
       return { patchPairs, allowMultiple };
     };
+    buildEscapeFuzzyRegex = (content_to_replace) => {
+      if (!content_to_replace) return null;
+      let pattern = "";
+      let i = 0;
+      const len = content_to_replace.length;
+      while (i < len) {
+        const char = content_to_replace[i];
+        if (char === "\\") {
+          while (i < len && content_to_replace[i] === "\\") {
+            i++;
+          }
+          pattern += "\\\\*";
+        } else if (char === "\n") {
+          pattern += "(?:\\r?\\n|\\\\*n|\\\\*r|\\s*)";
+          i++;
+        } else if (char === "\r") {
+          pattern += "(?:\\r|\\\\*r)?";
+          i++;
+        } else if (char === "	") {
+          pattern += "(?:\\t|\\\\*t|\\s*)";
+          i++;
+        } else if (char === '"' || char === "'" || char === "`") {
+          if (!pattern.endsWith("\\\\*")) {
+            pattern += "\\\\*";
+          }
+          pattern += char;
+          i++;
+        } else if (/[.*+?^${}()|[\]]/.test(char)) {
+          pattern += "\\" + char;
+          i++;
+        } else if (/\s/.test(char)) {
+          while (i < len && /\s/.test(content_to_replace[i]) && content_to_replace[i] !== "\n" && content_to_replace[i] !== "\r" && content_to_replace[i] !== "	") {
+            i++;
+          }
+          pattern += "\\s*";
+        } else {
+          pattern += char;
+          i++;
+        }
+      }
+      if (!pattern) return null;
+      try {
+        return new RegExp(pattern, "g");
+      } catch (e) {
+        return null;
+      }
+    };
     applyPatches = (content, patches, options = {}) => {
       const allowMultiple = typeof options === "boolean" ? options : !!(options && options.allowMultiple);
       let currentFileContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -2713,8 +2760,40 @@ var init_text = __esm({
       const patchMatches = [];
       for (let i = 0; i < patches.length; i++) {
         const pair = patches[i];
-        const content_to_replace = strip(pair.replace || "");
+        const rawReplace = (pair.replace || "").trim();
         const content_to_add = strip(pair.new || "");
+        if (rawReplace.startsWith("^LINE:") && rawReplace.endsWith("$")) {
+          const body = rawReplace.slice(6, -1).trim();
+          const parts = body.split("..");
+          const startLine = parseInt(parts[0]);
+          const endLine = parts[1] !== void 0 ? parseInt(parts[1]) : startLine;
+          if (!isNaN(startLine) && !isNaN(endLine)) {
+            const fileLines = currentFileContent.split("\n");
+            if (startLine < 1 || startLine > fileLines.length || endLine < startLine || endLine > fileLines.length) {
+              patchMatches.push({
+                index: i,
+                success: false,
+                error: `Block ${i + 1}: Line range ^LINE:${startLine}..${endLine}$ out of bounds (file has ${fileLines.length} lines).`
+              });
+              continue;
+            }
+            const slicedLines = fileLines.slice(startLine - 1, endLine);
+            const firstMatchContent = slicedLines.join("\n");
+            let startPos = 0;
+            for (let k = 0; k < startLine - 1; k++) {
+              startPos += fileLines[k].length + 1;
+            }
+            patchMatches.push({
+              index: i,
+              success: true,
+              startPos,
+              firstMatchContent,
+              content_to_add
+            });
+            continue;
+          }
+        }
+        const content_to_replace = strip(pair.replace || "");
         if (content_to_replace === "" && content_to_add === "") {
           patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Empty replace and add content.` });
           continue;
@@ -2736,7 +2815,13 @@ var init_text = __esm({
             matchRegex = new RegExp(exactPattern, "g");
           }
         }
-        const matches = [...currentFileContent.matchAll(matchRegex)];
+        let matches = [...currentFileContent.matchAll(matchRegex)];
+        if (matches.length === 0 && content_to_replace !== "") {
+          const escapeFuzzyRegex = buildEscapeFuzzyRegex(content_to_replace);
+          if (escapeFuzzyRegex) {
+            matches = [...currentFileContent.matchAll(escapeFuzzyRegex)];
+          }
+        }
         if (matches.length === 0) {
           patchMatches.push({ index: i, success: false, error: `Block ${i + 1}: Could not find match.` });
           continue;
@@ -6845,21 +6930,18 @@ var init_main_tools = __esm({
       }
       return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")]
+Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")] IN NEW LINE
 **NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 **TOOL CALLS POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
-${mode === "Flux" ? `- Escape quotes: \\" for code strings
-- Double-escape literal sequences (eg. \\\\n)
-- Use real newlines for code formatting
+${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
 - Tool denied? Ask for guidance \u2190 MANDATORY
 - Need text or huge files? SearchKeyword > Full Read
-- Update Todos from realtime progress each turn
 ` : ""}
 - COMMUNICATION WITH USER -
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep titles short
 
 - WEB TOOLS -
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -6868,7 +6950,7 @@ ${mode === "Flux" ? `- Escape quotes: \\" for code strings
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -8623,8 +8705,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 -- CHAT FORMATTING --
 - GFM Markdown ONLY
 - Same Language as User Query
-- After tool calls emit no chat in this turn
-- On completion: summarize changes (why) + edited files${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
+- Finish all chatting before tool calls${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
@@ -9085,8 +9166,14 @@ var init_history = __esm({
       const datePart = parts[0];
       const timePart = parts[1] || "";
       const ampm = parts[2] || "";
-      const dateNums = datePart.split(/[-/.]/).map(Number);
+      const dateNums = datePart.split(/[-\/.]/).map(Number);
       if (dateNums.length !== 3) return null;
+      let locale = "en";
+      try {
+        locale = Intl.DateTimeFormat().resolvedOptions().locale || "en";
+      } catch {
+      }
+      const isDayFirst = !/^en[-_]?us$|^en$/.test(locale?.toLowerCase());
       let year, month, day;
       if (dateNums[0] > 1e3) {
         year = dateNums[0];
@@ -9101,12 +9188,18 @@ var init_history = __esm({
           day = dateNums[1];
           month = dateNums[0];
         } else {
-          month = dateNums[0];
-          day = dateNums[1];
+          if (isDayFirst) {
+            day = dateNums[0];
+            month = dateNums[1];
+          } else {
+            month = dateNums[0];
+            day = dateNums[1];
+          }
         }
       } else {
         return null;
       }
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
       let hours = 0, minutes = 0, seconds = 0;
       if (timePart) {
         const timeNums = timePart.split(":").map(Number);
@@ -9151,16 +9244,19 @@ var init_history = __esm({
         const threshold = 7 * 24 * 60 * 60 * 1e3;
         const now = Date.now();
         const keptEntries = [];
-        const timestampRegex = /(\d{1,4}[-/.]\d{1,4}[-/.]\d{1,4}(?:,\s*|\s+)?(?:\d{1,2}:\d{2}:\d{2}(?:\s*[aApP][mM])?)?)/;
+        const timestampRegex = /(\d{1,4}[-\/.]\d{1,4}[-\/.]\d{1,4}(?:,\s*|\s+)?(?:\d{1,2}:\d{2}:\d{2}(?:\s*[aApP][mM])?)?)/;
         for (const entry of entries) {
-          const entryText = entry.header + (entry.body.length > 0 ? "\n" + entry.body.join("\n") : "");
-          const match = entryText.match(timestampRegex);
-          if (match) {
-            const timeMs = parseCustomDate(match[1]);
-            if (timeMs && now - timeMs > threshold) {
-              continue;
+          const isLogEntry = entryStartRegex.test(entry.header);
+          if (isLogEntry) {
+            const headerMatch = entry.header.match(timestampRegex);
+            if (headerMatch) {
+              const timeMs = parseCustomDate(headerMatch[1]);
+              if (timeMs && now - timeMs > threshold) {
+                continue;
+              }
             }
           }
+          const entryText = entry.header + (entry.body.length > 0 ? "\n" + entry.body.join("\n") : "");
           keptEntries.push(entryText);
         }
         const finalContent = keptEntries.join("\n").trim();
@@ -12619,7 +12715,7 @@ var init_invoke = __esm({
       const subagentContext = {
         ...context,
         taskId,
-        onAskMain: async (questionText, optionsObj) => {
+        onAskMain: async (questionText) => {
           const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
           let questionResolver = null;
           const qPromise = new Promise((resolve) => {
@@ -12628,7 +12724,6 @@ var init_invoke = __esm({
           const qEntry = {
             id: questionId,
             question: questionText,
-            options: optionsObj,
             answered: false,
             answer: null,
             askedAt: Date.now(),
@@ -12782,7 +12877,7 @@ var init_getProgress = __esm({
       if (task.status === "running" || task.status === "waiting") {
         if (task.currentTool) output += `Current Tool: ${task.currentTool}
 `;
-        if (task.wps > 0) output += `WPS: ${task.wps}
+        if (task.wps > 0) output += `TPS: ${task.wps}
 `;
       }
       if (task.questions && task.questions.length > 0) {
@@ -12794,10 +12889,6 @@ var init_getProgress = __esm({
           pending.forEach((q) => {
             output += `"${q.question}"
 `;
-            if (q.options && Object.keys(q.options).length > 0) {
-              output += `Options: ${JSON.stringify(q.options)}
-`;
-            }
           });
           output += `Respond using tool: [tool:functions.Answer(id="${task.id}", answer="...")]
 
@@ -18546,20 +18637,16 @@ TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:function
 **NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 TOOL POLICY:
-- Escape quotes: \\" for code strings
-- Double-escape literal sequences (eg. \\\\n)
-- Use real newlines for code formatting
+- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
-- Tool denied? Ask for guidance \u2190 MANDATORY
 - Need text or huge files? SearchKeyword > Full Read
-- Update Todos from realtime progress each turn
 - Restricted Shell Access, No Deletion
 - ONLY valid tools and syntax defined below are allowed
 
 **PROVIDED TOOLS**
 -- Communication Tools --
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
-${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::description", ...MAX 4)]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ""}
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Communicate with USER. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep titles short
+${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ""}
 
 -- Web Tools --
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -18569,7 +18656,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...", optionA="option::descript
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
@@ -18611,7 +18698,7 @@ Current Time: ${time}
           role: m.role === "user" ? "user" : "model",
           parts: [{ text: m.text }]
         }));
-        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}] Invoking model ${targetModel}...`);
+        if (logCallback) logCallback(`[Subagent Turn ${turn + 1}]...`);
         const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, "Fast");
         const responseText = response.text || "";
         const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, "").trim();
@@ -18646,21 +18733,18 @@ ${cleanResponse}
             if (processedAskMainInTurn) continue;
             processedAskMainInTurn = true;
             let questionText = "";
-            let optionsObj = {};
             if (askMainCalls.length === 1) {
               const pArgs = parseArgs(askMainCalls[0].args);
               questionText = pArgs.question || askMainCalls[0].args;
-              optionsObj = pArgs;
             } else {
               questionText = askMainCalls.map((tc, idx) => {
                 const pArgs = parseArgs(tc.args);
                 return `Q${idx + 1}: ${pArgs.question || tc.args}`;
               }).join("\n");
-              optionsObj = {};
             }
             if (settings.onAskMain) {
               if (logCallback) logCallback(`[Executing Tool] AskMain("${questionText}")...`);
-              const answer = await settings.onAskMain(questionText, optionsObj);
+              const answer = await settings.onAskMain(questionText);
               if (logCallback) logCallback(`[Tool Result]
 Answer from Main Agent: ${answer}
 `);

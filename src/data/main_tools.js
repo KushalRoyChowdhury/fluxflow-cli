@@ -23,21 +23,18 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     }
     return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")]
+Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")] IN NEW LINE
 **NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
 
 **TOOL CALLS POLICY:**
 - MAX 4 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 4+, Run: max 1 or 2 consecutive)' : ''}
-${mode === 'Flux' ? `- Escape quotes: \\" for code strings
-- Double-escape literal sequences (eg. \\\\n)
-- Use real newlines for code formatting
+${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY
 - Need text or huge files? SearchKeyword > Full Read
-- Update Todos from realtime progress each turn
 ` : ""}
 - COMMUNICATION WITH USER -
-- [tool:functions.Ask(question="...", optionA="option::description", ...MAX 4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep options short
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep titles short
 
 - WEB TOOLS -
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -46,7 +43,7 @@ ${mode === 'Flux' ? `- Escape quotes: \\" for code strings
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : ''}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="...", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. allowMultiple: Replace all matches ONLY WHEN SURE. Multi-blocks: replaceContent2/newContent2... Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user

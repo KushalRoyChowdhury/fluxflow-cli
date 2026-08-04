@@ -69,7 +69,7 @@ export const invoke = async (args, context = {}) => {
     const subagentContext = {
         ...context,
         taskId: taskId,
-        onAskMain: async (questionText, optionsObj) => {
+        onAskMain: async (questionText) => {
             const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             let questionResolver = null;
             const qPromise = new Promise((resolve) => {
@@ -79,7 +79,6 @@ export const invoke = async (args, context = {}) => {
             const qEntry = {
                 id: questionId,
                 question: questionText,
-                options: optionsObj,
                 answered: false,
                 answer: null,
                 askedAt: Date.now(),
