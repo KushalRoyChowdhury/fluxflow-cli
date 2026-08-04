@@ -720,7 +720,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
     }
-    const text = flattenString(cleanSignals(msg.text || ''));
+    const text = flattenString(cleanSignals(msg.text || '', msg.role === 'think'));
 
     const streamCacheKey = `${msg.id}-${columns}`;
     let cachedBlocks = new Map();
@@ -1069,20 +1069,42 @@ const isInsideBacktick = (str, idx) => {
     }
     return inCode;
 };
-const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
+const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?<\/(think|thought)>|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 
 // Set to true for models that wrap tool calls in backticks so the backtick-skip logic is bypassed.
-export let bypassBacktick = false;
+export let bypassBacktick = true;
 
-export const cleanSignals = (text) => {
+export const cleanSignals = (text, isThinkRole = false) => {
     if (!text) return text;
+
+    if (isThinkRole) {
+        return text
+            .replace(/^<(think|thought)>/gi, '')
+            .replace(/<\/(think|thought)>$/gi, '');
+    }
 
     let result = text
         .replace(REGEX_INITIAL_THINK, '</think>')
         .replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
             (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
+
+    // Strip XML/YAML/code fence wrappers around tool calls so raw wrappers are not shown in UI
+    if (result && result.includes('[tool:')) {
+        result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
+            if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
+            return match;
+        });
+        if (bypassBacktick) {
+            result = result.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+                if (inner.includes('[tool:')) return inner.trim();
+                return match;
+            });
+        }
+        // If the response contains a tool call, also strip any other XML tags in the same response
+        result = result.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+    }
 
     const trigger = 'tool:functions.';
     const subagentTrigger = 'agent:generalist.';

@@ -59,7 +59,7 @@ const formatThinkText = (cleaned, columns = 80) => {
 // ============================================================================
 // PRE-COMPILED REGEXES (Prevents V8 recompilation during React render loop)
 // ============================================================================
-const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+const REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`\r\n]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
 const REGEX_FENCED_CODE = /```(\w*)\n?([\s\S]*?)(?:```|$)/;
 const REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
 const REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
@@ -279,13 +279,18 @@ const InlineMarkdown = React.memo(({ text, color, italic, theme = 'Dark' }) => {
                     return <Text key={j} italic color={textColor}><InlineMarkdown text={part.slice(1, -1)} color={textColor} italic={italic} theme={theme} /></Text>;
                 }
 
-                if (part.startsWith('`') && part.endsWith('`')) {
-                    const content = part.slice(1, -1);
-                    const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
-                        return p1.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
-                    });
-                    const hasFileRef = content.includes('@[');
-                    return <Text key={j} color={highlightColor} bold={hasFileRef}>{formatted}</Text>;
+                if (part.startsWith('`')) {
+                    if (part.endsWith('`') && part.length > 1) {
+                        const content = part.slice(1, -1);
+                        const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
+                            return p1.split('/').pop().split('\\').pop().replace(REGEX_COLON_L, '#L');
+                        });
+                        const hasFileRef = content.includes('@[');
+                        return <Text key={j} color={highlightColor} bold={hasFileRef}>{formatted}</Text>;
+                    } else {
+                        // Unclosed backtick span while streaming — render as code text so it doesn't freeze or hide trailing tokens
+                        return <Text key={j} color={highlightColor}>{part.slice(1)}</Text>;
+                    }
                 }
 
                 if (part.startsWith('@[') && part.endsWith(']')) {
@@ -910,10 +915,12 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
                     if (part.startsWith('```')) {
                         const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
                         const lang = match ? match[1] : 'code';
-                        const code = match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '');
+                        const raw = match ? match[2] : part.replace(/^```\w*\n?/, '').replace(/```$/, '');
+                        const rawLines = raw.trimEnd().split('\n');
+                        const gutterWidth = String(rawLines.length).length;
+                        const codeWidth = columns - 7 - gutterWidth;
+                        const code = codeWidth > 5 ? wrapText(raw, codeWidth) : raw;
                         const codeLines = code.trimEnd().split('\n');
-                        const gutterWidth = String(codeLines.length).length;
-
                         return (
                             <Box
                                 key={i}
@@ -1224,7 +1231,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     }
 
     const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
-    const content = React.useMemo(() => cleanSignals(msg.text), [msg.text]);
+    const content = React.useMemo(() => cleanSignals(msg.text, msg.role === 'think'), [msg.text, msg.role]);
 
     // Reset animation state if message ID changes (rare but possible)
     React.useEffect(() => {
@@ -1282,17 +1289,17 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
                 </Box>
 
             ) : msg.role === 'think' ? (
-                <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={1} width="100%">
+                <Box flexDirection="column" marginTop={0} marginBottom={0} paddingX={0} width="100%">
                     {msg.isStreaming && !msg.duration ? (
                         <Text bold color={colors.text}>✧ Thinking...</Text>
                     ) : (
                         <Text bold color={colors.text}>
                             ✦ Thought{msg.duration ? (
                                 <Text color={colors.textMuted}> for <Text bold color={colors.text}>{formatThinkingDuration(msg.duration)}</Text></Text>
-                            ) : '...'}
+                            ) : 's...'}
                         </Text>
                     )}
-                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={2} paddingTop={1} paddingBottom={1} flexDirection="column" width="100%">
+                    <Box borderStyle="single" borderLeft borderRight={false} borderTop={false} borderBottom={false} borderColor={colors.borderMuted} paddingLeft={2} paddingTop={0} paddingBottom={0} flexDirection="column" width="100%">
                         {formatThinkText(finalContent, columns)}
                     </Box>
                 </Box>
@@ -1359,8 +1366,9 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                 {isStreamingMsg ? (
                     <Text bold color={colors.text}>✧ Thinking...</Text>
                 ) : (
-                    <Text bold color={colors.text}>✦ Thought...</Text>
+                    <Text bold color={colors.text}>✦ Thoughts...</Text>
                 )}
+                {/* [TEMORARY SOLUTION] */}
                 {showFullThinking && (
                     <Box flexDirection="row" width="100%">
                         <Text color={colors.textMuted}>│ </Text>
@@ -1410,6 +1418,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         );
     }
 
+    // [TEMORARY SOLUTION]
     if (type === 'think-footer-padding') {
         if (!showFullThinking) return null;
         return (

@@ -23,11 +23,9 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     }
     return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")] IN NEW LINE
-**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
-
-**TOOL CALLS POLICY:**
-- MAX 4 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 4+, Run: max 1 or 2 consecutive)' : ''}
+FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** ← MANDATORY
+TOOL RULES:
+- MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
 ${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY

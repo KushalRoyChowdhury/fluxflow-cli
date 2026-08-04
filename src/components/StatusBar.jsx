@@ -189,7 +189,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         updateMemory();
         const interval = setInterval(() => {
             updateMemory();
-        }, 30000);
+        }, 60000);
 
         return () => {
             clearInterval(interval);
@@ -267,7 +267,8 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                 <Text color={colors.textMuted} dimColor>┃</Text>
 
                 <Box marginLeft={1}>
-                    <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text>
+                    <Text color={colors.textMuted} bold>{memoryUsage} {memoryUnit}</Text>
+                    {/* <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text> */}
                     {(apiTier === 'Custom' || apiTier === 'Paid') && (
                         <Box><Text color={colors.textMuted} dimColor> ┃ </Text><Text color={colors.textMuted} bold>PAID</Text></Box>
                     )}

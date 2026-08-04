@@ -582,7 +582,18 @@ export default function App({ args = [] }) {
     const typewriterQueueRef = useRef([]);
     const typewriterTickRef = useRef(null);
 
+    const flushTypewriterNow = () => {
+        const queue = typewriterQueueRef.current;
+        if (queue.length > 0 && activeStreamingMsgRef.current) {
+            const remaining = queue.join('');
+            queue.length = 0;
+            activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
+            forceRender();
+        }
+    };
+
     const commitActiveStreamingMessage = () => {
+        flushTypewriterNow();
         if (activeStreamingMsgRef.current) {
             const msg = {
                 ...activeStreamingMsgRef.current,
@@ -610,43 +621,35 @@ export default function App({ args = [] }) {
         }
         typewriterQueueRef.current = [];
         typewriterTickRef.current = setInterval(() => {
-            const queue = typewriterQueueRef.current;
-            if (queue.length > 0 && activeStreamingMsgRef.current) {
-                // Adaptive batch size: catch up faster when queue grows deep
-                let batchSize = 1;
-                if (queue.length > 85) batchSize = 30;
-                else if (queue.length > 80) batchSize = 25;
-                else if (queue.length > 75) batchSize = 20;
-                else if (queue.length > 65) batchSize = 16;
-                else if (queue.length > 50) batchSize = 12;
-                else if (queue.length > 35) batchSize = 8;
-                else if (queue.length > 15) batchSize = 6;
-                else if (queue.length > 5) batchSize = 4;
-                else if (queue.length > 3) batchSize = 2;
+            try {
+                const queue = typewriterQueueRef.current;
+                if (queue.length > 0 && activeStreamingMsgRef.current) {
+                    // Adaptive batch size: catch up faster when queue grows deep
+                    let batchSize = 1;
+                    if (queue.length > 85) batchSize = 30;
+                    else if (queue.length > 80) batchSize = 25;
+                    else if (queue.length > 75) batchSize = 20;
+                    else if (queue.length > 65) batchSize = 16;
+                    else if (queue.length > 50) batchSize = 12;
+                    else if (queue.length > 35) batchSize = 8;
+                    else if (queue.length > 15) batchSize = 6;
+                    else if (queue.length > 5) batchSize = 4;
+                    else if (queue.length > 3) batchSize = 2;
 
-                let batchedText = '';
-                for (let i = 0; i < batchSize && queue.length > 0; i++) {
-                    batchedText += queue.shift();
+                    let batchedText = '';
+                    for (let i = 0; i < batchSize && queue.length > 0; i++) {
+                        batchedText += queue.shift();
+                    }
+                    activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
+                    forceRender();
                 }
-                activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
-                forceRender();
-            }
+            } catch (e) { }
         }, 80); // [ANIMATION TICK]
     };
 
     const awaitTypewriter = async () => {
         while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
             await new Promise(resolve => setTimeout(resolve, 10));
-        }
-    };
-
-    const flushTypewriterNow = () => {
-        const queue = typewriterQueueRef.current;
-        if (queue.length > 0 && activeStreamingMsgRef.current) {
-            const remaining = queue.join('');
-            queue.length = 0;
-            activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
-            forceRender();
         }
     };
 
@@ -2498,6 +2501,7 @@ export default function App({ args = [] }) {
         }
 
         if (absoluteClean.startsWith('/')) {
+            setInput('');
             const parts = absoluteClean.split(' ');
             const cmd = parts[0]?.toLowerCase();
 
@@ -4039,10 +4043,10 @@ export default function App({ args = [] }) {
                             // Flush queue FIRST so ref.text is complete before deriving thinkPart
                             flushTypewriterNow();
                             const newText = activeStreamingMsgRef.current.text + chunkText;
-                            if (newText.toLowerCase().includes('</think>')) {
-                                const parts = newText.split(/<\/think>/gi);
+                            if (/<\/(think|thought)>/i.test(newText)) {
+                                const parts = newText.split(/<\/(think|thought)>/gi);
                                 const thinkPart = parts[0] || '';
-                                const agentPart = parts.slice(1).join('</think>') || '';
+                                const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
                                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -4053,7 +4057,7 @@ export default function App({ args = [] }) {
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
                                 activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
-                                appendStreamText(agentPart.replace(/<\/?(think|thought)>/gi, ''));
+                                appendStreamText(agentPart);
                             } else {
                                 appendStreamText(chunkText);
                             }
@@ -4169,6 +4173,23 @@ export default function App({ args = [] }) {
                             }
                             return updated;
                         }).reverse();
+
+                        // Fallback safety: If no agent message was created during turn but a think message has content,
+                        // ensure an agent message exists with the response content so saveChat preserves it across turns.
+                        const hasAgentMsg = newMsgs.some(m => m.role === 'agent' && m.text?.trim().length > 0);
+                        if (!hasAgentMsg) {
+                            const lastThinkMsg = [...newMsgs].reverse().find(m => m.role === 'think' && m.text?.trim().length > 0);
+                            if (lastThinkMsg) {
+                                newMsgs.push({
+                                    id: 'agent-fallback-' + Date.now(),
+                                    role: 'agent',
+                                    text: lastThinkMsg.text,
+                                    isStreaming: false,
+                                    workedDuration: totalDuration
+                                });
+                            }
+                        }
+
                         const historyToSave = newMsgs.filter(m => !String(m.id).startsWith('welcome') && (!m.isMeta || (m.text && m.text.includes('Request Cancelled'))));
                         // Pass null as name to preserve whatever the Janitor has set in the background
                         saveChat(chatId, null, historyToSave);

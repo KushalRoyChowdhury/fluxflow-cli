@@ -3134,7 +3134,7 @@ var init_text = __esm({
       if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
       }
-      const text = flattenString(cleanSignals(msg.text || ""));
+      const text = flattenString(cleanSignals(msg.text || "", msg.role === "think"));
       const streamCacheKey = `${msg.id}-${columns}`;
       let cachedBlocks = /* @__PURE__ */ new Map();
       if (msg.isStreaming) {
@@ -3437,13 +3437,29 @@ var init_text = __esm({
       }
       return inCode;
     };
-    REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?(?:<\/(think|thought)>|$)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
+    REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?<\/(think|thought)>|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
     REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
-    bypassBacktick = false;
-    cleanSignals = (text) => {
+    bypassBacktick = true;
+    cleanSignals = (text, isThinkRole = false) => {
       if (!text) return text;
+      if (isThinkRole) {
+        return text.replace(/^<(think|thought)>/gi, "").replace(/<\/(think|thought)>$/gi, "");
+      }
       let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) => !bypassBacktick && isInsideBacktick(str, offset) ? match : "");
+      if (result && result.includes("[tool:")) {
+        result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
+          if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
+          return match;
+        });
+        if (bypassBacktick) {
+          result = result.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+            if (inner.includes("[tool:")) return inner.trim();
+            return match;
+          });
+        }
+        result = result.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+      }
       const trigger = "tool:functions.";
       const subagentTrigger = "agent:generalist.";
       if (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger)) {
@@ -5561,7 +5577,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(MarkdownText, { key: i, text: cleanPart, color: "gray", columns: availableWidth, italic: true });
       }));
     };
-    REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
+    REGEX_MD_TOKENS = /(```[\s\S]*?```|`[^`\r\n]+`|@\[.*?\]|\*\*.*?\*\*|\*.*?\*|\\\(.*?\\\)|\\\[.*?\\\]|\$.*?\$|\[.*?\]\s*\(.*?\)|\[.*?\]\s*\[.*?\]|https?:\/\/[^\s]+)/g;
     REGEX_LATEX_FRAC = /\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g;
     REGEX_LATEX_STYLE = /(\\(?:mathbf|textbf|textit|underline|texttt)\{[^{}]*\})/g;
     REGEX_MATH_MULT = /\\multiply|\\mul|\\times/g;
@@ -5708,13 +5724,17 @@ var init_ChatLayout = __esm({
         if (part.startsWith("*") && part.endsWith("*")) {
           return /* @__PURE__ */ React4.createElement(Text4, { key: j, italic: true, color: textColor }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: part.slice(1, -1), color: textColor, italic, theme }));
         }
-        if (part.startsWith("`") && part.endsWith("`")) {
-          const content = part.slice(1, -1);
-          const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
-            return p1.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
-          });
-          const hasFileRef = content.includes("@[");
-          return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor, bold: hasFileRef }, formatted);
+        if (part.startsWith("`")) {
+          if (part.endsWith("`") && part.length > 1) {
+            const content = part.slice(1, -1);
+            const formatted = content.replace(REGEX_AT_REF, (match, p1) => {
+              return p1.split("/").pop().split("\\").pop().replace(REGEX_COLON_L, "#L");
+            });
+            const hasFileRef = content.includes("@[");
+            return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor, bold: hasFileRef }, formatted);
+          } else {
+            return /* @__PURE__ */ React4.createElement(Text4, { key: j, color: highlightColor }, part.slice(1));
+          }
         }
         if (part.startsWith("@[") && part.endsWith("]")) {
           const filePath = part.slice(2, -1);
@@ -6087,9 +6107,12 @@ var init_ChatLayout = __esm({
           if (part.startsWith("```")) {
             const match = part.match(/```(\w*)\n?([\s\S]*?)(?:```|$)/);
             const lang = match ? match[1] : "code";
-            const code = match ? match[2] : part.replace(/^```\w*\n?/, "").replace(/```$/, "");
+            const raw = match ? match[2] : part.replace(/^```\w*\n?/, "").replace(/```$/, "");
+            const rawLines = raw.trimEnd().split("\n");
+            const gutterWidth = String(rawLines.length).length;
+            const codeWidth = columns - 7 - gutterWidth;
+            const code = codeWidth > 5 ? wrapText(raw, codeWidth) : raw;
             const codeLines = code.trimEnd().split("\n");
-            const gutterWidth = String(codeLines.length).length;
             return /* @__PURE__ */ React4.createElement(
               Box3,
               {
@@ -6275,7 +6298,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 0, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(TerminalBox, { command: cmd, output: outputList, completed: true, columns, isPty, theme }));
       }
       const [animationDone, setAnimationDone] = React4.useState(!msg.isStreaming);
-      const content = React4.useMemo(() => cleanSignals(msg.text), [msg.text]);
+      const content = React4.useMemo(() => cleanSignals(msg.text, msg.role === "think"), [msg.text, msg.role]);
       React4.useEffect(() => {
         if (msg.isStreaming) setAnimationDone(false);
       }, [msg.id]);
@@ -6301,7 +6324,7 @@ var init_ChatLayout = __esm({
           finalContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "\n").replace(/\\$/, ""),
           columns - 7
         ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.userMsgText }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || colors.userMsgText, theme }))))
-      ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.userMsgBorder }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 1, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.duration))) : "..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 2, paddingTop: 1, paddingBottom: 1, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns, theme }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "["), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "]")) : null));
+      ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.userMsgBorder }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 0, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.duration))) : "s..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 2, paddingTop: 0, paddingBottom: 0, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns, theme }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "["), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "]")) : null));
     });
     BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version, theme = "Dark" }) => {
       const colors = getThemeColors(theme);
@@ -6334,7 +6357,7 @@ var init_ChatLayout = __esm({
         );
       }
       if (type === "think-header") {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 ")));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, width: "100%", marginTop: 0, marginBottom: 0 }, isStreamingMsg ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thoughts..."), showFullThinking && /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "\u2502 ")));
       }
       if (type === "think-line") {
         if (!showFullThinking) return null;
@@ -6677,7 +6700,7 @@ var init_StatusBar = __esm({
         updateMemory();
         const interval = setInterval(() => {
           updateMemory();
-        }, 3e4);
+        }, 6e4);
         return () => {
           clearInterval(interval);
           if (activeGetMemoryInfo === updateMemory) {
@@ -6704,7 +6727,7 @@ var init_StatusBar = __esm({
           const pct = tokens / maxLimit * 100;
           const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
           return /* @__PURE__ */ React5.createElement(Text5, { color, dimColor: true }, pct.toFixed(0), "%");
-        })())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, memoryUsage, "/", memoryLimit, " ", memoryUnit), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, "PAID"))))
+        })())), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, "\u2503"), /* @__PURE__ */ React5.createElement(Box4, { marginLeft: 1 }, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, memoryUsage, " ", memoryUnit), (apiTier === "Custom" || apiTier === "Paid") && /* @__PURE__ */ React5.createElement(Box4, null, /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, dimColor: true }, " \u2503 "), /* @__PURE__ */ React5.createElement(Text5, { color: colors.textMuted, bold: true }, "PAID"))))
       );
     });
     StatusBar_default = StatusBar;
@@ -6930,11 +6953,9 @@ var init_main_tools = __esm({
       }
       return `
 -- TOOL DEFINITIONS --
-Tool calls: ONLY use [tool:functions.ToolName(arg1="value1")] IN NEW LINE
-**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
-
-**TOOL CALLS POLICY:**
-- MAX 4 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 4+, Run: max 1 or 2 consecutive)" : ""}
+FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** \u2190 MANDATORY
+TOOL RULES:
+- MAX 3 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 3+, Run: max 1 or 2 consecutive)" : ""}
 ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
 - Tool denied? Ask for guidance \u2190 MANDATORY
@@ -8687,11 +8708,12 @@ ${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architec
 
 - USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION
 - USE RELATIVE TIME REFERENCE eg. few mins ago
+- NO HALLUCINATIONS
 
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
 ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && !isGemini) ? `CRITICAL THINKING POLICY
-- Use <think> ... </think> for reasoning before responding, even with simple queries/greetings
+- Use <think>...</think> for reasoning before responding any queries
 ` : ""}` : `${thinkingConfig}
 `}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
@@ -8703,9 +8725,8 @@ ${projectContextBlock}${isMemoryEnabled ? `
 - Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY" : ""}
 
 -- CHAT FORMATTING --
-- GFM Markdown ONLY
-- Language: ENGLISH only
-- Finish all chatting before tool calls${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
+- GFM Markdown
+- NEVER MIX CHAT & TOOLS IN SAME RESPONSE${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
@@ -13899,7 +13920,7 @@ var init_ai = __esm({
     RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
     RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
     RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
-    bypassBacktick2 = false;
+    bypassBacktick2 = true;
     client = null;
     globalSettings = {};
     systemInstructionCache = { key: null, value: null };
@@ -16131,8 +16152,8 @@ ${currentSummary}
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-          ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
           if (ideCtx.file_focused !== "none") {
+            ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
             const relFocused = path26.relative(process.cwd(), ideCtx.file_focused);
             const relOpened = (ideCtx.opened_editors || []).map((p) => {
               const rel = path26.relative(process.cwd(), p);
@@ -16270,7 +16291,6 @@ ${ideCtx.warnings}
 `;
             }
           } else {
-            ideBlock += `No file currently focused.`;
           }
         }
         const cleanAgentText = agentText.replace(/\s*\[Prompted on:.*?\]/g, "").trim();
@@ -16410,10 +16430,8 @@ OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwd
 WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(arg1="value1")] [/SYSTEM]
-${taggedContextStr}[USER PROMPT]
-${cleanPromptForModel.trim()}
-[/USER PROMPT]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM] ONLY VALID TOOL SCHEMA REMINDER: '[tool:functions.ToolName(arg1="value1")]' NEW LINE [/SYSTEM]
+${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
@@ -16534,7 +16552,7 @@ ${combinedNudge}`;
               }
               const stripToolCallWrappers = (text) => {
                 if (!text || !text.includes("[tool:")) return text;
-                text = text.replace(/<(\w+)(?:[^>]*)>\s*(\[tool:[^\]]*\](?:[\s\S]*?))?\s*<\/\1>/gi, (match2, tagName, innerContent) => {
+                text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match2, tagName, innerContent) => {
                   if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
                   return match2;
                 });
@@ -16542,6 +16560,7 @@ ${combinedNudge}`;
                   if (inner.includes("[tool:")) return inner.trim();
                   return match2;
                 });
+                text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
                 return text;
               };
               const contents = modifiedHistory.filter((msg) => (msg.role === "user" || msg.role === "agent" || msg.role === "system") && !String(msg.id).startsWith("welcome") && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith("[TERMINAL_RECORD]"))).map((msg, idx, arr) => {
@@ -18646,10 +18665,8 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
       const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(arg1="value1")]
-**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
-
-TOOL POLICY:
+FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** \u2190 MANDATORY
+TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
 - Need text or huge files? SearchKeyword > Full Read
@@ -18681,7 +18698,7 @@ ${providedToolsSection.trimEnd()}
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
 Keep main focus on tools and task, not chatting
-On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
+On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, NO HALLUCINATIONS
 
 CWD: ${process.cwd()}
 Current Time: ${time}
@@ -19954,7 +19971,17 @@ function App({ args = [] }) {
   const forceRender = () => setRenderTick((t) => t + 1);
   const typewriterQueueRef = useRef4([]);
   const typewriterTickRef = useRef4(null);
+  const flushTypewriterNow = () => {
+    const queue = typewriterQueueRef.current;
+    if (queue.length > 0 && activeStreamingMsgRef.current) {
+      const remaining = queue.join("");
+      queue.length = 0;
+      activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
+      forceRender();
+    }
+  };
   const commitActiveStreamingMessage = () => {
+    flushTypewriterNow();
     if (activeStreamingMsgRef.current) {
       const msg = {
         ...activeStreamingMsgRef.current,
@@ -19977,39 +20004,33 @@ function App({ args = [] }) {
     }
     typewriterQueueRef.current = [];
     typewriterTickRef.current = setInterval(() => {
-      const queue = typewriterQueueRef.current;
-      if (queue.length > 0 && activeStreamingMsgRef.current) {
-        let batchSize = 1;
-        if (queue.length > 85) batchSize = 30;
-        else if (queue.length > 80) batchSize = 25;
-        else if (queue.length > 75) batchSize = 20;
-        else if (queue.length > 65) batchSize = 16;
-        else if (queue.length > 50) batchSize = 12;
-        else if (queue.length > 35) batchSize = 8;
-        else if (queue.length > 15) batchSize = 6;
-        else if (queue.length > 5) batchSize = 4;
-        else if (queue.length > 3) batchSize = 2;
-        let batchedText = "";
-        for (let i = 0; i < batchSize && queue.length > 0; i++) {
-          batchedText += queue.shift();
+      try {
+        const queue = typewriterQueueRef.current;
+        if (queue.length > 0 && activeStreamingMsgRef.current) {
+          let batchSize = 1;
+          if (queue.length > 85) batchSize = 30;
+          else if (queue.length > 80) batchSize = 25;
+          else if (queue.length > 75) batchSize = 20;
+          else if (queue.length > 65) batchSize = 16;
+          else if (queue.length > 50) batchSize = 12;
+          else if (queue.length > 35) batchSize = 8;
+          else if (queue.length > 15) batchSize = 6;
+          else if (queue.length > 5) batchSize = 4;
+          else if (queue.length > 3) batchSize = 2;
+          let batchedText = "";
+          for (let i = 0; i < batchSize && queue.length > 0; i++) {
+            batchedText += queue.shift();
+          }
+          activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
+          forceRender();
         }
-        activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + batchedText);
-        forceRender();
+      } catch (e) {
       }
     }, 80);
   };
   const awaitTypewriter = async () => {
     while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  };
-  const flushTypewriterNow = () => {
-    const queue = typewriterQueueRef.current;
-    if (queue.length > 0 && activeStreamingMsgRef.current) {
-      const remaining = queue.join("");
-      queue.length = 0;
-      activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + remaining);
-      forceRender();
     }
   };
   const appendStreamText = (chunkText) => {
@@ -21620,6 +21641,7 @@ ${cleanText}`, color: "magenta" }];
       return;
     }
     if (absoluteClean.startsWith("/")) {
+      setInput("");
       const parts = absoluteClean.split(" ");
       const cmd = parts[0]?.toLowerCase();
       switch (cmd) {
@@ -23068,10 +23090,10 @@ Selection: ${val}`,
             if (inThinkMode && activeStreamingMsgRef.current?.role === "think") {
               flushTypewriterNow();
               const newText = activeStreamingMsgRef.current.text + chunkText;
-              if (newText.toLowerCase().includes("</think>")) {
-                const parts = newText.split(/<\/think>/gi);
+              if (/<\/(think|thought)>/i.test(newText)) {
+                const parts = newText.split(/<\/(think|thought)>/gi);
                 const thinkPart = parts[0] || "";
-                const agentPart = parts.slice(1).join("</think>") || "";
+                const agentPart = parts.slice(2).join("").replace(/<\/?(think|thought)>/gi, "");
                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
                 activeStreamingMsgRef.current.duration = Date.now() - startTime;
@@ -23079,7 +23101,7 @@ Selection: ${val}`,
                 inThinkMode = false;
                 currentAgentId = "agent-" + Date.now();
                 activeStreamingMsgRef.current = { id: currentAgentId, role: "agent", text: "", isStreaming: true };
-                appendStreamText(agentPart.replace(/<\/?(think|thought)>/gi, ""));
+                appendStreamText(agentPart);
               } else {
                 appendStreamText(chunkText);
               }
@@ -23172,6 +23194,19 @@ Selection: ${val}`,
               }
               return updated;
             }).reverse();
+            const hasAgentMsg = newMsgs.some((m) => m.role === "agent" && m.text?.trim().length > 0);
+            if (!hasAgentMsg) {
+              const lastThinkMsg = [...newMsgs].reverse().find((m) => m.role === "think" && m.text?.trim().length > 0);
+              if (lastThinkMsg) {
+                newMsgs.push({
+                  id: "agent-fallback-" + Date.now(),
+                  role: "agent",
+                  text: lastThinkMsg.text,
+                  isStreaming: false,
+                  workedDuration: totalDuration2
+                });
+              }
+            }
             const historyToSave = newMsgs.filter((m) => !String(m.id).startsWith("welcome") && (!m.isMeta || m.text && m.text.includes("Request Cancelled")));
             saveChat(chatId, null, historyToSave);
             setCompletedIndex(newMsgs.length);

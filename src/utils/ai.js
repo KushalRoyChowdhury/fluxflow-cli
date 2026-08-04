@@ -55,7 +55,7 @@ const RE_KIMI_SECTION_END    = /<\|\s*tool_calls_section_end\s*\|>/gi;
 
 // Set to true for models that wrap tool calls in backticks (e.g. `[tool:functions.Foo(...)]`)
 // so the backtick-skip logic is bypassed and they are still executed.
-let bypassBacktick = false;
+let bypassBacktick = true;
 
 let client = null;
 
@@ -800,6 +800,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                 }
 
                 if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+                    // fs.appendFileSync('debug.log', JSON.stringify(pendingParts) + '\n');
                     yield {
                         candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                         usageMetadata: latestUsageMetadata
@@ -2612,8 +2613,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const ideCtx = await getIDEContext();
         let ideBlock = "";
         if (isBridgeConnected()) {
-            ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
             if (ideCtx.file_focused !== "none") {
+                ideBlock = "\n[ADDITIONAL IDE CONTEXT]\n";
                 const relFocused = path.relative(process.cwd(), ideCtx.file_focused);
                 const relOpened = (ideCtx.opened_editors || []).map(p => {
                     const rel = path.relative(process.cwd(), p);
@@ -2763,7 +2764,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     ideBlock += `\n**LINT WARNINGS**:\n${ideCtx.warnings}\n`;
                 }
             } else {
-                ideBlock += `No file currently focused.`
+                // ideBlock += `No file currently focused.`;
             }
         }
 
@@ -2915,7 +2916,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM Priority: HIGH] ONLY use the system prompt tool schema [tool:functions.ToolName(arg1="value1")] [/SYSTEM]\n${taggedContextStr}[USER PROMPT]\n${cleanPromptForModel.trim()}\n[/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM] ONLY VALID TOOL SCHEMA REMINDER: '[tool:functions.ToolName(arg1="value1")]' NEW LINE [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -3056,7 +3057,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const stripToolCallWrappers = (text) => {
                         if (!text || !text.includes('[tool:')) return text;
                         // Strip XML-style wrappers: <tag>...[tool:...]...</tag>
-                        text = text.replace(/<(\w+)(?:[^>]*)>\s*(\[tool:[^\]]*\](?:[\s\S]*?))?\s*<\/\1>/gi, (match, tagName, innerContent) => {
+                        text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
                             if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
                             return match;
                         });
@@ -3065,6 +3066,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             if (inner.includes('[tool:')) return inner.trim();
                             return match;
                         });
+                        // If the response contains a tool call, also strip any other XML tags in the same response
+                        text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
                         return text;
                     };
                     const contents = modifiedHistory
@@ -5442,10 +5445,8 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-TO ACCESS TOOLS **STRICTLY USE THE EXACT FORMAT IN CHAT OUTPUT:** [tool:functions.ToolName(arg1="value1")]
-**NO OTHER SYNTAX/MARKERS/WRAPPER/BOUNDARY ALLOWED**
-
-TOOL POLICY:
+FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** ← MANDATORY
+TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Need text or huge files? SearchKeyword > Full Read
@@ -5478,7 +5479,7 @@ ${providedToolsSection.trimEnd()}
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
 Keep main focus on tools and task, not chatting
-On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, no hallucination
+On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, NO HALLUCINATIONS
 
 CWD: ${process.cwd()}
 Current Time: ${time}
