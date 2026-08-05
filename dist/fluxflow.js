@@ -778,7 +778,7 @@ var init_settings = __esm({
         useExternalData: false,
         externalDataPath: "",
         preserveThinking: true,
-        loadingPhrases: true,
+        loadingPhrases: false,
         progressiveRendering: true,
         showTPMEstimate: false,
         subAgents: true,
@@ -3440,7 +3440,7 @@ var init_text = __esm({
     REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?<\/(think|thought)>|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
     REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
-    bypassBacktick = true;
+    bypassBacktick = false;
     cleanSignals = (text, isThinkRole = false) => {
       if (!text) return text;
       if (isThinkRole) {
@@ -6272,6 +6272,7 @@ var init_ChatLayout = __esm({
           { cmd: "/mode", desc: "Toggle Flux/Flow modes" },
           { cmd: "/thinking", desc: "Set AI reasoning depth" },
           { cmd: "/model", desc: "Switch AI model" },
+          { cmd: "/wildcard-tooling", desc: "Use if the model lacks Tooling Capability" },
           { cmd: "/provider", desc: "Select AI Provider" },
           { cmd: "/settings", desc: "Configure system prefs" },
           { cmd: "/theme", desc: "Customize UI color theme" },
@@ -6953,7 +6954,7 @@ var init_main_tools = __esm({
       }
       return `
 -- TOOL DEFINITIONS --
-FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** \u2190 MANDATORY
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' SYNTAX STRING IN CHAT \u2190 MANDATORY
 TOOL RULES:
 - MAX 3 TOOL CALLS/TURN${mode === "Flux" ? " (Todo: 3+, Run: max 1 or 2 consecutive)" : ""}
 ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
@@ -6962,7 +6963,7 @@ ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 - Need text or huge files? SearchKeyword > Full Read
 ` : ""}
 - COMMUNICATION WITH USER -
-- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Suggest best options; no preferences. Keep titles short
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
 
 - WEB TOOLS -
 - [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
@@ -6971,7 +6972,7 @@ ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -8572,11 +8573,11 @@ var thinking_prompts_default;
 var init_thinking_prompts = __esm({
   "src/data/thinking_prompts.json"() {
     thinking_prompts_default = {
-      xHigh: "EFFORT: HIGH\nChallenge assumptions, verify before concluding, prefer the simplest correct solution, assess architecture, scalability & trade-offs, verify dependencies, regressions, failure modes & modular design, plan: files, modules, interfaces & tests\nRULES:\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
-      High: "EFFORT: HIGH\nRigorous thinking, prefer the simplest correct solution, assess architecture, performance & maintainability, verify error handling, assumptions, edge cases, dependencies & regressions, plan: files, functions, logic & interactions\nRULES:\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
-      Medium: "EFFORT: MEDIUM\nFocused, technical thinking, find the simplest solution meeting requirements, check error handling, assumptions, edge cases & dependencies, verify cohesive, modular changes, outline: files, functions & key logic\nRULES:\nLogical, implementation-focused, efficient, deliberate, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Brief verification for technical tasks/greetings",
-      Minimal: "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors",
-      Off: "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nverify imports, tool results & system stability; avoid syntax errors"
+      xHigh: "EFFORT: HIGH\nChallenge assumptions, verify before concluding, prefer the simplest correct solution, assess architecture, scalability & trade-offs, verify dependencies, regressions, failure modes & modular design, plan: files, modules, interfaces & tests\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
+      High: "EFFORT: HIGH\nRigorous thinking, prefer the simplest correct solution, assess architecture, performance & maintainability, verify error handling, assumptions, edge cases, dependencies & regressions, plan: files, functions, logic & interactions\nContinuous analysis, verify from first principles, seek failure paths, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Full technical verification",
+      Medium: "EFFORT: MEDIUM\nFocused, technical thinking, find the simplest solution meeting requirements, check error handling, assumptions, edge cases & dependencies, verify cohesive, modular changes, outline: files, functions & key logic\nLogical, implementation-focused, efficient, deliberate, verify imports, tool results & system stability; avoid syntax errors\nMANDATORY: Brief verification for technical tasks/greetings",
+      Minimal: "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors",
+      Off: "EFFORT: LOWEST\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
     };
   }
 });
@@ -8654,13 +8655,13 @@ ${tempMemories}` : "";
         thinkingConfig = thinking_prompts_default["xHigh"];
         thinkingConfig = thinkingConfig.replace("EFFORT: HIGH", `EFFORT: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace("\nMANDATORY: Full technical verification", "");
         if (thinkingLevel === "Fast") {
-          thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nVerify imports, tool results & system stability; avoid syntax errors";
+          thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors";
         } else if (thinkingLevel === "Low") {
-          thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors";
+          thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors";
         }
       }
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
-      const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}
+      const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Preferences: ${profile.instructions}
 
 ` : "";
       const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}
@@ -8669,7 +8670,7 @@ ${userInstrStr.length ? "" : "\n"}` : "";
 ${nicknameStr.length || userInstrStr.length ? "" : "\n"}` : "";
       const cwdStr = process.cwd();
       const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
-      const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (USER PREFERENCES) ---
+      const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES ---
 ${userMemories}
 
 ` : "";
@@ -8686,7 +8687,7 @@ ${userMemories}
         }
       })();
       const projectContextFiles = [
-        { name: "Fluxflow.md", desc: "HIGH PRIORITY. Overrides other files" },
+        { name: "Fluxflow.md", desc: "HIGH PRIORITY" },
         { name: "README.md", desc: "Goals" },
         { name: "Agent.md", desc: "Standards" },
         { name: "Skills.md", desc: "Workflows" },
@@ -8706,9 +8707,9 @@ Check these first; These Files > Training Data. Safety rules apply
 Identity: Flux Flow. Sassy, CLI Agent
 ${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
 
-- USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION
-- USE RELATIVE TIME REFERENCE eg. few mins ago
+- USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION${isMemoryEnabled ? "\n- USE RELATIVE TIME REFERENCE eg. few mins ago" : ""}
 - NO HALLUCINATIONS
+- Chat Context > Metadata
 
 -- THINKING GUIDANCE --
 ${aiProvider === "Mistral" || aiProvider === "Google" && !isGemini ? `${thinkingConfig}
@@ -8726,6 +8727,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 
 -- CHAT FORMATTING --
 - GFM Markdown
+- Language: ENGLISH ONLY
 - NEVER MIX CHAT & TOOLS IN SAME RESPONSE${mode === "Flux" ? "" : "\n- Use Kaomojis HEAVILY"}
 === END SYSTEM PROMPT ===
 
@@ -13875,7 +13877,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path26, { normalize } from "path";
 import fs27 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, bypassBacktick2, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     await init_prompts();
@@ -13898,6 +13900,7 @@ var init_ai = __esm({
     init_indentation();
     init_box();
     await init_main_tools();
+    init_text();
     dotenv.config({ quiet: true });
     RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
     RE_STUTTER_CODE_BLOCK_OPEN = /```[\s\S]*$/g;
@@ -13920,7 +13923,6 @@ var init_ai = __esm({
     RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
     RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
     RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
-    bypassBacktick2 = true;
     client = null;
     globalSettings = {};
     systemInstructionCache = { key: null, value: null };
@@ -15177,7 +15179,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
     };
     getActiveToolContext = (text) => {
       const cleanText = text.replace(RE_STRIP_THINK_CLOSED, "").replace(RE_STRIP_THINK_OPEN, "");
-      const scanText = bypassBacktick2 ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
+      const scanText = bypassBacktick ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
       RE_TOOL_CALL_FUNC.lastIndex = 0;
       let match;
       while ((match = RE_TOOL_CALL_FUNC.exec(scanText)) !== null) {
@@ -15410,7 +15412,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
       RE_STRIP_THINK_FULL.lastIndex = 0;
       const cleanText = translatedText.replace(RE_STRIP_THINK_FULL, "");
       const results = [];
-      const scanText = bypassBacktick2 ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
+      const scanText = bypassBacktick ? cleanText : cleanText.replace(RE_BACKTICK_SPAN, (m) => " ".repeat(m.length)).replace(RE_BACKTICK_OPEN, (m) => " ".repeat(m.length));
       const toolRegex = RE_TOOL_CALL_ANY;
       toolRegex.lastIndex = 0;
       let match;
@@ -15818,7 +15820,7 @@ Provide a consolidated summary of the entire session.`;
       }
     };
     getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow2) {
-      const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = "Google", apiTier } = settings;
+      const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = "Google", apiTier, wildcardTooling } = settings;
       const isMultiModal = isModelMultimodal(modelName);
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
       const isMemoryEnabled = systemSettings?.memory !== false;
@@ -16424,18 +16426,25 @@ ${ideCtx.warnings}
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]
+        const wildcardToolingPrompt = wildcardTooling ? "You cannot execute tools\nInstead, MUST output the exact string you WOULD have produced in Agentic Progression\n" : "";
+        const firstUserMsg = `[SYSTEM METADATA]
 Time: ${dateTimeStr}
 OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `
 WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
-${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ""}[SYSTEM] ONLY VALID TOOL SCHEMA REMINDER: '[tool:functions.ToolName(arg1="value1")]' NEW LINE [/SYSTEM]
-${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+${activeSummaryBlock}${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ""}[SYSTEM] EXACT STRING SYNTAX '[tool:functions.ToolName(arg="value")]' IN CHAT [/SYSTEM]
+${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
         const userMsgObj = { role: "user", text: firstUserMsg };
         if (attachedBinaryPart) {
           userMsgObj.binaryPart = attachedBinaryPart;
         }
+        modifiedHistory.forEach((msg) => {
+          if (msg.text && msg.role === "agent") {
+            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "");
+            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, "").trim();
+          }
+        });
         modifiedHistory.push(userMsgObj);
         if (activeSummaryBlock && history[history.length - 1]?.id) {
           yield { type: "summary_injected", content: { id: history[history.length - 1].id, text: firstUserMsg } };
@@ -16447,12 +16456,6 @@ ${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.t
         TERMINATION_SIGNAL = false;
         let fullAgentResponseChunks = [];
         let wasToolCalledInLastLoop = false;
-        modifiedHistory.forEach((msg) => {
-          if (msg.text && msg.role === "agent") {
-            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, "");
-            msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, "").trim();
-          }
-        });
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
           const currentTurnTools = [];
           wasToolCalledInLastLoop = false;
@@ -16498,7 +16501,7 @@ ${combinedNudge}`;
 [SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
 [QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ""}[QUESTION] ${hint.replace("/btw", "").trim()} [/QUESTION]` });
                 }
               } else {
                 if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === "user") {
@@ -16506,7 +16509,7 @@ ${combinedNudge}`;
 
 [STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
                 } else {
-                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                  modifiedHistory.push({ role: "user", text: `${thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh" && aiProvider === "Google") ? `${aiProvider === "Mistral" || modelName.toLowerCase().startsWith("gemma") ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ""}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
                 }
               }
               yield { type: "status", content: `${hint.startsWith("/btw") ? "Question Forwarded..." : "Steering Hint Injected..."}` };
@@ -16552,6 +16555,9 @@ ${combinedNudge}`;
               }
               const stripToolCallWrappers = (text) => {
                 if (!text || !text.includes("[tool:")) return text;
+                const THINK_OPEN_PH = "___THINK_OPEN_TAG___";
+                const THINK_CLOSE_PH = "___THINK_CLOSE_TAG___";
+                text = text.replaceAll("<think>", THINK_OPEN_PH).replaceAll("</think>", THINK_CLOSE_PH);
                 text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match2, tagName, innerContent) => {
                   if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
                   return match2;
@@ -16561,12 +16567,16 @@ ${combinedNudge}`;
                   return match2;
                 });
                 text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                text = text.replaceAll(THINK_OPEN_PH, "<think>").replaceAll(THINK_CLOSE_PH, "</think>");
                 return text;
               };
               const contents = modifiedHistory.filter((msg) => (msg.role === "user" || msg.role === "agent" || msg.role === "system") && !String(msg.id).startsWith("welcome") && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith("[TERMINAL_RECORD]"))).map((msg, idx, arr) => {
                 let text = msg.text || "";
-                text = stripToolCallWrappers(text);
+                if (!isMemoryEnabled) {
+                  text = text.replace(/\s*\n*\s*\[Prompted on:.*?\]/gi, "");
+                }
                 if (msg.role === "agent") {
+                  text = stripToolCallWrappers(text);
                   text = text.replace(/\[turn:\s*finish\]/gi, "").replace(/\[\[END\]\]/gi, "").trim();
                   text = text.replaceAll("\x1B[33m\u24D8 Request Cancelled\x1B[0m", "*User Cancelled Response Generation*");
                 }
@@ -16662,7 +16672,7 @@ ${ideErr} [/ERROR]`;
               const isGemmaOrMistral = aiProvider === "Mistral" || aiProvider === "Google" && modelName?.toLowerCase().startsWith("gemma");
               if (isGemmaOrMistral) {
                 const needsThinkingWarning = thinkingLevel !== "Fast" && (aiProvider === "Mistral" || thinkingLevel !== "xHigh");
-                const thinkingText = needsThinkingWarning ? ". **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**" : "";
+                const thinkingText = needsThinkingWarning ? ". **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think>...</think>**" : "";
                 const jitInstruction = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingText} [/SYSTEM]`;
                 if (lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
@@ -16702,6 +16712,7 @@ ${ideErr} [/ERROR]`;
                 lastUserMsg.parts[0].text += `
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
               }
+              fs27.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));
@@ -18503,8 +18514,8 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
 
 [SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]
 `, "").replaceAll(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY
-**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
-`, "").replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]
+**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]
+`, "").replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]
 `, "").replaceAll(
                   /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
                   ""
@@ -18515,7 +18526,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
                   const jitInstructionFast = `
 [SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
                   const jitInstructionThinking = `
-[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
+[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]`;
                   msg.text = msg.text.replaceAll(jitInstructionThinking, "").replaceAll(jitInstructionFast, "").trim();
                 }
               }
@@ -18665,7 +18676,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
       const targetModel = model || subAgentCustomModel || settings?.modelName || settings?.activeModel || savedSettings.activeModel;
       const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
       const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** \u2190 MANDATORY
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' SYNTAX STRING IN CHAT \u2190 MANDATORY
 TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
@@ -18686,7 +18697,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent: select string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
@@ -20364,6 +20375,7 @@ function App({ args = [] }) {
   const [latestVer, setLatestVer] = useState15(null);
   const [showFullThinking, setShowFullThinking] = useState15(false);
   const [activeModel, setActiveModel] = useState15(getDefaultModel("Google", "Free") || "gemma-4-31b-it");
+  const [wildcardTooling, setWildcardTooling] = useState15(false);
   const [janitorModel, setJanitorModel] = useState15(getFallbackValue("gemma_janitor_fallback_google") || "gemma-4-26b-a4b-it");
   const [isInitializing, setIsInitializing] = useState15(true);
   const [isAppFocused, setIsAppFocused] = useState15(true);
@@ -20492,6 +20504,15 @@ function App({ args = [] }) {
   const prevProviderRef = useRef4(aiProvider);
   const originalAllowExternalAccessRef = useRef4(false);
   const originalMemoryRef = useRef4(true);
+  useEffect12(() => {
+    if (wildcardTooling) {
+      setWildcardTooling(false);
+      setMessages((m) => {
+        setCompletedIndex(m.length + 1);
+        return [...m, { id: Date.now(), role: "system", text: `[SYSTEM] Wildcard tooling disabled`, isMeta: true }];
+      });
+    }
+  }, [activeModel]);
   useEffect12(() => {
     if (prevProviderRef.current !== aiProvider) {
       prevProviderRef.current = aiProvider;
@@ -21534,6 +21555,10 @@ function App({ args = [] }) {
       subs: getModels(aiProvider, apiTier)
     },
     {
+      cmd: "/wildcard-tooling",
+      desc: "Use if the model lacks Tooling Capability"
+    },
+    {
       cmd: "/provider",
       desc: "Select AI Provider"
     },
@@ -22061,6 +22086,17 @@ ${cleanText}`, color: "magenta" }];
           }
           break;
         }
+        case "/wildcard-tooling": {
+          setWildcardTooling((prev) => {
+            const next = !prev;
+            setMessages((m) => {
+              setCompletedIndex(m.length + 1);
+              return [...m, { id: Date.now(), role: "system", text: `[SYSTEM] Wildcard tooling ${next ? "enabled" : "disabled"}`, isMeta: true }];
+            });
+            return next;
+          });
+          break;
+        }
         case "/settings": {
           setActiveView("settings");
           break;
@@ -22577,6 +22613,7 @@ ${timestamp}` };
               aiProvider,
               apiKey,
               apiTier,
+              wildcardTooling,
               cols: terminalSize.columns - 6,
               rows: 30,
               onTokenChunk: (chunkText, wordCount) => {
@@ -25082,6 +25119,7 @@ Usage: fluxflow --export error`);
   /mode <flux|flow>                        Toggle Flux/Flow modes
   /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
   /model <model_name>                      Switch Model for Agent
+  /wildcard-tooling                        Use if the model lacks Tooling Capability
   /provider                                Select AI Provider
   /settings                                Configure system preferences
   /theme                                   Customize UI color theme

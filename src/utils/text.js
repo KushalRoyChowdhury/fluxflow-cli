@@ -1074,7 +1074,7 @@ const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 
 // Set to true for models that wrap tool calls in backticks so the backtick-skip logic is bypassed.
-export let bypassBacktick = true;
+export let bypassBacktick = false;
 
 export const cleanSignals = (text, isThinkRole = false) => {
     if (!text) return text;

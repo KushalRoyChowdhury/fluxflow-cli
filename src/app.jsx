@@ -1028,6 +1028,7 @@ export default function App({ args = [] }) {
     const [latestVer, setLatestVer] = useState(null);
     const [showFullThinking, setShowFullThinking] = useState(false);
     const [activeModel, setActiveModel] = useState(getDefaultModel('Google', 'Free') || 'gemma-4-31b-it');
+    const [wildcardTooling, setWildcardTooling] = useState(false);
     const [janitorModel, setJanitorModel] = useState(getFallbackValue('gemma_janitor_fallback_google') || 'gemma-4-26b-a4b-it');
     const [isInitializing, setIsInitializing] = useState(true);
     const [isAppFocused, setIsAppFocused] = useState(true);
@@ -1162,6 +1163,13 @@ export default function App({ args = [] }) {
     const prevProviderRef = useRef(aiProvider);
     const originalAllowExternalAccessRef = useRef(false);
     const originalMemoryRef = useRef(true);
+
+    useEffect(() => {
+        if (wildcardTooling) {
+            setWildcardTooling(false);
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `[SYSTEM] Wildcard tooling disabled`, isMeta: true }]; });
+        }
+    }, [activeModel]);
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
     useEffect(() => {
@@ -2378,6 +2386,10 @@ export default function App({ args = [] }) {
             subs: getModels(aiProvider, apiTier)
         },
         {
+            cmd: '/wildcard-tooling',
+            desc: 'Use if the model lacks Tooling Capability'
+        },
+        {
             cmd: '/provider',
             desc: 'Select AI Provider'
         },
@@ -2932,6 +2944,14 @@ export default function App({ args = [] }) {
                     }
                     break;
                 }
+                case '/wildcard-tooling': {
+                    setWildcardTooling(prev => {
+                        const next = !prev;
+                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `[SYSTEM] Wildcard tooling ${next ? 'enabled' : 'disabled'}`, isMeta: true }]; });
+                        return next;
+                    });
+                    break;
+                }
                 case '/settings': {
                     setActiveView('settings');
                     break;
@@ -3453,6 +3473,7 @@ export default function App({ args = [] }) {
                             aiProvider,
                             apiKey,
                             apiTier,
+                            wildcardTooling,
                             cols: terminalSize.columns - 6,
                             rows: 30,
                             onTokenChunk: (chunkText, wordCount) => {

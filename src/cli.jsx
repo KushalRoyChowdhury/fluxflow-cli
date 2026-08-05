@@ -134,6 +134,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /mode <flux|flow>                        Toggle Flux/Flow modes
   /thinking <Fast|Low|Medium|High|xHigh>   Set AI reasoning depth
   /model <model_name>                      Switch Model for Agent
+  /wildcard-tooling                        Use if the model lacks Tooling Capability
   /provider                                Select AI Provider
   /settings                                Configure system preferences
   /theme                                   Customize UI color theme

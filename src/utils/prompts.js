@@ -76,9 +76,9 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
 
         if (thinkingLevel === 'Fast') {
-            thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nRULES:\nVerify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nRULES:\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
         }
     }
 
@@ -86,13 +86,13 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
-    const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Instructions: ${profile.instructions}\n\n` : '';
+    const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Preferences: ${profile.instructions}\n\n` : '';
     const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}\n${userInstrStr.length ? '' : '\n'}` : '';
     const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}\n${(nicknameStr.length || userInstrStr.length) ? '' : '\n'}` : '';
     const cwdStr = process.cwd();
 
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
-    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES (USER PREFERENCES) ---\n${userMemories}\n\n` : '';
+    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES ---\n${userMemories}\n\n` : '';
 
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();
@@ -109,7 +109,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // Check for existing project context files
     const projectContextFiles = [
-        { name: 'Fluxflow.md', desc: 'HIGH PRIORITY. Overrides other files' },
+        { name: 'Fluxflow.md', desc: 'HIGH PRIORITY' },
         { name: 'README.md', desc: 'Goals' },
         { name: 'Agent.md', desc: 'Standards' },
         { name: 'Skills.md', desc: 'Workflows' },
@@ -134,9 +134,9 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
 Identity: Flux Flow. Sassy, CLI Agent
 ${mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Conversational, Sassy, Friendly, Humorous, Sarcastic`}
 
-- USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION
-- USE RELATIVE TIME REFERENCE eg. few mins ago
+- USE DIRECTORY STRUCTURE FOR FILE AVAILABILITY AND PATH RESOLUTION${isMemoryEnabled ? '\n- USE RELATIVE TIME REFERENCE eg. few mins ago' : ''}
 - NO HALLUCINATIONS
+- Chat Context > Metadata
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
@@ -150,6 +150,7 @@ ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 
 -- CHAT FORMATTING --
 - GFM Markdown
+- Language: ENGLISH ONLY
 - NEVER MIX CHAT & TOOLS IN SAME RESPONSE${mode === 'Flux' ? '' : '\n- Use Kaomojis HEAVILY'}
 === END SYSTEM PROMPT ===
 

@@ -36,7 +36,7 @@ const DEFAULT_SETTINGS = {
         useExternalData: false,
         externalDataPath: '',
         preserveThinking: true,
-        loadingPhrases: true,
+        loadingPhrases: false,
         progressiveRendering: true,
         showTPMEstimate: false,
         subAgents: true,

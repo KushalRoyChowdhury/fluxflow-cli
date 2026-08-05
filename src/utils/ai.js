@@ -26,6 +26,7 @@ import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, 
 import { getDirTreeIndentation } from './getDirTree/indentation.js';
 import { getDirTreeBox } from './getDirTree/box.js';
 import { isPsAvailable } from '../data/main_tools.js';
+import { bypassBacktick } from './text.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -52,10 +53,6 @@ const RE_KIMI_TOOL_CALL      = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functio
 const RE_KIMI_JSON_PAIR      = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
 const RE_KIMI_SECTION_BEGIN  = /<\|\s*tool_calls_section_begin\s*\|>/gi;
 const RE_KIMI_SECTION_END    = /<\|\s*tool_calls_section_end\s*\|>/gi;
-
-// Set to true for models that wrap tool calls in backticks (e.g. `[tool:functions.Foo(...)]`)
-// so the backtick-skip logic is bypassed and they are still executed.
-let bypassBacktick = true;
 
 let client = null;
 
@@ -753,7 +750,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                // console.log(lines); // [DEBUGGING POINT]
+                // fs.appendFileSync("NVIDIA_STREAM_DEBUG.txt", `${decoder.decode(value)}\n\n`); // [DEBUGGING POINT]
                 buffer = lines.pop();
 
                 for (const line of lines) {
@@ -2323,7 +2320,7 @@ export const deleteChatSummary = (chatId) => {
  * Executes a streaming request using the new SDK
  */
 export const getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow) {
-    const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier } = settings;
+    const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = 'Google', apiTier, wildcardTooling } = settings;
     const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
@@ -2916,12 +2913,25 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const firstUserMsg = `[SYSTEM METADATA, Chat Context > Metadata]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[SYSTEM] ONLY VALID TOOL SCHEMA REMINDER: '[tool:functions.ToolName(arg1="value1")]' NEW LINE [/SYSTEM]\n${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, MUST output the exact string you WOULD have produced in Agentic Progression\n' : '';
+        const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRING SYNTAX '[tool:functions.ToolName(arg="value")]' IN CHAT [/SYSTEM]\n${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
             userMsgObj.binaryPart = attachedBinaryPart;
         }
+
+        // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
+        // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
+        // and ensures steering hints don't carry reasoning glitches.
+        // Only Agent Msgs should be stripped.
+        modifiedHistory.forEach(msg => {
+            if (msg.text && msg.role === 'agent') {
+                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '');
+                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, '').trim();
+            }
+        });
+
         modifiedHistory.push(userMsgObj);
 
         if (activeSummaryBlock && history[history.length - 1]?.id) {
@@ -2937,17 +2947,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         let fullAgentResponseChunks = [];
         let wasToolCalledInLastLoop = false;
-
-        // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
-        // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
-        // and ensures steering hints don't carry reasoning glitches.
-        // Only Agent Msgs should be stripped.
-        modifiedHistory.forEach(msg => {
-            if (msg.text && msg.role === 'agent') {
-                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '');
-                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, '').trim();
-            }
-        });
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
@@ -2992,14 +2991,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                             modifiedHistory[modifiedHistory.length - 1].text += `\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]`;
                         } else {
-                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
                         }
                     } else {
                         // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                             modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT] ${hint.trim()} [/STEERING HINT]`;
                         } else {
-                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
+                            modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT] ${hint.trim()} [/STEERING HINT]` });
                         }
                     }
                     yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
@@ -3056,6 +3055,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // so the model only sees the raw tool call on the next turn.
                     const stripToolCallWrappers = (text) => {
                         if (!text || !text.includes('[tool:')) return text;
+                        // Deterministically protect <think> and </think> tags so they are never stripped
+                        const THINK_OPEN_PH = '___THINK_OPEN_TAG___';
+                        const THINK_CLOSE_PH = '___THINK_CLOSE_TAG___';
+                        text = text.replaceAll('<think>', THINK_OPEN_PH).replaceAll('</think>', THINK_CLOSE_PH);
+
                         // Strip XML-style wrappers: <tag>...[tool:...]...</tag>
                         text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
                             if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
@@ -3068,14 +3072,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         });
                         // If the response contains a tool call, also strip any other XML tags in the same response
                         text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+
+                        // Restore <think> and </think> tags
+                        text = text.replaceAll(THINK_OPEN_PH, '<think>').replaceAll(THINK_CLOSE_PH, '</think>');
                         return text;
                     };
                     const contents = modifiedHistory
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
                             let text = msg.text || '';
-                            text = stripToolCallWrappers(text);  // <-- Strip wrappers before any other processing
+                            if (!isMemoryEnabled) {
+                                text = text.replace(/\s*\n*\s*\[Prompted on:.*?\]/gi, '').trim();
+                            }
                             if (msg.role === 'agent') {
+                                text = stripToolCallWrappers(text);
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                                 text = text.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
                             }
@@ -3205,7 +3215,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const isGemmaOrMistral = aiProvider === 'Mistral' || (aiProvider === 'Google' && modelName?.toLowerCase().startsWith('gemma'));
                     if (isGemmaOrMistral) {
                         const needsThinkingWarning = thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || thinkingLevel !== 'xHigh');
-                        const thinkingText = needsThinkingWarning ? '. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>**' : '';
+                        const thinkingText = needsThinkingWarning ? '. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think>...</think>**' : '';
                         const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingText} [/SYSTEM]`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
@@ -3251,7 +3261,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
                     }
 
-                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
                     // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
@@ -5266,8 +5276,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         // Clean up JIT question injection markers
                         msg.text = msg.text
                             .replaceAll(`\n\n[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY [/SYSTEM]\n`, '')
-                            .replaceAll(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
-                            .replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]\n`, '')
+                            .replaceAll(`[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n`, '')
+                            .replaceAll(`[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n`, '')
                             .replaceAll(
                                 /\n\[SYSTEM\] WARNING, Turn Limit Impending: Step \d+\/\d+\. Wrap up quickly\/prompt user to continue & use \[\[END\]\] quickly\. \[\/SYSTEM\]/g,
                                 ''
@@ -5279,7 +5289,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const isGemmaOrMistral = aiProvider === 'Mistral' || (aiProvider === 'Google' && modelName?.toLowerCase().startsWith('gemma'));
                         if (isGemmaOrMistral && msg.text.startsWith('[TOOL RESULT]')) {
                             const jitInstructionFast = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
-                            const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think> ... </think>** [/SYSTEM]`;
+                            const jitInstructionThinking = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn. **STRICTLY MAINTAIN THINKING POLICY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]`;
                             msg.text = msg.text.replaceAll(jitInstructionThinking, '').replaceAll(jitInstructionFast, '').trim();
                         }
                     }
@@ -5445,7 +5455,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-FOR TOOL CALLING ONLY USE '[tool:functions.ToolName(arg1="value1")]' SYNTAX IN NEW LINE **NO OTHER SYNTAX ALLOWED** ← MANDATORY
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' SYNTAX STRING IN CHAT ← MANDATORY
 TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
@@ -5466,7 +5476,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" to target line ranges. Multi-blocks supported. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent: select string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
