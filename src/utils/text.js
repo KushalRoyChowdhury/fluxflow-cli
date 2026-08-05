@@ -118,7 +118,7 @@ export const parsePatchPairs = (args) => {
     const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === 'true';
 
     Object.keys(args).forEach(key => {
-        const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+        const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
         if (m) {
             const index = m[2] ? parseInt(m[2]) : 1;
             indices.add(index);
@@ -129,10 +129,10 @@ export const parsePatchPairs = (args) => {
     for (const i of sortedIndices) {
         let r, n;
         if (i === 1) {
-            r = args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
+            r = args.searchContent1 ?? args.searchContent ?? args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
             n = args.newContent1 ?? (args.content_to_add ?? args.newContent);
         } else {
-            r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
+            r = args[`searchContent${i}`] ?? args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
             n = args[`newContent${i}`] ?? args[`content_to_add${i}`];
         }
 

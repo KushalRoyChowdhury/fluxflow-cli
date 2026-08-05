@@ -24,6 +24,7 @@ import { awaitTool } from '../tools/await.js';
 import { emergency_rollback } from '../tools/emergency_rollback.js';
 import { awaitSubagent } from '../tools/awaitSubagent.js';
 import { answerSubagent } from '../tools/answerSubagent.js';
+import { steerSubagent } from '../tools/steerSubagent.js';
 
 
 const TOOL_MAP = {
@@ -50,10 +51,14 @@ const TOOL_MAP = {
     cancel,
     awaitSubagent,
     answerSubagent,
+    steerSubagent,
     invoke_sync: invokeSync,
     get_progress: getProgress,
     await_subagent: awaitSubagent,
     answer_subagent: answerSubagent,
+    steer_subagent: steerSubagent,
+    steer: steerSubagent,
+    Steer: steerSubagent,
     ask: ask_user,
 
     // PascalCase Normalizations for Token Efficiency

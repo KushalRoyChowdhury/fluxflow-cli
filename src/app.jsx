@@ -5805,7 +5805,7 @@ export default function App({ args = [] }) {
                                     const patchPairs = [];
                                     const indices = new Set();
                                     Object.keys(args).forEach(key => {
-                                        const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
+                                        const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
                                         if (m) {
                                             const index = m[2] ? parseInt(m[2]) : 1;
                                             indices.add(index);
@@ -5816,10 +5816,10 @@ export default function App({ args = [] }) {
                                     sortedIndices.forEach(i => {
                                         let r, n;
                                         if (i === 1) {
-                                            r = args.replaceContent1 ?? args.content_to_replace1 ?? args.replaceContent ?? args.content_to_replace ?? args.TargetContent ?? null;
+                                            r = args.searchContent1 ?? args.searchContent ?? args.replaceContent1 ?? args.content_to_replace1 ?? args.replaceContent ?? args.content_to_replace ?? args.TargetContent ?? null;
                                             n = args.newContent1 ?? args.content_to_add1 ?? args.newContent ?? args.content_to_add ?? args.ReplacementContent ?? args.replacementContent ?? null;
                                         } else {
-                                            r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`] ?? null;
+                                            r = args[`searchContent${i}`] ?? args[`replaceContent${i}`] ?? args[`content_to_replace${i}`] ?? null;
                                             n = args[`newContent${i}`] ?? args[`content_to_add${i}`] ?? null;
                                         }
                                         if (r !== null || n !== null) {

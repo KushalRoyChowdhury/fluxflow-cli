@@ -63,7 +63,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -1257,7 +1257,9 @@ const TOOL_LABELS = {
     'await': 'Waiting',
     'EmergencyRollback': 'Don\'t Panic. Lookin\' into it',
     'answer': 'Answering Sub-Agent',
-    'Answer': 'Answering Sub-Agent'
+    'Answer': 'Answering Sub-Agent',
+    'steer': 'Steering Sub-Agent',
+    'Steer': 'Steering Sub-Agent'
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -1267,7 +1269,7 @@ const getToolDetail = (toolName, argsStr) => {
         if (normToolName === 'invokesync' || normToolName === 'invoke') {
             return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
         }
-        if (normToolName === 'getprogress' || normToolName === 'cancel') {
+        if (normToolName === 'getprogress' || normToolName === 'cancel' || normToolName === 'steer' || normToolName === 'steersubagent') {
             return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
@@ -3833,7 +3835,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
@@ -3930,7 +3932,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'await': 'Waiting',
                                             'EmergencyRollback': 'Rolling the Ball',
                                             'Answer': 'Answering Sub-Agent',
-                                            'answer': 'Answering Sub-Agent'
+                                            'answer': 'Answering Sub-Agent',
+                                            'Steer': 'Steering Sub-Agent',
+                                            'steer': 'Steering Sub-Agent'
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -4098,7 +4102,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -4186,6 +4190,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 } else if (normToolName === 'cancel') {
                                     const detail = getToolDetail(normToolName, toolCall.args);
                                     label = `🛇  Cancelled${detail ? `: ${detail}` : ''}`;
+                                } else if (normToolName === 'steer' || normToolName === 'Steer') {
+                                    const detail = getToolDetail(normToolName, toolCall.args);
+                                    label = `✔  Steered${detail ? `: ${detail}` : ''}`;
                                 } else if (normToolName === 'EmergencyRollback') {
                                     const { method } = parseArgs(toolCall.args);
                                     // forceRevert feedback is shown post-execution (see below), getCheckpoint is immediate
@@ -5611,7 +5618,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent: select string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
@@ -5877,7 +5884,21 @@ Current Time: ${time}
             }
         }
 
-        subagentHistory.push({ role: 'user', text: toolResultsStr.trim() });
+        let steerAppendText = '';
+        if (settings?.taskId && typeof subagentProgress !== 'undefined') {
+            const taskObj = subagentProgress.find(t => t.id === settings.taskId);
+            if (taskObj && taskObj.pendingSteerMessages && taskObj.pendingSteerMessages.length > 0) {
+                const steerMsgs = [...taskObj.pendingSteerMessages];
+                taskObj.pendingSteerMessages = [];
+                for (const steerMsg of steerMsgs) {
+                    steerAppendText += `\n\n[STEERING INSTRUCTION FROM MAIN AGENT]: ${steerMsg}`;
+                    if (logCallback) logCallback(`[Subagent Steered] ${steerMsg}`);
+                }
+            }
+        }
+
+        const combinedUserText = (toolResultsStr.trim() + steerAppendText).trim();
+        subagentHistory.push({ role: 'user', text: combinedUserText });
         turn++;
     }
     // fs.writeFileSync("SUBAGENT_DEBUG.txt", finalAnswer);

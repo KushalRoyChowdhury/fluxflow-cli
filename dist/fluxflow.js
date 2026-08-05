@@ -2662,7 +2662,7 @@ var init_text = __esm({
       const indices = /* @__PURE__ */ new Set();
       const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === "true";
       Object.keys(args).forEach((key) => {
-        const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+        const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
         if (m) {
           const index2 = m[2] ? parseInt(m[2]) : 1;
           indices.add(index2);
@@ -2672,10 +2672,10 @@ var init_text = __esm({
       for (const i of sortedIndices) {
         let r, n;
         if (i === 1) {
-          r = args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
+          r = args.searchContent1 ?? args.searchContent ?? args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
           n = args.newContent1 ?? (args.content_to_add ?? args.newContent);
         } else {
-          r = args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
+          r = args[`searchContent${i}`] ?? args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
           n = args[`newContent${i}`] ?? args[`content_to_add${i}`];
         }
         if (r !== void 0 && n !== void 0) {
@@ -6989,7 +6989,7 @@ ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent accepts exact string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -7007,6 +7007,7 @@ Invocations:
 - [tool:functions.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
 - [tool:functions.Await(id="...", timeout="integer seconds, default: 120")]. Event-driven wait
 - [tool:functions.GetProgress(id="...")]. Poll \`getProgress\` sparingly; NO initial poll. Work or await. Never end while subagent runs
+- [tool:functions.Steer(id="...", message="...")]. Inject additional instruction or redirection into active async subagent
 - [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ""}`.trim() : `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 - [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
@@ -11934,7 +11935,7 @@ var init_update_file = __esm({
       const { patchPairs, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(parsed);
       if (parseError) return `ERROR: ${parseError}`;
       if (patchPairs.length === 0) {
-        return "ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.";
+        return "ERROR: No valid replacement pairs found. Use searchContent1, newContent1, etc.";
       }
       const allowMultiple = parsed.allowMultiple !== void 0 ? parsed.allowMultiple === true || String(parsed.allowMultiple).toLowerCase() === "true" : parsedAllowMultiple;
       const absolutePath = path14.resolve(process.cwd(), targetPath);
@@ -13863,6 +13864,12 @@ var init_invoke = __esm({
         lastChunkTime: Date.now(),
         wps: 0,
         questions: [],
+        pendingSteerMessages: [],
+        steer: (msg) => {
+          if (msg) {
+            taskEntry.pendingSteerMessages.push(msg);
+          }
+        },
         completionPromise,
         _resolveCompletion,
         _rejectCompletion,
@@ -14649,6 +14656,45 @@ var init_answerSubagent = __esm({
   }
 });
 
+// src/tools/steerSubagent.js
+var steerSubagent;
+var init_steerSubagent = __esm({
+  "src/tools/steerSubagent.js"() {
+    init_subagent_state();
+    init_arg_parser();
+    steerSubagent = async (args, context = {}) => {
+      const parsed = parseArgs(args);
+      const id = parsed.id;
+      const message = parsed.message || parsed.instruction || parsed.text || parsed.prompt;
+      if (!id) {
+        return 'ERROR: Missing "id" argument for Steer.';
+      }
+      if (!message) {
+        return 'ERROR: Missing "message" argument for Steer.';
+      }
+      const task = subagentProgress.find((t) => t.id === id);
+      if (!task) {
+        return `ERROR: Subagent task with ID [${id}] not found.`;
+      }
+      if (task.status === "completed" || task.status === "failed" || task.status === "cancelled") {
+        return `ERROR: Cannot steer subagent task [${id}] because it has already finished with status [${task.status.toUpperCase()}].`;
+      }
+      if (typeof task.steer === "function") {
+        task.steer(message);
+      } else {
+        if (!task.pendingSteerMessages) {
+          task.pendingSteerMessages = [];
+        }
+        task.pendingSteerMessages.push(message);
+      }
+      if (context.onSubagentUpdate) {
+        context.onSubagentUpdate();
+      }
+      return `SUCCESS: Steering instruction injected into subagent task [${id}]. It will be processed on the subagent's turn.`;
+    };
+  }
+});
+
 // src/utils/tools.js
 var TOOL_MAP, dispatchTool;
 var init_tools = __esm({
@@ -14679,6 +14725,7 @@ var init_tools = __esm({
     init_emergency_rollback();
     init_awaitSubagent();
     init_answerSubagent();
+    init_steerSubagent();
     TOOL_MAP = {
       web_search,
       web_scrape,
@@ -14703,10 +14750,14 @@ var init_tools = __esm({
       cancel,
       awaitSubagent,
       answerSubagent,
+      steerSubagent,
       invoke_sync: invokeSync,
       get_progress: getProgress,
       await_subagent: awaitSubagent,
       answer_subagent: answerSubagent,
+      steer_subagent: steerSubagent,
+      steer: steerSubagent,
+      Steer: steerSubagent,
       ask: ask_user,
       // PascalCase Normalizations for Token Efficiency
       Ask: ask_user,
@@ -15069,7 +15120,7 @@ var init_ai = __esm({
     systemInstructionCache = { key: null, value: null };
     colorMainWords = (label) => {
       if (!label) return label;
-      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+      return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ""}${icon}${ansiAfter || ""} \x1B[95m${word}\x1B[0m`;
       });
     };
@@ -16098,7 +16149,9 @@ var init_ai = __esm({
       "await": "Waiting",
       "EmergencyRollback": "Don't Panic. Lookin' into it",
       "answer": "Answering Sub-Agent",
-      "Answer": "Answering Sub-Agent"
+      "Answer": "Answering Sub-Agent",
+      "steer": "Steering Sub-Agent",
+      "Steer": "Steering Sub-Agent"
     };
     getToolDetail = (toolName, argsStr) => {
       try {
@@ -16107,7 +16160,7 @@ var init_ai = __esm({
         if (normToolName === "invokesync" || normToolName === "invoke") {
           return pArgs.title || (pArgs.task ? pArgs.task.substring(0, 30) : null);
         }
-        if (normToolName === "getprogress" || normToolName === "cancel") {
+        if (normToolName === "getprogress" || normToolName === "cancel" || normToolName === "steer" || normToolName === "steersubagent") {
           return pArgs.id || pArgs.taskId;
         }
         const filePath = pArgs.path || pArgs.targetFile || pArgs.TargetFile || pArgs.directory;
@@ -18369,7 +18422,9 @@ ${ideErr} [/ERROR]`;
                       "GetProgress": "get_progress",
                       "Cancel": "cancel",
                       "Await": "await",
-                      "Answer": "answer"
+                      "Answer": "answer",
+                      "Steer": "steer",
+                      "steer": "steer"
                     };
                     const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                     const partialArgs = toolContext.args || "";
@@ -18459,7 +18514,9 @@ ${ideErr} [/ERROR]`;
                           "await": "Waiting",
                           "EmergencyRollback": "Rolling the Ball",
                           "Answer": "Answering Sub-Agent",
-                          "answer": "Answering Sub-Agent"
+                          "answer": "Answering Sub-Agent",
+                          "Steer": "Steering Sub-Agent",
+                          "steer": "Steering Sub-Agent"
                         };
                         const toolTitle = TOOL_TITLES[potentialTool] || "Working";
                         process.stdout.write(`\x1B]0;${toolTitle}...\x07`);
@@ -18603,6 +18660,10 @@ ${ideErr} [/ERROR]`;
                       "answer": "answer",
                       "AnswerSubagent": "answer",
                       "answerSubagent": "answer",
+                      "Steer": "steer",
+                      "steer": "steer",
+                      "SteerSubagent": "steer",
+                      "steerSubagent": "steer",
                       "Cancel": "cancel",
                       "cancel": "cancel",
                       "EmergencyRollback": "EmergencyRollback"
@@ -18686,6 +18747,9 @@ ${ideErr} [/ERROR]`;
                     } else if (normToolName === "cancel") {
                       const detail2 = getToolDetail(normToolName, toolCall.args);
                       label = `\u{1F6C7}  Cancelled${detail2 ? `: ${detail2}` : ""}`;
+                    } else if (normToolName === "steer" || normToolName === "Steer") {
+                      const detail2 = getToolDetail(normToolName, toolCall.args);
+                      label = `\u2714  Steered${detail2 ? `: ${detail2}` : ""}`;
                     } else if (normToolName === "EmergencyRollback") {
                       const { method } = parseArgs(toolCall.args);
                       label = method === "forceRevert" ? "" : "\u2714  Rollback Point Checked";
@@ -19949,7 +20013,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", replaceContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. replaceContent: select string OR "^LINE:start..end$" for large selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
@@ -20197,7 +20261,22 @@ ${result}
             await incrementUsage("toolFailure");
           }
         }
-        subagentHistory.push({ role: "user", text: toolResultsStr.trim() });
+        let steerAppendText = "";
+        if (settings?.taskId && typeof subagentProgress !== "undefined") {
+          const taskObj = subagentProgress.find((t) => t.id === settings.taskId);
+          if (taskObj && taskObj.pendingSteerMessages && taskObj.pendingSteerMessages.length > 0) {
+            const steerMsgs = [...taskObj.pendingSteerMessages];
+            taskObj.pendingSteerMessages = [];
+            for (const steerMsg of steerMsgs) {
+              steerAppendText += `
+
+[STEERING INSTRUCTION FROM MAIN AGENT]: ${steerMsg}`;
+              if (logCallback) logCallback(`[Subagent Steered] ${steerMsg}`);
+            }
+          }
+        }
+        const combinedUserText = (toolResultsStr.trim() + steerAppendText).trim();
+        subagentHistory.push({ role: "user", text: combinedUserText });
         turn++;
       }
       return finalAnswer;
@@ -25597,7 +25676,7 @@ Selection: ${val}`,
           const patchPairs = [];
           const indices = /* @__PURE__ */ new Set();
           Object.keys(args2).forEach((key) => {
-            const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
+            const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
             if (m) {
               const index2 = m[2] ? parseInt(m[2]) : 1;
               indices.add(index2);
@@ -25607,10 +25686,10 @@ Selection: ${val}`,
           sortedIndices.forEach((i) => {
             let r, n;
             if (i === 1) {
-              r = args2.replaceContent1 ?? args2.content_to_replace1 ?? args2.replaceContent ?? args2.content_to_replace ?? args2.TargetContent ?? null;
+              r = args2.searchContent1 ?? args2.searchContent ?? args2.replaceContent1 ?? args2.content_to_replace1 ?? args2.replaceContent ?? args2.content_to_replace ?? args2.TargetContent ?? null;
               n = args2.newContent1 ?? args2.content_to_add1 ?? args2.newContent ?? args2.content_to_add ?? args2.ReplacementContent ?? args2.replacementContent ?? null;
             } else {
-              r = args2[`replaceContent${i}`] ?? args2[`content_to_replace${i}`] ?? null;
+              r = args2[`searchContent${i}`] ?? args2[`replaceContent${i}`] ?? args2[`content_to_replace${i}`] ?? null;
               n = args2[`newContent${i}`] ?? args2[`content_to_add${i}`] ?? null;
             }
             if (r !== null || n !== null) {

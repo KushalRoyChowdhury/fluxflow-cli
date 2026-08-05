@@ -19,7 +19,7 @@ export const update_file = async (args, context = {}) => {
     if (parseError) return `ERROR: ${parseError}`;
 
     if (patchPairs.length === 0) {
-        return 'ERROR: No valid replacement pairs found. Use replaceContent1, newContent1, etc.';
+        return 'ERROR: No valid replacement pairs found. Use searchContent1, newContent1, etc.';
     }
 
     const allowMultiple = parsed.allowMultiple !== undefined

@@ -46,6 +46,12 @@ export const invoke = async (args, context = {}) => {
         lastChunkTime: Date.now(),
         wps: 0,
         questions: [],
+        pendingSteerMessages: [],
+        steer: (msg) => {
+            if (msg) {
+                taskEntry.pendingSteerMessages.push(msg);
+            }
+        },
         completionPromise,
         _resolveCompletion,
         _rejectCompletion,
