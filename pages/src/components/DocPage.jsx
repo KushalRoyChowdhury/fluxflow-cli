@@ -5,13 +5,11 @@ import { useDocContext } from './DocContext'
 const pageVariants = {
     initial: {
         opacity: 0,
-        y: 20,
-        scale: 0.98
+        y: 20
     },
     animate: {
         opacity: 1,
         y: 0,
-        scale: 1,
         transition: {
             duration: 0.4,
             ease: [0.25, 1, 0.5, 1]
@@ -20,7 +18,6 @@ const pageVariants = {
     exit: {
         opacity: 0,
         y: -20,
-        scale: 0.98,
         transition: {
             duration: 0.3,
             ease: [0.25, 1, 0.5, 1]
@@ -55,9 +52,9 @@ export default function DocPage({ headings, children }) {
             >
                 <p className="text-sm text-slate-500 dark:text-slate-500">
                     Caught a mistake or want to contribute to the documentation?
-                    <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli" className="ml-1 text-blue-600 dark:text-blue-400 font-medium hover:underline">Edit this page on GitHub</a>
+                    <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli" className="ml-1 text-blue-600 dark:text-blue-400 font-medium hover:underline select-none">Edit this page on GitHub</a>
                 </p>
-                <div className='absolute text-transparent select-none'>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div>
+                <div className='absolute text-transparent select-none '>HUGE THANKS TO GEMINI CLI. (つ╥﹏╥)つ</div>
             </motion.footer>
         </motion.div>
     )

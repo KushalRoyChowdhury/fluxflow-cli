@@ -98,7 +98,7 @@ export default function SettingsMenu({
 
     useEffect(() => {
         const checkKeys = async () => {
-            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama'];
             const keyMap = {};
             for (const p of providers) {
                 try {
@@ -112,7 +112,7 @@ export default function SettingsMenu({
     }, []);
 
     const allSubAgentItems = React.useMemo(() => {
-        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama'];
         const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
         const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
 
@@ -248,11 +248,20 @@ export default function SettingsMenu({
     // Get items for current category
     const getCategoryItems = (catId) => {
         switch (catId) {
-            case 'providers':
-                return [
+            case 'providers': {
+                const items = [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
                     { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') }
                 ];
+                if (aiProvider === 'Ollama') {
+                    items.push({
+                        label: 'Endpoint',
+                        value: 'ollamaEndpoint',
+                        status: systemSettings.ollamaEndpoint || 'Cloud'
+                    });
+                }
+                return items;
+            }
             case 'appearance':
                 return [
                     { label: 'Theme', value: 'theme', status: systemSettings.theme || 'Dark' },
@@ -507,6 +516,13 @@ export default function SettingsMenu({
         } else if (item.value === 'autoDisallow') {
             setEditingItem('autoDisallowCommands');
             setEditValue(systemSettings.autoDisallowCommands || '');
+        } else if (item.value === 'ollamaEndpoint') {
+            setSystemSettings(s => {
+                const nextEndpoint = (s.ollamaEndpoint === 'Local') ? 'Cloud' : 'Local';
+                const updated = { ...s, ollamaEndpoint: nextEndpoint };
+                saveSettings({ systemSettings: updated, apiTier, quotas });
+                return updated;
+            });
         } else if (item.value === 'apiTier') {
             setActiveView('apiTier');
         } else if (item.value === 'aiProvider') {

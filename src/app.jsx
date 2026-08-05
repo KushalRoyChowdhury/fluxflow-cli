@@ -32,7 +32,7 @@ import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
-import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue } from './data/model_config.js';
+import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setOllamaMultimodal } from './data/model_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -928,13 +928,14 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
                     else if (val === 'openrouter') mapped = 'OpenRouter';
                     else if (val === 'nvidia') mapped = 'NVIDIA';
                     else if (val === 'mistral') mapped = 'Mistral';
+                    else if (val === 'ollama') mapped = 'Ollama';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1225,15 +1226,17 @@ export default function App({ args = [] }) {
 
         setActiveModel(defaultModel);
         saveSettings({ apiTier, activeModel: defaultModel });
-        setMessages(prev => {
-            setCompletedIndex(prev.length + 1);
-            return [...prev, {
-                id: 'tier-switch-' + Date.now(),
-                role: 'system',
-                text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
-                isMeta: true
-            }];
-        });
+        if (modelDisplayName) {
+            setMessages(prev => {
+                setCompletedIndex(prev.length + 1);
+                return [...prev, {
+                    id: 'tier-switch-' + Date.now(),
+                    role: 'system',
+                    text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+                    isMeta: true
+                }];
+            });
+        }
     }, [apiTier, aiProvider, apiKey]); // Synchronize with both apiTier, aiProvider, and apiKey
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.
@@ -2237,6 +2240,10 @@ export default function App({ args = [] }) {
                 prefix: 'nvapi-',
                 minLength: 70,
             },
+            Ollama: {
+                prefix: '',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2244,10 +2251,13 @@ export default function App({ args = [] }) {
             minLength: 0,
         };
 
-        if (key.startsWith(prefix) && key.length >= minLength) {
-            await saveProviderAPIKey(aiProvider, key);
-            setApiKey(key);
-            initAI(key, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
+        const isOllamaLocalEscape = aiProvider === 'Ollama' && (key.trim() === 'LOCAL' || key.trim() === '');
+        const effectiveKey = isOllamaLocalEscape ? 'LOCAL' : key;
+
+        if (isOllamaLocalEscape || (key.startsWith(prefix) && key.length >= minLength)) {
+            await saveProviderAPIKey(aiProvider, effectiveKey);
+            setApiKey(effectiveKey);
+            initAI(effectiveKey, { aiProvider, onIDEApproval: resetPendingApproval }); // Initialize SDK
 
             let defaultModel = 'gemma-4-31b-it';
             if (aiProvider === 'OpenRouter') {
@@ -2256,10 +2266,19 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
             } else if (aiProvider === 'NVIDIA') {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
+            } else if (aiProvider === 'Ollama') {
+                defaultModel = activeModel || '';
             }
             setActiveModel(defaultModel);
 
-            setMessages(prev => [...prev, { role: 'system', text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
+            let newSys = { ...systemSettings };
+            if (isOllamaLocalEscape) {
+                newSys = { ...newSys, ollamaEndpoint: 'Local' };
+                setSystemSettings(newSys);
+            }
+            saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
+
+            setMessages(prev => [...prev, { role: 'system', text: `${aiProvider} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n[SYSTEM] Ollama Endpoint automatically switched to Local.' : ''} Initialization complete.`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2337,9 +2356,9 @@ export default function App({ args = [] }) {
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         {
-            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'DeepSeek'
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'Ollama' || aiProvider === 'DeepSeek'
                 ? [
-                    { cmd: 'Fast', desc: 'Fastest' },
+                    { cmd: 'Fast', desc: 'Reasoning Disabled' },
                     { cmd: 'Standard', desc: 'Standard Reasoning' },
                     { cmd: 'High', desc: 'Extended Reasoning' }
                 ]
@@ -2383,7 +2402,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: getModels(aiProvider, apiTier)
+            subs: aiProvider === 'Ollama' ? [] : getModels(aiProvider, apiTier)
         },
         {
             cmd: '/wildcard-tooling',
@@ -2920,24 +2939,59 @@ export default function App({ args = [] }) {
                 }
                 case '/model': {
                     if (parts[1]) {
-                        const mod = parts.slice(1).join(' ');
-                        const freeDefault = getDefaultModel('Google', 'Free');
-                        const paidDefault = getDefaultModel('Google', 'Paid');
-                        if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google') {
+                        const rawArgs = parts.slice(1);
+                        let isMultimodalFlag = false;
+                        let invalidFlagError = false;
+
+                        const filteredParts = [];
+                        for (const arg of rawArgs) {
+                            if (arg === '--multimodal' || arg === '-m') {
+                                if (aiProvider === 'Ollama') {
+                                    isMultimodalFlag = true;
+                                } else {
+                                    invalidFlagError = true;
+                                }
+                            } else {
+                                filteredParts.push(arg);
+                            }
+                        }
+
+                        const mod = filteredParts.join(' ');
+
+                        if (aiProvider === 'Ollama') {
+                            setOllamaMultimodal(isMultimodalFlag);
+                        }
+
+                        if (invalidFlagError) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
+                                    text: `[ERROR] Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.`,
                                     isMeta: true
                                 }];
                             });
-                            setActiveModel(paidDefault);
-                        } else {
-                            setActiveModel(mod);
-                            const s = emojiSpace(2);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Model switched to ${mod}`, isMeta: true }]; });
+                        }
+
+                        if (mod) {
+                            const freeDefault = getDefaultModel('Google', 'Free');
+                            const paidDefault = getDefaultModel('Google', 'Paid');
+                            if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google') {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, {
+                                        id: Date.now(),
+                                        role: 'system',
+                                        text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
+                                        isMeta: true
+                                    }];
+                                });
+                                setActiveModel(paidDefault);
+                            } else {
+                                setActiveModel(mod);
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Model switched to ${mod}${aiProvider === 'Ollama' ? ` (Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'})` : ''}`, isMeta: true }]; });
+                            }
                         }
                     } else {
                         setActiveView('model');
@@ -4521,6 +4575,7 @@ export default function App({ args = [] }) {
                             { label: 'Google (Free/Paid)', value: 'Google' },
                             { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
                             { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                            { label: 'Ollama (Cloud/Local)', value: 'Ollama' },
                             { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                             { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
                             { label: 'Back', value: providerReturnView }
@@ -4543,7 +4598,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if (selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -4553,7 +4608,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`,
+                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. ${defaultModel ? `Model set to ${defaultModel}` : ''}.${selectedProvider === 'Ollama' ? '\n[SYSTEM] Memory is not available with Ollama Provider' : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`,
                                         isMeta: true
                                     }
                                 ]);
@@ -4725,7 +4780,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -4815,7 +4870,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -4979,17 +5034,15 @@ export default function App({ args = [] }) {
                                                 setCompletedIndex(prev.length + 1);
                                                 return [...prev, { id: Date.now(), role: 'system', text: `[IMAGE KEY] Custom API key saved successfully.`, isMeta: true }];
                                             });
-                                        } else {
-                                            setImageSettings(prev => ({ ...prev, keyType: 'Default' }));
-                                            newSettings.imageSettings = { ...imageSettings, keyType: 'Default' };
-                                            setMessages(prev => {
-                                                setCompletedIndex(prev.length + 1);
-                                                return [...prev, { id: Date.now(), role: 'system', text: `[IMAGE KEY ERROR] API key must start with sk_. Key strategy reset to Default.`, isMeta: true }];
-                                            });
                                         }
                                     } else if (key === 'providerKey') {
-                                        const keyInput = val.trim();
+                                        let keyInput = val.trim();
                                         const prov = inputConfig.provider;
+                                        if (prov === 'Ollama' && (keyInput === 'LOCAL' || keyInput === '')) {
+                                            keyInput = 'LOCAL';
+                                            setSystemSettings(s => ({ ...s, ollamaEndpoint: 'Local' }));
+                                            newSettings.systemSettings = { ...systemSettings, ollamaEndpoint: 'Local' };
+                                        }
                                         await saveProviderAPIKey(prov, keyInput);
                                         setAiProvider(prov);
                                         setApiKey(keyInput);
@@ -5002,14 +5055,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if (prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✅ ${prov} API Key saved successfully! Model set to ${defaultModel}.${prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `${prov} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n[SYSTEM] Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' ? '\n[SYSTEM] Memory is not available with Ollama Provider' : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n[SYSTEM] Memory is not available' : ''}`, isMeta: true }];
                                         });
                                     }
 
@@ -6009,12 +6062,12 @@ export default function App({ args = [] }) {
                                 })()}
 
                                 <GlintText
-                                    text={tempModelOverride || activeModel.split('/')[1] || activeModel}
+                                    text={tempModelOverride || activeModel.split('/')[1] || activeModel.length > 1 ? activeModel : 'Use \'/model model-id\' to select model' }
                                     baseColor={colors.text}
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
                                 />
-                                <Text color={colors.textMuted}> ({thinkingLevel})</Text>
+                                <Text color={colors.textMuted}> {activeModel.length > 0 ? `(${thinkingLevel})` : ''}</Text>
                             </Box>
                         </Box>
 
@@ -6151,6 +6204,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Google (Free/Paid)', value: 'Google' },
                                                         { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
                                                         { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
+                                                        { label: 'Ollama (Cloud/Local)', value: 'Ollama' },
                                                         { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
                                                         { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
                                                     ]}
@@ -6163,7 +6217,11 @@ export default function App({ args = [] }) {
                                         </>
                                     ) : (
                                         <>
-                                            <Text color="white">Please enter your {aiProvider} API Key to initialize the agent (If billing is enabled set /settings → Others → API Strategy to use premium models. Set budget limit at /budgets.).</Text>
+                                            <Text color="white">
+                                                {aiProvider === 'Ollama'
+                                                    ? 'Enter Ollama API Key (or type LOCAL to use local host):'
+                                                    : `Enter your ${aiProvider} API Key:`}
+                                            </Text>
                                             <Box marginTop={1}>
                                                 <Text color="gray" bold> {'>'} </Text>
                                                 <TextInput
@@ -6173,15 +6231,12 @@ export default function App({ args = [] }) {
                                                     mask="*"
                                                 />
                                             </Box>
-                                            <Box marginTop={1}>
-                                                <Text color="gray" italic>(Press ESC to go back to provider selection)</Text>
-                                            </Box>
                                         </>
                                     )}
                                 </Box>
 
                                 <Box paddingX={1} marginTop={1}>
-                                    <Text color="gray" italic>{setupStep === 0 ? '(Use arrows to select and Enter to confirm)' : '(Press Enter to confirm and initialize)'}</Text>
+                                    <Text color="gray" italic>{setupStep === 0 ? '(Use arrows to select and Enter to confirm, ESC to go back)' : '(Press Enter to confirm and initialize, ESC to go back)'}</Text>
                                 </Box>
                             </Box>
                         ) : (

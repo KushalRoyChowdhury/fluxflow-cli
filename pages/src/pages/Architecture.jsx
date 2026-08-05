@@ -5,6 +5,7 @@ const headings = [
     { id: 'agentic-loop', text: 'The Agentic Loop', level: 2 },
     { id: 'dual-model-system', text: 'Dual-Model System', level: 2 },
     { id: 'subagent-system', text: 'The Subagent System', level: 2 },
+    { id: 'emergency-rollback', text: 'Emergency Rollback System', level: 2 },
     { id: 'ide-bridge', text: 'IDE Bridge (Companion)', level: 2 },
     { id: 'multimodal-pipeline', text: 'Multimodal Pipeline', level: 2 },
     { id: 'persistence-safety', text: 'Persistence & Safety', level: 2 },
@@ -60,10 +61,20 @@ export default function Architecture() {
                 run parallel operations without blocking the main workflow:
             </p>
             <ul>
-                <li><strong>Sync/Async Execution Modes</strong> — Spawns blocking subagents (<code>invokeSync</code>) or asynchronous background subagents (<code>invoke</code>) with distinct telemetry tracking.</li>
-                <li><strong>Isolated Context</strong> — Subagents operate independently, without access to the main conversation history, receiving only system prompts and their specific assignment.</li>
-                <li><strong>Permanent Tool Access</strong> — Subagents are provided a permanent set of 10 system tools (including ReadFile, FileMap, PatchFile, WebSearch), with safety restrictions blocking command execution (<code>Run</code> is disabled).</li>
-                <li><strong>Reversion Security</strong> — All files modified by background subagents are logged chronologically under the session's active transaction for secure Git-less rollbacks.</li>
+                <li><strong>Sync/Async Execution Modes</strong> — Spawns blocking subagents (<code>invokeSync</code>) or asynchronous background subagents (<code>invoke</code>) with distinct telemetry tracking. Supports up to 7 concurrent background subagents.</li>
+                <li><strong>Isolated Context & Tooling</strong> — Subagents run independently without conversation clutter. They receive a dedicated suite of 10 system tools (including <code>ReadFile</code>, <code>PatchFile</code>, <code>WriteFile</code>, <code>SearchKeyword</code>, <code>WebSearch</code>), while unsafe commands (<code>Run</code>) are strictly disabled.</li>
+                <li><strong>Event-Driven Orchestration</strong> — Main agent manages subagents via <code>Await</code>, <code>GetProgress</code>, and <code>Cancel</code> tools to monitor status or abort stalled background workers.</li>
+                <li><strong>Reversion Security</strong> — All file mutations made by subagents are tracked chronologically under the session's active transaction for total Git-less rollback safety.</li>
+            </ul>
+
+            <h2 id="emergency-rollback">Emergency Rollback System</h2>
+            <p>
+                When <strong>Advance Rollback</strong> is enabled, FluxFlow maintains an automated turn-level checkpointing mechanism that allows the agent to self-heal and revert workspace states:
+            </p>
+            <ul>
+                <li><strong>Turn Checkpointing</strong> — Before executing prompt turns, FluxFlow scans workspace manifests and takes snapshots of changed files into an encrypted local ledger sanctuary.</li>
+                <li><strong><code>EmergencyRollback</code> Tool</strong> — Exposes <code>getCheckpoint</code> (to inspect past turn states and file diffs) and <code>forceRevert</code> (to roll back workspace files to a clean turn state).</li>
+                <li><strong>Self-Healing Recovery</strong> — If a tool call causes catastrophic corruption or broken builds, the agent can inspect turn history and autonomously execute a force rollback to restore a known working state.</li>
             </ul>
 
             <h2 id="ide-bridge">IDE Bridge (Companion Extension)</h2>

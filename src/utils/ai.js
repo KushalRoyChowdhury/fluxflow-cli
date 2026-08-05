@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
+import { Ollama } from 'ollama';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
 import { checkQuota, incrementUsage, addToUsage } from './usage.js';
@@ -1107,6 +1108,123 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
     }
 };
 
+const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05, endpointType = 'Cloud') {
+    const messages = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+
+    for (const content of contents) {
+        const role = content.role === 'user' ? 'user' : 'assistant';
+        let text = '';
+        const images = [];
+
+        if (Array.isArray(content.parts)) {
+            text = content.parts.map(p => p.text || '').filter(Boolean).join('\n');
+            for (const p of content.parts) {
+                if (p.inline_data && p.inline_data.data) {
+                    images.push(p.inline_data.data);
+                }
+            }
+        } else {
+            text = content.text || '';
+        }
+
+        if (text || images.length > 0) {
+            const msgObj = { role, content: text };
+            if (images.length > 0) {
+                msgObj.images = images;
+            }
+            messages.push(msgObj);
+        }
+    }
+
+    const isLocal = endpointType === 'Local' || !apiKey || apiKey === 'LOCAL';
+    const host = isLocal
+        ? (process.env.OLLAMA_HOST || 'http://127.0.0.1:11434')
+        : (process.env.OLLAMA_HOST || 'https://ollama.com');
+
+    const ollamaOptions = { host };
+    if (!isLocal && apiKey) {
+        ollamaOptions.headers = { Authorization: 'Bearer ' + apiKey };
+    }
+
+    const ollamaClient = new Ollama(ollamaOptions);
+
+    let pendingParts = [];
+    let latestUsageMetadata = null;
+    let lastFlushTime = Date.now();
+    let hasNewData = false;
+
+    const thinkMap = {
+        'Fast': false,
+        'Low': 'medium',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
+    const thinkParam = thinkMap[thinkingLevel] !== undefined ? thinkMap[thinkingLevel] : true;
+
+    const chatParams = {
+        model: model,
+        messages: messages,
+        stream: true,
+        think: thinkParam,
+        keep_alive: '10m',
+        options: { temperature }
+    };
+
+    const responseStream = await ollamaClient.chat(chatParams);
+
+    for await (const chunk of responseStream) {
+        if (signal?.aborted) {
+            throw new DOMException('The user aborted a request.', 'AbortError');
+        }
+
+        if (chunk.message?.thinking) {
+            pendingParts.push({ text: chunk.message.thinking, thought: true });
+            hasNewData = true;
+        }
+
+        if (chunk.message?.content) {
+            pendingParts.push({ text: chunk.message.content });
+            hasNewData = true;
+        }
+
+        if (chunk.done) {
+            // Ollama prompt_eval_duration is in nanoseconds. Under ~75ms (75,000,000 ns) indicates prompt cache reuse
+            const evalNs = chunk.prompt_eval_duration || 0;
+            const isCached = evalNs > 0 && evalNs < 75000000;
+            latestUsageMetadata = {
+                totalTokenCount: (chunk.prompt_eval_count || 0) + (chunk.eval_count || 0),
+                promptTokenCount: chunk.prompt_eval_count || 0,
+                candidatesTokenCount: chunk.eval_count || 0,
+                cachedContentTokenCount: (chunk.prompt_eval_count && isCached) ? chunk.prompt_eval_count : 0,
+                thoughtsTokenCount: 0
+            };
+            hasNewData = true;
+        }
+
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+            yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+        }
+    }
+
+    if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+        yield {
+            candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+            usageMetadata: latestUsageMetadata
+        };
+    }
+};
+
 export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
@@ -1178,7 +1296,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = process.env.NVIDIA_BASE_URL ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -1981,7 +2099,9 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
 
         try {
             let stream;
-            if (aiProvider === 'OpenRouter') {
+            if (aiProvider === 'Ollama') {
+                stream = getOllamaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, systemSettings?.ollamaEndpoint || 'Cloud');
+            } else if (aiProvider === 'OpenRouter') {
                 stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'DeepSeek') {
                 stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
@@ -2324,7 +2444,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
-    const isMemoryEnabled = systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -2913,7 +3033,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
-        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, MUST output the exact string you WOULD have produced in Agentic Progression\n' : '';
+
+        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, MUST output the EXACT STRING you WOULD have produced & wait for system to respond\n' : '';
+
         const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRING SYNTAX '[tool:functions.ToolName(arg="value")]' IN CHAT [/SYSTEM]\n${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
@@ -3261,7 +3383,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         lastUserMsg.parts[0].text += `\n[SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
                     }
 
-                    fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
+                    // fs.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
                     // fs.writeFileSync(`contents.txt`, `${isCacheHit ? "CACHED" : "NOT CACHED"}\nKey: ${sysInstructionCacheKey}\n\n${currentSystemInstruction}\n\n${firstUserMsg}`);
                     // break;
 
@@ -3277,7 +3399,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     let activeContents = contents;
 
-                    if (aiProvider === 'OpenRouter') {
+                    if (aiProvider === 'Ollama') {
+                        stream = getOllamaStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0,
+                            systemSettings?.ollamaEndpoint || 'Cloud'
+                        );
+                    } else if (aiProvider === 'OpenRouter') {
                         stream = getOpenRouterStream(
                             settings.apiKey,
                             targetModel,

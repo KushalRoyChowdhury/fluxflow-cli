@@ -507,7 +507,7 @@ var init_crypto = __esm({
 import fs4 from "fs";
 import path4 from "path";
 import { fileURLToPath } from "url";
-var __filename, __dirname, packageConfigPath, pathsToCheck, userConfigPath, activeConfig, multimodalModelsSet, rebuildMultimodalSet, loadRemoteModelConfig, isModelMultimodal, getModels, getDefaultModel, getFallbackValue;
+var __filename, __dirname, packageConfigPath, pathsToCheck, userConfigPath, activeConfig, multimodalModelsSet, rebuildMultimodalSet, loadRemoteModelConfig, customOllamaMultimodal, setOllamaMultimodal, isModelMultimodal, getModels, getDefaultModel, getFallbackValue;
 var init_model_config = __esm({
   "src/data/model_config.js"() {
     init_paths();
@@ -613,9 +613,14 @@ var init_model_config = __esm({
       }
       return false;
     };
+    customOllamaMultimodal = false;
+    setOllamaMultimodal = (enabled) => {
+      customOllamaMultimodal = !!enabled;
+    };
     isModelMultimodal = (model) => {
       if (!model) return false;
       const lower = model.trim().toLowerCase();
+      if (customOllamaMultimodal) return true;
       if (multimodalModelsSet.has(lower)) return true;
       if (lower.startsWith("gemini-") || lower.startsWith("gemma-")) return true;
       return false;
@@ -675,6 +680,7 @@ var init_secrets = __esm({
         if (provider === "OpenRouter") return secrets.OPENROUTER_API_KEY || null;
         if (provider === "Mistral") return secrets.MISTRAL_API_KEY || null;
         if (provider === "NVIDIA") return secrets.NVIDIA_API_KEY || null;
+        if (provider === "Ollama") return secrets.OLLAMA_API_KEY || "LOCAL";
       } catch (e) {
       }
       return null;
@@ -691,6 +697,8 @@ var init_secrets = __esm({
         await saveSecret("MISTRAL_API_KEY", key);
       } else if (provider === "NVIDIA") {
         await saveSecret("NVIDIA_API_KEY", key);
+      } else if (provider === "Ollama") {
+        await saveSecret("OLLAMA_API_KEY", key);
       }
     };
     getSecret = async (key) => {
@@ -786,7 +794,8 @@ var init_settings = __esm({
         SubAgentModel: "Default",
         SubAgentProvider: "",
         dynamicDirAwareness: false,
-        indentationTree: true
+        indentationTree: true,
+        ollamaEndpoint: "Cloud"
       },
       profileData: {
         name: null,
@@ -2655,8 +2664,8 @@ var init_text = __esm({
       Object.keys(args).forEach((key) => {
         const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
         if (m) {
-          const index = m[2] ? parseInt(m[2]) : 1;
-          indices.add(index);
+          const index2 = m[2] ? parseInt(m[2]) : 1;
+          indices.add(index2);
         }
       });
       const sortedIndices = Array.from(indices).sort((a, b) => a - b);
@@ -3061,11 +3070,11 @@ var init_text = __esm({
     alignChangeGroup = (group) => {
       const removals = [];
       const additions = [];
-      group.forEach((item, index) => {
+      group.forEach((item, index2) => {
         if (item.parsed.isR) {
-          removals.push({ index, content: item.parsed.content });
+          removals.push({ index: index2, content: item.parsed.content });
         } else if (item.parsed.isA) {
-          additions.push({ index, content: item.parsed.content });
+          additions.push({ index: index2, content: item.parsed.content });
         }
       });
       const N = removals.length;
@@ -5505,7 +5514,7 @@ var init_terminal = __esm({
       }
       return " ".repeat(baseSpaces);
     };
-    getFluxLogo = (version = "...", provider = "Loading...", theme = "Dark") => {
+    getFluxLogo = (version2 = "...", provider = "Loading...", theme = "Dark") => {
       const quote = STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
       const colors = getThemeColors(theme);
       const textColor = colors.logoTextAnsi;
@@ -5528,7 +5537,7 @@ var init_terminal = __esm({
       return `${coloredArt[0]}
 ${coloredArt[1]}  ${textColor}Selected Provider: ${provider}${reset}
 ${coloredArt[2]}
-${coloredArt[3]}  ${textColor}FluxFlow ${grey("v" + version)}${reset}
+${coloredArt[3]}  ${textColor}FluxFlow ${grey("v" + version2)}${reset}
 ${coloredArt[4]}
 ${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
@@ -6130,7 +6139,11 @@ var init_ChatLayout = __esm({
                 width: "100%"
               },
               /* @__PURE__ */ React4.createElement(Box3, null, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", bold: true }, "\u25B6_ ", lang.toUpperCase() || "CODE")),
-              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => /* @__PURE__ */ React4.createElement(Box3, { key: idx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, String(idx + 1).padStart(gutterWidth, " "), " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(line, lang, colors.text)))))
+              /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, codeLines.map((line, idx) => {
+                const wrappedCodeLine = wrapText(line, Math.max(10, codeWidth));
+                const subLines = wrappedCodeLine.split("\n");
+                return /* @__PURE__ */ React4.createElement(Box3, { key: idx, flexDirection: "column", width: "100%" }, subLines.map((subLine, subIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: subIdx, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { width: gutterWidth + 2, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray" }, subIdx === 0 ? String(idx + 1).padStart(gutterWidth, " ") + " " : " ".repeat(gutterWidth + 1))), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(subLine, lang, colors.text)))));
+              }))
             );
           }
           let cleanPart = part;
@@ -6156,7 +6169,7 @@ var init_ChatLayout = __esm({
       }
       return `${totalSecs}s`;
     };
-    MessageItem = React4.memo(({ msg, showFullThinking, columns = 80, aiProvider, version, theme = "Dark" }) => {
+    MessageItem = React4.memo(({ msg, showFullThinking, columns = 80, aiProvider, version: version2, theme = "Dark" }) => {
       const colors = getThemeColors(theme);
       const isDiffResult = msg.role === "system" && (msg.text?.includes("[DIFF_START]") || msg.text?.includes("- Content Preview:"));
       const isPatchError = msg.role === "system" && msg.text?.includes("[TOOL RESULT]: ERROR:") && !msg.text?.includes("[DIFF_START]") && (msg.toolName === "update_file" || msg.text?.includes("Could not find exact match"));
@@ -6166,7 +6179,7 @@ var init_ChatLayout = __esm({
         return /* @__PURE__ */ React4.createElement(Box3, { marginBottom: 1, paddingX: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, dimColor: true, padding: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, msg.text)), /* @__PURE__ */ React4.createElement(Box3, { paddingX: 1, marginTop: 0, marginBottom: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text }, msg.subText))));
       }
       if (msg.isLogo) {
-        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, getFluxLogo(version, aiProvider, theme)));
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "flex-start", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Text4, null, getFluxLogo(version2, aiProvider, theme)));
       }
       if (msg.id && String(msg.id).startsWith("welcome")) {
         return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", alignItems: "center", width: "100%", marginY: 1 }, /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 3, paddingY: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, bold: true }, msg.text.trim())));
@@ -6327,7 +6340,7 @@ var init_ChatLayout = __esm({
         ).split("\n").map((line, lineIdx) => /* @__PURE__ */ React4.createElement(Box3, { key: lineIdx, flexDirection: "row", width: "100%" }, /* @__PURE__ */ React4.createElement(Box3, { flexShrink: 0, width: 2 }, /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.userMsgText }, lineIdx === 0 ? ">" : " ")), /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1, marginLeft: 1 }, /* @__PURE__ */ React4.createElement(InlineMarkdown, { text: line, color: msg.color || colors.userMsgText, theme }))))
       ), /* @__PURE__ */ React4.createElement(Box3, { width: columns - 1, height: 1, overflow: "hidden" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.userMsgBorder }, "\u2580".repeat(Math.max(1, columns - 1))))) : msg.role === "think" ? /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", marginTop: 0, marginBottom: 0, paddingX: 0, width: "100%" }, msg.isStreaming && !msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2727 Thinking...") : /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, "\u2726 Thought", msg.duration ? /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, " for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.duration))) : "s..."), /* @__PURE__ */ React4.createElement(Box3, { borderStyle: "single", borderLeft: true, borderRight: false, borderTop: false, borderBottom: false, borderColor: colors.borderMuted, paddingLeft: 2, paddingTop: 0, paddingBottom: 0, flexDirection: "column", width: "100%" }, formatThinkText(finalContent, columns))) : /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", paddingX: 1, marginTop: 0, width: "100%" }, /* @__PURE__ */ React4.createElement(CodeRenderer, { text: finalContent.replace(/ \|\n\n/g, " |\n"), columns, theme }), msg.memoryUpdated && /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.text, italic: true }, "[Memory Updated]")), msg.role === "agent" && msg.workedDuration ? /* @__PURE__ */ React4.createElement(Box3, { marginTop: 1, marginBottom: 2, width: "100%" }, /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "["), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "Worked for ", /* @__PURE__ */ React4.createElement(Text4, { bold: true, color: colors.text }, formatThinkingDuration(msg.workedDuration))), /* @__PURE__ */ React4.createElement(Text4, { color: colors.textMuted }, "]")) : null));
     });
-    BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version, theme = "Dark" }) => {
+    BlockItem = React4.memo(({ block, columns = 80, showFullThinking, aiProvider, version: version2, theme = "Dark" }) => {
       const colors = getThemeColors(theme);
       const { msg, type, text, isStreamingMsg, workedDuration } = block;
       if (type === "chunk") {
@@ -6339,7 +6352,7 @@ var init_ChatLayout = __esm({
             columns,
             showFullThinking,
             aiProvider,
-            version,
+            version: version2,
             theme
           }
         )));
@@ -6352,7 +6365,7 @@ var init_ChatLayout = __esm({
             showFullThinking,
             columns,
             aiProvider,
-            version,
+            version: version2,
             theme
           }
         );
@@ -6424,9 +6437,13 @@ var init_ChatLayout = __esm({
       }
       if (type === "code-line") {
         const { lineNum, lang } = block;
-        return /* @__PURE__ */ React4.createElement(
+        const availableCodeWidth = columns - 12;
+        const wrappedLine = wrapText(text, Math.max(10, availableCodeWidth));
+        const subLines = wrappedLine.split("\n");
+        return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, subLines.map((subLine, subIdx) => /* @__PURE__ */ React4.createElement(
           Box3,
           {
+            key: subIdx,
             flexDirection: "row",
             borderStyle: "single",
             borderLeft: true,
@@ -6437,9 +6454,9 @@ var init_ChatLayout = __esm({
             paddingLeft: 2,
             width: "100%"
           },
-          /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, String(lineNum).padStart(4, " "), " ")),
-          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(text, lang, colors.text))
-        );
+          /* @__PURE__ */ React4.createElement(Box3, { width: 5, flexShrink: 0 }, /* @__PURE__ */ React4.createElement(Text4, { color: "gray", dimColor: true }, subIdx === 0 ? String(lineNum).padStart(4, " ") + " " : "     ")),
+          /* @__PURE__ */ React4.createElement(Box3, { flexGrow: 1 }, renderHighlightedLine(subLine, lang, colors.text))
+        )));
       }
       if (type === "code-fence-close") {
         return /* @__PURE__ */ React4.createElement(
@@ -6510,7 +6527,7 @@ var init_ChatLayout = __esm({
       }
       return null;
     });
-    ChatLayout = React4.memo(({ messages, showFullThinking, columns = 80, aiProvider, version, theme = "Dark" }) => {
+    ChatLayout = React4.memo(({ messages, showFullThinking, columns = 80, aiProvider, version: version2, theme = "Dark" }) => {
       return /* @__PURE__ */ React4.createElement(Box3, { flexDirection: "column", width: "100%" }, messages.map((msg, idx) => /* @__PURE__ */ React4.createElement(
         MessageItem,
         {
@@ -6519,7 +6536,7 @@ var init_ChatLayout = __esm({
           showFullThinking,
           columns,
           aiProvider,
-          version,
+          version: version2,
           theme
         }
       )));
@@ -7452,9 +7469,9 @@ var init_exec_command = __esm({
       const { onChunk } = options;
       if (!rawCommand) return 'ERROR: Missing "command" argument for exec_command.';
       const isWin = process.platform === "win32";
-      const systemSettings = options.systemSettings || {};
+      const systemSettings2 = options.systemSettings || {};
       const netEnv = {};
-      if (systemSettings.networkAccess === false) {
+      if (systemSettings2.networkAccess === false) {
         netEnv.HTTP_PROXY = "http://127.0.0.1:9999";
         netEnv.HTTPS_PROXY = "http://127.0.0.1:9999";
         netEnv.ALL_PROXY = "socks5://127.0.0.1:9999";
@@ -7463,7 +7480,7 @@ var init_exec_command = __esm({
         netEnv.all_proxy = "socks5://127.0.0.1:9999";
         netEnv.NO_PROXY = "localhost,127.0.0.1";
       }
-      return new Promise((resolve) => {
+      return new Promise((resolve2) => {
         const attempt = (shellType) => {
           const isPowerShell = shellType === "pwsh" || shellType === "powershell";
           const command = adjustWindowsCommand(rawCommand, isPowerShell);
@@ -7480,7 +7497,7 @@ var init_exec_command = __esm({
             shell = process.env.SHELL || "bash";
           }
           let shellArgs = isWin ? isPowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
-          if (systemSettings.networkAccess === false && !isWin) {
+          if (systemSettings2.networkAccess === false && !isWin) {
             const originalShell = shell;
             const originalArgs = [...shellArgs];
             if (process.platform === "linux") {
@@ -7518,7 +7535,7 @@ var init_exec_command = __esm({
                   const cleanOut = stripAnsi(output);
                   if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
                     isResolved = true;
-                    setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.
+                    setTimeout(() => resolve2(`SUCCESS: Dev server started successfully in background.
 
 ${cleanOut}`), 500);
                   }
@@ -7530,11 +7547,11 @@ ${cleanOut}`), 500);
                 const normalizedOutput = cleanTerminalOutput(output || "");
                 const finalOutput = stripAnsi(normalizedOutput).replace(/\n{3,}/g, "\n\n") || "Command executed with no output.";
                 if (exitCode !== 0) {
-                  resolve(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].
+                  resolve2(`ERROR: Command [${rawCommand}] failed with exit code [${exitCode}].
 
 ${finalOutput}`);
                 } else {
-                  resolve(`SUCCESS: Command [${rawCommand}] completed.
+                  resolve2(`SUCCESS: Command [${rawCommand}] completed.
 
 ${finalOutput}`);
                 }
@@ -7544,11 +7561,11 @@ ${finalOutput}`);
               if (isWin && (shellType === "pwsh" || shellType === "powershell") && err.code === "ENOENT") {
                 return false;
               }
-              runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
+              runStandardSpawn(resolve2, command, rawCommand, netEnv, onChunk, shellType, systemSettings2);
               return true;
             }
           } else {
-            runStandardSpawn(resolve, command, rawCommand, netEnv, onChunk, shellType, systemSettings);
+            runStandardSpawn(resolve2, command, rawCommand, netEnv, onChunk, shellType, systemSettings2);
             return true;
           }
         };
@@ -7563,7 +7580,7 @@ ${finalOutput}`);
         }
       });
     };
-    runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellType = "powershell", systemSettings = {}) => {
+    runStandardSpawn = (resolve2, command, rawCommand, netEnv, onChunk, shellType = "powershell", systemSettings2 = {}) => {
       const isWin = process.platform === "win32";
       const isPowerShell = shellType === "pwsh" || shellType === "powershell";
       let shell;
@@ -7579,7 +7596,7 @@ ${finalOutput}`);
         shell = process.env.SHELL || "bash";
       }
       let shellArgs = isWin ? isPowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
-      if (systemSettings.networkAccess === false && !isWin) {
+      if (systemSettings2.networkAccess === false && !isWin) {
         const originalShell = shell;
         const originalArgs = [...shellArgs];
         if (process.platform === "linux") {
@@ -7619,7 +7636,7 @@ ${finalOutput}`);
           const cleanOut = stripAnsi(stdout);
           if (/(?:Network:\s+use\s+--host\s+to|Network:\s+Type\s+--host\s+to|Local:\s+http:\/\/localhost:\d+|ready in \d+\s*ms|Compiled successfully|Development server is running|Listening on:)/i.test(cleanOut)) {
             isResolved = true;
-            setTimeout(() => resolve(`SUCCESS: Dev server started successfully in background.
+            setTimeout(() => resolve2(`SUCCESS: Dev server started successfully in background.
 
 ${cleanOut}`), 500);
           }
@@ -7646,11 +7663,11 @@ ${cleanStderr}`);
         const rawOutput = result.join("\n\n") || "Command executed with no output.";
         const finalOutput = stripAnsi(rawOutput).replace(/\n{3,}/g, "\n\n");
         if (code !== 0) {
-          resolve(`ERROR: Command [${rawCommand}] failed with exit code [${code}].
+          resolve2(`ERROR: Command [${rawCommand}] failed with exit code [${code}].
 
 ${finalOutput}`);
         } else {
-          resolve(`SUCCESS: Command [${rawCommand}] completed.
+          resolve2(`SUCCESS: Command [${rawCommand}] completed.
 
 ${finalOutput}`);
         }
@@ -7659,15 +7676,15 @@ ${finalOutput}`);
         if (isWin && err.code === "ENOENT") {
           if (shellType === "pwsh") {
             const nextCommand = adjustWindowsCommand(rawCommand, true);
-            return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, "powershell", systemSettings);
+            return runStandardSpawn(resolve2, nextCommand, rawCommand, netEnv, onChunk, "powershell", systemSettings2);
           } else if (shellType === "powershell") {
             const nextCommand = adjustWindowsCommand(rawCommand, false);
-            return runStandardSpawn(resolve, nextCommand, rawCommand, netEnv, onChunk, "cmd", systemSettings);
+            return runStandardSpawn(resolve2, nextCommand, rawCommand, netEnv, onChunk, "cmd", systemSettings2);
           }
         }
         activeChildProcess = null;
         const errorMsg = err instanceof Error ? err.message : String(err);
-        resolve(`ERROR: Failed to start command [${rawCommand}]: ${errorMsg}`);
+        resolve2(`ERROR: Failed to start command [${rawCommand}]: ${errorMsg}`);
       });
     };
   }
@@ -7679,7 +7696,7 @@ import { Box as Box6, Text as Text7, useInput as useInput3 } from "ink";
 import TextInput from "ink-text-input";
 import v8 from "v8";
 function SettingsMenu({
-  systemSettings,
+  systemSettings: systemSettings2,
   setSystemSettings,
   apiTier,
   setActiveView,
@@ -7692,7 +7709,7 @@ function SettingsMenu({
   onCloseTheme = null,
   setProviderReturnView = null
 }) {
-  const activeTheme = systemSettings.theme === "Chaos" || systemSettings.theme === "Mystery" ? "Mystery" : systemSettings.theme || "Dark";
+  const activeTheme = systemSettings2.theme === "Chaos" || systemSettings2.theme === "Mystery" ? "Mystery" : systemSettings2.theme || "Dark";
   const defaultIdx = themeOptions.indexOf(activeTheme);
   const [activeColumn, setActiveColumn] = useState6("categories");
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState6(0);
@@ -7701,7 +7718,7 @@ function SettingsMenu({
   const [editValue, setEditValue] = useState6("");
   const [isSelectingTheme, setIsSelectingTheme] = useState6(initialSelectingTheme);
   const [themeIndex, setThemeIndex] = useState6(defaultIdx >= 0 ? defaultIdx : 0);
-  const [initialTheme, setInitialTheme] = useState6(systemSettings.theme || "Dark");
+  const [initialTheme, setInitialTheme] = useState6(systemSettings2.theme || "Dark");
   const [isSelectingSubAgentModel, setIsSelectingSubAgentModel] = useState6(false);
   const [subAgentModelIndex, setSubAgentModelIndex] = useState6(0);
   const [subAgentScrollOffset, setSubAgentScrollOffset] = useState6(0);
@@ -7710,7 +7727,7 @@ function SettingsMenu({
   const [activeProviderKeys, setActiveProviderKeys] = useState6({});
   useEffect5(() => {
     const checkKeys = async () => {
-      const providers = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral"];
+      const providers = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral", "Ollama"];
       const keyMap = {};
       for (const p of providers) {
         try {
@@ -7724,7 +7741,7 @@ function SettingsMenu({
     checkKeys();
   }, []);
   const allSubAgentItems = React7.useMemo(() => {
-    const ALL_PROVIDERS = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral"];
+    const ALL_PROVIDERS = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral", "Ollama"];
     const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
     const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : "ENV";
     const items = [
@@ -7825,49 +7842,58 @@ function SettingsMenu({
   }, []);
   const getCategoryItems = (catId) => {
     switch (catId) {
-      case "providers":
-        return [
+      case "providers": {
+        const items = [
           { label: "Current Provider", value: "aiProvider", status: aiProvider },
           { label: "Key Strategy", value: "apiTier", status: apiTier === "Free" ? "Free" : quotas?.providerBudgets?.__useProvider ? "Paid" : "Paid" }
         ];
+        if (aiProvider === "Ollama") {
+          items.push({
+            label: "Endpoint",
+            value: "ollamaEndpoint",
+            status: systemSettings2.ollamaEndpoint || "Cloud"
+          });
+        }
+        return items;
+      }
       case "appearance":
         return [
-          { label: "Theme", value: "theme", status: systemSettings.theme || "Dark" },
-          { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings.loadingPhrases !== false ? "ON" : "OFF" },
-          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings.progressiveRendering ? "ON" : "OFF" },
-          { label: "Show TPM Estimate", value: "showTPMEstimate", status: systemSettings.showTPMEstimate ? "ON" : "OFF" }
+          { label: "Theme", value: "theme", status: systemSettings2.theme || "Dark" },
+          { label: "Loading Phrases", value: "loadingPhrases", status: systemSettings2.loadingPhrases !== false ? "ON" : "OFF" },
+          { label: "Progressive Rendering [EXPERIMENTAL]", value: "progressiveRendering", status: systemSettings2.progressiveRendering ? "ON" : "OFF" },
+          { label: "Show TPM Estimate", value: "showTPMEstimate", status: systemSettings2.showTPMEstimate ? "ON" : "OFF" }
         ];
       case "memory":
         return [
-          { label: "Toggle Memory", value: "memory", status: systemSettings.memory ? "ON" : "OFF" }
+          { label: "Toggle Memory", value: "memory", status: systemSettings2.memory ? "ON" : "OFF" }
         ];
       case "security":
-        const activePreset = getActivePreset(systemSettings);
+        const activePreset = getActivePreset(systemSettings2);
         return [
           { label: "Sandbox Preset", value: "sandboxPreset", status: activePreset, section: "Sandbox" },
-          { label: "YOLO Mode", value: "autoExec", status: systemSettings.autoExec ? "ON" : "OFF", section: "Sandbox" },
-          { label: "External Workspace Access", value: "externalAccess", status: systemSettings.allowExternalAccess ? "ON" : "OFF", section: "Sandbox" },
-          { label: "Network Access (Terminal)", value: "networkAccess", status: systemSettings.networkAccess !== false ? "ON" : "OFF", section: "Sandbox" },
-          { label: "Always Ask Commands", value: "alwaysAsk", status: truncateCSV(systemSettings.alwaysAskCommands), section: "Sandbox" },
-          { label: "Auto Approve Commands", value: "autoApprove", status: truncateCSV(systemSettings.autoApproveCommands), section: "Sandbox" },
-          { label: "Auto Disapprove Commands", value: "autoDisallow", status: truncateCSV(systemSettings.autoDisallowCommands), section: "Sandbox" },
-          { label: "Auto Approve Git Commits", value: "autoApproveGit", status: systemSettings.autoApproveGit ? "ON" : "OFF", section: "Sandbox" },
-          { label: "Advanced Recovery [EXPERIMENTAL]", value: "advanceRollback", status: systemSettings.advanceRollback ? "ON" : "OFF", section: "Other" },
-          { label: "Auto-Delete History", value: "autoDelete", status: systemSettings.autoDeleteHistory || "30d", section: "Other" },
-          { label: "Save AppData Externally", value: "externalData", status: systemSettings.useExternalData ? "ON" : "OFF", section: "Other" }
+          { label: "YOLO Mode", value: "autoExec", status: systemSettings2.autoExec ? "ON" : "OFF", section: "Sandbox" },
+          { label: "External Workspace Access", value: "externalAccess", status: systemSettings2.allowExternalAccess ? "ON" : "OFF", section: "Sandbox" },
+          { label: "Network Access (Terminal)", value: "networkAccess", status: systemSettings2.networkAccess !== false ? "ON" : "OFF", section: "Sandbox" },
+          { label: "Always Ask Commands", value: "alwaysAsk", status: truncateCSV(systemSettings2.alwaysAskCommands), section: "Sandbox" },
+          { label: "Auto Approve Commands", value: "autoApprove", status: truncateCSV(systemSettings2.autoApproveCommands), section: "Sandbox" },
+          { label: "Auto Disapprove Commands", value: "autoDisallow", status: truncateCSV(systemSettings2.autoDisallowCommands), section: "Sandbox" },
+          { label: "Auto Approve Git Commits", value: "autoApproveGit", status: systemSettings2.autoApproveGit ? "ON" : "OFF", section: "Sandbox" },
+          { label: "Advanced Recovery [EXPERIMENTAL]", value: "advanceRollback", status: systemSettings2.advanceRollback ? "ON" : "OFF", section: "Other" },
+          { label: "Auto-Delete History", value: "autoDelete", status: systemSettings2.autoDeleteHistory || "30d", section: "Other" },
+          { label: "Save AppData Externally", value: "externalData", status: systemSettings2.useExternalData ? "ON" : "OFF", section: "Other" }
         ];
       case "updater":
         return [
-          { label: "Auto-Update", value: "autoUpdate", status: systemSettings.autoUpdate ? "ON" : "OFF" },
-          { label: "Preferred Package Manager", value: "updateManager", status: (systemSettings.updateManager || "npm") === "custom" ? "Custom" : (systemSettings.updateManager || "npm").toUpperCase() }
+          { label: "Auto-Update", value: "autoUpdate", status: systemSettings2.autoUpdate ? "ON" : "OFF" },
+          { label: "Preferred Package Manager", value: "updateManager", status: (systemSettings2.updateManager || "npm") === "custom" ? "Custom" : (systemSettings2.updateManager || "npm").toUpperCase() }
         ];
       case "other":
         return [
-          { label: "Sub-Agents", value: "subAgents", status: systemSettings.subAgents !== false ? "ON" : "OFF" },
-          { label: "Sub-Agent Model", value: "subAgentModel", status: systemSettings.CustomSubAgent && systemSettings.SubAgentModel ? systemSettings.SubAgentModel : "Default" },
-          { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings.preserveThinking !== false ? "ON" : "OFF" },
-          { label: "Dynamic Directory Awareness", value: "dynamicDirAwareness", status: systemSettings.dynamicDirAwareness ? "ON" : "OFF" },
-          { label: "Directory Tree Design", value: "indentationTree", status: systemSettings.indentationTree !== false ? "Modern" : "Classic (deprecated)" }
+          { label: "Sub-Agents", value: "subAgents", status: systemSettings2.subAgents !== false ? "ON" : "OFF" },
+          { label: "Sub-Agent Model", value: "subAgentModel", status: systemSettings2.CustomSubAgent && systemSettings2.SubAgentModel ? systemSettings2.SubAgentModel : "Default" },
+          { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings2.preserveThinking !== false ? "ON" : "OFF" },
+          { label: "Dynamic Directory Awareness", value: "dynamicDirAwareness", status: systemSettings2.dynamicDirAwareness ? "ON" : "OFF" },
+          { label: "Directory Tree Design", value: "indentationTree", status: systemSettings2.indentationTree !== false ? "Modern" : "Classic (deprecated)" }
           // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
         ];
       default:
@@ -8006,7 +8032,7 @@ function SettingsMenu({
     if (item.value === "memory") {
       setSystemSettings((s) => ({ ...s, memory: !s.memory }));
     } else if (item.value === "sandboxPreset") {
-      const activePreset = getActivePreset(systemSettings);
+      const activePreset = getActivePreset(systemSettings2);
       const presets = ["Autonomous", "Balanced", "Strict"];
       const curIndex = presets.indexOf(activePreset);
       const nextIndex = (curIndex + 1) % presets.length;
@@ -8041,8 +8067,8 @@ function SettingsMenu({
         return updated;
       });
     } else if (item.value === "autoExec") {
-      if (!systemSettings.autoExec) {
-        if (systemSettings.allowExternalAccess) {
+      if (!systemSettings2.autoExec) {
+        if (systemSettings2.allowExternalAccess) {
           setActiveView("doubleDanger");
         } else {
           setActiveView("autoExecDanger");
@@ -8051,8 +8077,8 @@ function SettingsMenu({
         setSystemSettings((s) => ({ ...s, autoExec: false, sandboxPreset: "Custom" }));
       }
     } else if (item.value === "externalAccess") {
-      if (!systemSettings.allowExternalAccess) {
-        if (systemSettings.autoExec) {
+      if (!systemSettings2.allowExternalAccess) {
+        if (systemSettings2.autoExec) {
           setActiveView("doubleDanger");
         } else {
           setActiveView("externalDanger");
@@ -8064,22 +8090,29 @@ function SettingsMenu({
       setSystemSettings((s) => ({ ...s, networkAccess: s.networkAccess === false, sandboxPreset: "Custom" }));
     } else if (item.value === "alwaysAsk") {
       setEditingItem("alwaysAskCommands");
-      setEditValue(systemSettings.alwaysAskCommands || "");
+      setEditValue(systemSettings2.alwaysAskCommands || "");
     } else if (item.value === "autoApprove") {
       setEditingItem("autoApproveCommands");
-      setEditValue(systemSettings.autoApproveCommands || "");
+      setEditValue(systemSettings2.autoApproveCommands || "");
     } else if (item.value === "autoApproveGit") {
       setSystemSettings((s) => ({ ...s, autoApproveGit: !s.autoApproveGit, sandboxPreset: "Custom" }));
     } else if (item.value === "autoDisallow") {
       setEditingItem("autoDisallowCommands");
-      setEditValue(systemSettings.autoDisallowCommands || "");
+      setEditValue(systemSettings2.autoDisallowCommands || "");
+    } else if (item.value === "ollamaEndpoint") {
+      setSystemSettings((s) => {
+        const nextEndpoint = s.ollamaEndpoint === "Local" ? "Cloud" : "Local";
+        const updated = { ...s, ollamaEndpoint: nextEndpoint };
+        saveSettings2({ systemSettings: updated, apiTier, quotas });
+        return updated;
+      });
     } else if (item.value === "apiTier") {
       setActiveView("apiTier");
     } else if (item.value === "aiProvider") {
       if (setProviderReturnView) setProviderReturnView("settings");
       setActiveView("selectProvider");
     } else if (item.value === "advanceRollback") {
-      if (!systemSettings.advanceRollback) {
+      if (!systemSettings2.advanceRollback) {
         setActiveView("advanceRollbackDanger");
       } else {
         setSystemSettings((s) => {
@@ -8090,22 +8123,22 @@ function SettingsMenu({
       }
     } else if (item.value === "autoDelete") {
       const options = ["1d", "7d", "30d"];
-      const currentIndex = options.indexOf(systemSettings.autoDeleteHistory || "30d");
+      const currentIndex = options.indexOf(systemSettings2.autoDeleteHistory || "30d");
       const nextIndex = (currentIndex + 1) % options.length;
       setSystemSettings((s) => ({ ...s, autoDeleteHistory: options[nextIndex] }));
     } else if (item.value === "autoUpdate") {
       setSystemSettings((s) => ({ ...s, autoUpdate: !s.autoUpdate }));
     } else if (item.value === "externalData") {
-      if (!systemSettings.useExternalData) {
+      if (!systemSettings2.useExternalData) {
         setInputConfig({
           label: "Enter absolute path for External AppData:",
           note: "All history, logs and secrets will be stored here. ~/.fluxflow/settings.json stays as anchor.",
           key: "externalDataPath",
-          value: systemSettings.externalDataPath || ""
+          value: systemSettings2.externalDataPath || ""
         });
         setActiveView("input");
       } else {
-        const newSettings = { ...systemSettings, useExternalData: false };
+        const newSettings = { ...systemSettings2, useExternalData: false };
         setSystemSettings(newSettings);
         saveSettings2({ systemSettings: newSettings, apiTier, quotas });
         setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: "[STORAGE RESET] Flux Flow will return to default ~/.fluxflow after restart." }]);
@@ -8128,7 +8161,7 @@ function SettingsMenu({
         return newSysSettings;
       });
     } else if (item.value === "subAgentModel") {
-      const currentSubAgentModel = systemSettings.CustomSubAgent && systemSettings.SubAgentModel ? systemSettings.SubAgentModel : "Default";
+      const currentSubAgentModel = systemSettings2.CustomSubAgent && systemSettings2.SubAgentModel ? systemSettings2.SubAgentModel : "Default";
       const curIdx = availableModels.findIndex((m) => m.value === currentSubAgentModel);
       setSubAgentModelIndex(curIdx >= 0 ? curIdx : 0);
       setIsSelectingSubAgentModel(true);
@@ -8139,7 +8172,7 @@ function SettingsMenu({
         return newSysSettings;
       });
     } else if (item.value === "dynamicDirAwareness") {
-      if (!systemSettings.dynamicDirAwareness) {
+      if (!systemSettings2.dynamicDirAwareness) {
         setActiveView("dynamicDirDanger");
       } else {
         setSystemSettings((s) => {
@@ -8167,16 +8200,16 @@ function SettingsMenu({
         return newSysSettings;
       });
     } else if (item.value === "theme") {
-      const activeTheme2 = systemSettings.theme === "Chaos" || systemSettings.theme === "Mystery" ? "Mystery" : systemSettings.theme || "Dark";
+      const activeTheme2 = systemSettings2.theme === "Chaos" || systemSettings2.theme === "Mystery" ? "Mystery" : systemSettings2.theme || "Dark";
       const idx = themeOptions.indexOf(activeTheme2);
       setThemeIndex(idx >= 0 ? idx : 0);
-      setInitialTheme(systemSettings.theme || "Dark");
+      setInitialTheme(systemSettings2.theme || "Dark");
       setIsSelectingTheme(true);
     }
   };
-  const colors = getThemeColors(systemSettings.theme);
+  const colors = getThemeColors(systemSettings2.theme);
   if (isSelectingSubAgentModel) {
-    const currentSavedModel = systemSettings.CustomSubAgent && systemSettings.SubAgentModel ? systemSettings.SubAgentModel : "Default";
+    const currentSavedModel = systemSettings2.CustomSubAgent && systemSettings2.SubAgentModel ? systemSettings2.SubAgentModel : "Default";
     const VISIBLE_COUNT = 15;
     let startIndex = subAgentScrollOffset;
     if (subAgentModelIndex < startIndex) {
@@ -8214,15 +8247,15 @@ function SettingsMenu({
   if (isSelectingTheme) {
     const previewThemeName = themeOptions[themeIndex];
     const previewColors = getThemeColors(previewThemeName);
-    return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: previewColors.border, padding: 1, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text, bold: true }, "Choose your color scheme:")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", flexGrow: 1 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", paddingRight: 1 }, themeOptions.map((tName, index) => {
-      const isSelected = themeIndex === index;
-      const isSaved = (systemSettings.theme || "Dark") === tName;
+    return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: previewColors.border, padding: 1, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text, bold: true }, "Choose your color scheme:")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", flexGrow: 1 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", paddingRight: 1 }, themeOptions.map((tName, index2) => {
+      const isSelected = themeIndex === index2;
+      const isSaved = (systemSettings2.theme || "Dark") === tName;
       const isForest = tName === "Forest Sprite";
       return /* @__PURE__ */ React7.createElement(Box6, { key: tName, paddingX: 0 }, /* @__PURE__ */ React7.createElement(Text7, { color: isSelected ? previewColors.text : previewColors.textDim, bold: isSelected }, isSelected ? "> " : "  ", tName, isForest && /* @__PURE__ */ React7.createElement(Text7, { color: isSelected ? previewColors.success || "#52b788" : "green", bold: true }, " \u2605"), isSaved ? /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.primary || "cyan", italic: true }, " (saved)") : ""));
     })), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", flexGrow: 1, borderStyle: "round", borderColor: previewColors.borderMuted, paddingX: 2, paddingY: 1, backgroundColor: previewColors.cardBg }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.secondary || "cyan", bold: true }, "> ", "you: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "add a greeting function")), /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.success || "green" }, "  Here's the change:")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", marginLeft: 2, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "3 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, '  import "fmt"')), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "4"), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffRemovalBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalNum || previewColors.diffRemovalText }, "5 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalPrefix || previewColors.diffRemovalText }, "- "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalText }, "func "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalHighlightColor || previewColors.diffRemovalText, backgroundColor: previewColors.diffRemovalHighlightBg, bold: true }, "main()"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffRemovalText }, " {"))), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffAdditionBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionNum || previewColors.diffAdditionText }, "5 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionPrefix || previewColors.diffAdditionText }, "+ "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, "func "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText, backgroundColor: previewColors.diffAdditionHighlightBg, bold: true }, "greet(name string)"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, " {"))), /* @__PURE__ */ React7.createElement(Box6, { backgroundColor: previewColors.diffAdditionBg }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionNum || previewColors.diffAdditionText }, "6 "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionPrefix || previewColors.diffAdditionText }, "+ "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionText }, "    "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.diffAdditionHighlightColor || previewColors.diffAdditionText, backgroundColor: previewColors.diffAdditionHighlightBg }, 'fmt.Printf("Hello, %s!\\n", name)'))), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "7   }")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", marginTop: 1, marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "\u25BE Thought Process"), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textMuted }, "  I need to add a greeting function. I'll use fmt.Printf.")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column" }, /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.warning || "yellow" }, "\u2699 tool: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "write_file main.go")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.accent || "magenta" }, "\u29BF task: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "Implementing greeting")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.danger || "red" }, "X error: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "compilation failed")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.warning || "yellow" }, "\u26A0 warning: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "deprecation warning")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.info || "blue" }, "\u2192 link: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.info || "blue", underline: true }, "file:///path/to/main.go")), /* @__PURE__ */ React7.createElement(Text7, null, /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.accent || "magenta" }, "\u2605 accent: "), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.text }, "highlighted text")), /* @__PURE__ */ React7.createElement(Text7, { color: previewColors.textDim }, "\xB7 dim: press Enter to continue")))), /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, marginTop: 1, flexDirection: "row", justifyContent: "space-between" }, /* @__PURE__ */ React7.createElement(Text7, { color: "gray", italic: true }, "\u25B2\u25BC Navigate \u2022 ENTER to Select \u2022 ESC to Cancel"), /* @__PURE__ */ React7.createElement(Text7, { color: "gray" }, "Previewing: ", themeOptions[themeIndex], themeOptions[themeIndex] === "Forest Sprite" ? " \u2605" : "")));
   }
-  return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: colors.borderMuted, width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text, bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", maxWidth: 40, borderStyle: "round", borderColor: activeColumn === "categories" ? colors.border : colors.borderMuted, padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? colors.text : colors.textDim, bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index) => {
-    const isSelected = selectedCategoryIndex === index;
+  return /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", borderStyle: "round", borderColor: colors.border, padding: 0, width: "100%", minHeight: 32 }, /* @__PURE__ */ React7.createElement(Box6, { paddingX: 1, paddingY: 0, marginBottom: 0, borderStyle: "single", borderColor: colors.borderMuted, width: "100%" }, /* @__PURE__ */ React7.createElement(Text7, { color: colors.text, bold: true }, "SYSTEM CONFIGURATION")), /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "row", width: "100%", minHeight: 26 }, /* @__PURE__ */ React7.createElement(Box6, { flexDirection: "column", width: "30%", maxWidth: 40, borderStyle: "round", borderColor: activeColumn === "categories" ? colors.border : colors.borderMuted, padding: 1, paddingY: 0 }, /* @__PURE__ */ React7.createElement(Box6, { marginBottom: 1 }, /* @__PURE__ */ React7.createElement(Text7, { color: activeColumn === "categories" ? colors.text : colors.textDim, bold: true, underline: true }, "CATEGORIES")), CATEGORIES.map((cat, index2) => {
+    const isSelected = selectedCategoryIndex === index2;
     const isExit = cat.id === "exit";
     return /* @__PURE__ */ React7.createElement(
       Box6,
@@ -8246,14 +8279,14 @@ function SettingsMenu({
     let lastSection = null;
     const elements = [];
     const getListItems = (val) => (val || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-    const approveList = getListItems(systemSettings.autoApproveCommands);
-    const disallowList = getListItems(systemSettings.autoDisallowCommands);
-    const askList = getListItems(systemSettings.alwaysAskCommands);
+    const approveList = getListItems(systemSettings2.autoApproveCommands);
+    const disallowList = getListItems(systemSettings2.autoDisallowCommands);
+    const askList = getListItems(systemSettings2.alwaysAskCommands);
     const allLists = [...approveList, ...disallowList, ...askList];
     const uniqueLists = new Set(allLists);
     const hasConflict = currentCatId === "security" && allLists.length !== uniqueLists.size;
-    currentItems.forEach((item, index) => {
-      const isSelected = activeColumn === "items" && selectedItemIndex === index;
+    currentItems.forEach((item, index2) => {
+      const isSelected = activeColumn === "items" && selectedItemIndex === index2;
       const labelLength = item.label.length;
       const dotsCount = Math.max(2, 38 - labelLength);
       const dots = ".".repeat(dotsCount);
@@ -8292,7 +8325,7 @@ function SettingsMenu({
             value: editValue,
             onChange: setEditValue,
             onSubmit: (val) => {
-              const newSysSettings = { ...systemSettings, [editingItem]: val.trim(), sandboxPreset: "Custom" };
+              const newSysSettings = { ...systemSettings2, [editingItem]: val.trim(), sandboxPreset: "Custom" };
               setSystemSettings(newSysSettings);
               saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
               setEditingItem(null);
@@ -8532,6 +8565,1113 @@ var init_AskUserModal = __esm({
   }
 });
 
+// node_modules/.pnpm/whatwg-fetch@3.6.20/node_modules/whatwg-fetch/dist/fetch.umd.js
+var require_fetch_umd = __commonJS({
+  "node_modules/.pnpm/whatwg-fetch@3.6.20/node_modules/whatwg-fetch/dist/fetch.umd.js"(exports, module) {
+    (function(global2, factory) {
+      typeof exports === "object" && typeof module !== "undefined" ? factory(exports) : typeof define === "function" && define.amd ? define(["exports"], factory) : factory(global2.WHATWGFetch = {});
+    })(exports, (function(exports2) {
+      "use strict";
+      var g = typeof globalThis !== "undefined" && globalThis || typeof self !== "undefined" && self || // eslint-disable-next-line no-undef
+      typeof global !== "undefined" && global || {};
+      var support = {
+        searchParams: "URLSearchParams" in g,
+        iterable: "Symbol" in g && "iterator" in Symbol,
+        blob: "FileReader" in g && "Blob" in g && (function() {
+          try {
+            new Blob();
+            return true;
+          } catch (e) {
+            return false;
+          }
+        })(),
+        formData: "FormData" in g,
+        arrayBuffer: "ArrayBuffer" in g
+      };
+      function isDataView(obj) {
+        return obj && DataView.prototype.isPrototypeOf(obj);
+      }
+      if (support.arrayBuffer) {
+        var viewClasses = [
+          "[object Int8Array]",
+          "[object Uint8Array]",
+          "[object Uint8ClampedArray]",
+          "[object Int16Array]",
+          "[object Uint16Array]",
+          "[object Int32Array]",
+          "[object Uint32Array]",
+          "[object Float32Array]",
+          "[object Float64Array]"
+        ];
+        var isArrayBufferView = ArrayBuffer.isView || function(obj) {
+          return obj && viewClasses.indexOf(Object.prototype.toString.call(obj)) > -1;
+        };
+      }
+      function normalizeName(name) {
+        if (typeof name !== "string") {
+          name = String(name);
+        }
+        if (/[^a-z0-9\-#$%&'*+.^_`|~!]/i.test(name) || name === "") {
+          throw new TypeError('Invalid character in header field name: "' + name + '"');
+        }
+        return name.toLowerCase();
+      }
+      function normalizeValue(value) {
+        if (typeof value !== "string") {
+          value = String(value);
+        }
+        return value;
+      }
+      function iteratorFor(items) {
+        var iterator = {
+          next: function() {
+            var value = items.shift();
+            return { done: value === void 0, value };
+          }
+        };
+        if (support.iterable) {
+          iterator[Symbol.iterator] = function() {
+            return iterator;
+          };
+        }
+        return iterator;
+      }
+      function Headers2(headers) {
+        this.map = {};
+        if (headers instanceof Headers2) {
+          headers.forEach(function(value, name) {
+            this.append(name, value);
+          }, this);
+        } else if (Array.isArray(headers)) {
+          headers.forEach(function(header) {
+            if (header.length != 2) {
+              throw new TypeError("Headers constructor: expected name/value pair to be length 2, found" + header.length);
+            }
+            this.append(header[0], header[1]);
+          }, this);
+        } else if (headers) {
+          Object.getOwnPropertyNames(headers).forEach(function(name) {
+            this.append(name, headers[name]);
+          }, this);
+        }
+      }
+      Headers2.prototype.append = function(name, value) {
+        name = normalizeName(name);
+        value = normalizeValue(value);
+        var oldValue = this.map[name];
+        this.map[name] = oldValue ? oldValue + ", " + value : value;
+      };
+      Headers2.prototype["delete"] = function(name) {
+        delete this.map[normalizeName(name)];
+      };
+      Headers2.prototype.get = function(name) {
+        name = normalizeName(name);
+        return this.has(name) ? this.map[name] : null;
+      };
+      Headers2.prototype.has = function(name) {
+        return this.map.hasOwnProperty(normalizeName(name));
+      };
+      Headers2.prototype.set = function(name, value) {
+        this.map[normalizeName(name)] = normalizeValue(value);
+      };
+      Headers2.prototype.forEach = function(callback, thisArg) {
+        for (var name in this.map) {
+          if (this.map.hasOwnProperty(name)) {
+            callback.call(thisArg, this.map[name], name, this);
+          }
+        }
+      };
+      Headers2.prototype.keys = function() {
+        var items = [];
+        this.forEach(function(value, name) {
+          items.push(name);
+        });
+        return iteratorFor(items);
+      };
+      Headers2.prototype.values = function() {
+        var items = [];
+        this.forEach(function(value) {
+          items.push(value);
+        });
+        return iteratorFor(items);
+      };
+      Headers2.prototype.entries = function() {
+        var items = [];
+        this.forEach(function(value, name) {
+          items.push([name, value]);
+        });
+        return iteratorFor(items);
+      };
+      if (support.iterable) {
+        Headers2.prototype[Symbol.iterator] = Headers2.prototype.entries;
+      }
+      function consumed(body) {
+        if (body._noBody) return;
+        if (body.bodyUsed) {
+          return Promise.reject(new TypeError("Already read"));
+        }
+        body.bodyUsed = true;
+      }
+      function fileReaderReady(reader) {
+        return new Promise(function(resolve2, reject) {
+          reader.onload = function() {
+            resolve2(reader.result);
+          };
+          reader.onerror = function() {
+            reject(reader.error);
+          };
+        });
+      }
+      function readBlobAsArrayBuffer(blob) {
+        var reader = new FileReader();
+        var promise = fileReaderReady(reader);
+        reader.readAsArrayBuffer(blob);
+        return promise;
+      }
+      function readBlobAsText(blob) {
+        var reader = new FileReader();
+        var promise = fileReaderReady(reader);
+        var match = /charset=([A-Za-z0-9_-]+)/.exec(blob.type);
+        var encoding = match ? match[1] : "utf-8";
+        reader.readAsText(blob, encoding);
+        return promise;
+      }
+      function readArrayBufferAsText(buf) {
+        var view = new Uint8Array(buf);
+        var chars = new Array(view.length);
+        for (var i = 0; i < view.length; i++) {
+          chars[i] = String.fromCharCode(view[i]);
+        }
+        return chars.join("");
+      }
+      function bufferClone(buf) {
+        if (buf.slice) {
+          return buf.slice(0);
+        } else {
+          var view = new Uint8Array(buf.byteLength);
+          view.set(new Uint8Array(buf));
+          return view.buffer;
+        }
+      }
+      function Body() {
+        this.bodyUsed = false;
+        this._initBody = function(body) {
+          this.bodyUsed = this.bodyUsed;
+          this._bodyInit = body;
+          if (!body) {
+            this._noBody = true;
+            this._bodyText = "";
+          } else if (typeof body === "string") {
+            this._bodyText = body;
+          } else if (support.blob && Blob.prototype.isPrototypeOf(body)) {
+            this._bodyBlob = body;
+          } else if (support.formData && FormData.prototype.isPrototypeOf(body)) {
+            this._bodyFormData = body;
+          } else if (support.searchParams && URLSearchParams.prototype.isPrototypeOf(body)) {
+            this._bodyText = body.toString();
+          } else if (support.arrayBuffer && support.blob && isDataView(body)) {
+            this._bodyArrayBuffer = bufferClone(body.buffer);
+            this._bodyInit = new Blob([this._bodyArrayBuffer]);
+          } else if (support.arrayBuffer && (ArrayBuffer.prototype.isPrototypeOf(body) || isArrayBufferView(body))) {
+            this._bodyArrayBuffer = bufferClone(body);
+          } else {
+            this._bodyText = body = Object.prototype.toString.call(body);
+          }
+          if (!this.headers.get("content-type")) {
+            if (typeof body === "string") {
+              this.headers.set("content-type", "text/plain;charset=UTF-8");
+            } else if (this._bodyBlob && this._bodyBlob.type) {
+              this.headers.set("content-type", this._bodyBlob.type);
+            } else if (support.searchParams && URLSearchParams.prototype.isPrototypeOf(body)) {
+              this.headers.set("content-type", "application/x-www-form-urlencoded;charset=UTF-8");
+            }
+          }
+        };
+        if (support.blob) {
+          this.blob = function() {
+            var rejected = consumed(this);
+            if (rejected) {
+              return rejected;
+            }
+            if (this._bodyBlob) {
+              return Promise.resolve(this._bodyBlob);
+            } else if (this._bodyArrayBuffer) {
+              return Promise.resolve(new Blob([this._bodyArrayBuffer]));
+            } else if (this._bodyFormData) {
+              throw new Error("could not read FormData body as blob");
+            } else {
+              return Promise.resolve(new Blob([this._bodyText]));
+            }
+          };
+        }
+        this.arrayBuffer = function() {
+          if (this._bodyArrayBuffer) {
+            var isConsumed = consumed(this);
+            if (isConsumed) {
+              return isConsumed;
+            } else if (ArrayBuffer.isView(this._bodyArrayBuffer)) {
+              return Promise.resolve(
+                this._bodyArrayBuffer.buffer.slice(
+                  this._bodyArrayBuffer.byteOffset,
+                  this._bodyArrayBuffer.byteOffset + this._bodyArrayBuffer.byteLength
+                )
+              );
+            } else {
+              return Promise.resolve(this._bodyArrayBuffer);
+            }
+          } else if (support.blob) {
+            return this.blob().then(readBlobAsArrayBuffer);
+          } else {
+            throw new Error("could not read as ArrayBuffer");
+          }
+        };
+        this.text = function() {
+          var rejected = consumed(this);
+          if (rejected) {
+            return rejected;
+          }
+          if (this._bodyBlob) {
+            return readBlobAsText(this._bodyBlob);
+          } else if (this._bodyArrayBuffer) {
+            return Promise.resolve(readArrayBufferAsText(this._bodyArrayBuffer));
+          } else if (this._bodyFormData) {
+            throw new Error("could not read FormData body as text");
+          } else {
+            return Promise.resolve(this._bodyText);
+          }
+        };
+        if (support.formData) {
+          this.formData = function() {
+            return this.text().then(decode);
+          };
+        }
+        this.json = function() {
+          return this.text().then(JSON.parse);
+        };
+        return this;
+      }
+      var methods = ["CONNECT", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT", "TRACE"];
+      function normalizeMethod(method) {
+        var upcased = method.toUpperCase();
+        return methods.indexOf(upcased) > -1 ? upcased : method;
+      }
+      function Request(input, options) {
+        if (!(this instanceof Request)) {
+          throw new TypeError('Please use the "new" operator, this DOM object constructor cannot be called as a function.');
+        }
+        options = options || {};
+        var body = options.body;
+        if (input instanceof Request) {
+          if (input.bodyUsed) {
+            throw new TypeError("Already read");
+          }
+          this.url = input.url;
+          this.credentials = input.credentials;
+          if (!options.headers) {
+            this.headers = new Headers2(input.headers);
+          }
+          this.method = input.method;
+          this.mode = input.mode;
+          this.signal = input.signal;
+          if (!body && input._bodyInit != null) {
+            body = input._bodyInit;
+            input.bodyUsed = true;
+          }
+        } else {
+          this.url = String(input);
+        }
+        this.credentials = options.credentials || this.credentials || "same-origin";
+        if (options.headers || !this.headers) {
+          this.headers = new Headers2(options.headers);
+        }
+        this.method = normalizeMethod(options.method || this.method || "GET");
+        this.mode = options.mode || this.mode || null;
+        this.signal = options.signal || this.signal || (function() {
+          if ("AbortController" in g) {
+            var ctrl = new AbortController();
+            return ctrl.signal;
+          }
+        })();
+        this.referrer = null;
+        if ((this.method === "GET" || this.method === "HEAD") && body) {
+          throw new TypeError("Body not allowed for GET or HEAD requests");
+        }
+        this._initBody(body);
+        if (this.method === "GET" || this.method === "HEAD") {
+          if (options.cache === "no-store" || options.cache === "no-cache") {
+            var reParamSearch = /([?&])_=[^&]*/;
+            if (reParamSearch.test(this.url)) {
+              this.url = this.url.replace(reParamSearch, "$1_=" + (/* @__PURE__ */ new Date()).getTime());
+            } else {
+              var reQueryString = /\?/;
+              this.url += (reQueryString.test(this.url) ? "&" : "?") + "_=" + (/* @__PURE__ */ new Date()).getTime();
+            }
+          }
+        }
+      }
+      Request.prototype.clone = function() {
+        return new Request(this, { body: this._bodyInit });
+      };
+      function decode(body) {
+        var form = new FormData();
+        body.trim().split("&").forEach(function(bytes) {
+          if (bytes) {
+            var split = bytes.split("=");
+            var name = split.shift().replace(/\+/g, " ");
+            var value = split.join("=").replace(/\+/g, " ");
+            form.append(decodeURIComponent(name), decodeURIComponent(value));
+          }
+        });
+        return form;
+      }
+      function parseHeaders(rawHeaders) {
+        var headers = new Headers2();
+        var preProcessedHeaders = rawHeaders.replace(/\r?\n[\t ]+/g, " ");
+        preProcessedHeaders.split("\r").map(function(header) {
+          return header.indexOf("\n") === 0 ? header.substr(1, header.length) : header;
+        }).forEach(function(line) {
+          var parts = line.split(":");
+          var key = parts.shift().trim();
+          if (key) {
+            var value = parts.join(":").trim();
+            try {
+              headers.append(key, value);
+            } catch (error) {
+              console.warn("Response " + error.message);
+            }
+          }
+        });
+        return headers;
+      }
+      Body.call(Request.prototype);
+      function Response(bodyInit, options) {
+        if (!(this instanceof Response)) {
+          throw new TypeError('Please use the "new" operator, this DOM object constructor cannot be called as a function.');
+        }
+        if (!options) {
+          options = {};
+        }
+        this.type = "default";
+        this.status = options.status === void 0 ? 200 : options.status;
+        if (this.status < 200 || this.status > 599) {
+          throw new RangeError("Failed to construct 'Response': The status provided (0) is outside the range [200, 599].");
+        }
+        this.ok = this.status >= 200 && this.status < 300;
+        this.statusText = options.statusText === void 0 ? "" : "" + options.statusText;
+        this.headers = new Headers2(options.headers);
+        this.url = options.url || "";
+        this._initBody(bodyInit);
+      }
+      Body.call(Response.prototype);
+      Response.prototype.clone = function() {
+        return new Response(this._bodyInit, {
+          status: this.status,
+          statusText: this.statusText,
+          headers: new Headers2(this.headers),
+          url: this.url
+        });
+      };
+      Response.error = function() {
+        var response = new Response(null, { status: 200, statusText: "" });
+        response.ok = false;
+        response.status = 0;
+        response.type = "error";
+        return response;
+      };
+      var redirectStatuses = [301, 302, 303, 307, 308];
+      Response.redirect = function(url, status) {
+        if (redirectStatuses.indexOf(status) === -1) {
+          throw new RangeError("Invalid status code");
+        }
+        return new Response(null, { status, headers: { location: url } });
+      };
+      exports2.DOMException = g.DOMException;
+      try {
+        new exports2.DOMException();
+      } catch (err) {
+        exports2.DOMException = function(message, name) {
+          this.message = message;
+          this.name = name;
+          var error = Error(message);
+          this.stack = error.stack;
+        };
+        exports2.DOMException.prototype = Object.create(Error.prototype);
+        exports2.DOMException.prototype.constructor = exports2.DOMException;
+      }
+      function fetch2(input, init) {
+        return new Promise(function(resolve2, reject) {
+          var request = new Request(input, init);
+          if (request.signal && request.signal.aborted) {
+            return reject(new exports2.DOMException("Aborted", "AbortError"));
+          }
+          var xhr = new XMLHttpRequest();
+          function abortXhr() {
+            xhr.abort();
+          }
+          xhr.onload = function() {
+            var options = {
+              statusText: xhr.statusText,
+              headers: parseHeaders(xhr.getAllResponseHeaders() || "")
+            };
+            if (request.url.indexOf("file://") === 0 && (xhr.status < 200 || xhr.status > 599)) {
+              options.status = 200;
+            } else {
+              options.status = xhr.status;
+            }
+            options.url = "responseURL" in xhr ? xhr.responseURL : options.headers.get("X-Request-URL");
+            var body = "response" in xhr ? xhr.response : xhr.responseText;
+            setTimeout(function() {
+              resolve2(new Response(body, options));
+            }, 0);
+          };
+          xhr.onerror = function() {
+            setTimeout(function() {
+              reject(new TypeError("Network request failed"));
+            }, 0);
+          };
+          xhr.ontimeout = function() {
+            setTimeout(function() {
+              reject(new TypeError("Network request timed out"));
+            }, 0);
+          };
+          xhr.onabort = function() {
+            setTimeout(function() {
+              reject(new exports2.DOMException("Aborted", "AbortError"));
+            }, 0);
+          };
+          function fixUrl(url) {
+            try {
+              return url === "" && g.location.href ? g.location.href : url;
+            } catch (e) {
+              return url;
+            }
+          }
+          xhr.open(request.method, fixUrl(request.url), true);
+          if (request.credentials === "include") {
+            xhr.withCredentials = true;
+          } else if (request.credentials === "omit") {
+            xhr.withCredentials = false;
+          }
+          if ("responseType" in xhr) {
+            if (support.blob) {
+              xhr.responseType = "blob";
+            } else if (support.arrayBuffer) {
+              xhr.responseType = "arraybuffer";
+            }
+          }
+          if (init && typeof init.headers === "object" && !(init.headers instanceof Headers2 || g.Headers && init.headers instanceof g.Headers)) {
+            var names = [];
+            Object.getOwnPropertyNames(init.headers).forEach(function(name) {
+              names.push(normalizeName(name));
+              xhr.setRequestHeader(name, normalizeValue(init.headers[name]));
+            });
+            request.headers.forEach(function(value, name) {
+              if (names.indexOf(name) === -1) {
+                xhr.setRequestHeader(name, value);
+              }
+            });
+          } else {
+            request.headers.forEach(function(value, name) {
+              xhr.setRequestHeader(name, value);
+            });
+          }
+          if (request.signal) {
+            request.signal.addEventListener("abort", abortXhr);
+            xhr.onreadystatechange = function() {
+              if (xhr.readyState === 4) {
+                request.signal.removeEventListener("abort", abortXhr);
+              }
+            };
+          }
+          xhr.send(typeof request._bodyInit === "undefined" ? null : request._bodyInit);
+        });
+      }
+      fetch2.polyfill = true;
+      if (!g.fetch) {
+        g.fetch = fetch2;
+        g.Headers = Headers2;
+        g.Request = Request;
+        g.Response = Response;
+      }
+      exports2.Headers = Headers2;
+      exports2.Request = Request;
+      exports2.Response = Response;
+      exports2.fetch = fetch2;
+      Object.defineProperty(exports2, "__esModule", { value: true });
+    }));
+  }
+});
+
+// node_modules/.pnpm/ollama@0.6.3/node_modules/ollama/dist/browser.mjs
+function getPlatform() {
+  if (typeof window !== "undefined" && window.navigator) {
+    const nav = navigator;
+    if ("userAgentData" in nav && nav.userAgentData?.platform) {
+      return `${nav.userAgentData.platform.toLowerCase()} Browser/${navigator.userAgent};`;
+    }
+    if (navigator.platform) {
+      return `${navigator.platform.toLowerCase()} Browser/${navigator.userAgent};`;
+    }
+    return `unknown Browser/${navigator.userAgent};`;
+  } else if (typeof process !== "undefined") {
+    return `${process.arch} ${process.platform} Node.js/${process.version}`;
+  }
+  return "";
+}
+function normalizeHeaders(headers) {
+  if (headers instanceof Headers) {
+    const obj = {};
+    headers.forEach((value, key) => {
+      obj[key] = value;
+    });
+    return obj;
+  } else if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  } else {
+    return headers || {};
+  }
+}
+var import_whatwg_fetch, defaultPort, defaultHost, version, __defProp$1, __defNormalProp$1, __publicField$1, ResponseError, AbortableAsyncIterator, checkOk, readEnvVar, fetchWithHeaders, get, post, del, parseJSON, formatHost, __defProp2, __defNormalProp, __publicField, Ollama$1, browser;
+var init_browser = __esm({
+  "node_modules/.pnpm/ollama@0.6.3/node_modules/ollama/dist/browser.mjs"() {
+    import_whatwg_fetch = __toESM(require_fetch_umd(), 1);
+    defaultPort = "11434";
+    defaultHost = `http://127.0.0.1:${defaultPort}`;
+    version = "0.6.3";
+    __defProp$1 = Object.defineProperty;
+    __defNormalProp$1 = (obj, key, value) => key in obj ? __defProp$1(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    __publicField$1 = (obj, key, value) => {
+      __defNormalProp$1(obj, typeof key !== "symbol" ? key + "" : key, value);
+      return value;
+    };
+    ResponseError = class _ResponseError extends Error {
+      constructor(error, status_code) {
+        super(error);
+        this.error = error;
+        this.status_code = status_code;
+        this.name = "ResponseError";
+        if (Error.captureStackTrace) {
+          Error.captureStackTrace(this, _ResponseError);
+        }
+      }
+    };
+    AbortableAsyncIterator = class {
+      constructor(abortController, itr, doneCallback) {
+        __publicField$1(this, "abortController");
+        __publicField$1(this, "itr");
+        __publicField$1(this, "doneCallback");
+        this.abortController = abortController;
+        this.itr = itr;
+        this.doneCallback = doneCallback;
+      }
+      abort() {
+        this.abortController.abort();
+      }
+      async *[Symbol.asyncIterator]() {
+        for await (const message of this.itr) {
+          if ("error" in message) {
+            throw new Error(message.error);
+          }
+          yield message;
+          if (message.done || message.status === "success") {
+            this.doneCallback();
+            return;
+          }
+        }
+        throw new Error("Did not receive done or success response in stream.");
+      }
+    };
+    checkOk = async (response) => {
+      if (response.ok) {
+        return;
+      }
+      let message = `Error ${response.status}: ${response.statusText}`;
+      let errorData = null;
+      if (response.headers.get("content-type")?.includes("application/json")) {
+        try {
+          errorData = await response.json();
+          message = errorData.error || message;
+        } catch (error) {
+          console.log("Failed to parse error response as JSON");
+        }
+      } else {
+        try {
+          console.log("Getting text from response");
+          const textResponse = await response.text();
+          message = textResponse || message;
+        } catch (error) {
+          console.log("Failed to get text from error response");
+        }
+      }
+      throw new ResponseError(message, response.status);
+    };
+    readEnvVar = (obj, key) => {
+      return obj[key];
+    };
+    fetchWithHeaders = async (fetch2, url, options = {}) => {
+      const defaultHeaders = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent": `ollama-js/${version} (${getPlatform()})`
+      };
+      options.headers = normalizeHeaders(options.headers);
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:" && parsed.hostname === "ollama.com") {
+          const apiKey = typeof process === "object" && process !== null && typeof process.env === "object" && process.env !== null ? readEnvVar(process.env, "OLLAMA_API_KEY") : void 0;
+          const authorization = options.headers["authorization"] || options.headers["Authorization"];
+          if (!authorization && apiKey) {
+            options.headers["Authorization"] = `Bearer ${apiKey}`;
+          }
+        }
+      } catch (error) {
+        console.error("error parsing url", error);
+      }
+      const customHeaders = Object.fromEntries(
+        Object.entries(options.headers).filter(
+          ([key]) => !Object.keys(defaultHeaders).some(
+            (defaultKey) => defaultKey.toLowerCase() === key.toLowerCase()
+          )
+        )
+      );
+      options.headers = {
+        ...defaultHeaders,
+        ...customHeaders
+      };
+      return fetch2(url, options);
+    };
+    get = async (fetch2, host, options) => {
+      const response = await fetchWithHeaders(fetch2, host, {
+        headers: options?.headers
+      });
+      await checkOk(response);
+      return response;
+    };
+    post = async (fetch2, host, data, options) => {
+      const isRecord = (input) => {
+        return input !== null && typeof input === "object" && !Array.isArray(input);
+      };
+      const formattedData = isRecord(data) ? JSON.stringify(data) : data;
+      const response = await fetchWithHeaders(fetch2, host, {
+        method: "POST",
+        body: formattedData,
+        signal: options?.signal,
+        headers: options?.headers
+      });
+      await checkOk(response);
+      return response;
+    };
+    del = async (fetch2, host, data, options) => {
+      const response = await fetchWithHeaders(fetch2, host, {
+        method: "DELETE",
+        body: JSON.stringify(data),
+        headers: options?.headers
+      });
+      await checkOk(response);
+      return response;
+    };
+    parseJSON = async function* (itr) {
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      const reader = itr.getReader();
+      while (true) {
+        const { done, value: chunk } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(chunk, { stream: true });
+        const parts = buffer.split("\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          try {
+            yield JSON.parse(part);
+          } catch (error) {
+            console.warn("invalid json: ", part);
+          }
+        }
+      }
+      buffer += decoder.decode();
+      for (const part of buffer.split("\n").filter((p) => p !== "")) {
+        try {
+          yield JSON.parse(part);
+        } catch (error) {
+          console.warn("invalid json: ", part);
+        }
+      }
+    };
+    formatHost = (host) => {
+      if (!host) {
+        return defaultHost;
+      }
+      let isExplicitProtocol = host.includes("://");
+      if (host.startsWith(":")) {
+        host = `http://127.0.0.1${host}`;
+        isExplicitProtocol = true;
+      }
+      if (!isExplicitProtocol) {
+        host = `http://${host}`;
+      }
+      const url = new URL(host);
+      let port = url.port;
+      if (!port) {
+        if (!isExplicitProtocol) {
+          port = defaultPort;
+        } else {
+          port = url.protocol === "https:" ? "443" : "80";
+        }
+      }
+      let auth = "";
+      if (url.username) {
+        auth = url.username;
+        if (url.password) {
+          auth += `:${url.password}`;
+        }
+        auth += "@";
+      }
+      let formattedHost = `${url.protocol}//${auth}${url.hostname}:${port}${url.pathname}`;
+      if (formattedHost.endsWith("/")) {
+        formattedHost = formattedHost.slice(0, -1);
+      }
+      return formattedHost;
+    };
+    __defProp2 = Object.defineProperty;
+    __defNormalProp = (obj, key, value) => key in obj ? __defProp2(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+    __publicField = (obj, key, value) => {
+      __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+      return value;
+    };
+    Ollama$1 = class Ollama {
+      constructor(config) {
+        __publicField(this, "config");
+        __publicField(this, "fetch");
+        __publicField(this, "ongoingStreamedRequests", []);
+        this.config = {
+          host: "",
+          headers: config?.headers
+        };
+        if (!config?.proxy) {
+          this.config.host = formatHost(config?.host ?? defaultHost);
+        }
+        this.fetch = config?.fetch ?? fetch;
+      }
+      // Abort any ongoing streamed requests to Ollama
+      abort() {
+        for (const request of this.ongoingStreamedRequests) {
+          request.abort();
+        }
+        this.ongoingStreamedRequests.length = 0;
+      }
+      /**
+       * Processes a request to the Ollama server. If the request is streamable, it will return a
+       * AbortableAsyncIterator that yields the response messages. Otherwise, it will return the response
+       * object.
+       * @param endpoint {string} - The endpoint to send the request to.
+       * @param request {object} - The request object to send to the endpoint.
+       * @protected {T | AbortableAsyncIterator<T>} - The response object or a AbortableAsyncIterator that yields
+       * response messages.
+       * @throws {Error} - If the response body is missing or if the response is an error.
+       * @returns {Promise<T | AbortableAsyncIterator<T>>} - The response object or a AbortableAsyncIterator that yields the streamed response.
+       */
+      async processStreamableRequest(endpoint, request) {
+        request.stream = request.stream ?? false;
+        const host = `${this.config.host}/api/${endpoint}`;
+        if (request.stream) {
+          const abortController = new AbortController();
+          const response2 = await post(this.fetch, host, request, {
+            signal: abortController.signal,
+            headers: this.config.headers
+          });
+          if (!response2.body) {
+            throw new Error("Missing body");
+          }
+          const itr = parseJSON(response2.body);
+          const abortableAsyncIterator = new AbortableAsyncIterator(
+            abortController,
+            itr,
+            () => {
+              const i = this.ongoingStreamedRequests.indexOf(abortableAsyncIterator);
+              if (i > -1) {
+                this.ongoingStreamedRequests.splice(i, 1);
+              }
+            }
+          );
+          this.ongoingStreamedRequests.push(abortableAsyncIterator);
+          return abortableAsyncIterator;
+        }
+        const response = await post(this.fetch, host, request, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Encodes an image to base64 if it is a Uint8Array.
+       * @param image {Uint8Array | string} - The image to encode.
+       * @returns {Promise<string>} - The base64 encoded image.
+       */
+      async encodeImage(image) {
+        if (typeof image !== "string") {
+          const uint8Array = new Uint8Array(image);
+          let byteString = "";
+          const len = uint8Array.byteLength;
+          for (let i = 0; i < len; i++) {
+            byteString += String.fromCharCode(uint8Array[i]);
+          }
+          return btoa(byteString);
+        }
+        return image;
+      }
+      /**
+       * Generates a response from a text prompt.
+       * @param request {GenerateRequest} - The request object.
+       * @returns {Promise<GenerateResponse | AbortableAsyncIterator<GenerateResponse>>} - The response object or
+       * an AbortableAsyncIterator that yields response messages.
+       */
+      async generate(request) {
+        if (request.images) {
+          request.images = await Promise.all(request.images.map(this.encodeImage.bind(this)));
+        }
+        return this.processStreamableRequest("generate", request);
+      }
+      /**
+       * Chats with the model. The request object can contain messages with images that are either
+       * Uint8Arrays or base64 encoded strings. The images will be base64 encoded before sending the
+       * request.
+       * @param request {ChatRequest} - The request object.
+       * @returns {Promise<ChatResponse | AbortableAsyncIterator<ChatResponse>>} - The response object or an
+       * AbortableAsyncIterator that yields response messages.
+       */
+      async chat(request) {
+        if (request.messages) {
+          for (const message of request.messages) {
+            if (message.images) {
+              message.images = await Promise.all(
+                message.images.map(this.encodeImage.bind(this))
+              );
+            }
+          }
+        }
+        return this.processStreamableRequest("chat", request);
+      }
+      /**
+       * Creates a new model from a stream of data.
+       * @param request {CreateRequest} - The request object.
+       * @returns {Promise<ProgressResponse | AbortableAsyncIterator<ProgressResponse>>} - The response object or a stream of progress responses.
+       */
+      async create(request) {
+        return this.processStreamableRequest("create", {
+          ...request
+        });
+      }
+      /**
+       * Pulls a model from the Ollama registry. The request object can contain a stream flag to indicate if the
+       * response should be streamed.
+       * @param request {PullRequest} - The request object.
+       * @returns {Promise<ProgressResponse | AbortableAsyncIterator<ProgressResponse>>} - The response object or
+       * an AbortableAsyncIterator that yields response messages.
+       */
+      async pull(request) {
+        return this.processStreamableRequest("pull", {
+          name: request.model,
+          stream: request.stream,
+          insecure: request.insecure
+        });
+      }
+      /**
+       * Pushes a model to the Ollama registry. The request object can contain a stream flag to indicate if the
+       * response should be streamed.
+       * @param request {PushRequest} - The request object.
+       * @returns {Promise<ProgressResponse | AbortableAsyncIterator<ProgressResponse>>} - The response object or
+       * an AbortableAsyncIterator that yields response messages.
+       */
+      async push(request) {
+        return this.processStreamableRequest("push", {
+          name: request.model,
+          stream: request.stream,
+          insecure: request.insecure
+        });
+      }
+      /**
+       * Deletes a model from the server. The request object should contain the name of the model to
+       * delete.
+       * @param request {DeleteRequest} - The request object.
+       * @returns {Promise<StatusResponse>} - The response object.
+       */
+      async delete(request) {
+        await del(
+          this.fetch,
+          `${this.config.host}/api/delete`,
+          { name: request.model },
+          { headers: this.config.headers }
+        );
+        return { status: "success" };
+      }
+      /**
+       * Copies a model from one name to another. The request object should contain the name of the
+       * model to copy and the new name.
+       * @param request {CopyRequest} - The request object.
+       * @returns {Promise<StatusResponse>} - The response object.
+       */
+      async copy(request) {
+        await post(this.fetch, `${this.config.host}/api/copy`, { ...request }, {
+          headers: this.config.headers
+        });
+        return { status: "success" };
+      }
+      /**
+       * Lists the models on the server.
+       * @returns {Promise<ListResponse>} - The response object.
+       * @throws {Error} - If the response body is missing.
+       */
+      async list() {
+        const response = await get(this.fetch, `${this.config.host}/api/tags`, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Shows the metadata of a model. The request object should contain the name of the model.
+       * @param request {ShowRequest} - The request object.
+       * @returns {Promise<ShowResponse>} - The response object.
+       */
+      async show(request) {
+        const response = await post(this.fetch, `${this.config.host}/api/show`, {
+          ...request
+        }, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Embeds text input into vectors.
+       * @param request {EmbedRequest} - The request object.
+       * @returns {Promise<EmbedResponse>} - The response object.
+       */
+      async embed(request) {
+        const response = await post(this.fetch, `${this.config.host}/api/embed`, {
+          ...request
+        }, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Embeds a text prompt into a vector.
+       * @param request {EmbeddingsRequest} - The request object.
+       * @returns {Promise<EmbeddingsResponse>} - The response object.
+       */
+      async embeddings(request) {
+        const response = await post(this.fetch, `${this.config.host}/api/embeddings`, {
+          ...request
+        }, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Lists the running models on the server
+       * @returns {Promise<ListResponse>} - The response object.
+       * @throws {Error} - If the response body is missing.
+       */
+      async ps() {
+        const response = await get(this.fetch, `${this.config.host}/api/ps`, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Returns the Ollama server version.
+       * @returns {Promise<VersionResponse>} - The server version object.
+       */
+      async version() {
+        const response = await get(this.fetch, `${this.config.host}/api/version`, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Performs web search using the Ollama web search API
+       * @param request {WebSearchRequest} - The search request containing query and options
+       * @returns {Promise<WebSearchResponse>} - The search results
+       * @throws {Error} - If the request is invalid or the server returns an error
+       */
+      async webSearch(request) {
+        if (!request.query || request.query.length === 0) {
+          throw new Error("Query is required");
+        }
+        const response = await post(this.fetch, `https://ollama.com/api/web_search`, { ...request }, {
+          headers: this.config.headers
+        });
+        return await response.json();
+      }
+      /**
+       * Fetches a single page using the Ollama web fetch API
+       * @param request {WebFetchRequest} - The fetch request containing a URL
+       * @returns {Promise<WebFetchResponse>} - The fetch result
+       * @throws {Error} - If the request is invalid or the server returns an error
+       */
+      async webFetch(request) {
+        if (!request.url || request.url.length === 0) {
+          throw new Error("URL is required");
+        }
+        const response = await post(this.fetch, `https://ollama.com/api/web_fetch`, { ...request }, { headers: this.config.headers });
+        return await response.json();
+      }
+    };
+    browser = new Ollama$1();
+  }
+});
+
+// node_modules/.pnpm/ollama@0.6.3/node_modules/ollama/dist/index.mjs
+import fs7, { promises } from "node:fs";
+import { resolve } from "node:path";
+var import_whatwg_fetch2, Ollama2, index;
+var init_dist = __esm({
+  "node_modules/.pnpm/ollama@0.6.3/node_modules/ollama/dist/index.mjs"() {
+    init_browser();
+    import_whatwg_fetch2 = __toESM(require_fetch_umd(), 1);
+    Ollama2 = class extends Ollama$1 {
+      async encodeImage(image) {
+        if (typeof image !== "string") {
+          return Buffer.from(image).toString("base64");
+        }
+        try {
+          if (fs7.existsSync(image)) {
+            const fileBuffer = await promises.readFile(resolve(image));
+            return Buffer.from(fileBuffer).toString("base64");
+          }
+        } catch {
+        }
+        return image;
+      }
+      /**
+       * checks if a file exists
+       * @param path {string} - The path to the file
+       * @private @internal
+       * @returns {Promise<boolean>} - Whether the file exists or not
+       */
+      async fileExists(path28) {
+        try {
+          await promises.access(path28);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      async create(request) {
+        if (request.from && await this.fileExists(resolve(request.from))) {
+          throw Error("Creating with a local path is not currently supported from ollama-js");
+        }
+        if (request.stream) {
+          return super.create(request);
+        } else {
+          return super.create(request);
+        }
+      }
+    };
+    index = new Ollama2();
+  }
+});
+
 // src/data/janitor_tools.js
 var JANITOR_TOOLS_PROTOCOL;
 var init_janitor_tools = __esm({
@@ -8583,7 +9723,7 @@ var init_thinking_prompts = __esm({
 });
 
 // src/utils/prompts.js
-import fs7 from "fs";
+import fs8 from "fs";
 var cachedProjectContextBlock, cachedChatId, cachedUserMemories, getCachedUserMemories, getMemoryPrompt, getSystemInstruction, getJanitorInstruction;
 var init_prompts = __esm({
   async "src/utils/prompts.js"() {
@@ -8609,7 +9749,7 @@ var init_prompts = __esm({
           }
         } catch (e) {
           cachedUserMemories = "";
-          fs7.appendFileSync(`${LOGS_DIR}/memory/error.txt`, `${e.message}
+          fs8.appendFileSync(`${LOGS_DIR}/memory/error.txt`, `${e.message}
 -------------------------------------------------
 
 `);
@@ -8628,7 +9768,7 @@ var init_prompts = __esm({
 ${tempMemories}` : "";
       return tempMemoriesStr ? `${tempMemoriesStr}` : "";
     };
-    getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini, chatId) => {
+    getSystemInstruction = (profile, thinkingLevel, mode, systemSettings2, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = "Google", isMultiModal = false, isGemini, chatId) => {
       let forcedReasoning = false;
       if (process.env.forcedReasoning && process.env.NVIDIA_BASE_URL && aiProvider.toUpperCase() === "NVIDIA") {
         forcedReasoning = true;
@@ -8695,7 +9835,7 @@ ${userMemories}
         { name: "architecture.md", desc: "System Structure" }
       ];
       if (isFirstPrompt || cachedProjectContextBlock === null) {
-        const foundFiles = projectContextFiles.filter((f) => fs7.existsSync(f.name));
+        const foundFiles = projectContextFiles.filter((f) => fs8.existsSync(f.name));
         cachedProjectContextBlock = mode === "Flux" && foundFiles.length > 0 ? `
 -- PROJECT CONTEXT --
 ${foundFiles.map((f) => `- ${f.name}: ${f.desc}`).join("\n")}
@@ -8717,7 +9857,7 @@ ${forcedReasoning || thinkingLevel !== "Fast" && (aiProvider === "Mistral" || th
 - Use <think>...</think> for reasoning before responding any queries
 ` : ""}` : `${thinkingConfig}
 `}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
+${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === "deepseek" ? false : isMultiModal, aiProvider, systemSettings2?.advanceRollback, systemSettings2?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `
 -- MEMORY RULES --
 - Subtly Personalize with  RELEVENT CONTEXTUAL MEMORIES. Auto Saves
@@ -8761,30 +9901,30 @@ ${userMemories}` : ""}`.trim();
 });
 
 // src/utils/revert.js
-import fs8 from "fs-extra";
+import fs9 from "fs-extra";
 import path7 from "path";
 async function performRestoration(change, tx) {
   try {
     if (change.type === "create") {
-      if (await fs8.pathExists(change.filePath)) {
-        await fs8.chmod(change.filePath, 438).catch(() => {
+      if (await fs9.pathExists(change.filePath)) {
+        await fs9.chmod(change.filePath, 438).catch(() => {
         });
-        await fs8.remove(change.filePath);
+        await fs9.remove(change.filePath);
       }
     } else if (change.type === "update") {
       if (!change.backupFile) return;
       const backupPath = path7.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-      if (await fs8.pathExists(backupPath)) {
+      if (await fs9.pathExists(backupPath)) {
         const backupContainer = readEncryptedJson(backupPath, null);
         if (!backupContainer || !backupContainer.data) {
           throw new Error(`Backup container corrupt or empty for ${path7.basename(change.filePath)}`);
         }
         const decrypted = decryptAes(backupContainer.data);
-        if (await fs8.pathExists(change.filePath)) {
-          await fs8.chmod(change.filePath, 438).catch(() => {
+        if (await fs9.pathExists(change.filePath)) {
+          await fs9.chmod(change.filePath, 438).catch(() => {
           });
         }
-        await fs8.writeFile(change.filePath, decrypted, "utf8");
+        await fs9.writeFile(change.filePath, decrypted, "utf8");
       } else {
       }
     }
@@ -8804,7 +9944,7 @@ async function restoreWithRetry(change, tx, maxAttempts = 7) {
         return false;
       }
       const delay = Math.min(100 * Math.pow(2, attempt - 1), 5e3);
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise((resolve2) => setTimeout(resolve2, delay));
     }
   }
   return false;
@@ -8814,7 +9954,7 @@ var init_revert = __esm({
   "src/utils/revert.js"() {
     init_paths();
     init_crypto();
-    fs8.ensureDirSync(BACKUPS_DIR);
+    fs9.ensureDirSync(BACKUPS_DIR);
     currentTransaction = null;
     lastChatId = null;
     RevertManager = {
@@ -8839,16 +9979,16 @@ var init_revert = __esm({
               if (lastTx) {
                 const alreadyBackedUp2 = lastTx.changes.some((c) => c.filePath === absolutePath);
                 if (alreadyBackedUp2) return;
-                const fileExists2 = await fs8.pathExists(absolutePath);
+                const fileExists2 = await fs9.pathExists(absolutePath);
                 let type2 = fileExists2 || forcedContent ? "update" : "create";
                 let backupFile2 = null;
                 if (type2 === "update") {
                   const fileName = path7.basename(absolutePath);
                   backupFile2 = `${lastTx.id}_${fileName}.bak`;
                   const chatBackupDir = path7.join(BACKUPS_DIR, lastTx.chatId);
-                  await fs8.ensureDir(chatBackupDir);
+                  await fs9.ensureDir(chatBackupDir);
                   const backupPath = path7.join(chatBackupDir, backupFile2);
-                  let content = forcedContent !== null ? forcedContent : await fs8.readFile(absolutePath, "utf8").catch(() => null);
+                  let content = forcedContent !== null ? forcedContent : await fs9.readFile(absolutePath, "utf8").catch(() => null);
                   if (content !== null) {
                     writeEncryptedJson(backupPath, { data: encryptAes(content) });
                   } else {
@@ -8864,16 +10004,16 @@ var init_revert = __esm({
           }
           const alreadyBackedUp = currentTransaction.changes.some((c) => c.filePath === absolutePath);
           if (alreadyBackedUp) return;
-          const fileExists = await fs8.pathExists(absolutePath);
+          const fileExists = await fs9.pathExists(absolutePath);
           let type = fileExists || forcedContent ? "update" : "create";
           let backupFile = null;
           if (type === "update") {
             const fileName = path7.basename(absolutePath);
             backupFile = `${currentTransaction.id}_${fileName}.bak`;
             const chatBackupDir = path7.join(BACKUPS_DIR, currentTransaction.chatId);
-            await fs8.ensureDir(chatBackupDir);
+            await fs9.ensureDir(chatBackupDir);
             const backupPath = path7.join(chatBackupDir, backupFile);
-            let content = forcedContent !== null ? forcedContent : await fs8.readFile(absolutePath, "utf8").catch(() => null);
+            let content = forcedContent !== null ? forcedContent : await fs9.readFile(absolutePath, "utf8").catch(() => null);
             if (content !== null) {
               writeEncryptedJson(backupPath, { data: encryptAes(content) });
             } else {
@@ -8896,14 +10036,14 @@ var init_revert = __esm({
             if (removed.changes) {
               for (const change of removed.changes) {
                 if (change.backupFile) {
-                  await fs8.remove(path7.join(BACKUPS_DIR, removed.chatId, change.backupFile)).catch(() => {
+                  await fs9.remove(path7.join(BACKUPS_DIR, removed.chatId, change.backupFile)).catch(() => {
                   });
                 }
               }
             }
           }
           writeEncryptedJson(LEDGER_FILE, ledger);
-          await fs8.remove(ACTIVE_TX_FILE).catch(() => {
+          await fs9.remove(ACTIVE_TX_FILE).catch(() => {
           });
         } catch (err) {
         } finally {
@@ -8912,7 +10052,7 @@ var init_revert = __esm({
       },
       async recoverCrashedTransaction() {
         try {
-          if (await fs8.pathExists(ACTIVE_TX_FILE)) {
+          if (await fs9.pathExists(ACTIVE_TX_FILE)) {
             const orphanedTx = readEncryptedJson(ACTIVE_TX_FILE, null);
             if (orphanedTx?.changes?.length > 0) {
               const ledger = readEncryptedJson(LEDGER_FILE, []);
@@ -8921,7 +10061,7 @@ var init_revert = __esm({
                 writeEncryptedJson(LEDGER_FILE, ledger);
               }
             }
-            await fs8.remove(ACTIVE_TX_FILE).catch(() => {
+            await fs9.remove(ACTIVE_TX_FILE).catch(() => {
             });
           }
         } catch (e) {
@@ -8942,7 +10082,7 @@ var init_revert = __esm({
           for (const change of tx.changes) {
             if (change.backupFile) {
               const backupPath = path7.join(BACKUPS_DIR, tx.chatId, change.backupFile);
-              await fs8.remove(backupPath).catch(() => {
+              await fs9.remove(backupPath).catch(() => {
               });
             }
           }
@@ -8961,7 +10101,7 @@ var init_revert = __esm({
       },
       async deleteChatBackups(chatId) {
         try {
-          await fs8.remove(path7.join(BACKUPS_DIR, chatId));
+          await fs9.remove(path7.join(BACKUPS_DIR, chatId));
           let ledger = readEncryptedJson(LEDGER_FILE, []);
           const clean = ledger.filter((t) => t.chatId !== chatId);
           if (ledger.length !== clean.length) writeEncryptedJson(LEDGER_FILE, clean);
@@ -8973,7 +10113,7 @@ var init_revert = __esm({
 });
 
 // src/utils/history.js
-import fs9 from "fs-extra";
+import fs10 from "fs-extra";
 import path8 from "path";
 import { nanoid } from "nanoid";
 var WRITE_LOCK, withLock, loadHistory, saveChat, saveChatTitle, deleteChat, generateChatId, cleanupOldHistory, parseCustomDate, cleanupLogFile, cleanupOldLogs, getTruncatedHistory, saveChatContext, loadChatContext;
@@ -8998,9 +10138,9 @@ var init_history = __esm({
       return nextLock;
     };
     loadHistory = async () => {
-      await fs9.ensureDir(HISTORY_DIR);
+      await fs10.ensureDir(HISTORY_DIR);
       let history = {};
-      if (await fs9.pathExists(HISTORY_FILE)) {
+      if (await fs10.pathExists(HISTORY_FILE)) {
         try {
           history = readEncryptedJson(HISTORY_FILE, {});
         } catch (e) {
@@ -9011,7 +10151,7 @@ var init_history = __esm({
         const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
         Object.defineProperty(history[id], "messages", {
           get: () => {
-            if (fs9.existsSync(chatFile)) {
+            if (fs10.existsSync(chatFile)) {
               try {
                 return readEncryptedJson(chatFile, []);
               } catch (e) {
@@ -9034,7 +10174,7 @@ var init_history = __esm({
     };
     saveChat = async (id, name, messages) => {
       return withLock(async () => {
-        await fs9.ensureDir(HISTORY_DIR);
+        await fs10.ensureDir(HISTORY_DIR);
         const history = await loadHistory();
         const existingChat = history[id];
         let persistentMessages = (messages || []).filter(
@@ -9131,7 +10271,7 @@ var init_history = __esm({
           };
         }
         writeEncryptedJson(HISTORY_FILE, indexHistory);
-        if (await fs9.pathExists(CONTEXT_FILE)) {
+        if (await fs10.pathExists(CONTEXT_FILE)) {
           try {
             const contextData = readEncryptedJson(CONTEXT_FILE, []);
             if (Array.isArray(contextData)) {
@@ -9153,9 +10293,9 @@ var init_history = __esm({
         }
         await RevertManager.deleteChatBackups(id);
         const chatFile = path8.join(HISTORY_DIR, `${id}.json`);
-        if (await fs9.pathExists(chatFile)) {
+        if (await fs10.pathExists(chatFile)) {
           try {
-            await fs9.remove(chatFile);
+            await fs10.remove(chatFile);
           } catch (e) {
           }
         }
@@ -9240,8 +10380,8 @@ var init_history = __esm({
     };
     cleanupLogFile = async (filePath) => {
       try {
-        if (!await fs9.pathExists(filePath)) return;
-        const content = await fs9.readFile(filePath, "utf8");
+        if (!await fs10.pathExists(filePath)) return;
+        const content = await fs10.readFile(filePath, "utf8");
         if (!content.trim()) return;
         const lines = content.split("\n");
         const entries = [];
@@ -9284,26 +10424,26 @@ var init_history = __esm({
         }
         const finalContent = keptEntries.join("\n").trim();
         if (finalContent) {
-          await fs9.writeFile(filePath, finalContent + "\n", "utf8");
+          await fs10.writeFile(filePath, finalContent + "\n", "utf8");
         } else {
-          await fs9.writeFile(filePath, "", "utf8");
+          await fs10.writeFile(filePath, "", "utf8");
         }
       } catch (e) {
       }
     };
     cleanupOldLogs = async (logsDir) => {
       try {
-        if (!await fs9.pathExists(logsDir)) return;
+        if (!await fs10.pathExists(logsDir)) return;
         const cleanRecursive = async (dir) => {
-          const files = await fs9.readdir(dir);
+          const files = await fs10.readdir(dir);
           for (const file of files) {
             const fullPath = path8.join(dir, file);
-            const stat = await fs9.stat(fullPath);
+            const stat = await fs10.stat(fullPath);
             if (stat.isDirectory()) {
               await cleanRecursive(fullPath);
-              const subFiles = await fs9.readdir(fullPath);
+              const subFiles = await fs10.readdir(fullPath);
               if (subFiles.length === 0) {
-                await fs9.remove(fullPath);
+                await fs10.remove(fullPath);
               }
             } else if (file.endsWith(".log")) {
               await cleanupLogFile(fullPath);
@@ -9338,7 +10478,7 @@ var init_history = __esm({
     };
     loadChatContext = async (chatId) => {
       try {
-        if (!await fs9.pathExists(CONTEXT_FILE)) return { total: 0, context: 0 };
+        if (!await fs10.pathExists(CONTEXT_FILE)) return { total: 0, context: 0 };
         const contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) return { total: 0, context: 0 };
         const entry = contextData.find((item) => Object.keys(item)[0] === String(chatId));
@@ -9351,7 +10491,7 @@ var init_history = __esm({
 });
 
 // src/utils/usage.js
-import fs10 from "fs-extra";
+import fs11 from "fs-extra";
 import path9 from "path";
 var generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
@@ -9394,17 +10534,17 @@ var init_usage = __esm({
     loadUsageFromFile = async () => {
       const today2 = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
       try {
-        if (!await fs10.exists(USAGE_FILE) && await fs10.exists(USAGE_FILE_OLD)) {
-          await fs10.ensureDir(path9.dirname(USAGE_FILE));
-          await fs10.move(USAGE_FILE_OLD, USAGE_FILE);
+        if (!await fs11.exists(USAGE_FILE) && await fs11.exists(USAGE_FILE_OLD)) {
+          await fs11.ensureDir(path9.dirname(USAGE_FILE));
+          await fs11.move(USAGE_FILE_OLD, USAGE_FILE);
         }
       } catch (err) {
       }
       const tempFile = USAGE_FILE + ".tmp";
       let primaryData = null;
       try {
-        if (await fs10.exists(tempFile)) {
-          const rawContent = (await fs10.readFile(tempFile, "utf8")).trim();
+        if (await fs11.exists(tempFile)) {
+          const rawContent = (await fs11.readFile(tempFile, "utf8")).trim();
           let parsed = null;
           if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
             parsed = JSON.parse(rawContent);
@@ -9414,26 +10554,26 @@ var init_usage = __esm({
           if (parsed && parsed.date && parsed.stats) {
             primaryData = parsed;
             try {
-              await fs10.rename(tempFile, USAGE_FILE);
+              await fs11.rename(tempFile, USAGE_FILE);
             } catch (e) {
             }
           } else {
             try {
-              await fs10.remove(tempFile);
+              await fs11.remove(tempFile);
             } catch (e) {
             }
           }
         }
       } catch (err) {
         try {
-          await fs10.remove(tempFile);
+          await fs11.remove(tempFile);
         } catch (e) {
         }
       }
       if (!primaryData) {
         try {
-          if (await fs10.exists(USAGE_FILE)) {
-            const rawContent = (await fs10.readFile(USAGE_FILE, "utf8")).trim();
+          if (await fs11.exists(USAGE_FILE)) {
+            const rawContent = (await fs11.readFile(USAGE_FILE, "utf8")).trim();
             if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
               primaryData = JSON.parse(rawContent);
             } else {
@@ -9484,11 +10624,11 @@ var init_usage = __esm({
     flushUsage = async () => {
       if (!isDirty || !cachedUsage) return;
       try {
-        await fs10.ensureDir(path9.dirname(USAGE_FILE));
+        await fs11.ensureDir(path9.dirname(USAGE_FILE));
         let diskData = null;
         try {
-          if (await fs10.exists(USAGE_FILE)) {
-            const rawContent = (await fs10.readFile(USAGE_FILE, "utf8")).trim();
+          if (await fs11.exists(USAGE_FILE)) {
+            const rawContent = (await fs11.readFile(USAGE_FILE, "utf8")).trim();
             if (rawContent.startsWith("{") || rawContent.startsWith("[")) {
               diskData = JSON.parse(rawContent);
             } else {
@@ -9567,11 +10707,11 @@ var init_usage = __esm({
         cachedUsage.saveId = generateSaveId();
         const tempFile = USAGE_FILE + ".tmp";
         const encryptedStr = encryptAes(JSON.stringify(cachedUsage, null, 2));
-        await fs10.writeFile(tempFile, encryptedStr, "utf8");
-        const fd = await fs10.open(tempFile, "r+");
-        await fs10.fsync(fd);
-        await fs10.close(fd);
-        await fs10.rename(tempFile, USAGE_FILE);
+        await fs11.writeFile(tempFile, encryptedStr, "utf8");
+        const fd = await fs11.open(tempFile, "r+");
+        await fs11.fsync(fd);
+        await fs11.close(fd);
+        await fs11.rename(tempFile, USAGE_FILE);
         isDirty = false;
         lastWriteTime = Date.now();
       } catch (e) {
@@ -10057,7 +11197,7 @@ var init_usage = __esm({
 // src/utils/puppeteer_helper.js
 import os3 from "os";
 import path10 from "path";
-import fs11 from "fs";
+import fs12 from "fs";
 import { createRequire } from "module";
 import { fileURLToPath as fileURLToPath2 } from "url";
 function getPuppeteerConfig() {
@@ -10083,27 +11223,27 @@ function getPuppeteerConfig() {
     return {};
   }
   let configPath = path10.resolve(__dirname2, "..", "..", ".puppeteerrc.cjs");
-  if (!fs11.existsSync(configPath)) {
+  if (!fs12.existsSync(configPath)) {
     configPath = path10.resolve(__dirname2, "..", ".puppeteerrc.cjs");
   }
-  if (!fs11.existsSync(configPath)) {
+  if (!fs12.existsSync(configPath)) {
     return {};
   }
   try {
     const config = require2(configPath);
     const cacheDir = config.cacheDirectory;
-    const version = config.chrome?.version;
+    const version2 = config.chrome?.version;
     if (cacheDir) {
       process.env.PUPPETEER_CACHE_DIR = cacheDir;
-      if (version) {
+      if (version2) {
         const expectedPath = path10.join(
           cacheDir,
           "chrome",
-          `${pptrPlatform}-${version}`,
+          `${pptrPlatform}-${version2}`,
           subDir,
           execName
         );
-        if (fs11.existsSync(expectedPath)) {
+        if (fs12.existsSync(expectedPath)) {
           return {
             executablePath: expectedPath,
             cacheDirectory: cacheDir
@@ -10111,36 +11251,36 @@ function getPuppeteerConfig() {
         }
       }
       const findExecutable = (dir) => {
-        if (!fs11.existsSync(dir)) return null;
+        if (!fs12.existsSync(dir)) return null;
         try {
-          const files = fs11.readdirSync(dir);
+          const files = fs12.readdirSync(dir);
           const dirsToSearch = [];
           for (const file of files) {
             const fullPath = path10.join(dir, file);
             let stat;
             try {
-              stat = fs11.statSync(fullPath);
+              stat = fs12.statSync(fullPath);
             } catch (e) {
               continue;
             }
             if (stat.isDirectory()) {
               dirsToSearch.push(fullPath);
             } else if (file.toLowerCase() === execName.toLowerCase()) {
-              if (!version || fullPath.includes(version)) {
+              if (!version2 || fullPath.includes(version2)) {
                 return fullPath;
               }
             }
           }
-          if (version) {
+          if (version2) {
             for (const d of dirsToSearch) {
-              if (d.includes(version)) {
+              if (d.includes(version2)) {
                 const found = findExecutable(d);
                 if (found) return found;
               }
             }
           }
           for (const d of dirsToSearch) {
-            if (!version || !d.includes(version)) {
+            if (!version2 || !d.includes(version2)) {
               const found = findExecutable(d);
               if (found) return found;
             }
@@ -10171,7 +11311,7 @@ var init_puppeteer_helper = __esm({
 
 // src/tools/web_search.js
 import puppeteer from "puppeteer";
-import fs12 from "fs";
+import fs13 from "fs";
 import path11 from "path";
 var web_search;
 var init_web_search = __esm({
@@ -10202,10 +11342,10 @@ Sources:
 - DO NOT USE MARKDOWN LINKS.
 - DO NOT INCLUDE ANY TEXT, NOTES, OR EXPLANATIONS AFTER THE SOURCES SECTION.`;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          let browser = null;
+          let browser2 = null;
           try {
             const pptrConfig = getPuppeteerConfig();
-            browser = await puppeteer.launch({
+            browser2 = await puppeteer.launch({
               headless: true,
               executablePath: pptrConfig.executablePath || void 0,
               args: [
@@ -10215,7 +11355,7 @@ Sources:
                 "--disable-dev-shm-usage"
               ]
             });
-            const page = await browser.newPage();
+            const page = await browser2.newPage();
             await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36");
             await page.setViewport({ width: 1366, height: 768 });
             const jitter = attempt === 1 ? Math.random() * 1e3 + 500 : Math.random() * 2e3 + 1e3;
@@ -10315,14 +11455,14 @@ Sources:
             if (!aiResult || /^(\+\d+|Searching|Answering|Thinking|Finished)$/i.test(aiResult)) {
               throw new Error("EMPTY_AI_RESPONSE");
             }
-            await browser.close();
+            await browser2.close();
             return `AI Search results for [${query}]:
 
 ${aiResult}`;
           } catch (err) {
             lastError = err;
-            fs12.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "ai_mode", "ERROR.txt"), err.message);
-            if (browser) await browser.close();
+            fs13.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "ai_mode", "ERROR.txt"), err.message);
+            if (browser2) await browser2.close();
             if (attempt < maxRetries) {
               const backoff = Math.pow(2, attempt) * 1e3;
               await new Promise((r) => setTimeout(r, backoff));
@@ -10331,10 +11471,10 @@ ${aiResult}`;
         }
       }
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        let browser = null;
+        let browser2 = null;
         try {
           const pptrConfig = getPuppeteerConfig();
-          browser = await puppeteer.launch({
+          browser2 = await puppeteer.launch({
             headless: true,
             executablePath: pptrConfig.executablePath || void 0,
             args: [
@@ -10344,7 +11484,7 @@ ${aiResult}`;
               "--disable-dev-shm-usage"
             ]
           });
-          const page = await browser.newPage();
+          const page = await browser2.newPage();
           await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36");
           await page.setViewport({ width: 1366, height: 768 });
           const jitter = attempt === 1 ? Math.random() * 1e3 + 500 : Math.random() * 2e3 + 1e3;
@@ -10371,19 +11511,19 @@ Snippet: ${snippet}`;
             if (bodyText.includes("anomaly")) {
               throw new Error("ANOMALY_DETECTED");
             }
-            await browser.close();
+            await browser2.close();
             return `No results found for query: [${query}].`;
           }
           const finalResults = results.join("\n\n");
-          await browser.close();
+          await browser2.close();
           const prefix = aiMode ? "AI Mode temporarily failed, used Standard search.\n\n" : "";
           return `${prefix}Search results for [${query}]:
 
 ${finalResults}`;
         } catch (err) {
           lastError = err;
-          if (browser) await browser.close();
-          fs12.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "standard_mode", "ERROR.txt"), err.message);
+          if (browser2) await browser2.close();
+          fs13.writeFileSync(path11.join(LOGS_DIR, "web_tools", "search", "standard_mode", "ERROR.txt"), err.message);
           if (attempt < maxRetries) {
             const backoff = Math.pow(2, attempt) * 1e3;
             await new Promise((r) => setTimeout(r, backoff));
@@ -10419,10 +11559,10 @@ var init_web_scrape = __esm({
       const maxRetries = 3;
       let lastError = null;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        let browser = null;
+        let browser2 = null;
         try {
           const pptrConfig = getPuppeteerConfig();
-          browser = await puppeteer2.launch({
+          browser2 = await puppeteer2.launch({
             headless: true,
             executablePath: pptrConfig.executablePath || void 0,
             args: [
@@ -10432,7 +11572,7 @@ var init_web_scrape = __esm({
               "--disable-dev-shm-usage"
             ]
           });
-          const page = await browser.newPage();
+          const page = await browser2.newPage();
           await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.178 Safari/537.36");
           await page.setViewport({ width: 1366, height: 768 });
           const jitter = attempt === 1 ? Math.random() * 1e3 + 500 : Math.random() * 2e3 + 1e3;
@@ -10489,13 +11629,13 @@ var init_web_scrape = __esm({
           turndownService.use(gfm);
           const rawMarkdown = turndownService.turndown(cleanedHtml).replace(/\.\s*\n/g, "\n").replace(/ +/g, " ").replace(/\t/g, "  ").replace(/\n\s+/g, "\n").replace(/\n{3,}/g, "\n\n");
           const markdown = rawMarkdown.substring(0, 5e4);
-          await browser.close();
+          await browser2.close();
           return `Markdown parsed from [${url}]:
 
 ${markdown}${rawMarkdown.length > 5e4 ? "\n\n[TRUNCATED AT 50K CHARS]" : ""}`;
         } catch (err) {
           lastError = err;
-          if (browser) await browser.close();
+          if (browser2) await browser2.close();
           if (attempt < maxRetries) {
             const backoff = Math.pow(2, attempt) * 1e3;
             await new Promise((r) => setTimeout(r, backoff));
@@ -10571,12 +11711,12 @@ var init_memory = __esm({
           const memId = id || contentOld;
           const newText = contentNew || content;
           if (!memId || !newText) return "ERROR: Missing 'id' or content for update.";
-          const index = memories.findIndex((m) => m.id === memId);
-          if (index === -1) return `ERROR: Memory ID [${memId}] not found.`;
+          const index2 = memories.findIndex((m) => m.id === memId);
+          if (index2 === -1) return `ERROR: Memory ID [${memId}] not found.`;
           const now = /* @__PURE__ */ new Date();
           const dateStr = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
           const formattedText = newText.includes("[Saved on:") ? newText : `${newText.trim()} [Saved on: ${dateStr}]`;
-          memories[index].memory = formattedText;
+          memories[index2].memory = formattedText;
           writeEncryptedJson(MEMORIES_FILE, memories);
           return `SUCCESS: Memory [${memId}] updated.`;
         }
@@ -10619,7 +11759,7 @@ var init_chat = __esm({
 });
 
 // src/tools/view_file.js
-import fs13 from "fs";
+import fs14 from "fs";
 import path12 from "path";
 var view_file;
 var init_view_file = __esm({
@@ -10636,10 +11776,10 @@ var init_view_file = __esm({
       if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
       const absolutePath = path12.resolve(process.cwd(), targetPath);
       try {
-        if (!fs13.existsSync(absolutePath)) {
+        if (!fs14.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist.`;
         }
-        const stats = fs13.statSync(absolutePath);
+        const stats = fs14.statSync(absolutePath);
         if (stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a directory. Use list_files instead.`;
         }
@@ -10663,7 +11803,7 @@ var init_view_file = __esm({
           if (!isMultiModal) {
             return `ERROR: Multimodality is not supported for the current model. Unable to load [${targetPath}].`;
           }
-          const buffer = fs13.readFileSync(absolutePath);
+          const buffer = fs14.readFileSync(absolutePath);
           const base64 = buffer.toString("base64");
           const mimeType = mimeMap[ext];
           return {
@@ -10676,7 +11816,7 @@ var init_view_file = __esm({
             }
           };
         }
-        let content = fs13.readFileSync(absolutePath, "utf8");
+        let content = fs14.readFileSync(absolutePath, "utf8");
         if (content.startsWith("\uFEFF")) {
           content = content.slice(1);
         }
@@ -10704,7 +11844,7 @@ ${code}`;
 });
 
 // src/tools/write_file.js
-import fs14 from "fs";
+import fs15 from "fs";
 import path13 from "path";
 var write_file;
 var init_write_file = __esm({
@@ -10721,9 +11861,9 @@ var init_write_file = __esm({
       try {
         await RevertManager.recordFileChange(absolutePath);
         let ancestry = "";
-        if (fs14.existsSync(absolutePath)) {
+        if (fs15.existsSync(absolutePath)) {
           try {
-            const oldData = fs14.readFileSync(absolutePath, "utf8");
+            const oldData = fs15.readFileSync(absolutePath, "utf8");
             const lines = oldData.split(/\r?\n/);
             ancestry = `Old File contents:
 ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
@@ -10735,16 +11875,16 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 `;
           }
         }
-        if (!fs14.existsSync(parentDir)) {
-          fs14.mkdirSync(parentDir, { recursive: true });
+        if (!fs15.existsSync(parentDir)) {
+          fs15.mkdirSync(parentDir, { recursive: true });
         }
         const strip = (t) => t.replace(/^```[\w]*\n?/, "").replace(/```\s*$/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const processedContent = strip(content);
         const finalContent = processedContent.endsWith("\n") ? processedContent : processedContent + "\n";
         const lineCount = finalContent.split(/\r?\n/).length;
         const originalSize = Buffer.byteLength(finalContent, "utf8");
-        fs14.writeFileSync(absolutePath, finalContent, "utf8");
-        let verifiedContent = fs14.readFileSync(absolutePath, "utf8");
+        fs15.writeFileSync(absolutePath, finalContent, "utf8");
+        let verifiedContent = fs15.readFileSync(absolutePath, "utf8");
         const verifiedSize = Buffer.byteLength(verifiedContent, "utf8");
         const verifiedLines = verifiedContent.split(/\r?\n/);
         const verifiedLineCount = verifiedLines.length;
@@ -10779,7 +11919,7 @@ ${snippet}`;
 });
 
 // src/tools/update_file.js
-import fs15 from "fs";
+import fs16 from "fs";
 import path14 from "path";
 var update_file;
 var init_update_file = __esm({
@@ -10799,10 +11939,10 @@ var init_update_file = __esm({
       const allowMultiple = parsed.allowMultiple !== void 0 ? parsed.allowMultiple === true || String(parsed.allowMultiple).toLowerCase() === "true" : parsedAllowMultiple;
       const absolutePath = path14.resolve(process.cwd(), targetPath);
       try {
-        if (!fs15.existsSync(absolutePath)) {
+        if (!fs16.existsSync(absolutePath)) {
           return `ERROR: File [${targetPath}] does not exist. Use WriteFile instead.`;
         }
-        let diskContent = context.forcedContent || fs15.readFileSync(absolutePath, "utf8");
+        let diskContent = context.forcedContent || fs16.readFileSync(absolutePath, "utf8");
         if (diskContent.startsWith("\uFEFF")) diskContent = diskContent.slice(1);
         const originalContent = diskContent.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
         const { content: finalContent, results } = applyPatches(originalContent, patchPairs, { allowMultiple });
@@ -10813,7 +11953,7 @@ var init_update_file = __esm({
 ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
         }
         await RevertManager.recordFileChange(absolutePath, originalContent);
-        fs15.writeFileSync(absolutePath, finalContent, "utf8");
+        fs16.writeFileSync(absolutePath, finalContent, "utf8");
         const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
         if (failures.length > 0) {
           return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.
@@ -10835,7 +11975,7 @@ ${diffText}`;
 });
 
 // src/tools/read_folder.js
-import fs16 from "fs";
+import fs17 from "fs";
 import path15 from "path";
 var EXCLUDED_DIRS, isExcludedDir, formatMtime, read_folder;
 var init_read_folder = __esm({
@@ -11015,15 +12155,15 @@ var init_read_folder = __esm({
       recurseDepth = Math.max(1, Math.min(3, recurseDepth));
       const absolutePath = path15.resolve(process.cwd(), targetPath);
       try {
-        if (!fs16.existsSync(absolutePath)) {
+        if (!fs17.existsSync(absolutePath)) {
           return `ERROR: Path [${targetPath}] does not exist.`;
         }
-        const stats = fs16.statSync(absolutePath);
+        const stats = fs17.statSync(absolutePath);
         if (!stats.isDirectory()) {
           return `ERROR: Path [${targetPath}] is a file, not a directory. Use ReadFile instead.`;
         }
         if (recurseDepth === 1) {
-          const files = fs16.readdirSync(absolutePath);
+          const files = fs17.readdirSync(absolutePath);
           const totalItems = files.length;
           const maxDisplay = 150;
           const displayItems = files.slice(0, maxDisplay);
@@ -11032,7 +12172,7 @@ var init_read_folder = __esm({
             const fPath = path15.join(absolutePath, file);
             let info = { name: file, type: "unknown", size: "N/A", mtime: "N/A" };
             try {
-              const fStats = fs16.statSync(fPath);
+              const fStats = fs17.statSync(fPath);
               info = {
                 name: file,
                 type: fStats.isDirectory() ? "directory" : "file",
@@ -11074,7 +12214,7 @@ ${formatted}${footer2}`;
           if (currentDepth > recurseDepth || truncated) return [];
           let entries = [];
           try {
-            entries = fs16.readdirSync(dirPath);
+            entries = fs17.readdirSync(dirPath);
           } catch (e) {
             const indent2 = "  ".repeat(depth - 1);
             return [`${indent2}[Inaccessible Directory]`];
@@ -11085,7 +12225,7 @@ ${formatted}${footer2}`;
             const fullPath = path15.join(dirPath, name);
             let isDir = false;
             try {
-              isDir = fs16.statSync(fullPath).isDirectory();
+              isDir = fs17.statSync(fullPath).isDirectory();
             } catch (e) {
             }
             if (isDir) {
@@ -11123,7 +12263,7 @@ ${formatted}${footer2}`;
             totalFiles++;
             let sizeStr = "N/A";
             try {
-              const fStats = fs16.statSync(file.fullPath);
+              const fStats = fs17.statSync(file.fullPath);
               sizeStr = (fStats.size / 1024).toFixed(1) + "KB";
             } catch (e) {
             }
@@ -11199,7 +12339,7 @@ var init_ask_user = __esm({
 // src/tools/write_pdf.js
 import puppeteer3 from "puppeteer";
 import path16 from "path";
-import fs17 from "fs-extra";
+import fs18 from "fs-extra";
 import { PDFDocument } from "pdf-lib";
 var write_pdf;
 var init_write_pdf = __esm({
@@ -11217,12 +12357,12 @@ var init_write_pdf = __esm({
       if (!targetPath) return 'ERROR: Missing "path" argument for write_pdf.';
       if (!content) return 'ERROR: Missing "content" (HTML/CSS) for write_pdf.';
       const absolutePath = path16.resolve(process.cwd(), targetPath);
-      let browser = null;
+      let browser2 = null;
       try {
-        await fs17.ensureDir(path16.dirname(absolutePath));
+        await fs18.ensureDir(path16.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
         const pptrConfig = getPuppeteerConfig();
-        browser = await puppeteer3.launch({
+        browser2 = await puppeteer3.launch({
           headless: true,
           executablePath: pptrConfig.executablePath || void 0,
           args: [
@@ -11232,7 +12372,7 @@ var init_write_pdf = __esm({
             "--disable-dev-shm-usage"
           ]
         });
-        const page = await browser.newPage();
+        const page = await browser2.newPage();
         let resolvedContent = content;
         const resolvedCache = {};
         const resolveToBase64 = async (originalSrc) => {
@@ -11241,10 +12381,10 @@ var init_write_pdf = __esm({
           }
           try {
             const imgPath = path16.resolve(process.cwd(), originalSrc);
-            if (await fs17.pathExists(imgPath)) {
+            if (await fs18.pathExists(imgPath)) {
               const ext = path16.extname(imgPath).toLowerCase().replace(".", "") || "png";
               const mime = ext === "jpg" ? "jpeg" : ext === "svg" ? "svg+xml" : ext;
-              const base64 = await fs17.readFile(imgPath, "base64");
+              const base64 = await fs18.readFile(imgPath, "base64");
               return `data:image/${mime};base64,${base64}`;
             }
           } catch (e) {
@@ -11260,8 +12400,8 @@ var init_write_pdf = __esm({
           if (originalHref && fullTag.toLowerCase().includes("stylesheet") && !originalHref.startsWith("http://") && !originalHref.startsWith("https://") && !originalHref.startsWith("data:")) {
             try {
               const cssPath = path16.resolve(process.cwd(), originalHref);
-              if (await fs17.pathExists(cssPath)) {
-                const cssContent = await fs17.readFile(cssPath, "utf-8");
+              if (await fs18.pathExists(cssPath)) {
+                const cssContent = await fs18.readFile(cssPath, "utf-8");
                 cssCache[fullTag] = `<style>${cssContent}</style>`;
               }
             } catch (e) {
@@ -11350,21 +12490,21 @@ var init_write_pdf = __esm({
         pdfDoc.setCreator("FluxFlow PDF Engine");
         pdfDoc.setProducer("FluxFlow (Generative AI)");
         const finalPdfBytes = await pdfDoc.save();
-        await fs17.writeFile(absolutePath, finalPdfBytes);
-        const stats = await fs17.stat(absolutePath);
+        await fs18.writeFile(absolutePath, finalPdfBytes);
+        const stats = await fs18.stat(absolutePath);
         return `SUCCESS: PDF generated successfully at [${targetPath}] (${(stats.size / 1024).toFixed(2)} KB).`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to generate PDF [${targetPath}]: ${errorMsg}`;
       } finally {
-        if (browser) await browser.close();
+        if (browser2) await browser2.close();
       }
     };
   }
 });
 
 // src/tools/write_docx.js
-import fs18 from "fs-extra";
+import fs19 from "fs-extra";
 import path17 from "path";
 import HTMLtoDOCX from "html-to-docx";
 var write_docx;
@@ -11381,7 +12521,7 @@ var init_write_docx = __esm({
       if (!content) return 'ERROR: Missing "content" (HTML) for write_docx.';
       const absolutePath = path17.resolve(process.cwd(), targetPath);
       try {
-        await fs18.ensureDir(path17.dirname(absolutePath));
+        await fs19.ensureDir(path17.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
         const fileName = path17.basename(targetPath);
         const fullHtml = content.includes("<html") ? content : `
@@ -11404,7 +12544,7 @@ var init_write_docx = __esm({
           footer: true,
           pageNumber: true
         });
-        await fs18.writeFile(absolutePath, docxBuffer);
+        await fs19.writeFile(absolutePath, docxBuffer);
         return `SUCCESS: Word document [${targetPath}] generated successfully.
 - Size: ${(docxBuffer.length / 1024).toFixed(1)} KB`;
       } catch (err) {
@@ -11416,7 +12556,7 @@ var init_write_docx = __esm({
 });
 
 // src/tools/search_keyword.js
-import fs19 from "fs/promises";
+import fs20 from "fs/promises";
 import path18 from "path";
 import fg from "fast-glob";
 async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
@@ -11424,7 +12564,7 @@ async function getFilesRecursively(dir, excludes, baseDir = dir, depth = 1) {
   let results = [];
   let list;
   try {
-    list = await fs19.readdir(dir, { withFileTypes: true });
+    list = await fs20.readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -11750,7 +12890,7 @@ var init_search_keyword = __esm({
             const normalised = pathArg.replace(/[\/\\]+$/, "");
             const fullPath = path18.resolve(rootDir, normalised);
             try {
-              const stat = await fs19.stat(fullPath);
+              const stat = await fs20.stat(fullPath);
               if (stat.isDirectory()) {
                 pathArgType = "dir";
                 filesToSearch = await getFilesRecursively(fullPath, excludes, rootDir);
@@ -11769,7 +12909,7 @@ var init_search_keyword = __esm({
         }
         const searchPromises = filesToSearch.map(async (fileObj) => {
           try {
-            const content = await fs19.readFile(fileObj.fullPath, "utf-8");
+            const content = await fs20.readFile(fileObj.fullPath, "utf-8");
             if (content.includes("\0")) return [];
             const lines = content.split(/\r?\n/);
             const fileMatches = [];
@@ -11839,7 +12979,7 @@ var init_search_keyword = __esm({
 });
 
 // src/tools/generate_image.js
-import fs20 from "fs-extra";
+import fs21 from "fs-extra";
 import path19 from "path";
 var injectPngMetadata, generate_image;
 var init_generate_image = __esm({
@@ -12020,9 +13160,9 @@ var init_generate_image = __esm({
         };
         finalBuffer = injectPngMetadata(finalBuffer, metadata);
         const absolutePath = path19.resolve(process.cwd(), outputPath);
-        await fs20.ensureDir(path19.dirname(absolutePath));
+        await fs21.ensureDir(path19.dirname(absolutePath));
         await RevertManager.recordFileChange(absolutePath);
-        await fs20.writeFile(absolutePath, finalBuffer);
+        await fs21.writeFile(absolutePath, finalBuffer);
         await recordImageGeneration(settings);
         const ext = path19.extname(outputPath).toLowerCase();
         const mimeMap = {
@@ -12139,14 +13279,14 @@ var init_addMemScore = __esm({
 });
 
 // src/utils/parsers.js
-import fs21 from "fs-extra";
+import fs22 from "fs-extra";
 import path20 from "path";
 import https from "https";
 async function downloadWasm(wasmFile, targetUrl = null) {
   const url = targetUrl || `https://unpkg.com/tree-sitter-wasms@0.1.13/out/${wasmFile}`;
   const localPath = path20.join(PARSER_DIR, wasmFile);
-  await fs21.ensureDir(PARSER_DIR);
-  return new Promise((resolve, reject) => {
+  await fs22.ensureDir(PARSER_DIR);
+  return new Promise((resolve2, reject) => {
     const options = {
       headers: {
         "User-Agent": "FluxFlow-Agent"
@@ -12159,21 +13299,21 @@ async function downloadWasm(wasmFile, targetUrl = null) {
           const parsedUrl = new URL(url);
           nextUrl = `${parsedUrl.protocol}//${parsedUrl.host}${nextUrl}`;
         }
-        downloadWasm(wasmFile, nextUrl).then(resolve).catch(reject);
+        downloadWasm(wasmFile, nextUrl).then(resolve2).catch(reject);
         return;
       }
       if (response.statusCode !== 200) {
         reject(new Error(`Failed to download ${wasmFile}: HTTP ${response.statusCode}`));
         return;
       }
-      const file = fs21.createWriteStream(localPath);
+      const file = fs22.createWriteStream(localPath);
       response.pipe(file);
       file.on("finish", () => {
         file.close();
-        resolve();
+        resolve2();
       });
     }).on("error", (err) => {
-      if (fs21.existsSync(localPath)) fs21.unlink(localPath, () => {
+      if (fs22.existsSync(localPath)) fs22.unlink(localPath, () => {
       });
       reject(err);
     });
@@ -12181,12 +13321,12 @@ async function downloadWasm(wasmFile, targetUrl = null) {
 }
 function isParserInstalled(wasmFile) {
   const localPath = path20.join(PARSER_DIR, wasmFile);
-  return fs21.existsSync(localPath);
+  return fs22.existsSync(localPath);
 }
 async function deleteParser(wasmFile) {
   const localPath = path20.join(PARSER_DIR, wasmFile);
-  if (fs21.existsSync(localPath)) {
-    await fs21.unlink(localPath);
+  if (fs22.existsSync(localPath)) {
+    await fs22.unlink(localPath);
   }
 }
 var EXTENSION_TO_WASM;
@@ -12208,7 +13348,7 @@ var init_parsers = __esm({
 });
 
 // src/tools/file_map.js
-import fs22 from "fs-extra";
+import fs23 from "fs-extra";
 import path21 from "path";
 import { createRequire as createRequire2 } from "module";
 function sanitize(text, limit = 50) {
@@ -12326,8 +13466,8 @@ function traverse(node, depth = 0, isLast = true, prefix = "", parentName = null
     result += `${nextPrefix}\u2514\u2500\u2500 ... depth exceeded ...
 `;
   } else {
-    children.forEach((child, index) => {
-      const isLastChildInLoop = index === children.length - 1;
+    children.forEach((child, index2) => {
+      const isLastChildInLoop = index2 === children.length - 1;
       const effectiveIsLast = isPassthrough ? isLast && isLastChildInLoop : isLastChildInLoop;
       result += traverse(child, nextDepth, effectiveIsLast, nextPrefix, nextParentName, maxDepth);
     });
@@ -12402,7 +13542,7 @@ var init_file_map = __esm({
         return 'ERROR: No file path provided. Use [tool:functions.FileMap(path="...")]';
       }
       const absolutePath = path21.isAbsolute(filePath) ? filePath : path21.resolve(process.cwd(), filePath);
-      if (!fs22.existsSync(absolutePath)) {
+      if (!fs23.existsSync(absolutePath)) {
         return `ERROR: File not found: ${filePath}`;
       }
       const ext = path21.extname(absolutePath).slice(1).toLowerCase();
@@ -12411,7 +13551,7 @@ var init_file_map = __esm({
         return `ERROR: Unsupported file extension: .${ext}`;
       }
       const wasmPath = path21.resolve(PARSER_DIR, wasmFile);
-      if (!fs22.existsSync(wasmPath)) {
+      if (!fs23.existsSync(wasmPath)) {
         return `ERROR: Parser for .${ext} not found. Please download it in Settings > Other.`;
       }
       try {
@@ -12436,7 +13576,7 @@ var init_file_map = __esm({
         const parser = new Parser();
         const Lang = await TreeSitter.Language.load(wasmPath);
         parser.setLanguage(Lang);
-        const sourceCode = await fs22.readFile(absolutePath, "utf8");
+        const sourceCode = await fs23.readFile(absolutePath, "utf8");
         const lines = sourceCode.split("\n").length;
         let maxDepth = 12;
         if (lines > 1e4) maxDepth = 2;
@@ -12459,7 +13599,7 @@ Stack: ${err.stack}` : "";
 });
 
 // src/tools/todo.js
-import fs23 from "fs";
+import fs24 from "fs";
 import path22 from "path";
 var todo;
 var init_todo = __esm({
@@ -12532,8 +13672,8 @@ var init_todo = __esm({
         };
       };
       try {
-        if (!fs23.existsSync(todoDir)) {
-          fs23.mkdirSync(todoDir, { recursive: true });
+        if (!fs24.existsSync(todoDir)) {
+          fs24.mkdirSync(todoDir, { recursive: true });
         }
         if (method === "create") {
           if (!tasks) return 'ERROR: Missing "tasks" for create method.';
@@ -12545,7 +13685,7 @@ var init_todo = __esm({
             markedCount = result.markedCount;
           }
           await RevertManager.recordFileChange(todoFile);
-          fs23.writeFileSync(todoFile, content, "utf8");
+          fs24.writeFileSync(todoFile, content, "utf8");
           const total = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           if (markedCount > 0) {
             const completed = content.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -12559,8 +13699,8 @@ ${content}`;
           if (!tasks) return 'ERROR: Missing "tasks" for append method.';
           const appendContent = getTasksString(tasks);
           await RevertManager.recordFileChange(todoFile);
-          fs23.appendFileSync(todoFile, appendContent, "utf8");
-          const fullContent = fs23.readFileSync(todoFile, "utf8");
+          fs24.appendFileSync(todoFile, appendContent, "utf8");
+          const fullContent = fs24.readFileSync(todoFile, "utf8");
           const lines = fullContent.split(/\r?\n/).map((l) => l.trim());
           const total = lines.filter((l) => l.startsWith("- [ ]") || l.startsWith("- [x]") || l.startsWith("- [X]")).length;
           const completed = lines.filter((l) => l.startsWith("- [x]") || l.startsWith("- [X]")).length;
@@ -12569,10 +13709,10 @@ ${content}`;
 ${fullContent}`;
         }
         if (method === "get") {
-          if (!fs23.existsSync(todoFile)) {
+          if (!fs24.existsSync(todoFile)) {
             return "TODO GET: No task list found for this session.";
           }
-          let content = fs23.readFileSync(todoFile, "utf8");
+          let content = fs24.readFileSync(todoFile, "utf8");
           let markedCount = 0;
           if (markDone) {
             const result = applyMarkDone(content, markDone);
@@ -12580,7 +13720,7 @@ ${fullContent}`;
               content = result.content;
               markedCount = result.markedCount;
               await RevertManager.recordFileChange(todoFile);
-              fs23.writeFileSync(todoFile, content, "utf8");
+              fs24.writeFileSync(todoFile, content, "utf8");
             }
           }
           const totalLines = content.split(/\r?\n/).map((l) => l.trim());
@@ -12741,8 +13881,8 @@ var init_invoke = __esm({
         onAskMain: async (questionText) => {
           const questionId = `q-${Date.now()}-${Math.floor(Math.random() * 1e3)}`;
           let questionResolver = null;
-          const qPromise = new Promise((resolve) => {
-            questionResolver = resolve;
+          const qPromise = new Promise((resolve2) => {
+            questionResolver = resolve2;
           });
           const qEntry = {
             id: questionId,
@@ -12921,8 +14061,8 @@ var init_getProgress = __esm({
       output += `
 Progress Log:
 `;
-      task.progress.forEach((turnLogs, index) => {
-        output += `--- Turn ${index + 1} ---
+      task.progress.forEach((turnLogs, index2) => {
+        output += `--- Turn ${index2 + 1} ---
 `;
         const filteredLogs = turnLogs.filter((log) => !log.startsWith("[SUBAGENT SUCCESS]"));
         const processedLogs = filteredLogs.map((log) => {
@@ -13045,11 +14185,11 @@ var init_await = __esm({
 });
 
 // src/utils/advanceRevert.js
-import fs24 from "fs-extra";
+import fs25 from "fs-extra";
 import path23 from "path";
 async function scanWorkspace(dir, baseDir = dir) {
   const manifest = {};
-  const entries = await fs24.readdir(dir, { withFileTypes: true }).catch(() => []);
+  const entries = await fs25.readdir(dir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (JUNK_DIRECTORIES.includes(entry.name)) continue;
     const fullPath = path23.join(dir, entry.name);
@@ -13058,7 +14198,7 @@ async function scanWorkspace(dir, baseDir = dir) {
       const sub = await scanWorkspace(fullPath, baseDir);
       Object.assign(manifest, sub);
     } else {
-      const stats = await fs24.stat(fullPath).catch(() => null);
+      const stats = await fs25.stat(fullPath).catch(() => null);
       if (stats) {
         manifest[relPath] = {
           size: stats.size,
@@ -13070,19 +14210,19 @@ async function scanWorkspace(dir, baseDir = dir) {
   return manifest;
 }
 async function copyWorkspaceFiles(destDir, manifest) {
-  await fs24.ensureDir(destDir);
+  await fs25.ensureDir(destDir);
   for (const relPath of Object.keys(manifest)) {
     const srcPath = path23.join(process.cwd(), relPath);
     const destPath = path23.join(destDir, relPath);
-    await fs24.ensureDir(path23.dirname(destPath));
-    await fs24.copyFile(srcPath, destPath).catch(() => {
+    await fs25.ensureDir(path23.dirname(destPath));
+    await fs25.copyFile(srcPath, destPath).catch(() => {
     });
   }
 }
 async function restoreSnapshotDir(srcDir, destDir, stats = null, baseDir = null) {
-  if (!await fs24.pathExists(srcDir)) return;
+  if (!await fs25.pathExists(srcDir)) return;
   if (!baseDir) baseDir = srcDir;
-  const entries = await fs24.readdir(srcDir, { withFileTypes: true }).catch(() => []);
+  const entries = await fs25.readdir(srcDir, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     const srcPath = path23.join(srcDir, entry.name);
     const destPath = path23.join(destDir, entry.name);
@@ -13090,14 +14230,14 @@ async function restoreSnapshotDir(srcDir, destDir, stats = null, baseDir = null)
       await restoreSnapshotDir(srcPath, destPath, stats, baseDir);
     } else {
       const relPath = path23.relative(baseDir, srcPath).replace(/\\/g, "/");
-      const existed = await fs24.pathExists(destPath);
+      const existed = await fs25.pathExists(destPath);
       if (existed) {
-        await fs24.chmod(destPath, 438).catch(() => {
+        await fs25.chmod(destPath, 438).catch(() => {
         });
       }
-      await fs24.ensureDir(path23.dirname(destPath));
-      const ok = await fs24.copyFile(srcPath, destPath).then(() => true).catch(() => false);
-      await fs24.chmod(destPath, 438).catch(() => {
+      await fs25.ensureDir(path23.dirname(destPath));
+      const ok = await fs25.copyFile(srcPath, destPath).then(() => true).catch(() => false);
+      await fs25.chmod(destPath, 438).catch(() => {
       });
       if (stats) {
         if (!ok) {
@@ -13136,9 +14276,9 @@ var init_advanceRevert = __esm({
       async takeInitialSnapshot(chatId) {
         try {
           const snapshotsDir = path23.join(DATA_DIR, "snapshots", chatId);
-          await fs24.remove(snapshotsDir).catch(() => {
+          await fs25.remove(snapshotsDir).catch(() => {
           });
-          await fs24.ensureDir(snapshotsDir);
+          await fs25.ensureDir(snapshotsDir);
           const manifest = await scanWorkspace(process.cwd());
           await copyWorkspaceFiles(path23.join(snapshotsDir, "initial"), manifest);
           const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
@@ -13228,9 +14368,9 @@ var init_advanceRevert = __esm({
           const currentFiles = await scanWorkspace(process.cwd());
           for (const relPath of Object.keys(currentFiles)) {
             const fullPath = path23.join(process.cwd(), relPath);
-            await fs24.chmod(fullPath, 438).catch(() => {
+            await fs25.chmod(fullPath, 438).catch(() => {
             });
-            await fs24.remove(fullPath).catch(() => {
+            await fs25.remove(fullPath).catch(() => {
             });
           }
           const initialDir = path23.join(snapshotsDir, "initial");
@@ -13242,9 +14382,9 @@ var init_advanceRevert = __esm({
             if (cp.deletedFiles && cp.deletedFiles.length > 0) {
               for (const delFile of cp.deletedFiles) {
                 const fullPath = path23.join(process.cwd(), delFile);
-                await fs24.chmod(fullPath, 438).catch(() => {
+                await fs25.chmod(fullPath, 438).catch(() => {
                 });
-                await fs24.remove(fullPath).catch(() => {
+                await fs25.remove(fullPath).catch(() => {
                 });
               }
             }
@@ -13277,7 +14417,7 @@ var init_advanceRevert = __esm({
       async cleanup(chatId) {
         try {
           const snapshotsDir = path23.join(DATA_DIR, "snapshots", chatId);
-          await fs24.remove(snapshotsDir).catch(() => {
+          await fs25.remove(snapshotsDir).catch(() => {
           });
           const ledger = readEncryptedJson(LEDGER_ADVANCE_FILE, {});
           if (ledger[chatId]) {
@@ -13302,8 +14442,8 @@ var init_emergency_rollback = __esm({
       const method = parsed.method;
       const id = parsed.id;
       const chatId = context.chatId;
-      const systemSettings = context.systemSettings;
-      if (!systemSettings?.advanceRollback) {
+      const systemSettings2 = context.systemSettings;
+      if (!systemSettings2?.advanceRollback) {
         return "ERROR: Advance Rollback feature is currently disabled in settings under Security. Tell user to enable it.";
       }
       if (!chatId) {
@@ -13409,7 +14549,7 @@ var init_awaitSubagent = __esm({
       if (timeoutSec > 300) timeoutSec = 300;
       if (!id) {
         if (parsed.time) {
-          await new Promise((resolve) => setTimeout(resolve, timeoutSec * 1e3));
+          await new Promise((resolve2) => setTimeout(resolve2, timeoutSec * 1e3));
           return `SUCCESS: Waited for ${timeoutSec}s.`;
         }
         return 'ERROR: Missing "id" argument for Await.';
@@ -13431,9 +14571,9 @@ Error: ${task.error || "Unknown error"}`;
         return `INFO: Subagent task [${id}] was cancelled.`;
       }
       let timeoutId;
-      const timeoutPromise = new Promise((resolve) => {
+      const timeoutPromise = new Promise((resolve2) => {
         timeoutId = setTimeout(() => {
-          resolve({ type: "timeout" });
+          resolve2({ type: "timeout" });
         }, timeoutSec * 1e3);
       });
       try {
@@ -13644,8 +14784,8 @@ var init_editor = __esm({
     contextResolver = null;
     securityListener = null;
     cliVersion = "2.0.0";
-    initBridge = (version) => {
-      cliVersion = version;
+    initBridge = (version2) => {
+      cliVersion = version2;
       connect();
     };
     registerSecurityListener = (callback) => {
@@ -13707,16 +14847,16 @@ var init_editor = __esm({
       });
     };
     getIDEContext = () => {
-      return new Promise((resolve) => {
+      return new Promise((resolve2) => {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
-          resolve({ cursor_line: 0, selected: 0, manual_edits: "", file_focused: "none", opened_editors: [] });
+          resolve2({ cursor_line: 0, selected: 0, manual_edits: "", file_focused: "none", opened_editors: [] });
           return;
         }
-        contextResolver = resolve;
+        contextResolver = resolve2;
         ws.send(JSON.stringify({ command: "requestContext" }));
         setTimeout(() => {
-          if (contextResolver === resolve) {
-            resolve({ cursor_line: 0, selected: 0, manual_edits: "", file_focused: "none", opened_editors: [] });
+          if (contextResolver === resolve2) {
+            resolve2({ cursor_line: 0, selected: 0, manual_edits: "", file_focused: "none", opened_editors: [] });
             contextResolver = null;
           }
         }, 1e3);
@@ -13736,13 +14876,13 @@ var init_editor = __esm({
 
 // src/utils/getDirTree/indentation.js
 import path24 from "path";
-import fs25 from "fs";
+import fs26 from "fs";
 var safeReaddirWithTypesDefault, getDirTreeIndentation;
 var init_indentation = __esm({
   "src/utils/getDirTree/indentation.js"() {
     safeReaddirWithTypesDefault = (dir) => {
       try {
-        return fs25.readdirSync(dir, { withFileTypes: true });
+        return fs26.readdirSync(dir, { withFileTypes: true });
       } catch (e) {
         return [];
       }
@@ -13792,13 +14932,13 @@ var init_indentation = __esm({
 
 // src/utils/getDirTree/box.js
 import path25 from "path";
-import fs26 from "fs";
+import fs27 from "fs";
 var safeReaddirWithTypesDefault2, getDirTreeBox;
 var init_box = __esm({
   "src/utils/getDirTree/box.js"() {
     safeReaddirWithTypesDefault2 = (dir) => {
       try {
-        return fs26.readdirSync(dir, { withFileTypes: true });
+        return fs27.readdirSync(dir, { withFileTypes: true });
       } catch (e) {
         return [];
       }
@@ -13823,8 +14963,8 @@ var init_box = __esm({
         ...filtered.map((e) => ({ name: e.name, isDir: e.isDirectory() })),
         ...collapsedInDir.map((name) => ({ name, isDir: true, isCollapsed: true }))
       ];
-      finalItems.forEach((item, index) => {
-        const isLast = index === finalItems.length - 1;
+      finalItems.forEach((item, index2) => {
+        const isLast = index2 === finalItems.length - 1;
         const filePath = path25.join(dir, item.name);
         const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
         const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
@@ -13876,10 +15016,11 @@ __export(ai_exports, {
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path26, { normalize } from "path";
-import fs27 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+import fs28 from "fs";
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, getOllamaStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
+    init_dist();
     await init_prompts();
     init_history();
     init_usage();
@@ -13949,8 +15090,8 @@ var init_ai = __esm({
             throw error;
           }
           const delay = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
-          await new Promise((resolve, reject) => {
-            const timer = setTimeout(resolve, delay);
+          await new Promise((resolve2, reject) => {
+            const timer = setTimeout(resolve2, delay);
             if (signal) {
               signal.addEventListener("abort", () => {
                 clearTimeout(timer);
@@ -14063,10 +15204,10 @@ var init_ai = __esm({
           if (i === retries - 1) throw e;
         }
         if (signal) {
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve2, reject) => {
             const timer = setTimeout(() => {
               signal.removeEventListener("abort", abortHandler);
-              resolve();
+              resolve2();
             }, Math.min(24e3, delay * Math.pow(2, i)));
             const abortHandler = () => {
               clearTimeout(timer);
@@ -14075,7 +15216,7 @@ var init_ai = __esm({
             signal.addEventListener("abort", abortHandler);
           });
         } else {
-          await new Promise((resolve) => setTimeout(resolve, Math.min(24e3, delay * Math.pow(2, i))));
+          await new Promise((resolve2) => setTimeout(resolve2, Math.min(24e3, delay * Math.pow(2, i))));
         }
       }
       if (signal?.aborted) {
@@ -14579,7 +15720,7 @@ var init_ai = __esm({
           if (hasYielded || attempts >= maxAttempts) {
             throw error;
           }
-          await new Promise((resolve) => setTimeout(resolve, 3500));
+          await new Promise((resolve2) => setTimeout(resolve2, 3500));
         }
       }
     };
@@ -14591,9 +15732,9 @@ var init_ai = __esm({
       const push = (item) => {
         queue.push(item);
         if (resolveNext) {
-          const resolve = resolveNext;
+          const resolve2 = resolveNext;
           resolveNext = null;
-          resolve();
+          resolve2();
         }
       };
       let cleanModelId = modelName.split("/").pop();
@@ -14646,9 +15787,9 @@ var init_ai = __esm({
             pollInterval = null;
           }
           if (resolveNext) {
-            const resolve = resolveNext;
+            const resolve2 = resolveNext;
             resolveNext = null;
-            resolve();
+            resolve2();
           }
         }
       })();
@@ -14667,8 +15808,8 @@ var init_ai = __esm({
             if (done) {
               break;
             }
-            await new Promise((resolve) => {
-              resolveNext = resolve;
+            await new Promise((resolve2) => {
+              resolveNext = resolve2;
             });
           }
         }
@@ -14830,6 +15971,103 @@ var init_ai = __esm({
         }
       }
     };
+    getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05, endpointType = "Cloud") {
+      const messages = [];
+      if (systemInstruction) {
+        messages.push({ role: "system", content: systemInstruction });
+      }
+      for (const content of contents) {
+        const role = content.role === "user" ? "user" : "assistant";
+        let text = "";
+        const images = [];
+        if (Array.isArray(content.parts)) {
+          text = content.parts.map((p) => p.text || "").filter(Boolean).join("\n");
+          for (const p of content.parts) {
+            if (p.inline_data && p.inline_data.data) {
+              images.push(p.inline_data.data);
+            }
+          }
+        } else {
+          text = content.text || "";
+        }
+        if (text || images.length > 0) {
+          const msgObj = { role, content: text };
+          if (images.length > 0) {
+            msgObj.images = images;
+          }
+          messages.push(msgObj);
+        }
+      }
+      const isLocal = endpointType === "Local" || !apiKey || apiKey === "LOCAL";
+      const host = isLocal ? process.env.OLLAMA_HOST || "http://127.0.0.1:11434" : process.env.OLLAMA_HOST || "https://ollama.com";
+      const ollamaOptions = { host };
+      if (!isLocal && apiKey) {
+        ollamaOptions.headers = { Authorization: "Bearer " + apiKey };
+      }
+      const ollamaClient = new Ollama2(ollamaOptions);
+      let pendingParts = [];
+      let latestUsageMetadata = null;
+      let lastFlushTime = Date.now();
+      let hasNewData = false;
+      const thinkMap = {
+        "Fast": false,
+        "Low": "medium",
+        "Medium": "medium",
+        "Standard": "medium",
+        "High": "high",
+        "xHigh": "high"
+      };
+      const thinkParam = thinkMap[thinkingLevel] !== void 0 ? thinkMap[thinkingLevel] : true;
+      const chatParams = {
+        model,
+        messages,
+        stream: true,
+        think: thinkParam,
+        keep_alive: "10m",
+        options: { temperature }
+      };
+      const responseStream = await ollamaClient.chat(chatParams);
+      for await (const chunk of responseStream) {
+        if (signal?.aborted) {
+          throw new DOMException("The user aborted a request.", "AbortError");
+        }
+        if (chunk.message?.thinking) {
+          pendingParts.push({ text: chunk.message.thinking, thought: true });
+          hasNewData = true;
+        }
+        if (chunk.message?.content) {
+          pendingParts.push({ text: chunk.message.content });
+          hasNewData = true;
+        }
+        if (chunk.done) {
+          const evalNs = chunk.prompt_eval_duration || 0;
+          const isCached = evalNs > 0 && evalNs < 75e6;
+          latestUsageMetadata = {
+            totalTokenCount: (chunk.prompt_eval_count || 0) + (chunk.eval_count || 0),
+            promptTokenCount: chunk.prompt_eval_count || 0,
+            candidatesTokenCount: chunk.eval_count || 0,
+            cachedContentTokenCount: chunk.prompt_eval_count && isCached ? chunk.prompt_eval_count : 0,
+            thoughtsTokenCount: 0
+          };
+          hasNewData = true;
+        }
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+          yield {
+            candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+            usageMetadata: latestUsageMetadata
+          };
+          pendingParts = [];
+          lastFlushTime = Date.now();
+          hasNewData = false;
+        }
+      }
+      if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+        yield {
+          candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+          usageMetadata: latestUsageMetadata
+        };
+      }
+    };
     signalTermination = () => {
       TERMINATION_SIGNAL = true;
     };
@@ -14888,8 +16126,8 @@ var init_ai = __esm({
       const USER_CONTEXT_LENGTH = 4 * (1024 * 2);
       const AGENT_CONTEXT_LENGTH = 4 * (1024 * 8);
       const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
-      const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = "Google", apiKey } = settings;
-      const isMemoryEnabled = process.env.NVIDIA_BASE_URL ? false : systemSettings?.memory !== false;
+      const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings: systemSettings2, sessionStats, aiProvider = "Google", apiKey } = settings;
+      const isMemoryEnabled = process.env.NVIDIA_BASE_URL || aiProvider === "Ollama" ? false : systemSettings2?.memory !== false;
       const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
       const janitorUserMemories = persistentStorage.map((m) => `- [${m.id}]: ${m.memory}`).join("\n");
       const janitorContents = history.slice(0, -1).filter((msg) => msg.text && !msg.text.includes("[TOOL RESULT]") && !msg.text.includes("OBSERVATION:") && !msg.text.startsWith("[TERMINAL_RECORD]") && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith("welcome") && !String(msg.id).startsWith("logo")).slice(-14).map((msg) => {
@@ -15110,7 +16348,7 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
                   process.stdout.write(`\x1B]0;Memory Updated\x07`);
                   process.stdout.write(`\x1B]633;P;TerminalTitle=Memory Updated\x07`);
                 }
-                await new Promise((resolve) => setTimeout(resolve, 3e3));
+                await new Promise((resolve2) => setTimeout(resolve2, 3e3));
               }
             }
           }
@@ -15146,20 +16384,20 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
               return String(err);
             }
           })() : String(err);
-          await new Promise((resolve) => setTimeout(resolve, 1e3));
+          await new Promise((resolve2) => setTimeout(resolve2, 1e3));
           const janitorErrDir = path26.join(LOGS_DIR, "janitor");
-          if (!fs27.existsSync(janitorErrDir)) fs27.mkdirSync(janitorErrDir, { recursive: true });
-          fs27.appendFileSync(path26.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
+          if (!fs28.existsSync(janitorErrDir)) fs28.mkdirSync(janitorErrDir, { recursive: true });
+          fs28.appendFileSync(path26.join(janitorErrDir, "error.log"), `ERROR [Attempt ${attempts}/${MAX_JANITOR_RETRIES + 1}] [${date}]: ${errLog}
 
 `);
           if (attempts > MAX_JANITOR_RETRIES) break;
           const backoff = Math.min(750 * Math.pow(2, attempts - 1), 5e3);
-          await new Promise((resolve) => setTimeout(resolve, backoff));
+          await new Promise((resolve2) => setTimeout(resolve2, backoff));
         }
       }
       if (attempts) {
         const janitorErrDir = path26.join(LOGS_DIR, "janitor");
-        fs27.appendFileSync(path26.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
+        fs28.appendFileSync(path26.join(janitorErrDir, "error.log"), `-----------------------------------------------------------------------------
 
 `);
       }
@@ -15518,7 +16756,9 @@ ${originalTextProcessed.length > USER_CONTEXT_LENGTH ? "... (truncated) ...\n\n"
         }, 100);
         try {
           let stream;
-          if (aiProvider === "OpenRouter") {
+          if (aiProvider === "Ollama") {
+            stream = getOllamaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature, systemSettings?.ollamaEndpoint || "Cloud");
+          } else if (aiProvider === "OpenRouter") {
             stream = getOpenRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
           } else if (aiProvider === "DeepSeek") {
             stream = getDeepSeekStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
@@ -15715,8 +16955,8 @@ ${newMemoryListStr}
         })() : String(err);
         ;
         const janitorLogDir = path26.join(LOGS_DIR, "janitor");
-        if (!fs27.existsSync(janitorLogDir)) fs27.mkdirSync(janitorLogDir, { recursive: true });
-        fs27.appendFileSync(
+        if (!fs28.existsSync(janitorLogDir)) fs28.mkdirSync(janitorLogDir, { recursive: true });
+        fs28.appendFileSync(
           path26.join(janitorLogDir, "error.log"),
           `[${(/* @__PURE__ */ new Date()).toLocaleString()}] Past memory batch consolidation error: ${errLog}
 `
@@ -15809,7 +17049,7 @@ Provide a consolidated summary of the entire session.`;
     deleteChatSummary = (chatId) => {
       try {
         const summariesFile = path26.join(SECRET_DIR, "chat-summaries.json");
-        if (fs27.existsSync(summariesFile)) {
+        if (fs28.existsSync(summariesFile)) {
           const summaries = readEncryptedJson(summariesFile, {});
           if (summaries[chatId]) {
             delete summaries[chatId];
@@ -15820,10 +17060,10 @@ Provide a consolidated summary of the entire session.`;
       }
     };
     getAIStream = async function* (modelName, history, settings, steeringCallback, versionFluxflow2) {
-      const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings, sessionStats, aiProvider = "Google", apiTier, wildcardTooling } = settings;
+      const { profile, thinkingLevel, mode, janitorModel, chatId, isPlayground, systemSettings: systemSettings2, sessionStats, aiProvider = "Google", apiTier, wildcardTooling } = settings;
       const isMultiModal = isModelMultimodal(modelName);
       if (!client && aiProvider === "Google") throw new Error("AI not initialized");
-      const isMemoryEnabled = systemSettings?.memory !== false;
+      const isMemoryEnabled = process.env.NVIDIA_BASE_URL || settings?.aiProvider === "Ollama" ? false : systemSettings2?.memory !== false;
       const originalText = history[history.length - 1].text;
       const summariesFile = path26.join(SECRET_DIR, "chat-summaries.json");
       let wasCompressedInStream = false;
@@ -15835,7 +17075,7 @@ Provide a consolidated summary of the entire session.`;
       yield { type: "status", content: "[start]" };
       yield { type: "status", content: "Gathering Context" };
       await RevertManager.startTransaction(chatId, agentText);
-      if (systemSettings?.advanceRollback) {
+      if (systemSettings2?.advanceRollback) {
         await AdvanceRevertManager.takeInitialSnapshot(chatId);
       }
       TERMINATION_SIGNAL = false;
@@ -16077,7 +17317,7 @@ Provide a consolidated summary of the entire session.`;
         ];
         const safeReaddirWithTypes = (dir) => {
           try {
-            return fs27.readdirSync(dir, { withFileTypes: true });
+            return fs28.readdirSync(dir, { withFileTypes: true });
           } catch (e) {
             return [];
           }
@@ -16096,7 +17336,7 @@ Provide a consolidated summary of the entire session.`;
           return currentCount.value;
         };
         const getDirTree = (dir, maxDepth) => {
-          const useModern = systemSettings?.indentationTree !== false;
+          const useModern = systemSettings2?.indentationTree !== false;
           return useModern ? getDirTreeIndentation(dir, maxDepth, 1, safeReaddirWithTypes, COLLAPSED_DIRS_GLOBAL) : getDirTreeBox(dir, maxDepth, "", 1, safeReaddirWithTypes, COLLAPSED_DIRS_GLOBAL);
         };
         const totalFolders = countFolders(process.cwd());
@@ -16146,7 +17386,7 @@ ${currentSummary}
 **CONTEXT SUMMARY OF PREVIOUS TURNS**
 ${currentSummary}
 ` : "";
-        const dynamicDirAwareness = !!systemSettings?.dynamicDirAwareness;
+        const dynamicDirAwareness = !!systemSettings2?.dynamicDirAwareness;
         const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${modelName}|${profile}|${dynamicDirAwareness}`;
         const isSysInstructionCached = !dynamicDirAwareness && systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
         let dirStructure = isSysInstructionCached ? "" : "\n**DIRECTORY STRUCTURE**\nCWD: " + process.cwd() + `${isPlayground ? " [PLAYGROUND MODE]" : ""}
@@ -16322,8 +17562,8 @@ ${ideCtx.warnings}
               filePath = tagClean.slice(0, matchRange.index);
             }
             const absPath = path26.resolve(process.cwd(), filePath);
-            if (fs27.existsSync(absPath)) {
-              const stats = fs27.statSync(absPath);
+            if (fs28.existsSync(absPath)) {
+              const stats = fs28.statSync(absPath);
               if (stats.isFile()) {
                 const pathLower = filePath.toLowerCase();
                 const isPdf = pathLower.endsWith(".pdf");
@@ -16348,7 +17588,7 @@ ${ideCtx.warnings}
                 if (startLine === null && !isMultimodalFile) {
                   let lineCount = 0;
                   try {
-                    lineCount = fs27.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
+                    lineCount = fs28.readFileSync(absPath, "utf8").split(/\r\n|\r|\n/).length;
                   } catch (e) {
                   }
                   if (lineCount > 300) {
@@ -16426,10 +17666,10 @@ ${ideCtx.warnings}
         }
         const osDetected = process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux";
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, "$1");
-        const wildcardToolingPrompt = wildcardTooling ? "You cannot execute tools\nInstead, MUST output the exact string you WOULD have produced in Agentic Progression\n" : "";
+        const wildcardToolingPrompt = wildcardTooling ? "You cannot execute tools\nInstead, MUST output the EXACT STRING you WOULD have produced & wait for system to respond\n" : "";
         const firstUserMsg = `[SYSTEM METADATA]
 Time: ${dateTimeStr}
-OS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `
+OS: ${osDetected}${systemSettings2?.dynamicDirAwareness ? dirStructure : ""}${cwdMismatch ? `
 WARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches
 ` : ""}${memoryPrompt}${ideBlock}
 [/METADATA]
@@ -16459,7 +17699,7 @@ ${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.t
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
           const currentTurnTools = [];
           wasToolCalledInLastLoop = false;
-          if (systemSettings?.compression === 0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
+          if (systemSettings2?.compression === 0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
             modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
           }
           if (loop > 0) {
@@ -16573,7 +17813,7 @@ ${combinedNudge}`;
               const contents = modifiedHistory.filter((msg) => (msg.role === "user" || msg.role === "agent" || msg.role === "system") && !String(msg.id).startsWith("welcome") && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith("[TERMINAL_RECORD]"))).map((msg, idx, arr) => {
                 let text = msg.text || "";
                 if (!isMemoryEnabled) {
-                  text = text.replace(/\s*\n*\s*\[Prompted on:.*?\]/gi, "");
+                  text = text.replace(/\s*\n*\s*\[Prompted on:.*?\]/gi, "").trim();
                 }
                 if (msg.role === "agent") {
                   text = stripToolCallWrappers(text);
@@ -16644,13 +17884,13 @@ ${combinedNudge}`;
                 throw new Error("Error: Quota Exausted for Agent");
               }
               targetModel = modelName;
-              const sysInstructionCacheKey2 = `${chatId}|${aiProvider}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+              const sysInstructionCacheKey2 = `${chatId}|${aiProvider}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings2?.dynamicDirAwareness}|${!!systemSettings2?.subAgents}`;
               let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey2 && systemInstructionCache.value;
               if (isCacheHit) {
                 currentSystemInstruction = systemInstructionCache.value;
               } else {
-                currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false, chatId);
-                if (!systemSettings?.dynamicDirAwareness) {
+                currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? thinkingLevel : thinkingLevel, mode, systemSettings2, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === "Google" ? true : isMultiModal, !(targetModel || "gemma").toLowerCase().startsWith("gemma") ? true : false, chatId);
+                if (!systemSettings2?.dynamicDirAwareness) {
                   currentSystemInstruction += `
 ${dirStructure.replace("\n**DIRECTORY STRUCTURE**", "\n**DIRECTORY STRUCTURE**")}`;
                 }
@@ -16659,7 +17899,7 @@ ${dirStructure.replace("\n**DIRECTORY STRUCTURE**", "\n**DIRECTORY STRUCTURE**")
               }
               const lastUserMsg = contents[contents.length - 1];
               if (isBridgeConnected() & loop > 0) {
-                await new Promise((resolve) => setTimeout(resolve, 2500));
+                await new Promise((resolve2) => setTimeout(resolve2, 2500));
                 yield { type: "status", content: "Verifying" };
                 const ideCtxJIT = await getIDEContext();
                 const ideErr = ideCtxJIT ? ideCtxJIT.diagnostics : null;
@@ -16679,7 +17919,7 @@ ${ideErr} [/ERROR]`;
                   lastUserMsg.parts[0].text += jitInstruction;
                 }
               }
-              if (systemSettings?.advanceRollback && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
+              if (systemSettings2?.advanceRollback && lastUserMsg && lastUserMsg.role === "user" && lastUserMsg.parts?.[0]?.text?.startsWith("[TOOL RESULT]")) {
                 try {
                   const fileChanges = await AdvanceRevertManager.getLatestFileChanges(chatId);
                   if (fileChanges && (fileChanges.newFiles.length > 0 || fileChanges.modifiedFiles.length > 0 || fileChanges.deletedFiles.length > 0)) {
@@ -16712,7 +17952,6 @@ ${ideErr} [/ERROR]`;
                 lastUserMsg.parts[0].text += `
 [SYSTEM] WARNING, Turn Limit Impending: Step ${currentStep}/${MAX_LOOPS}. Wrap up quickly/prompt user to continue. [/SYSTEM]`;
               }
-              fs27.writeFileSync(`contents_context.json`, `${JSON.stringify({ contents }, null, 2)}`);
               const abortPromise = new Promise((_, reject) => {
                 if (abortController.signal.aborted) {
                   reject(new DOMException("The user aborted a request.", "AbortError"));
@@ -16724,7 +17963,20 @@ ${ideErr} [/ERROR]`;
               abortPromise.catch(() => {
               });
               let activeContents = contents;
-              if (aiProvider === "OpenRouter") {
+              if (aiProvider === "Ollama") {
+                stream = getOllamaStream(
+                  settings.apiKey,
+                  targetModel,
+                  activeContents,
+                  currentSystemInstruction,
+                  thinkingLevel,
+                  mode,
+                  isMultiModal,
+                  abortController.signal,
+                  1,
+                  systemSettings2?.ollamaEndpoint || "Cloud"
+                );
+              } else if (aiProvider === "OpenRouter") {
                 stream = getOpenRouterStream(
                   settings.apiKey,
                   targetModel,
@@ -17241,7 +18493,7 @@ ${ideErr} [/ERROR]`;
                       const reason = repetitionRatio > repetitionThresholdThinking ? "Reasoning Loop Detected" : "Thinking Budget Exceeded";
                       yield { type: "status", content: `${reason}. Re-centering...` };
                       isThinkingLoop = true;
-                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      await new Promise((resolve2) => setTimeout(resolve2, 3e3));
                       break;
                     }
                     const signalSafeText3 = getSanitizedText(turnText);
@@ -17253,7 +18505,7 @@ ${ideErr} [/ERROR]`;
                       yield { type: "status", content: `Response Loop Detected. Re-centering...` };
                       isThinkingLoop = false;
                       isGeneralLoop = true;
-                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      await new Promise((resolve2) => setTimeout(resolve2, 3e3));
                       break;
                     }
                     const proseText = contextSafeText.replace(RE_STUTTER_CODE_BLOCK_CLOSED, "").replace(RE_STUTTER_CODE_BLOCK_OPEN, "").replace(RE_STUTTER_INLINE_CODE, "").replace(RE_STUTTER_TABLE_ROW, "");
@@ -17308,7 +18560,7 @@ ${ideErr} [/ERROR]`;
                       yield { type: "status", content: `Stuttering Detected. Re-centering...` };
                       isThinkingLoop = false;
                       isStutteringLoop = true;
-                      await new Promise((resolve) => setTimeout(resolve, 3e3));
+                      await new Promise((resolve2) => setTimeout(resolve2, 3e3));
                       break;
                     }
                   }
@@ -17376,8 +18628,8 @@ ${ideErr} [/ERROR]`;
                       let actualEndLine = eLine;
                       try {
                         const absPath = path26.resolve(process.cwd(), targetPath2);
-                        if (fs27.existsSync(absPath)) {
-                          const content = fs27.readFileSync(absPath, "utf8");
+                        if (fs28.existsSync(absPath)) {
+                          const content = fs28.readFileSync(absPath, "utf8");
                           const lines = content.split("\n").length;
                           totalLines = lines;
                           if (!rawStart && !rawEnd && lines > 800) {
@@ -17603,9 +18855,9 @@ ${ideErr} [/ERROR]`;
                           const denyMsg = `Access Denied. Prohibited from accessing external directories while "External Workspace Access" is disabled.`;
                           if (settings.onExecStart) settings.onExecStart(command || "No Command");
                           yield { type: "exec_start" };
-                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          await new Promise((resolve2) => setTimeout(resolve2, 50));
                           if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
-                          await new Promise((resolve) => setTimeout(resolve, 50));
+                          await new Promise((resolve2) => setTimeout(resolve2, 50));
                           if (settings.onExecEnd) settings.onExecEnd();
                           toolResults.push({ role: "user", text: `[TOOL RESULT]: ERROR: ${denyMsg}` });
                           yield { type: "tool_result", content: `[TOOL RESULT]: ERROR: ${denyMsg}` };
@@ -17646,8 +18898,8 @@ ${ideErr} [/ERROR]`;
                     if (settings.onToolApproval) {
                       let shouldPrompt = normToolName === "write_file" || normToolName === "update_file" || normToolName === "exec_command";
                       if (shouldPrompt) {
-                        const systemSettings2 = settings.systemSettings || {};
-                        const autoExec = systemSettings2.autoExec;
+                        const systemSettings3 = settings.systemSettings || {};
+                        const autoExec = systemSettings3.autoExec;
                         let decision = null;
                         let forcePrompt = false;
                         let disallowMatch = false;
@@ -17661,18 +18913,18 @@ ${ideErr} [/ERROR]`;
                             const lowerCmd = cmd.toLowerCase();
                             return list.some((item) => lowerCmd.startsWith(item));
                           };
-                          const askMatch = matchesList(cmdTrimmed, systemSettings2.alwaysAskCommands);
-                          const approveMatch = matchesList(cmdTrimmed, systemSettings2.autoApproveCommands);
-                          disallowMatch = matchesList(cmdTrimmed, systemSettings2.autoDisallowCommands);
+                          const askMatch = matchesList(cmdTrimmed, systemSettings3.alwaysAskCommands);
+                          const approveMatch = matchesList(cmdTrimmed, systemSettings3.autoApproveCommands);
+                          disallowMatch = matchesList(cmdTrimmed, systemSettings3.autoDisallowCommands);
                           if (askMatch) {
                             forcePrompt = true;
                           } else if (approveMatch) {
                             decision = "allow";
-                          } else if (systemSettings2.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
+                          } else if (systemSettings3.autoApproveGit && /^git\s+commit\b/i.test(cmdTrimmed)) {
                             decision = "allow";
                           }
                           if (!forcePrompt && !decision) {
-                            if (systemSettings2.networkAccess === false) {
+                            if (systemSettings3.networkAccess === false) {
                               let normalized = cmdTrimmed.trim().replace(/\s+/g, " ").replace(/^['"]+|['"]+$/g, "").toLowerCase();
                               const tokens = normalized.split(" ");
                               const rawCmd = tokens[0];
@@ -17820,8 +19072,8 @@ ${ideErr} [/ERROR]`;
                                 if (currentIDE && normFocused === normAbsPath && currentIDE.full_content) {
                                   originalContent = currentIDE.full_content;
                                   hasOriginal = true;
-                                } else if (fs27.existsSync(absPath)) {
-                                  originalContent = fs27.readFileSync(absPath, "utf8");
+                                } else if (fs28.existsSync(absPath)) {
+                                  originalContent = fs28.readFileSync(absPath, "utf8");
                                   hasOriginal = true;
                                 }
                                 originalContentForReporting = originalContent;
@@ -17875,10 +19127,10 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                                 } else if (normToolName === "write_file") {
                                   const rawContent = toolArgs.content || toolArgs.newContent || "";
                                   const modifiedContent = rawContent.endsWith("\n") ? rawContent : rawContent + "\n";
-                                  if (!fs27.existsSync(absPath)) {
+                                  if (!fs28.existsSync(absPath)) {
                                     isNewFileCreated = true;
-                                    fs27.mkdirSync(path26.dirname(absPath), { recursive: true });
-                                    fs27.writeFileSync(absPath, "", "utf8");
+                                    fs28.mkdirSync(path26.dirname(absPath), { recursive: true });
+                                    fs28.writeFileSync(absPath, "", "utf8");
                                   }
                                   yield { type: "status", content: `Opening New File Diff in IDE: ${path26.basename(absPath)}` };
                                   showDiffInIDE(absPath, "", modifiedContent);
@@ -17895,21 +19147,21 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                             ideDecision = res;
                           });
                           const originalApproval = settings.onToolApproval;
-                          approval = await new Promise(async (resolve) => {
+                          approval = await new Promise(async (resolve2) => {
                             const pollInterval = setInterval(() => {
                               if (ideDecision) {
                                 if (globalSettings.onIDEApproval) globalSettings.onIDEApproval(ideDecision);
                                 clearInterval(pollInterval);
-                                resolve(ideDecision);
+                                resolve2(ideDecision);
                               }
                             }, 100);
                             try {
                               const res = await originalApproval(normToolName, toolCall.args);
                               clearInterval(pollInterval);
-                              resolve(res);
+                              resolve2(res);
                             } catch (e) {
                               clearInterval(pollInterval);
-                              resolve("deny");
+                              resolve2("deny");
                             }
                           });
                           registerSecurityListener(null);
@@ -17918,9 +19170,9 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                             if (filePath) {
                               const absPath = path26.resolve(process.cwd(), filePath);
                               closeDiffInIDE(absPath, approval);
-                              if (approval === "deny" && isNewFileCreated && fs27.existsSync(absPath)) {
+                              if (approval === "deny" && isNewFileCreated && fs28.existsSync(absPath)) {
                                 try {
-                                  fs27.unlinkSync(absPath);
+                                  fs28.unlinkSync(absPath);
                                 } catch (e) {
                                 }
                               }
@@ -17939,11 +19191,11 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
                           if (finalIDE && finalIDE.file_focused && normPath(finalIDE.file_focused) === normPath(absPath) && finalIDE.full_content) {
                             finalContent = finalIDE.full_content;
                           }
-                          if (!finalContent && fs27.existsSync(absPath)) {
-                            finalContent = fs27.readFileSync(absPath, "utf8");
+                          if (!finalContent && fs28.existsSync(absPath)) {
+                            finalContent = fs28.readFileSync(absPath, "utf8");
                             if (!finalContent) {
                               await new Promise((r) => setTimeout(r, 100));
-                              finalContent = fs27.readFileSync(absPath, "utf8");
+                              finalContent = fs28.readFileSync(absPath, "utf8");
                             }
                           }
                           const verifiedLines = finalContent.split(/\r?\n/);
@@ -18053,9 +19305,9 @@ ${snippet2}`;
                             thisIsFirstToolFeedback = false;
                           }
                           if (normToolName === "exec_command") {
-                            await new Promise((resolve) => setTimeout(resolve, 50));
+                            await new Promise((resolve2) => setTimeout(resolve2, 50));
                             if (settings.onExecChunk) settings.onExecChunk(`ERROR: ${denyMsg}`);
-                            await new Promise((resolve) => setTimeout(resolve, 50));
+                            await new Promise((resolve2) => setTimeout(resolve2, 50));
                             if (settings.onExecEnd) settings.onExecEnd();
                           }
                           toolResults.push({ role: "user", text: `[TOOL RESULT]: DENIED: ${denyMsg}` });
@@ -18081,7 +19333,7 @@ ${snippet2}`;
                       const timeSinceLastTool = Date.now() - lastToolFinishedAt;
                       const delay = Math.max(0, 1e3 - timeSinceLastTool);
                       if (delay > 0) {
-                        await new Promise((resolve) => setTimeout(resolve, delay));
+                        await new Promise((resolve2) => setTimeout(resolve2, delay));
                       }
                     }
                     let execToolContext = {
@@ -18236,7 +19488,7 @@ ${snippet2}`;
                       }
                     }
                     if (normToolName === "exec_command" && settings.onExecEnd) {
-                      await new Promise((resolve) => setTimeout(resolve, 800));
+                      await new Promise((resolve2) => setTimeout(resolve2, 800));
                       settings.onExecEnd();
                     }
                     const isDenied = result && result.startsWith("DENIED:");
@@ -18388,8 +19640,8 @@ ${snippet2}`;
               ;
               const date = (/* @__PURE__ */ new Date()).toLocaleString();
               const agentErrDir = path26.join(LOGS_DIR, "agent");
-              if (!fs27.existsSync(agentErrDir)) fs27.mkdirSync(agentErrDir, { recursive: true });
-              fs27.appendFileSync(path26.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
+              if (!fs28.existsSync(agentErrDir)) fs28.mkdirSync(agentErrDir, { recursive: true });
+              fs28.appendFileSync(path26.join(agentErrDir, "error.log"), `ERROR [${date}]: ${errLog}
 
 ----------------------------------------------------------------------
 
@@ -18431,7 +19683,7 @@ ${recoveryText}`
                   for (let i = waitTime / 1e3; i > 0; i--) {
                     if (TERMINATION_SIGNAL) break;
                     yield { type: "status", content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
-                    await new Promise((resolve) => setTimeout(resolve, 1e3));
+                    await new Promise((resolve2) => setTimeout(resolve2, 1e3));
                   }
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
@@ -18449,7 +19701,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
                   for (let i = waitTime / 1e3; i > 0; i--) {
                     if (TERMINATION_SIGNAL) break;
                     yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]` };
-                    await new Promise((resolve) => setTimeout(resolve, 1e3));
+                    await new Promise((resolve2) => setTimeout(resolve2, 1e3));
                   }
                   yield { type: "status", content: `Trying to reach ${modelName}` };
                 } else {
@@ -18559,7 +19811,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
             isStutteringLoop = false;
             isGeneralLoop = false;
           }
-          if (systemSettings?.advanceRollback) {
+          if (systemSettings2?.advanceRollback) {
             await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
           }
           wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
@@ -18575,8 +19827,8 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path26.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog.includes("fetch failed") ? "Failed to Connect. Check your Internet Connection or Wait a moment" : errLog}` };
-        if (!fs27.existsSync(agentErrDir)) fs27.mkdirSync(agentErrDir, { recursive: true });
-        fs27.appendFileSync(path26.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
+        if (!fs28.existsSync(agentErrDir)) fs28.mkdirSync(agentErrDir, { recursive: true });
+        fs28.appendFileSync(path26.join(agentErrDir, "error.log"), `CRITICAL ERROR [${date}]: ${err}
 
 ----------------------------------------------------------------------
 
@@ -18595,7 +19847,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
           performance.clearMarks();
         }
         await RevertManager.commitTransaction();
-        if (systemSettings?.advanceRollback) {
+        if (systemSettings2?.advanceRollback) {
           await AdvanceRevertManager.cleanup(chatId);
         }
         await getIDEContext();
@@ -18998,9 +20250,9 @@ function ResumeModal({ onSelect, onDelete, onClose, theme = "Dark" }) {
     }
   }
   const visibleKeys = keys.slice(startIndex, startIndex + MAX_VISIBLE);
-  return /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box9, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.text, bold: true }, "CHAT HISTORY: RESUME CONVERSATION")), keys.length === 0 ? /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: colors.textMuted }, "No saved chats found.")) : /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more chats above)")), visibleKeys.map((id, index) => {
+  return /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React10.createElement(Box9, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.text, bold: true }, "CHAT HISTORY: RESUME CONVERSATION")), keys.length === 0 ? /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React10.createElement(Text10, { italic: true, color: colors.textMuted }, "No saved chats found.")) : /* @__PURE__ */ React10.createElement(Box9, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React10.createElement(Box9, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React10.createElement(Text10, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more chats above)")), visibleKeys.map((id, index2) => {
     const chat2 = history[id];
-    const actualIndex = startIndex + index;
+    const actualIndex = startIndex + index2;
     const isSelected = actualIndex === selectedIndex;
     const dateStr = formatDate(chat2?.updatedAt);
     return /* @__PURE__ */ React10.createElement(
@@ -19219,7 +20471,7 @@ var init_UpdateProcessor = __esm({
           setLog(`Running: ${command}...`);
           const isWin = process.platform === "win32";
           const executeCommand = (usePowerShell) => {
-            return new Promise((resolve) => {
+            return new Promise((resolve2) => {
               const shell = isWin ? usePowerShell ? "powershell.exe" : "cmd.exe" : process.env.SHELL || "bash";
               const shellArgs = isWin ? usePowerShell ? ["-NoProfile", "-Command", command] : ["/c", command] : ["-c", command];
               const handleOutput = (data) => {
@@ -19251,15 +20503,15 @@ var init_UpdateProcessor = __esm({
                   ptyProcess.onExit(({ exitCode }) => {
                     child = null;
                     if (exitCode !== 0) {
-                      resolve({ error: `Process exited with code ${exitCode}` });
+                      resolve2({ error: `Process exited with code ${exitCode}` });
                     } else {
-                      resolve({ success: true });
+                      resolve2({ success: true });
                     }
                   });
                   return;
                 } catch (err) {
                   if (isWin && usePowerShell && err.code === "ENOENT") {
-                    resolve({ retryCmd: true });
+                    resolve2({ retryCmd: true });
                     return;
                   }
                 }
@@ -19271,17 +20523,17 @@ var init_UpdateProcessor = __esm({
               cp.on("close", (code) => {
                 child = null;
                 if (code !== 0) {
-                  resolve({ error: `Process exited with code ${code}` });
+                  resolve2({ error: `Process exited with code ${code}` });
                 } else {
-                  resolve({ success: true });
+                  resolve2({ success: true });
                 }
               });
               cp.on("error", (err) => {
                 if (isWin && usePowerShell && err.code === "ENOENT") {
-                  resolve({ retryCmd: true });
+                  resolve2({ retryCmd: true });
                 } else {
                   child = null;
-                  resolve({ error: err.message });
+                  resolve2({ error: err.message });
                 }
               });
             });
@@ -19785,8 +21037,8 @@ function RevertModal({ prompts, onSelect, onClose, theme = "Dark" }) {
     }
   }
   const visiblePrompts = prompts.slice(startIndex, startIndex + MAX_VISIBLE);
-  return /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box13, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text, bold: true }, "CODEBASE TIME TRAVEL: SELECT UNDO POINT")), /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text }, "Select a prompt to revert the codebase back to the state ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: colors.secondary || "cyan" }, "immediately before"), " it was executed:")), prompts.length === 0 ? /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: colors.textMuted }, "No prompt checkpoints found for this session.")) : /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more prompts above)")), visiblePrompts.map((p, index) => {
-    const actualIndex = startIndex + index;
+  return /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React14.createElement(Box13, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text, bold: true }, "CODEBASE TIME TRAVEL: SELECT UNDO POINT")), /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.text }, "Select a prompt to revert the codebase back to the state ", /* @__PURE__ */ React14.createElement(Text14, { bold: true, color: colors.secondary || "cyan" }, "immediately before"), " it was executed:")), prompts.length === 0 ? /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, paddingY: 1 }, /* @__PURE__ */ React14.createElement(Text14, { italic: true, color: colors.textMuted }, "No prompt checkpoints found for this session.")) : /* @__PURE__ */ React14.createElement(Box13, { flexDirection: "column", width: "100%" }, startIndex > 0 && /* @__PURE__ */ React14.createElement(Box13, { paddingX: 2, marginBottom: 1 }, /* @__PURE__ */ React14.createElement(Text14, { color: colors.textMuted }, "\u25B2 (+", startIndex, " more prompts above)")), visiblePrompts.map((p, index2) => {
+    const actualIndex = startIndex + index2;
     const isSelected = actualIndex === selectedIndex;
     const dateStr = formatDate2(p.timestamp);
     const fileCount = p.changes ? p.changes.length : 0;
@@ -19850,7 +21102,7 @@ var init_RevertModal = __esm({
 import puppeteer4 from "puppeteer";
 import { exec } from "child_process";
 import { promisify } from "util";
-import fs28 from "fs";
+import fs29 from "fs";
 var execAsync, checkPuppeteerReady, installPuppeteerBrowser;
 var init_setup = __esm({
   "src/utils/setup.js"() {
@@ -19859,11 +21111,11 @@ var init_setup = __esm({
     checkPuppeteerReady = () => {
       try {
         const pptrConfig = getPuppeteerConfig();
-        if (pptrConfig.executablePath && fs28.existsSync(pptrConfig.executablePath)) {
+        if (pptrConfig.executablePath && fs29.existsSync(pptrConfig.executablePath)) {
           return true;
         }
         const exePath = puppeteer4.executablePath();
-        const exists = exePath && fs28.existsSync(exePath);
+        const exists = exePath && fs29.existsSync(exePath);
         if (exists) return true;
       } catch (e) {
         return false;
@@ -19932,10 +21184,10 @@ var init_GlintText = __esm({
         }, typeSpeed);
         return () => clearTimeout(timer);
       }, [text, displayedText, typeSpeed]);
-      return /* @__PURE__ */ React15.createElement(Text15, null, displayedText.split("").map((char, index) => {
-        const distance = Math.abs(index - position);
+      return /* @__PURE__ */ React15.createElement(Text15, null, displayedText.split("").map((char, index2) => {
+        const distance = Math.abs(index2 - position);
         const color = distance <= glintWidth / 2 ? glintColor : baseColor;
-        return /* @__PURE__ */ React15.createElement(Text15, { key: index, color, ...props }, char);
+        return /* @__PURE__ */ React15.createElement(Text15, { key: index2, color, ...props }, char);
       }));
     };
     GlintText_default = GlintText;
@@ -19950,7 +21202,7 @@ __export(app_exports, {
 import os4 from "os";
 import React16, { useState as useState15, useEffect as useEffect12, useRef as useRef4, useMemo as useMemo2 } from "react";
 import { Box as Box14, Text as Text16, useInput as useInput9, useStdout as useStdout2, Static } from "ink";
-import fs29 from "fs-extra";
+import fs30 from "fs-extra";
 import path27 from "path";
 import { exec as exec2 } from "child_process";
 import { fileURLToPath as fileURLToPath3 } from "url";
@@ -20040,12 +21292,12 @@ function App({ args = [] }) {
     }, 80);
   };
   const awaitTypewriter = async () => {
-    while (systemSettings.progressiveRendering && typewriterQueueRef.current.length > 0) {
-      await new Promise((resolve) => setTimeout(resolve, 10));
+    while (systemSettings2.progressiveRendering && typewriterQueueRef.current.length > 0) {
+      await new Promise((resolve2) => setTimeout(resolve2, 10));
     }
   };
   const appendStreamText = (chunkText) => {
-    if (systemSettings.progressiveRendering && typewriterTickRef.current) {
+    if (systemSettings2.progressiveRendering && typewriterTickRef.current) {
       const tokens = chunkText.split(/(\s+)/).filter(Boolean);
       for (const tok of tokens) {
         typewriterQueueRef.current.push(tok);
@@ -20081,7 +21333,7 @@ function App({ args = [] }) {
             const gCAsync = async () => {
               for (let i = 0; i < 1; i++) {
                 global.gc();
-                await new Promise((resolve) => setImmediate(resolve));
+                await new Promise((resolve2) => setImmediate(resolve2));
               }
               lastGCTimeRef.current = Date.now();
             };
@@ -20243,9 +21495,9 @@ function App({ args = [] }) {
         }
         i++;
       } else if (arg === "--auto-del" && args[i + 1]) {
-        const del = args[i + 1].toLowerCase();
-        if (["1d", "7d", "30d"].includes(del)) {
-          parsed.autoDel = del;
+        const del2 = args[i + 1].toLowerCase();
+        if (["1d", "7d", "30d"].includes(del2)) {
+          parsed.autoDel = del2;
         }
         i++;
       } else if (arg === "--auto-exec" && args[i + 1]) {
@@ -20283,13 +21535,14 @@ function App({ args = [] }) {
         i++;
       } else if (arg === "--provider" && args[i + 1]) {
         const val = args[i + 1].toLowerCase();
-        if (["google", "deepseek", "openrouter", "nvidia", "mistral"].includes(val)) {
+        if (["google", "deepseek", "openrouter", "nvidia", "mistral", "ollama"].includes(val)) {
           let mapped = "Google";
           if (val === "google") mapped = "Google";
           else if (val === "deepseek") mapped = "DeepSeek";
           else if (val === "openrouter") mapped = "OpenRouter";
           else if (val === "nvidia") mapped = "NVIDIA";
           else if (val === "mistral") mapped = "Mistral";
+          else if (val === "ollama") mapped = "Ollama";
           parsed.provider = mapped;
         }
         i++;
@@ -20306,7 +21559,7 @@ function App({ args = [] }) {
     return parsed;
   }, [args]);
   const performVersionCheck = async (manual = false, settingsOverride = null) => {
-    const settingsToUse = settingsOverride || systemSettings;
+    const settingsToUse = settingsOverride || systemSettings2;
     if (manual) {
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -20386,10 +21639,10 @@ function App({ args = [] }) {
     const kbPath = getKeybindingsPath(ideName);
     if (!kbPath) return;
     try {
-      await fs29.ensureDir(path27.dirname(kbPath));
+      await fs30.ensureDir(path27.dirname(kbPath));
       let bindings = [];
-      if (fs29.existsSync(kbPath)) {
-        const content = fs29.readFileSync(kbPath, "utf8").trim();
+      if (fs30.existsSync(kbPath)) {
+        const content = fs30.readFileSync(kbPath, "utf8").trim();
         if (content) {
           try {
             bindings = parseJsonc(content);
@@ -20409,7 +21662,7 @@ function App({ args = [] }) {
         },
         "when": "terminalFocus"
       });
-      fs29.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
+      fs30.writeFileSync(kbPath, JSON.stringify(bindings, null, 4), "utf8");
       cachedShortcut = "Shift + Enter";
       setMessages((prev) => {
         setCompletedIndex(prev.length + 1);
@@ -20442,8 +21695,8 @@ function App({ args = [] }) {
   const [providerBudgetCursor, setProviderBudgetCursor] = useState15(0);
   const [pbsCursor, setPbsCursor] = useState15(0);
   const [pbsSelected, setPbsSelected] = useState15({});
-  const [systemSettings, setSystemSettings] = useState15({ memory: true, theme: "Dark", compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
-  const colors = useMemo2(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
+  const [systemSettings2, setSystemSettings] = useState15({ memory: true, theme: "Dark", compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
+  const colors = useMemo2(() => getThemeColors(systemSettings2.theme), [systemSettings2.theme]);
   const [profileData, setProfileData] = useState15({ name: null, nickname: null, instructions: null });
   const [imageSettings, setImageSettings] = useState15({ keyType: "Default", quality: "Low-High", apiKey: "" });
   const [sessionStats, setSessionStats] = useState15({ tokens: 0 });
@@ -20559,15 +21812,17 @@ function App({ args = [] }) {
     }
     setActiveModel(defaultModel);
     saveSettings({ apiTier, activeModel: defaultModel });
-    setMessages((prev) => {
-      setCompletedIndex(prev.length + 1);
-      return [...prev, {
-        id: "tier-switch-" + Date.now(),
-        role: "system",
-        text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
-        isMeta: true
-      }];
-    });
+    if (modelDisplayName) {
+      setMessages((prev) => {
+        setCompletedIndex(prev.length + 1);
+        return [...prev, {
+          id: "tier-switch-" + Date.now(),
+          role: "system",
+          text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+          isMeta: true
+        }];
+      });
+    }
   }, [apiTier, aiProvider, apiKey]);
   const terminalEnv = useMemo2(() => {
     const ideName = getIDEName();
@@ -20615,7 +21870,7 @@ function App({ args = [] }) {
   let interval_for_timer;
   useEffect12(() => {
     let interval;
-    if (statusText && systemSettings.loadingPhrases !== false) {
+    if (statusText && systemSettings2.loadingPhrases !== false) {
       const updatePhrase = () => {
         const randomPhrase = WITTY_LOADING_PHRASES[Math.floor(Math.random() * WITTY_LOADING_PHRASES.length)];
         setWittyPhrase(randomPhrase);
@@ -20628,7 +21883,7 @@ function App({ args = [] }) {
     return () => {
       clearInterval(interval);
     };
-  }, [statusText, systemSettings]);
+  }, [statusText, systemSettings2]);
   const [isSpinnerActive, setIsSpinnerActive] = useState15(true);
   const [isProcessing, setIsProcessing] = useState15(false);
   const [isCompressing, setIsCompressing] = useState15(false);
@@ -20742,7 +21997,7 @@ function App({ args = [] }) {
     const isClear = completedIndex < cachedHistoryRef.current.completedIndex;
     const isChatChanged = cachedHistoryRef.current.chatId !== chatId;
     const isClearKeyChanged = cachedHistoryRef.current.clearKey !== clearKey;
-    const isThemeChanged = cachedHistoryRef.current.theme !== systemSettings.theme;
+    const isThemeChanged = cachedHistoryRef.current.theme !== systemSettings2.theme;
     if (isResize || isClear || isChatChanged || isClearKeyChanged || isThemeChanged) {
       const completedMsgs = messages.slice(0, completedIndex);
       for (let i = 0; i < completedMsgs.length; i++) {
@@ -20766,7 +22021,7 @@ function App({ args = [] }) {
         seenSelections: new Set(seenAskSelections),
         chatId,
         clearKey,
-        theme: systemSettings.theme
+        theme: systemSettings2.theme
       };
     } else {
       historicalBlocks = cachedHistoryRef.current.historicalBlocks;
@@ -21134,10 +22389,10 @@ function App({ args = [] }) {
       process.stdin.off("data", onData);
     };
   }, []);
-  const prevThemeRef = useRef4(systemSettings.theme);
+  const prevThemeRef = useRef4(systemSettings2.theme);
   useEffect12(() => {
-    if (prevThemeRef.current && prevThemeRef.current !== systemSettings.theme) {
-      prevThemeRef.current = systemSettings.theme;
+    if (prevThemeRef.current && prevThemeRef.current !== systemSettings2.theme) {
+      prevThemeRef.current = systemSettings2.theme;
       if (stdout) {
         stdout.write("\x1B[2J\x1B[3J\x1B[H");
         if (stdout.isTTY) {
@@ -21147,13 +22402,13 @@ function App({ args = [] }) {
       setClearKey((prev) => prev + 1);
       clearBlocksCache();
     } else {
-      prevThemeRef.current = systemSettings.theme;
+      prevThemeRef.current = systemSettings2.theme;
     }
-  }, [systemSettings.theme, stdout]);
+  }, [systemSettings2.theme, stdout]);
   useEffect12(() => {
     async function init() {
       try {
-        const pkg = JSON.parse(fs29.readFileSync(path27.join(process.cwd(), "package.json"), "utf8"));
+        const pkg = JSON.parse(fs30.readFileSync(path27.join(process.cwd(), "package.json"), "utf8"));
         initBridge(versionFluxflow || pkg.version || "2.0.0");
       } catch (e) {
         initBridge("2.0.0");
@@ -21267,7 +22522,7 @@ function App({ args = [] }) {
       if (!parsedArgs.playground) {
         deleteChat(PLAYGROUND_CHAT_ID).catch(() => {
         });
-        fs29.remove(path27.join(DATA_DIR, "playground")).catch(() => {
+        fs30.remove(path27.join(DATA_DIR, "playground")).catch(() => {
         });
       }
       performVersionCheck(false, freshSettings);
@@ -21303,7 +22558,7 @@ function App({ args = [] }) {
       if (parsedArgs.playground) {
         const playgroundDir = path27.join(DATA_DIR, "playground");
         try {
-          fs29.ensureDirSync(playgroundDir);
+          fs30.ensureDirSync(playgroundDir);
           process.chdir(playgroundDir);
         } catch (e) {
         }
@@ -21344,8 +22599,8 @@ function App({ args = [] }) {
         if (kbPath) {
           try {
             let bindings = [];
-            if (fs29.existsSync(kbPath)) {
-              const content = fs29.readFileSync(kbPath, "utf8").trim();
+            if (fs30.existsSync(kbPath)) {
+              const content = fs30.readFileSync(kbPath, "utf8").trim();
               if (content) {
                 bindings = parseJsonc(content);
               }
@@ -21384,10 +22639,10 @@ function App({ args = [] }) {
   useEffect12(() => {
     if (!isInitializing) {
       const modelToSave = parsedArgs.model && activeModel === parsedArgs.model ? persistedModelRef.current : activeModel;
-      let settingsToSave = systemSettings;
+      let settingsToSave = systemSettings2;
       if (parsedArgs.playground) {
         settingsToSave = {
-          ...systemSettings,
+          ...systemSettings2,
           allowExternalAccess: originalAllowExternalAccessRef.current,
           memory: originalMemoryRef.current
         };
@@ -21404,7 +22659,7 @@ function App({ args = [] }) {
         apiTier
       });
     }
-  }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
+  }, [mode, thinkingLevel, aiProvider, activeModel, showFullThinking, systemSettings2, profileData, imageSettings, isInitializing, parsedArgs, apiTier]);
   const handleSetup = async (val) => {
     const key = val.trim();
     const validators = {
@@ -21427,16 +22682,22 @@ function App({ args = [] }) {
       NVIDIA: {
         prefix: "nvapi-",
         minLength: 70
+      },
+      Ollama: {
+        prefix: "",
+        minLength: 0
       }
     };
     const { prefix, minLength } = validators[aiProvider] ?? {
       prefix: "",
       minLength: 0
     };
-    if (key.startsWith(prefix) && key.length >= minLength) {
-      await saveProviderAPIKey(aiProvider, key);
-      setApiKey(key);
-      initAI(key, { aiProvider, onIDEApproval: resetPendingApproval });
+    const isOllamaLocalEscape = aiProvider === "Ollama" && (key.trim() === "LOCAL" || key.trim() === "");
+    const effectiveKey = isOllamaLocalEscape ? "LOCAL" : key;
+    if (isOllamaLocalEscape || key.startsWith(prefix) && key.length >= minLength) {
+      await saveProviderAPIKey(aiProvider, effectiveKey);
+      setApiKey(effectiveKey);
+      initAI(effectiveKey, { aiProvider, onIDEApproval: resetPendingApproval });
       let defaultModel = "gemma-4-31b-it";
       if (aiProvider === "OpenRouter") {
         defaultModel = "google/gemma-4-31b-it:free";
@@ -21444,9 +22705,17 @@ function App({ args = [] }) {
         defaultModel = "deepseek-v4-flash";
       } else if (aiProvider === "NVIDIA") {
         defaultModel = "deepseek-ai/deepseek-v4-flash";
+      } else if (aiProvider === "Ollama") {
+        defaultModel = activeModel || "";
       }
       setActiveModel(defaultModel);
-      setMessages((prev) => [...prev, { role: "system", text: `${aiProvider} API Key saved successfully! Model set to ${defaultModel}. Initialization complete.`, isMeta: true }]);
+      let newSys = { ...systemSettings2 };
+      if (isOllamaLocalEscape) {
+        newSys = { ...newSys, ollamaEndpoint: "Local" };
+        setSystemSettings(newSys);
+      }
+      saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
+      setMessages((prev) => [...prev, { role: "system", text: `${aiProvider} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}.` : ""}${isOllamaLocalEscape ? "\n[SYSTEM] Ollama Endpoint automatically switched to Local." : ""} Initialization complete.`, isMeta: true }]);
     } else {
       setMessages((prev) => [
         ...prev,
@@ -21515,8 +22784,8 @@ function App({ args = [] }) {
     {
       cmd: "/thinking",
       desc: "Set AI reasoning depth",
-      subs: aiProvider === "DeepSeek" ? [
-        { cmd: "Fast", desc: "Fastest" },
+      subs: aiProvider === "Ollama" || aiProvider === "DeepSeek" ? [
+        { cmd: "Fast", desc: "Reasoning Disabled" },
         { cmd: "Standard", desc: "Standard Reasoning" },
         { cmd: "High", desc: "Extended Reasoning" }
       ] : aiProvider === "NVIDIA" ? [
@@ -21552,7 +22821,7 @@ function App({ args = [] }) {
     {
       cmd: "/model",
       desc: "Select Agent Model",
-      subs: getModels(aiProvider, apiTier)
+      subs: aiProvider === "Ollama" ? [] : getModels(aiProvider, apiTier)
     },
     {
       cmd: "/wildcard-tooling",
@@ -21737,9 +23006,9 @@ ${cleanText}`, color: "magenta" }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
               });
-              await fs29.ensureDir(dest);
+              await fs30.ensureDir(dest);
               const excludeDirs = ["node_modules", ".git", ".venv", "venv", "env", ".next", "dist", "build", ".cache"];
-              await fs29.copy(src, dest, {
+              await fs30.copy(src, dest, {
                 overwrite: true,
                 filter: (srcPath) => {
                   const relative = path27.relative(src, srcPath);
@@ -21806,7 +23075,7 @@ ${cleanText}`, color: "magenta" }];
               }
             }
             setTimeout(() => {
-              fs29.emptyDir(path27.join(DATA_DIR, "playground")).catch((err) => {
+              fs30.emptyDir(path27.join(DATA_DIR, "playground")).catch((err) => {
                 setMessages((prev) => {
                   const newMsgs = [...prev, {
                     id: "playground-" + Date.now(),
@@ -21835,7 +23104,7 @@ ${cleanText}`, color: "magenta" }];
               const gCAsync = async () => {
                 for (let i = 0; i < 3; i++) {
                   global.gc();
-                  await new Promise((resolve) => setImmediate(resolve));
+                  await new Promise((resolve2) => setImmediate(resolve2));
                 }
                 lastGCTimeRef.current = Date.now();
               };
@@ -21862,7 +23131,7 @@ ${cleanText}`, color: "magenta" }];
               const gCAsync = async () => {
                 for (let i = 0; i < 3; i++) {
                   global.gc();
-                  await new Promise((resolve) => setImmediate(resolve));
+                  await new Promise((resolve2) => setImmediate(resolve2));
                 }
                 lastGCTimeRef.current = Date.now();
               };
@@ -22059,27 +23328,57 @@ ${cleanText}`, color: "magenta" }];
         }
         case "/model": {
           if (parts[1]) {
-            const mod = parts.slice(1).join(" ");
-            const freeDefault = getDefaultModel("Google", "Free");
-            const paidDefault = getDefaultModel("Google", "Paid");
-            if (mod === freeDefault && apiTier !== "Free" && aiProvider === "Google") {
+            const rawArgs = parts.slice(1);
+            let isMultimodalFlag = false;
+            let invalidFlagError = false;
+            const filteredParts = [];
+            for (const arg of rawArgs) {
+              if (arg === "--multimodal" || arg === "-m") {
+                if (aiProvider === "Ollama") {
+                  isMultimodalFlag = true;
+                } else {
+                  invalidFlagError = true;
+                }
+              } else {
+                filteredParts.push(arg);
+              }
+            }
+            const mod = filteredParts.join(" ");
+            if (aiProvider === "Ollama") {
+              setOllamaMultimodal(isMultimodalFlag);
+            }
+            if (invalidFlagError) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, {
                   id: Date.now(),
                   role: "system",
-                  text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
+                  text: `[ERROR] Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.`,
                   isMeta: true
                 }];
               });
-              setActiveModel(paidDefault);
-            } else {
-              setActiveModel(mod);
-              const s2 = emojiSpace(2);
-              setMessages((prev) => {
-                setCompletedIndex(prev.length + 1);
-                return [...prev, { id: Date.now(), role: "system", text: `[SYSTEM] Model switched to ${mod}`, isMeta: true }];
-              });
+            }
+            if (mod) {
+              const freeDefault = getDefaultModel("Google", "Free");
+              const paidDefault = getDefaultModel("Google", "Paid");
+              if (mod === freeDefault && apiTier !== "Free" && aiProvider === "Google") {
+                setMessages((prev) => {
+                  setCompletedIndex(prev.length + 1);
+                  return [...prev, {
+                    id: Date.now(),
+                    role: "system",
+                    text: `**[ACCESS DENIED]** ${freeDefault} is restricted to the Free API tier. Automatically switching you to **${paidDefault}** for optimal performance.`,
+                    isMeta: true
+                  }];
+                });
+                setActiveModel(paidDefault);
+              } else {
+                setActiveModel(mod);
+                setMessages((prev) => {
+                  setCompletedIndex(prev.length + 1);
+                  return [...prev, { id: Date.now(), role: "system", text: `[SYSTEM] Model switched to ${mod}${aiProvider === "Ollama" ? ` (Multimodal: ${isMultimodalFlag ? "ON" : "OFF"})` : ""}`, isMeta: true }];
+                });
+              }
             }
           } else {
             setActiveView("model");
@@ -22207,12 +23506,12 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: Date.now(), role: "system", text: "[NUCLEAR] Initiating reset...", isMeta: true }];
               });
-              if (fs29.existsSync(LOGS_DIR)) fs29.removeSync(LOGS_DIR);
-              if (fs29.existsSync(SECRET_DIR)) fs29.removeSync(SECRET_DIR);
-              if (fs29.existsSync(SETTINGS_FILE)) fs29.removeSync(SETTINGS_FILE);
+              if (fs30.existsSync(LOGS_DIR)) fs30.removeSync(LOGS_DIR);
+              if (fs30.existsSync(SECRET_DIR)) fs30.removeSync(SECRET_DIR);
+              if (fs30.existsSync(SETTINGS_FILE)) fs30.removeSync(SETTINGS_FILE);
               try {
-                const items = fs29.readdirSync(FLUXFLOW_DIR);
-                if (items.length === 0) fs29.removeSync(FLUXFLOW_DIR);
+                const items = fs30.readdirSync(FLUXFLOW_DIR);
+                if (items.length === 0) fs30.removeSync(FLUXFLOW_DIR);
               } catch (e) {
               }
               setTimeout(() => {
@@ -22335,14 +23634,14 @@ ${list || "No saved chats found."}`, isMeta: true }];
 - [Define custom step-by-step recipes for this project here]
 `;
             const filePath = path27.join(process.cwd(), "FluxFlow.md");
-            if (fs29.pathExistsSync(filePath)) {
+            if (fs30.pathExistsSync(filePath)) {
               setMessages((prev) => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, { id: "init-err-" + Date.now(), role: "system", text: "ERROR: FluxFlow.md already exists in this directory.", isMeta: true }];
               });
             } else {
               try {
-                fs29.writeFileSync(filePath, template);
+                fs30.writeFileSync(filePath, template);
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
                   return [...prev, { id: "init-ok-" + Date.now(), role: "system", text: "[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.", isMeta: true }];
@@ -22413,7 +23712,7 @@ ${list || "No saved chats found."}`, isMeta: true }];
                 thinkingLevel,
                 mode,
                 janitorModel,
-                systemSettings,
+                systemSettings: systemSettings2,
                 sessionStats
               };
               const summary = await compressHistory(config, messages);
@@ -22605,7 +23904,7 @@ ${timestamp}` };
               profile: profileData,
               thinkingLevel,
               mode,
-              systemSettings,
+              systemSettings: systemSettings2,
               janitorModel,
               sessionStats,
               chatId,
@@ -22703,26 +24002,26 @@ ${timestamp}` };
                 }
               },
               onToolApproval: async (tool, args2) => {
-                const isAuto = autoAcceptWrites || systemSettings.autoExec;
+                const isAuto = autoAcceptWrites || systemSettings2.autoExec;
                 if (tool === "exec_command") {
                   const { command } = parseArgs(args2 || "{}");
                   const safeRegex = /^(echo|ls|dir|pwd|cd|git status|git log|git diff|type|cat|help)\b/i;
                   if (isAuto || command && safeRegex.test(command.trim())) return "allow";
-                  return new Promise((resolve) => {
-                    setPendingApproval({ tool, args: args2, resolve });
+                  return new Promise((resolve2) => {
+                    setPendingApproval({ tool, args: args2, resolve: resolve2 });
                     setActiveView("terminalApproval");
                   });
                 }
                 if (isAuto) return "allow";
-                return new Promise((resolve) => {
-                  setPendingApproval({ tool, args: args2, resolve });
+                return new Promise((resolve2) => {
+                  setPendingApproval({ tool, args: args2, resolve: resolve2 });
                   setActiveView("approval");
                 });
               },
               onAskUser: async (question, options) => {
                 flushTypewriterNow();
                 commitActiveStreamingMessage();
-                return new Promise((resolve) => {
+                return new Promise((resolve2) => {
                   let resolvedFlag = false;
                   setPendingAsk({
                     question,
@@ -22747,7 +24046,7 @@ Selection: ${val}`,
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;
                       });
-                      resolve(val);
+                      resolve2(val);
                     }
                   });
                   setActiveView("ask");
@@ -22774,9 +24073,9 @@ Selection: ${val}`,
                 setQueuedPrompt(null);
                 queuedPromptRef.current = null;
                 setMessages((prev) => {
-                  const index = [...prev].reverse().findIndex((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
-                  if (index !== -1) {
-                    const actualIndex = prev.length - 1 - index;
+                  const index2 = [...prev].reverse().findIndex((m) => m.text?.includes("[STEERING HINT: QUEUED]") || m.text?.includes("[QUESTION: QUEUED]"));
+                  if (index2 !== -1) {
+                    const actualIndex = prev.length - 1 - index2;
                     const newMsgs = [...prev];
                     let text = newMsgs[actualIndex].text;
                     if (text.includes("[STEERING HINT: QUEUED]")) {
@@ -22810,14 +24109,14 @@ Selection: ${val}`,
           let inToolCallString = null;
           const signalRegex = /\[?\s*turn\s*:\s*.*?\s*\]?/gi;
           for await (const packet of stream) {
-            await new Promise((resolve) => setTimeout(resolve, 3));
+            await new Promise((resolve2) => setTimeout(resolve2, 3));
             if (packet.type === "text") {
               setLastChunkTime(Date.now());
             }
             if (isFirstPacket && packet.type === "text") {
               apiStart = Date.now();
               isFirstPacket = false;
-              if (systemSettings.progressiveRendering) {
+              if (systemSettings2.progressiveRendering) {
                 startTypewriter();
               }
             }
@@ -22892,7 +24191,7 @@ Selection: ${val}`,
               if (global.gc) {
                 for (let i2 = 0; i2 < 2; i2++) {
                   global.gc();
-                  await new Promise((resolve) => setImmediate(resolve));
+                  await new Promise((resolve2) => setImmediate(resolve2));
                 }
                 lastGCTimeRef.current = Date.now();
               }
@@ -22908,7 +24207,7 @@ Selection: ${val}`,
               hasFiredJanitor = true;
               clearBlocksCache();
               runJanitorTask(
-                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
+                { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings: systemSettings2, sessionStats, aiProvider, apiKey },
                 packet.data.agentText,
                 packet.data.fullAgentTextRaw,
                 packet.data.history,
@@ -23037,7 +24336,7 @@ Selection: ${val}`,
               if (global.gc) {
                 for (let i2 = 0; i2 < 3; i2++) {
                   global.gc();
-                  await new Promise((resolve) => setImmediate(resolve));
+                  await new Promise((resolve2) => setImmediate(resolve2));
                 }
                 lastGCTimeRef.current = Date.now();
               }
@@ -23186,7 +24485,7 @@ Selection: ${val}`,
             try {
               for (let i = 0; i < 3; i++) {
                 global.gc();
-                await new Promise((resolve) => setImmediate(resolve));
+                await new Promise((resolve2) => setImmediate(resolve2));
               }
               lastGCTimeRef.current = Date.now();
             } catch (e) {
@@ -23464,7 +24763,7 @@ Selection: ${val}`,
         return /* @__PURE__ */ React16.createElement(
           SettingsMenu,
           {
-            systemSettings,
+            systemSettings: systemSettings2,
             setSystemSettings,
             apiTier,
             setActiveView,
@@ -23480,7 +24779,7 @@ Selection: ${val}`,
         return /* @__PURE__ */ React16.createElement(
           SettingsMenu,
           {
-            systemSettings,
+            systemSettings: systemSettings2,
             setSystemSettings,
             apiTier,
             setActiveView,
@@ -23503,11 +24802,12 @@ Selection: ${val}`,
               { label: "Google (Free/Paid)", value: "Google" },
               { label: "Nvidia (Free/Custom)", value: "NVIDIA" },
               { label: "DeepSeek (Paid)", value: "DeepSeek" },
+              { label: "Ollama (Cloud/Local)", value: "Ollama" },
               { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
               { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" },
               { label: "Back", value: providerReturnView }
             ],
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             onSelect: async (item) => {
               if (item.value === providerReturnView || item.value === "settings" || item.value === "Back") {
                 setActiveView(providerReturnView);
@@ -23523,9 +24823,9 @@ Selection: ${val}`,
                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                 setActiveModel(defaultModel);
                 setApiTier(targetTier);
-                if (selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL) {
+                if (selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL || selectedProvider === "Ollama") {
                   setSystemSettings((s) => ({ ...s, memory: false }));
-                  saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
+                  saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings2, memory: false } });
                 } else {
                   saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas });
                 }
@@ -23533,7 +24833,7 @@ Selection: ${val}`,
                   ...prev,
                   {
                     role: "system",
-                    text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. Model set to ${defaultModel}.${selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available with Custom Endpoints" : ""}`,
+                    text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. ${defaultModel ? `Model set to ${defaultModel}` : ""}.${selectedProvider === "Ollama" ? "\n[SYSTEM] Memory is not available with Ollama Provider" : ""}${selectedProvider === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available with Custom Endpoints" : ""}`,
                     isMeta: true
                   }
                 ]);
@@ -23595,7 +24895,7 @@ Selection: ${val}`,
               { label: "Custom (Set reset day of month)", value: "Custom" },
               { label: "Back", value: "apiTier" }
             ],
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             onSelect: (item) => {
               if (item.value === "apiTier" || item.value === "Back") {
                 setActiveView("apiTier");
@@ -23631,7 +24931,7 @@ Selection: ${val}`,
               { label: `Provider Budgets  (set limits per provider individually) ${quotas.providerBudgets?.["__useProvider"] ? "\u25CF" : ""}`, value: "provider" },
               { label: "Back", value: budgetReturnView }
             ],
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             onSelect: (item) => {
               if (item.value === budgetReturnView || item.value === "Back") {
                 setActiveView(budgetReturnView);
@@ -23688,7 +24988,7 @@ Selection: ${val}`,
           }
         );
       case "providerBudgetSelect": {
-        const PROVIDERS_LIST = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
+        const PROVIDERS_LIST = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter", "Ollama"];
         const anySelected = PROVIDERS_LIST.some((p) => pbsSelected[p]);
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "SELECT PROVIDERS TO SET BUDGETS FOR")), PROVIDERS_LIST.map((prov, i) => {
           const isActive = i === pbsCursor;
@@ -23708,7 +25008,7 @@ Selection: ${val}`,
               { label: "Custom (Set reset day of month)", value: "Custom" },
               { label: "Back", value: "chat" }
             ],
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             onSelect: (item) => {
               if (item.value === "chat" || item.value === "Back") {
                 setActiveView("chat");
@@ -23744,7 +25044,7 @@ Selection: ${val}`,
         const isFreeTier = apiTier !== "Paid";
         const usingProviderBudgets = !!quotas.providerBudgets?.__useProvider;
         const providerBudgetsMap = quotas.providerBudgets || {};
-        const configuredProviders = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"].filter(
+        const configuredProviders = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter", "Ollama"].filter(
           (p) => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
         );
         const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -23815,11 +25115,11 @@ Selection: ${val}`,
                 setJanitorModel(val);
                 newSettings.janitorModel = val;
               } else if (key === "autoApproveCommands" || key === "autoDisallowCommands" || key === "alwaysAskCommands") {
-                const newSysSettings = { ...systemSettings, [key]: val.trim(), sandboxPreset: "Custom" };
+                const newSysSettings = { ...systemSettings2, [key]: val.trim(), sandboxPreset: "Custom" };
                 setSystemSettings(newSysSettings);
                 newSettings.systemSettings = newSysSettings;
               } else if (key === "externalDataPath") {
-                const newSysSettings = { ...systemSettings, useExternalData: true, externalDataPath: val.trim() };
+                const newSysSettings = { ...systemSettings2, useExternalData: true, externalDataPath: val.trim() };
                 setSystemSettings(newSysSettings);
                 newSettings.systemSettings = newSysSettings;
                 setMessages((prev) => [...prev, { id: Date.now(), role: "system", text: "[EXTERNAL STORAGE] Flux Flow will use " + val.trim() + " for data after restart." }]);
@@ -23833,17 +25133,15 @@ Selection: ${val}`,
                     setCompletedIndex(prev.length + 1);
                     return [...prev, { id: Date.now(), role: "system", text: `[IMAGE KEY] Custom API key saved successfully.`, isMeta: true }];
                   });
-                } else {
-                  setImageSettings((prev) => ({ ...prev, keyType: "Default" }));
-                  newSettings.imageSettings = { ...imageSettings, keyType: "Default" };
-                  setMessages((prev) => {
-                    setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: Date.now(), role: "system", text: `[IMAGE KEY ERROR] API key must start with sk_. Key strategy reset to Default.`, isMeta: true }];
-                  });
                 }
               } else if (key === "providerKey") {
-                const keyInput = val.trim();
+                let keyInput = val.trim();
                 const prov = inputConfig.provider;
+                if (prov === "Ollama" && (keyInput === "LOCAL" || keyInput === "")) {
+                  keyInput = "LOCAL";
+                  setSystemSettings((s) => ({ ...s, ollamaEndpoint: "Local" }));
+                  newSettings.systemSettings = { ...systemSettings2, ollamaEndpoint: "Local" };
+                }
                 await saveProviderAPIKey(prov, keyInput);
                 setAiProvider(prov);
                 setApiKey(keyInput);
@@ -23855,13 +25153,13 @@ Selection: ${val}`,
                 newSettings.aiProvider = prov;
                 newSettings.activeModel = defaultModel;
                 newSettings.apiTier = targetTier;
-                if (prov === "NVIDIA" && process.env.NVIDIA_BASE_URL) {
+                if (prov === "NVIDIA" && process.env.NVIDIA_BASE_URL || prov === "Ollama") {
                   setSystemSettings((s) => ({ ...s, memory: false }));
-                  newSettings.systemSettings = { ...systemSettings, memory: false };
+                  newSettings.systemSettings = { ...systemSettings2, memory: false };
                 }
                 setMessages((prev) => {
                   setCompletedIndex(prev.length + 1);
-                  return [...prev, { id: Date.now(), role: "system", text: `\u2705 ${prov} API Key saved successfully! Model set to ${defaultModel}.${prov === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available with Custom Endpoints" : ""}`, isMeta: true }];
+                  return [...prev, { id: Date.now(), role: "system", text: `${prov} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}` : ""}${prov === "Ollama" && keyInput === "LOCAL" ? "\n[SYSTEM] Ollama Endpoint automatically switched to Local" : ""}${prov === "Ollama" ? "\n[SYSTEM] Memory is not available with Ollama Provider" : ""}${prov === "NVIDIA" && process.env.NVIDIA_BASE_URL ? "\n[SYSTEM] Memory is not available" : ""}`, isMeta: true }];
                 });
               }
               if (next) {
@@ -23950,7 +25248,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Confirm Intent",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "Turn On Dynamic Directory Awareness", value: "on" },
               { label: "Keep Off (Recommended)", value: "off" }
@@ -23972,7 +25270,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Actions",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "Back to Settings", value: "back" }
             ],
@@ -23984,7 +25282,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Confirm Intent",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "I know the risk and turning on intentionally", value: "on" },
               { label: "Keep Off (Recommended)", value: "off" }
@@ -24002,7 +25300,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Confirm",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "I understand and wish to enable", value: "on" },
               { label: "Keep Off", value: "off" }
@@ -24020,7 +25318,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Confirm Intent",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "I know the risk and turning on intentionally", value: "on" },
               { label: "Keep Off (Recommended)", value: "off" }
@@ -24038,7 +25336,7 @@ Selection: ${val}`,
           CommandMenu,
           {
             title: "Final Confirmation",
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             items: [
               { label: "I agree knowing the consequences", value: "on" },
               { label: "Keep Off", value: "off" }
@@ -24098,7 +25396,7 @@ Selection: ${val}`,
                 setActiveView("key");
               }
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         )));
       case "exit":
@@ -24116,7 +25414,7 @@ Selection: ${val}`,
               setPendingAsk(null);
               setActiveView("chat");
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         ));
       case "revert":
@@ -24188,7 +25486,7 @@ Selection: ${val}`,
               }
             },
             onClose: () => setActiveView("chat"),
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         ));
       case "resume":
@@ -24232,7 +25530,7 @@ Selection: ${val}`,
               return newHistory;
             },
             onClose: () => setActiveView("chat"),
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         ));
       case "keybindingsPrompt":
@@ -24252,11 +25550,11 @@ Selection: ${val}`,
               }
               setActiveView("chat");
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         )));
       case "memory":
-        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(MemoryModal, { onClose: () => setActiveView("chat"), theme: systemSettings.theme }));
+        return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(MemoryModal, { onClose: () => setActiveView("chat"), theme: systemSettings2.theme }));
       case "parserDownload":
         return /* @__PURE__ */ React16.createElement(Box14, { width: "100%", alignItems: "center", justifyContent: "center" }, /* @__PURE__ */ React16.createElement(ParserDownloadModal, { onClose: () => setActiveView("settings") }));
       case "profile":
@@ -24270,7 +25568,7 @@ Selection: ${val}`,
               setActiveView("chat");
             },
             onCancel: () => setActiveView("chat"),
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         );
       case "resolution":
@@ -24278,7 +25576,7 @@ Selection: ${val}`,
           ResolutionModal,
           {
             data: resolutionData,
-            theme: systemSettings.theme,
+            theme: systemSettings2.theme,
             onResolve: (val) => {
               setResolutionData(null);
               setActiveView("chat");
@@ -24301,8 +25599,8 @@ Selection: ${val}`,
           Object.keys(args2).forEach((key) => {
             const m = key.match(/^(replaceContent|newContent|content_to_replace|content_to_add|TargetContent|ReplacementContent|replacementContent)(\d+)?$/);
             if (m) {
-              const index = m[2] ? parseInt(m[2]) : 1;
-              indices.add(index);
+              const index2 = m[2] ? parseInt(m[2]) : 1;
+              indices.add(index2);
             }
           });
           const sortedIndices = Array.from(indices).sort((a, b) => a - b);
@@ -24344,7 +25642,7 @@ Selection: ${val}`,
               setPendingApproval(null);
               setActiveView("chat");
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         )));
       case "updateManager":
@@ -24370,7 +25668,7 @@ Selection: ${val}`,
                 setInputConfig({
                   label: "Enter Custom Update Command (Global install recommended):",
                   key: "customUpdateCommand",
-                  value: systemSettings.customUpdateCommand,
+                  value: systemSettings2.customUpdateCommand,
                   next: (val) => {
                     setSystemSettings((s) => ({ ...s, updateManager: "custom", customUpdateCommand: val }));
                     return null;
@@ -24382,7 +25680,7 @@ Selection: ${val}`,
                 setActiveView("settings");
               }
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         );
       case "update":
@@ -24391,7 +25689,7 @@ Selection: ${val}`,
           {
             latest: latestVer,
             current: versionFluxflow,
-            settings: systemSettings,
+            settings: systemSettings2,
             onClose: () => setActiveView("chat"),
             onSuccess: () => {
               setMessages((prev) => {
@@ -24425,11 +25723,11 @@ Selection: ${val}`,
               setPendingApproval(null);
               setActiveView("chat");
             },
-            theme: systemSettings.theme
+            theme: systemSettings2.theme
           }
         )));
       default:
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6, theme: systemSettings.theme }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa, showTPMEstimate: systemSettings.showTPMEstimate })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, flexShrink: 0, width: "100%" }, showBtwBox && btwResponse && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 1, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "INQUIRY RESPONSE"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(CodeRenderer, { text: btwResponse, columns: terminalSize.columns - 6, theme: systemSettings2.theme }))), activeSubagents.filter((sa) => sa.status === "running").length > 0 && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, paddingY: 0, width: "100%", marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Box14, { justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "ACTIVE SUBAGENTS")), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", marginTop: 1, width: "100%" }, activeSubagents.filter((sa) => sa.status === "running").map((sa) => /* @__PURE__ */ React16.createElement(SubagentRow, { key: sa.id, sa, showTPMEstimate: systemSettings2.showTPMEstimate })))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 0, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, null, statusText ? /* @__PURE__ */ React16.createElement(Box14, { gap: 1 }, /* @__PURE__ */ React16.createElement(build_default, null), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
             text: statusText.trimEnd(),
@@ -24472,12 +25770,12 @@ Selection: ${val}`,
         })(), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
-            text: tempModelOverride || activeModel.split("/")[1] || activeModel,
+            text: tempModelOverride || activeModel.split("/")[1] || activeModel.length > 1 ? activeModel : "Use '/model model-id' to select model",
             baseColor: colors.text,
             glintColor: colors.textMuted,
             glintWidth: 3
           }
-        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " (", thinkingLevel, ")"))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
+        ), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", activeModel.length > 0 ? `(${thinkingLevel})` : ""))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2584".repeat(Math.max(1, terminalSize.columns)))), /* @__PURE__ */ React16.createElement(
           Box14,
           {
             backgroundColor: colors.inputBg,
@@ -24515,7 +25813,7 @@ Selection: ${val}`,
         ), /* @__PURE__ */ React16.createElement(Box14, { width: "100%", height: 1, overflow: "hidden" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.inputBorder }, "\u2580".repeat(Math.max(1, terminalSize.columns))))));
     }
   };
-  return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React16.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider, theme: systemSettings.theme }) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}-${systemSettings.theme}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React16.createElement(
+  return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, isInitializing ? null : showBridgePromo ? /* @__PURE__ */ React16.createElement(BridgePromo, { width: stdout?.columns || 80, height: stdout?.rows || 24, selectedIndex: promoSelectedIndex, aiProvider, theme: systemSettings2.theme }) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column", width: "100%" }, /* @__PURE__ */ React16.createElement(Static, { key: `static-${clearKey}-${chatId}-${terminalSize.columns}-${terminalSize.rows}-${systemSettings2.theme}`, items: parsedBlocks.completed }, (block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
     {
       key: block.key,
@@ -24524,7 +25822,7 @@ Selection: ${val}`,
       showFullThinking,
       aiProvider,
       version: versionFluxflow,
-      theme: systemSettings.theme
+      theme: systemSettings2.theme
     }
   ))), /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", paddingX: 1, paddingBottom: 0, width: "100%" }, (activeView === "chat" || ["ask", "approval", "terminalApproval"].includes(activeView)) && /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", width: "100%" }, parsedBlocks.active.map((block) => /* @__PURE__ */ React16.createElement(
     BlockItem,
@@ -24535,7 +25833,7 @@ Selection: ${val}`,
       showFullThinking,
       aiProvider,
       version: versionFluxflow,
-      theme: systemSettings.theme
+      theme: systemSettings2.theme
     }
   )), activeCommand && /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(TerminalBox, { command: activeCommand, output: execOutput, isFocused: isTerminalFocused, isPty: isActiveCommandPty, terminalHeight: terminalSize.rows, columns: terminalSize.columns }))), isInitializing ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "double", borderColor: "grey", padding: 1, flexShrink: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Starting Flux Flow...")) : !apiKey ? /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: "white", padding: 0, flexDirection: "column", flexShrink: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, "API KEY REQUIRED")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "column" }, setupStep === 0 ? /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Select your Preferred Provider:"), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(
     CommandMenu,
@@ -24544,6 +25842,7 @@ Selection: ${val}`,
         { label: "Google (Free/Paid)", value: "Google" },
         { label: "Nvidia (Free/Custom)", value: "NVIDIA" },
         { label: "DeepSeek (Paid)", value: "DeepSeek" },
+        { label: "Ollama (Cloud/Local)", value: "Ollama" },
         { label: "Mistral (Free/Paid) [EXPERIMENTAL]", value: "Mistral" },
         { label: "OpenRouter (Free/Paid) [EXPERIMENTAL]", value: "OpenRouter" }
       ],
@@ -24552,7 +25851,7 @@ Selection: ${val}`,
         setSetupStep(1);
       }
     }
-  ))) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, "Please enter your ", aiProvider, " API Key to initialize the agent (If billing is enabled set /settings \u2192 Others \u2192 API Strategy to use premium models. Set budget limit at /budgets.)."), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React16.createElement(
+  ))) : /* @__PURE__ */ React16.createElement(React16.Fragment, null, /* @__PURE__ */ React16.createElement(Text16, { color: "white" }, aiProvider === "Ollama" ? "Enter Ollama API Key (or type LOCAL to use local host):" : `Enter your ${aiProvider} API Key:`), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", bold: true }, " ", ">", " "), /* @__PURE__ */ React16.createElement(
     TextInput4,
     {
       value: tempKey,
@@ -24560,7 +25859,7 @@ Selection: ${val}`,
       onSubmit: handleSetup,
       mask: "*"
     }
-  )), /* @__PURE__ */ React16.createElement(Box14, { marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, "(Press ESC to go back to provider selection)")))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm)" : "(Press Enter to confirm and initialize)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "red", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " to cancel.")), suggestions.length > 0 && (() => {
+  )))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm, ESC to go back)" : "(Press Enter to confirm and initialize, ESC to go back)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "red", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " to cancel.")), suggestions.length > 0 && (() => {
     const windowSize = 5;
     let startIdx = suggestionOffsetRef.current;
     let firstSelectableIndex = 0;
@@ -24645,15 +25944,15 @@ Selection: ${val}`,
       tokens: sessionStats.tokens,
       tokensTotal: chatTokens,
       chatId,
-      isMemoryEnabled: systemSettings.memory,
+      isMemoryEnabled: systemSettings2.memory,
       apiTier,
       aiProvider,
       activeModel,
       isProcessing,
       lastChunkTime,
-      theme: systemSettings.theme,
+      theme: systemSettings2.theme,
       wps: streamingWordStatsRef.current.wps,
-      showTPMEstimate: systemSettings.showTPMEstimate
+      showTPMEstimate: systemSettings2.showTPMEstimate
     }
   )), activeView === "exit" && (() => {
     const wallTimeMs = Date.now() - SESSION_START_TIME;
@@ -24801,7 +26100,7 @@ var init_app = __esm({
     CHANGELOG_URL = "https://fluxflow-cli.onrender.com/changelog";
     DOCS_URL = "https://fluxflow-cli.onrender.com/";
     packageJsonPath = path27.join(path27.dirname(fileURLToPath3(import.meta.url)), "../package.json");
-    packageJson = JSON.parse(fs29.readFileSync(packageJsonPath, "utf8"));
+    packageJson = JSON.parse(fs30.readFileSync(packageJsonPath, "utf8"));
     versionFluxflow = packageJson.version;
     updatedOn = packageJson.date || "2026-05-20";
     ResolutionModal = ({ data, onResolve, onEdit, theme = "Dark" }) => {
@@ -24835,14 +26134,14 @@ var init_app = __esm({
         const scan = (currentDir) => {
           if (fileList.length >= 2e3) return;
           try {
-            const files = fs29.readdirSync(currentDir);
+            const files = fs30.readdirSync(currentDir);
             for (const file of files) {
               if (fileList.length >= 2e3) return;
               if (["node_modules", ".git", ".gemini", "dist", "build", ".next", ".cache", "out"].includes(file)) {
                 continue;
               }
               const filePath = path27.join(currentDir, file);
-              const stat = fs29.statSync(filePath);
+              const stat = fs30.statSync(filePath);
               if (stat.isDirectory()) {
                 scan(filePath);
               } else {
@@ -25030,7 +26329,7 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   if (!Number.isNaN(_allocValue)) {
     console.log(`
 [MEMORY] Starting with: '${_allocValue > _maxAllowed ? _maxAllowed : _allocValue} MB' Allocation${_allocValue > _maxAllowed ? " (Max allowed: '" + _maxAllowed + " MB')" : ""}. Please Wait...`);
-    await new Promise((resolve) => setTimeout(resolve, 5e3));
+    await new Promise((resolve2) => setTimeout(resolve2, 5e3));
   }
   const cp = spawn3(process.execPath, [
     `--max-old-space-size=${HEAP_LIMIT}`,
@@ -25048,11 +26347,11 @@ if (isBundled && !process.execArgv.some((arg) => arg.includes("max-old-space-siz
   const isUpdate = args[0] === "--update";
   const isExport = args[0] === "--export";
   if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
-    const fs30 = await import("fs");
+    const fs31 = await import("fs");
     const path28 = await import("path");
     const { fileURLToPath: fileURLToPath5 } = await import("url");
     const packageJsonPath2 = path28.join(path28.dirname(fileURLToPath5(import.meta.url)), "../package.json");
-    const packageJson2 = JSON.parse(fs30.readFileSync(packageJsonPath2, "utf8"));
+    const packageJson2 = JSON.parse(fs31.readFileSync(packageJsonPath2, "utf8"));
     const versionFluxflow2 = packageJson2.version;
     if (isExport) {
       const subArg = (args[1] || "").toLowerCase();
@@ -25182,7 +26481,7 @@ Usage: fluxflow --export error`);
             const { render: render2, Box: Box15, Text: Text17 } = await import("ink");
             const SelectInput3 = (await import("ink-select-input")).default;
             const TextInput5 = (await import("ink-text-input")).default;
-            return new Promise((resolve) => {
+            return new Promise((resolve2) => {
               const items = [
                 { label: "NPM", value: "npm" },
                 { label: "PNPM", value: "pnpm" },
@@ -25229,7 +26528,7 @@ Usage: fluxflow --export error`);
               };
               const cleanupAndResolve = (val) => {
                 if (unmountFn) unmountFn();
-                resolve(val);
+                resolve2(val);
               };
               const { unmount } = render2(/* @__PURE__ */ React18.createElement(PromptComponent, null));
               unmountFn = unmount;

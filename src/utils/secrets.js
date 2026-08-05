@@ -29,6 +29,7 @@ export const getProviderAPIKey = async (provider) => {
         if (provider === 'OpenRouter') return secrets.OPENROUTER_API_KEY || null;
         if (provider === 'Mistral') return secrets.MISTRAL_API_KEY || null;
         if (provider === 'NVIDIA') return secrets.NVIDIA_API_KEY || null;
+        if (provider === 'Ollama') return secrets.OLLAMA_API_KEY || 'LOCAL';
     } catch (e) {}
     return null;
 };
@@ -45,6 +46,8 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('MISTRAL_API_KEY', key);
     } else if (provider === 'NVIDIA') {
         await saveSecret('NVIDIA_API_KEY', key);
+    } else if (provider === 'Ollama') {
+        await saveSecret('OLLAMA_API_KEY', key);
     }
 };
 

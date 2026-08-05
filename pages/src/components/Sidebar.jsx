@@ -5,7 +5,7 @@ import Search from './Search'
 
 export default function Sidebar() {
     return (
-        <aside className="hidden lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300">
+        <aside className="hidden lg:block w-72 shrink-0 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-black h-screen sticky top-0 overflow-y-auto transition-colors duration-300 select-none">
             <div className="p-8">
                 <motion.div
                     initial={{ opacity: 0, x: -20 }}

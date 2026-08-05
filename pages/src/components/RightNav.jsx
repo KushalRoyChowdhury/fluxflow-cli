@@ -41,7 +41,7 @@ export default function RightNav() {
             </p>
             <nav className="relative">
                 <div
-                    className="absolute left-0 w-px bg-slate-200 dark:bg-white/10 h-full"
+                    className="absolute z-0 left-0 w-px bg-slate-200 dark:bg-white/10 h-full"
                     aria-hidden="true"
                 />
                 <ul className="space-y-2 relative">

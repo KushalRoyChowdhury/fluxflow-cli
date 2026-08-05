@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.18.0"]
+export const stableVersions = ["3.19.0"]
 
 export const changelogData = {
+    "3.19.0": {
+        "note": "AUGUST 6.",
+        "added": [
+            "**Native Ollama Integration**\n• Use ANY model available in Ollama Cloud or downloaded on-device models via Ollama.\n• Select a model using `/model <model-id>`.\n• To use local models, enter `LOCAL` when FluxFlow prompts for an API key during setup.\n• Enable multimodality on demand with any supported model using the flag `-m` or `--multimodal` during selection. E.g., `/model gemma3-4b-it -m`. If used `-m` on non-multomodal models, FluxFlow wont stop you, but the model might enter existantial crisis.",
+            "Improved environment for non-agentic models in FluxFlow with tool calling:\n• Many models are trained for chat/reasoning and may have weak tool-calling reliability. Use the new command `/wildcard-tooling` to use those models in agentic workflows with better tool-calling reliability."
+        ],
+        "changed": [
+            "Overall tool-calling improvements."
+        ],
+        "fixes": []
+    },
     "3.18.0": {
         "note": "AUGUST 4.",
         "added": [],

@@ -940,16 +940,24 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
                                     <Text color="gray" bold>▶_ {lang.toUpperCase() || 'CODE'}</Text>
                                 </Box>
                                 <Box flexDirection="column" width="100%">
-                                    {codeLines.map((line, idx) => (
-                                        <Box key={idx} width="100%">
-                                            <Box width={gutterWidth + 2} flexShrink={0}>
-                                                <Text color="gray">{String(idx + 1).padStart(gutterWidth, ' ')} </Text>
+                                    {codeLines.map((line, idx) => {
+                                        const wrappedCodeLine = wrapText(line, Math.max(10, codeWidth));
+                                        const subLines = wrappedCodeLine.split('\n');
+                                        return (
+                                            <Box key={idx} flexDirection="column" width="100%">
+                                                {subLines.map((subLine, subIdx) => (
+                                                    <Box key={subIdx} width="100%">
+                                                        <Box width={gutterWidth + 2} flexShrink={0}>
+                                                            <Text color="gray">{subIdx === 0 ? String(idx + 1).padStart(gutterWidth, ' ') + ' ' : ' '.repeat(gutterWidth + 1)}</Text>
+                                                        </Box>
+                                                        <Box flexGrow={1}>
+                                                            {renderHighlightedLine(subLine, lang, colors.text)}
+                                                        </Box>
+                                                    </Box>
+                                                ))}
                                             </Box>
-                                            <Box flexGrow={1}>
-                                                {renderHighlightedLine(line, lang, colors.text)}
-                                            </Box>
-                                        </Box>
-                                    ))}
+                                        );
+                                    })}
                                 </Box>
                             </Box>
                         );
@@ -1496,21 +1504,29 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
 
     if (type === 'code-line') {
         const { lineNum, lang } = block;
+        const availableCodeWidth = columns - 12;
+        const wrappedLine = wrapText(text, Math.max(10, availableCodeWidth));
+        const subLines = wrappedLine.split('\n');
         return (
-            <Box
-                flexDirection="row"
-                borderStyle="single"
-                borderLeft borderRight={false} borderTop={false} borderBottom={false}
-                borderColor={colors.codeBorder}
-                paddingLeft={2}
-                width="100%"
-            >
-                <Box width={5} flexShrink={0}>
-                    <Text color="gray" dimColor>{String(lineNum).padStart(4, ' ')} </Text>
-                </Box>
-                <Box flexGrow={1}>
-                    {renderHighlightedLine(text, lang, colors.text)}
-                </Box>
+            <Box flexDirection="column" width="100%">
+                {subLines.map((subLine, subIdx) => (
+                    <Box
+                        key={subIdx}
+                        flexDirection="row"
+                        borderStyle="single"
+                        borderLeft borderRight={false} borderTop={false} borderBottom={false}
+                        borderColor={colors.codeBorder}
+                        paddingLeft={2}
+                        width="100%"
+                    >
+                        <Box width={5} flexShrink={0}>
+                            <Text color="gray" dimColor>{subIdx === 0 ? String(lineNum).padStart(4, ' ') + ' ' : '     '}</Text>
+                        </Box>
+                        <Box flexGrow={1}>
+                            {renderHighlightedLine(subLine, lang, colors.text)}
+                        </Box>
+                    </Box>
+                ))}
             </Box>
         );
     }

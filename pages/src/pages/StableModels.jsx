@@ -3,6 +3,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'google-gemini', text: 'Google Gemini', level: 2 },
     { id: 'deepseek', text: 'DeepSeek', level: 2 },
+    { id: 'ollama', text: 'Ollama', level: 2 },
     { id: 'mistral', text: 'Mistral', level: 2 },
     { id: 'nvidia', text: 'NVIDIA (NIM)', level: 2 },
     { id: 'openrouter', text: 'OpenRouter', level: 2 },
@@ -15,9 +16,9 @@ function Badge({ type }) {
         case 'text':
             return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">Text Only</span>
         case 'experimental':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">Experimental</span>
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100/50 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80">Experimental</span>
         case 'auto':
-            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">Auto Router</span>
+            return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">Custom</span>
         default:
             return null
     }
@@ -36,7 +37,7 @@ function CategoryHeader({ title }) {
 export default function StableModels() {
     return (
         <DocPage headings={headings}>
-            <h1 id="stable-models">Stable Models</h1>
+            <h1 id="stable-models">Supported Models</h1>
             <p className="text-lg text-slate-600 dark:text-slate-400 leading-relaxed mb-10">
                 FluxFlow supports a variety of high-performance AI models across multiple
                 providers. You can switch between models dynamically using the
@@ -150,6 +151,32 @@ export default function StableModels() {
                 </table>
             </div>
 
+            {/* OLLAMA */}
+            <h2 id="ollama" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Ollama
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Run local or cloud Ollama models directly within FluxFlow. Type any custom model name (e.g. <code className="font-mono text-blue-600 dark:text-blue-400">llama3.2</code>, <code className="font-mono text-blue-600 dark:text-blue-400">qwen2.5-coder</code>) using <code className="font-mono text-blue-600 dark:text-blue-400">/model &lt;model-name&gt;</code>. Pass <code className="font-mono text-blue-600 dark:text-blue-400">--multimodal</code> or <code className="font-mono text-blue-600 dark:text-blue-400">-m</code> flag for vision models. Eg. <code className="font-mono text-blue-600 dark:text-blue-400">/model gemma4:31b -m</code> OR <code className="font-mono text-blue-600 dark:text-blue-400">/model gemma4:31b --multimodal</code>
+            </p>
+            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">&lt;custom-model-id&gt;</td>
+                            <td className="py-2.5 px-4"><Badge type="auto" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">User-Defined Model Input (Cloud / Local Host)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
             {/* MISTRAL */}
             <h2 id="mistral" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 Mistral
@@ -217,15 +244,22 @@ export default function StableModels() {
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-ai/deepseek-v4-flash</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Efficient</td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-ai/deepseek-v4-pro</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
                         </tr>
 
-                        <CategoryHeader title="Google & StepFun Models" />
+                        <CategoryHeader title="StepFun Models" />
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">stepfun-ai/step-3.7-flash</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
+
+                        <CategoryHeader title="Google Models" />
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-31b-it</td>
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
@@ -233,33 +267,18 @@ export default function StableModels() {
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/diffusiongemma-26b-a4b-it</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mega Fast</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">stepfun-ai/step-3.7-flash</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Caffeinated Speed</td>
                         </tr>
 
                         <CategoryHeader title="Mistral Models" />
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistralai/mistral-medium-3.5-128b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistralai/mistral-large-3-675b-instruct-2512</td>
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
                         </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistralai/mistral-small-4-119b-2603</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
 
-                        <CategoryHeader title="OpenAI & Meta Models" />
+                        <CategoryHeader title="OpenAI Models" />
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openai/gpt-oss-20b</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
@@ -270,6 +289,34 @@ export default function StableModels() {
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
                         </tr>
+
+                        <CategoryHeader title="Z-AI Models" />
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">z-ai/glm-5.2</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
+                        </tr>
+
+                        <CategoryHeader title="MiniMax Models" />
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">minimaxai/minimax-m3</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
+                        </tr>
+
+                        <CategoryHeader title="NVIDIA Models" />
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-ultra-550b-a55b</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-super-120b-a12b</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
+                        </tr>
+
+                        <CategoryHeader title="Meta Models" />
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">meta/llama-3.3-70b-instruct</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
@@ -281,48 +328,18 @@ export default function StableModels() {
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
                         </tr>
 
-                        <CategoryHeader title="Qwen & MiniMax Models" />
+                        <CategoryHeader title="Thinking Machines Models" />
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen/qwen3.5-397b-a17b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen/qwen3.5-122b-a10b</td>
-                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">minimaxai/minimax-m2.7</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">minimaxai/minimax-m3</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">thinkingmachines/inkling</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
                         </tr>
 
-                        <CategoryHeader title="NVIDIA & Other Models" />
+                        <CategoryHeader title="PoolSide Models" />
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-ultra-550b-a55b</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-xs-2.1</td>
                             <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">nvidia/nemotron-3-super-120b-a12b</td>
-                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">z-ai/glm-5.2</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
-                        </tr>
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">bytedance/seed-oss-36b-instruct</td>
-                            <td className="py-2.5 px-4"><Badge type="text" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only</td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Text Only [EXPERIMENTAL]</td>
                         </tr>
                     </tbody>
                 </table>
@@ -347,11 +364,6 @@ export default function StableModels() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
-                        <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">openrouter/free</td>
-                            <td className="py-2.5 px-4"><Badge type="auto" /></td>
-                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">OpenRouter Free (Auto Router)</td>
-                        </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-31b-it:free</td>
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
