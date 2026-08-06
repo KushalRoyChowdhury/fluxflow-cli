@@ -118,24 +118,42 @@ export const parsePatchPairs = (args) => {
     const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === 'true';
 
     Object.keys(args).forEach(key => {
-        const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+        const m = key.match(/^(searchContent|search_content|replaceContent|replace_content|newContent|new_content|content_to_replace|content_to_add|searchBlock|search_block|newBlock|new_block)_?(\d+)?$/i);
         if (m) {
-            const index = m[2] ? parseInt(m[2]) : 1;
+            const index = m[2] ? parseInt(m[2], 10) : 1;
             indices.add(index);
         }
     });
 
     const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-    for (const i of sortedIndices) {
-        let r, n;
-        if (i === 1) {
-            r = args.searchContent1 ?? args.searchContent ?? args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
-            n = args.newContent1 ?? (args.content_to_add ?? args.newContent);
-        } else {
-            r = args[`searchContent${i}`] ?? args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
-            n = args[`newContent${i}`] ?? args[`content_to_add${i}`];
-        }
+    const searchNames = ['searchContent', 'search_content', 'replaceContent', 'replace_content', 'content_to_replace', 'searchBlock', 'search_block'];
+    const newNames = ['newContent', 'new_content', 'content_to_add', 'newBlock', 'new_block'];
 
+    const getVal = (index, searchList, newList) => {
+        let r, n;
+        for (const name of searchList) {
+            const keysToTry = index === 1
+                ? [`${name}1`, name, `${name}_1`]
+                : [`${name}${index}`, `${name}_${index}`];
+            for (const k of keysToTry) {
+                if (args[k] !== undefined) { r = args[k]; break; }
+            }
+            if (r !== undefined) break;
+        }
+        for (const name of newList) {
+            const keysToTry = index === 1
+                ? [`${name}1`, name, `${name}_1`]
+                : [`${name}${index}`, `${name}_${index}`];
+            for (const k of keysToTry) {
+                if (args[k] !== undefined) { n = args[k]; break; }
+            }
+            if (n !== undefined) break;
+        }
+        return { r, n };
+    };
+
+    for (const i of sortedIndices) {
+        const { r, n } = getVal(i, searchNames, newNames);
         if (r !== undefined && n !== undefined) {
             patchPairs.push({ replace: r, new: n });
         } else if (r !== undefined || n !== undefined) {
@@ -450,6 +468,10 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     const allLinesOriginal = originalContent.split(/\r?\n/);
     const allLinesFinal = finalContent.split(/\r?\n/);
 
+    const maxLineNum = Math.max(allLinesOriginal.length, allLinesFinal.length, 1);
+    const gutterWidth = Math.max(4, String(maxLineNum).length);
+    const fmtNum = (num) => String(num).padStart(gutterWidth, ' ');
+
     let diffText = `[DIFF_START]\n`;
     const separatorLine = '═'.repeat(88);
 
@@ -468,7 +490,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             const contextStart = Math.max(0, startLineFinal - 4);
             currentFinalLineIdx = contextStart;
             while (currentFinalLineIdx < startLineFinal - 1) {
-                diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                 currentFinalLineIdx++;
             }
         } else {
@@ -479,7 +501,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             if (gap >= threshold) {
                 let afterLimit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
                 while (currentFinalLineIdx < afterLimit) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
                 diffText += `[UI_CONTEXT] ${separatorLine}\n`;
@@ -487,12 +509,12 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
                 const beforeStart = Math.max(currentFinalLineIdx, startLineFinal - 4);
                 currentFinalLineIdx = beforeStart;
                 while (currentFinalLineIdx < startLineFinal - 1) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             } else {
                 while (currentFinalLineIdx < startLineFinal - 1) {
-                    diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+                    diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
                     currentFinalLineIdx++;
                 }
             }
@@ -519,7 +541,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
                     lineText = origIndent + line.trimStart();
                 }
             }
-            diffText += `-${res.originalStartLine + i}|${lineText}\n`;
+            diffText += `-${fmtNum(res.originalStartLine + i)} |${lineText}\n`;
         });
 
         // 3. Report the Addition (+) with Exact Anchoring
@@ -544,7 +566,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
         }
 
         while (currentFinalLineIdx < hunkEndInFinal) {
-            diffText += `+${currentFinalLineIdx + 1}|${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+            diffText += `+${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
             currentFinalLineIdx++;
         }
 
@@ -554,7 +576,7 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
     if (lastSuccessfulHunk !== null) {
         let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
         while (currentFinalLineIdx < limit) {
-            diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
+            diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
             currentFinalLineIdx++;
         }
     }
@@ -1082,7 +1104,9 @@ export const cleanSignals = (text, isThinkRole = false) => {
     if (isThinkRole) {
         return text
             .replace(/^<(think|thought)>/gi, '')
-            .replace(/<\/(think|thought)>$/gi, '');
+            .replace(/<\/(think|thought)>$/gi, '')
+            .replace(/^\r?\n+/, '')
+            .replace(/\r?\n+$/, '');
     }
 
     let result = text

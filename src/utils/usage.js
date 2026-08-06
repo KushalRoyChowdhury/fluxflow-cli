@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { USAGE_FILE, USAGE_FILE_OLD } from './paths.js';
 import { encryptAes, decryptAes } from './crypto.js';
+import { loadSettings } from './settings.js';
 
 const generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
 
@@ -550,16 +551,18 @@ export const getCustomPeriodUsage = async (resetDay = 1) => {
 /**
  * Checks if a call is allowed based on settings and tier
  */
-export const checkQuota = async (key, settings) => {
-    const tier = settings.apiTier || 'Free';
-    const quotas = settings.quotas || {};
+export const checkQuotaDetailed = async (key, settings = {}) => {
+    const loadedSettings = await loadSettings().catch(() => ({}));
+    const tier = settings.apiTier || loadedSettings.apiTier || 'Free';
+    const quotas = settings.quotas || settings.systemSettings?.quotas || loadedSettings.quotas || {};
 
-    // Resolve effective limits — use per-provider budget if enabled for the active provider
+    const providerBudgets = quotas.providerBudgets || {};
+    const useProvider = !!providerBudgets.__useProvider;
+    const currentProvider = settings.aiProvider || loadedSettings.aiProvider || 'Google';
+    const isPerProvider = useProvider && !!providerBudgets[currentProvider];
+
     const resolveAgentLimits = () => {
-        const providerBudgets = quotas.providerBudgets || {};
-        const useProvider = !!providerBudgets.__useProvider;
-        const currentProvider = settings.aiProvider || 'Google';
-        if (useProvider && providerBudgets[currentProvider]) {
+        if (isPerProvider) {
             const pb = providerBudgets[currentProvider];
             return {
                 agentLimit: (typeof pb.agentLimit === 'number' && pb.agentLimit > 0) ? pb.agentLimit : 99999999,
@@ -574,66 +577,86 @@ export const checkQuota = async (key, settings) => {
         };
     };
 
-    if (tier === 'Free') {
-        if (key === 'agent') {
-            const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
+    if (key === 'agent') {
+        const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
+        const dailyUsage = await getDailyUsage();
 
-            const dailyUsage = await getDailyUsage();
+        let monthlyUsage;
+        if (quotas.resetMode === 'Custom') {
+            monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+        } else {
+            monthlyUsage = await getMonthlyUsage();
+        }
 
-            // Hard constraint for free tier
-            if ((dailyUsage.agent + dailyUsage.background) >= 999999) return false;
+        let dailyAgentCount = 0;
+        let dailyTokenCount = 0;
+        let monthlyTokenCount = 0;
 
-            const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
-            if (!dailyOk) return false;
+        if (isPerProvider) {
+            dailyAgentCount = dailyUsage.providerRequests?.[currentProvider] || 0;
 
-            let monthlyUsage;
-            if (quotas.resetMode === 'Custom') {
-                monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
-            } else {
-                monthlyUsage = await getMonthlyUsage();
+            const dailyModels = dailyUsage.models?.[currentProvider] || {};
+            for (const m in dailyModels) {
+                dailyTokenCount += dailyModels[m]?.tokens || 0;
             }
 
-            return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
-        }
-        if (key === 'background') {
-            const dailyUsage = await getDailyUsage();
-            if ((dailyUsage.agent + dailyUsage.background) >= 999999) return false;
-            return dailyUsage.background < (quotas.backgroundLimit || 999999);
-        }
-        if (key === 'search') {
-            const dailyUsage = await getDailyUsage();
-            return dailyUsage.search < (quotas.searchLimit || 100);
-        }
-    }
-
-    if (tier === 'Paid' || tier === 'Custom') {
-        if (key === 'agent') {
-            const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
-
-            const dailyUsage = await getDailyUsage();
-            const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
-            if (!dailyOk) return false;
-
-            let monthlyUsage;
-            if (quotas.resetMode === 'Custom') {
-                monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
-            } else {
-                monthlyUsage = await getMonthlyUsage();
+            const monthlyModels = monthlyUsage.models?.[currentProvider] || {};
+            for (const m in monthlyModels) {
+                monthlyTokenCount += monthlyModels[m]?.tokens || 0;
             }
+        } else {
+            dailyAgentCount = dailyUsage.agent || 0;
+            dailyTokenCount = dailyUsage.tokens || 0;
+            monthlyTokenCount = monthlyUsage.tokens || 0;
+        }
 
-            return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
+        if (tier === 'Free' && (dailyUsage.agent + dailyUsage.background) >= 999999) {
+            return { allowed: false, reason: 'Free Tier Daily Usage Limit Exceeded' };
         }
-        if (key === 'background') {
-            const dailyUsage = await getDailyUsage();
-            return dailyUsage.background < (quotas.backgroundLimit || 999999);
+
+        if (dailyAgentCount >= agentLimit) {
+            return {
+                allowed: false,
+                reason: isPerProvider ? `Daily Request Limit Reached for ${currentProvider}` : `Daily Agent Request Limit Reached`
+            };
         }
-        if (key === 'search') {
-            const dailyUsage = await getDailyUsage();
-            return dailyUsage.search < (quotas.searchLimit || 100);
+        if (dailyTokenCount >= tokenLimit) {
+            return {
+                allowed: false,
+                reason: isPerProvider ? `Daily Token Budget Exhausted for ${currentProvider}` : `Daily Token Budget Exhausted`
+            };
         }
+        if (monthlyTokenCount >= monthlyTokenLimit) {
+            return {
+                allowed: false,
+                reason: isPerProvider ? `Monthly Token Budget Exhausted for ${currentProvider}` : `Monthly Token Budget Exhausted`
+            };
+        }
+
+        return { allowed: true };
     }
 
-    return true;
+    if (key === 'background') {
+        const dailyUsage = await getDailyUsage();
+        if (tier === 'Free' && (dailyUsage.agent + dailyUsage.background) >= 999999) {
+            return { allowed: false, reason: 'Free Tier Background Limit Exceeded' };
+        }
+        const ok = dailyUsage.background < (quotas.backgroundLimit || 999999);
+        return { allowed: ok, reason: ok ? undefined : 'Background Request Limit Exceeded' };
+    }
+
+    if (key === 'search') {
+        const dailyUsage = await getDailyUsage();
+        const ok = dailyUsage.search < (quotas.searchLimit || 100);
+        return { allowed: ok, reason: ok ? undefined : 'Search Quota Exceeded' };
+    }
+
+    return { allowed: true };
+};
+
+export const checkQuota = async (key, settings = {}) => {
+    const res = await checkQuotaDetailed(key, settings);
+    return res.allowed;
 };
 
 /**

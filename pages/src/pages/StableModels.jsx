@@ -195,6 +195,21 @@ export default function StableModels() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
                         <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-3b-2512</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-8b-2512</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">ministral-14b-2512</td>
+                            <td className="py-2.5 px-4"><Badge type="experimental" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Cost Saving (Text Only)</td>
+                        </tr>
+                        <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-small-2506</td>
                             <td className="py-2.5 px-4"><Badge type="experimental" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Cost Saving</td>
@@ -210,9 +225,15 @@ export default function StableModels() {
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Devstral Coding</td>
                         </tr>
                         <tr>
-                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-medium-2505</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-medium-2508</td>
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mistral Medium Multimodal</td>
+                        </tr>
+
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">mistral-large-2512</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Mistral Large (Multimodal)</td>
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">labs-leanstral-1-5-1</td>
@@ -369,6 +390,13 @@ export default function StableModels() {
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
                         </tr>
+
+
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">google/gemma-4-26b-a4b-it:free</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-s-2.1:free</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
@@ -412,6 +440,11 @@ export default function StableModels() {
                         </tr>
                         <tr>
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-fable-5</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">anthropic/claude-opus-5</td>
                             <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
                         </tr>

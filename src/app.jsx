@@ -595,9 +595,13 @@ export default function App({ args = [] }) {
     const commitActiveStreamingMessage = () => {
         flushTypewriterNow();
         if (activeStreamingMsgRef.current) {
+            let msgText = flattenString(activeStreamingMsgRef.current.text);
+            if (activeStreamingMsgRef.current.role === 'think') {
+                msgText = msgText.replace(/^\r?\n+/, '').replace(/\r?\n+$/, '');
+            }
             const msg = {
                 ...activeStreamingMsgRef.current,
-                text: flattenString(activeStreamingMsgRef.current.text),
+                text: msgText,
                 isStreaming: false
             };
             setMessages(prev => {
@@ -806,7 +810,7 @@ export default function App({ args = [] }) {
                                 if (name) availableModelNamesSet.add(name);
                             });
                         }
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 const isModelAvailable = availableModelNamesSet.has(configuredModel);
@@ -1100,6 +1104,8 @@ export default function App({ args = [] }) {
     const [providerBudgetCursor, setProviderBudgetCursor] = useState(0); // which provider in the queue we're on
     const [pbsCursor, setPbsCursor] = useState(0); // providerBudgetSelect list cursor
     const [pbsSelected, setPbsSelected] = useState({}); // providerBudgetSelect checkbox state
+    const [pbfFormState, setPbfFormState] = useState({}); // providerBudgetFlow form values
+    const [pbfFieldIndex, setPbfFieldIndex] = useState(0); // providerBudgetFlow active field cursor
     const [systemSettings, setSystemSettings] = useState({ memory: true, theme: 'Dark', compression: 0.0, autoExec: false, autoDeleteHistory: '7d', autoUpdate: false, updateManager: 'npm', customUpdateCommand: '' });
     const colors = useMemo(() => getThemeColors(systemSettings.theme), [systemSettings.theme]);
     const [profileData, setProfileData] = useState({ name: null, nickname: null, instructions: null });
@@ -1233,7 +1239,7 @@ export default function App({ args = [] }) {
                 return [...prev, {
                     id: 'tier-switch-' + Date.now(),
                     role: 'system',
-                    text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+                    text: `**Switched to ${modelDisplayName}.`,
                     isMeta: true
                 }];
             });
@@ -1687,7 +1693,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -1710,6 +1716,43 @@ export default function App({ args = [] }) {
                 return;
             } else if (key.escape) {
                 setActiveView('budgetTypeSelect');
+                return;
+            }
+            return;
+        }
+
+        // Provider Budget Form keyboard handling
+        if (activeView === 'providerBudgetFlow') {
+            const totalFields = providerBudgetQueue.length * 2 + 1;
+            if (key.upArrow) {
+                setPbfFieldIndex(i => Math.max(0, i - 1));
+                return;
+            } else if (key.downArrow) {
+                setPbfFieldIndex(i => Math.min(totalFields - 1, i + 1));
+                return;
+            } else if (key.return) {
+                if (pbfFieldIndex === totalFields - 1) {
+                    const rawPB = quotas.providerBudgets || {};
+                    const cleaned = { __useProvider: true };
+                    for (const prov of providerBudgetQueue) {
+                        const formProv = pbfFormState[prov] || {};
+                        cleaned[prov] = {
+                            agentLimit: 9999999999,
+                            tokenLimit: parseInt(formProv.tokenLimit, 10) || 0,
+                            monthlyTokenLimit: parseInt(formProv.monthlyTokenLimit, 10) || 0
+                        };
+                    }
+                    const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
+                    setQuotas(finalCleanedQuotas);
+                    saveSettings({ apiTier, quotas: finalCleanedQuotas });
+                    const returnMode = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
+                    setActiveView(returnMode);
+                } else {
+                    setPbfFieldIndex(i => Math.min(totalFields - 1, i + 1));
+                }
+                return;
+            } else if (key.escape) {
+                setActiveView('providerBudgetSelect');
                 return;
             }
             return;
@@ -4071,7 +4114,7 @@ export default function App({ args = [] }) {
                             if (afterText.match(/<\/(think|thought)>/i)) {
                                 const parts = afterText.split(/<\/(think|thought)>/i);
                                 const rawThinkContent = parts[0] || '';
-                                const thinkContent = rawThinkContent.replace(/^<(think|thought)>/i, '');
+                                const thinkContent = rawThinkContent.replace(/^<(think|thought)[^>]*>\r?\n?/i, '').replace(/\r?\n?$/g, '');
                                 // Regex split with capturing group puts captured tag at odd indices, so text after tag is at index 2+
                                 const agentContent = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
 
@@ -4087,7 +4130,7 @@ export default function App({ args = [] }) {
                                     appendStreamText(agentContent);
                                 }
                             } else {
-                                let thinkStartText = afterText.replace(/^<(think|thought)>/gi, '');
+                                let thinkStartText = afterText.replace(/^<(think|thought)[^>]*>\r?\n?/gi, '');
                                 appendStreamText(thinkStartText);
                             }
                             continue;
@@ -4390,7 +4433,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -4401,82 +4444,24 @@ export default function App({ args = [] }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeView]);
 
-    // Effect: when activeView becomes 'providerBudgetFlow', set up the input chain for the current provider
+    // Effect: initialize pbfFormState when entering providerBudgetFlow
     useEffect(() => {
         if (activeView !== 'providerBudgetFlow') return;
 
-        const currentProvider = providerBudgetQueue[providerBudgetCursor];
-        if (!currentProvider) {
-            const returnMode = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
-            const rawPB = quotas.providerBudgets || {};
-            const cleaned = { __useProvider: true };
-            for (const prov of providerBudgetQueue) {
-                if (rawPB[prov]) cleaned[prov] = rawPB[prov];
-            }
-            const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
-            setQuotas(finalCleanedQuotas);
-            saveSettings({ apiTier, quotas: finalCleanedQuotas });
-            setActiveView(returnMode);
-            return;
+        const initialForm = {};
+        const existingPBs = quotas.providerBudgets || {};
+        for (const prov of providerBudgetQueue) {
+            const pb = existingPBs[prov] || {};
+            initialForm[prov] = {
+                agentLimit: getPrefilledValue(pb.agentLimit),
+                tokenLimit: getPrefilledValue(pb.tokenLimit),
+                monthlyTokenLimit: getPrefilledValue(pb.monthlyTokenLimit)
+            };
         }
-
-        const existingPB = (quotas.providerBudgets || {})[currentProvider] || {};
-        const totalProviders = providerBudgetQueue.length;
-        const currentStep = providerBudgetCursor + 1;
-        const providerLabel = `[${currentStep}/${totalProviders}] ${currentProvider}`;
-
-        const advanceToNext = (finalQuotas) => {
-            if (providerBudgetCursor + 1 < providerBudgetQueue.length) {
-                setProviderBudgetCursor(c => c + 1);
-                setActiveView('providerBudgetFlow');
-            } else {
-                const rawPB = finalQuotas.providerBudgets || {};
-                const cleaned = { __useProvider: true };
-                for (const prov of providerBudgetQueue) {
-                    if (rawPB[prov]) cleaned[prov] = rawPB[prov];
-                }
-                const finalCleanedQuotas = { ...finalQuotas, providerBudgets: cleaned };
-                setQuotas(finalCleanedQuotas);
-                const rm = budgetReturnView === 'settings' ? 'resetMode' : 'budgetResetMode';
-                saveSettings({ apiTier, quotas: finalCleanedQuotas });
-                setActiveView(rm);
-            }
-        };
-
-        setInputConfig({
-            label: `${providerLabel} — Daily budget (requests/day):`,
-            key: 'providerBudgets',
-            providerKey: currentProvider,
-            subKey: 'agentLimit',
-            value: getPrefilledValue(existingPB.agentLimit),
-            returnView: 'providerBudgetSelect',
-            next: (newQuotas) => {
-                const updatedPB = (newQuotas.providerBudgets || {})[currentProvider] || {};
-                return {
-                    label: `${providerLabel} — Daily budget (tokens/day):`,
-                    key: 'providerBudgets',
-                    providerKey: currentProvider,
-                    subKey: 'tokenLimit',
-                    value: getPrefilledValue(updatedPB.tokenLimit),
-                    returnView: 'providerBudgetSelect',
-                    next: (q2) => {
-                        const pb2 = (q2.providerBudgets || {})[currentProvider] || {};
-                        return {
-                            label: `${providerLabel} — Monthly budget (tokens/month):`,
-                            key: 'providerBudgets',
-                            providerKey: currentProvider,
-                            subKey: 'monthlyTokenLimit',
-                            value: getPrefilledValue(pb2.monthlyTokenLimit),
-                            returnView: 'providerBudgetFlow',
-                            onDone: advanceToNext
-                        };
-                    }
-                };
-            }
-        });
-        setActiveView('input');
+        setPbfFormState(initialForm);
+        setPbfFieldIndex(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeView, providerBudgetCursor]);
+    }, [activeView, providerBudgetQueue]);
 
     const CustomMenuItem = ({ label, isSelected }) => {
         const isCancel = label === 'Cancel' || label === 'Back' || label.toLowerCase().includes('exit') || label.toLowerCase().includes('back');
@@ -4494,10 +4479,9 @@ export default function App({ args = [] }) {
         );
     };
 
-    const renderProgressBar = (label, current, limit) => {
+    const renderProgressBar = (label, current, limit, barWidth = 10, paddingLeft = 2, labelWidth = 9) => {
         const actualPercent = limit > 0 ? Math.min(100, (current / limit) * 100) : 0;
         const percent = Math.round(actualPercent);
-        const barWidth = 15;
         const filledCount = Math.round((percent / 100) * barWidth);
         const barStr = '█'.repeat(filledCount) + '░'.repeat(Math.max(0, barWidth - filledCount));
 
@@ -4508,7 +4492,7 @@ export default function App({ args = [] }) {
             barColor = colors.danger || 'red';
         }
 
-        const isTokens = label.toLowerCase().includes('token');
+        const isTokens = label.toLowerCase().includes('token') || label.toLowerCase().includes('daily') || label.toLowerCase().includes('monthly');
         const displayLimit = shouldClearValue(limit) ? '∞' : (isTokens ? formatTokens(limit) : limit);
         const displayCurrent = isTokens ? formatTokens(current) : current;
 
@@ -4522,8 +4506,8 @@ export default function App({ args = [] }) {
         }
 
         return (
-            <Box flexDirection="row" paddingLeft={4} key={label}>
-                <Box width={18}>
+            <Box flexDirection="row" paddingLeft={paddingLeft} key={label}>
+                <Box width={labelWidth}>
                     <Text color={colors.textMuted}>{label}: </Text>
                 </Box>
                 <Text color={barColor}>{barStr}</Text>
@@ -4816,10 +4800,84 @@ export default function App({ args = [] }) {
                 );
             }
 
-            case 'providerBudgetFlow':
-                // Logic is handled by the useEffect above — it fires when this view becomes active
-                // and immediately transitions to 'input' with the correct config for the current provider.
-                return null;
+            case 'providerBudgetFlow': {
+                const fields = [];
+                for (const prov of providerBudgetQueue) {
+                    fields.push({ provider: prov, subKey: 'tokenLimit', label: 'Daily Tokens (tokens/day)' });
+                    fields.push({ provider: prov, subKey: 'monthlyTokenLimit', label: 'Monthly Tokens (tokens/month)' });
+                }
+                const saveButtonIndex = fields.length;
+
+                return (
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
+                        <Box paddingX={1} marginBottom={1}>
+                            <Text color={colors.text} bold>PROVIDER BUDGET CONFIGURATION</Text>
+                        </Box>
+                        <Box paddingX={1} paddingBottom={0} marginBottom={0}>
+                            <Text color={colors.textMuted} italic>Set limits for selected providers (leave blank or 0 for no limit)</Text>
+                        </Box>
+
+                        {providerBudgetQueue.map((prov) => {
+                            const provFields = fields.filter(f => f.provider === prov);
+                            return (
+                                <Box key={prov} flexDirection="column" marginY={0} paddingX={1}>
+                                    <Text color={colors.primary || "cyan"} bold>{`\n── ${prov} ──`}</Text>
+                                    {provFields.map((field) => {
+                                        const fieldIdx = fields.findIndex(f => f.provider === field.provider && f.subKey === field.subKey);
+                                        const isFocused = pbfFieldIndex === fieldIdx;
+                                        const currentVal = pbfFormState[field.provider]?.[field.subKey] ?? '';
+
+                                        return (
+                                            <Box key={field.subKey} paddingLeft={2} flexDirection="row">
+                                                <Text color={isFocused ? colors.text : colors.textMuted} bold={isFocused}>
+                                                    {isFocused ? '❯ ' : '  '}{field.label.padEnd(30, ' ')}: {' '}
+                                                </Text>
+                                                {isFocused ? (
+                                                    <TextInput
+                                                        value={currentVal}
+                                                        onChange={(val) => {
+                                                            setPbfFormState(prev => ({
+                                                                ...prev,
+                                                                [prov]: {
+                                                                    ...(prev[prov] || {}),
+                                                                    [field.subKey]: val
+                                                                }
+                                                            }));
+                                                        }}
+                                                        onSubmit={() => {
+                                                            if (fieldIdx + 1 <= saveButtonIndex) {
+                                                                setPbfFieldIndex(fieldIdx + 1);
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <Text color={currentVal ? colors.text : colors.textMuted}>
+                                                        {currentVal ? currentVal : '0 (Unlimited)'}
+                                                    </Text>
+                                                )}
+                                            </Box>
+                                        );
+                                    })}
+                                </Box>
+                            );
+                        })}
+
+                        <Box paddingX={2} marginTop={1}>
+                            {pbfFieldIndex === saveButtonIndex ? (
+                                <Box backgroundColor={colors.highlightBg || "#2a2a2a"} paddingX={1}>
+                                    <Text color={colors.success || "green"} bold>❯ [ Save & Apply Budgets ]</Text>
+                                </Box>
+                            ) : (
+                                <Text color={colors.textMuted}>  [ Save & Apply Budgets ]</Text>
+                            )}
+                        </Box>
+
+                        <Box paddingX={1} marginTop={1} flexDirection="column">
+                            <Text color={colors.textMuted} italic>↑↓ Navigate fields  •  Enter next / save  •  ESC to go back</Text>
+                        </Box>
+                    </Box>
+                );
+            }
 
             case 'budgetResetMode':
 
@@ -4877,20 +4935,33 @@ export default function App({ args = [] }) {
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
 
                 let resetInfo = '';
+                let resetCountdown = '';
                 if (quotas.resetMode === 'Custom') {
                     const today = new Date();
                     const resetDay = quotas.resetDay || 1;
+                    let resetYear = today.getFullYear();
                     let resetMonth = today.getMonth();
                     if (today.getDate() >= resetDay) {
                         resetMonth += 1;
+                        if (resetMonth > 11) {
+                            resetMonth = 0;
+                            resetYear += 1;
+                        }
                     }
-                    const resetDate = new Date(today.getFullYear(), resetMonth, resetDay);
-                    const monthName = resetDate.toLocaleString('default', { month: 'short' });
+                    const targetResetDate = new Date(resetYear, resetMonth, resetDay, 0, 0, 0);
+                    const monthName = targetResetDate.toLocaleString('default', { month: 'short' }).toUpperCase();
                     resetInfo = `${monthName}-${resetDay}`;
+
+                    const diffMs = Math.max(0, targetResetDate.getTime() - today.getTime());
+                    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const daysLeft = Math.floor(totalHours / 24);
+                    const hoursLeft = totalHours % 24;
+
+                    resetCountdown = `(${daysLeft} days: ${hoursLeft} hrs left)`;
                 }
 
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} width="100%">
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} paddingBottom={0} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
                             <Text color={colors.text} bold underline>BUDGET LIMIT STATUS</Text>
                             <Text color={colors.textMuted}>[ ESC to Close ]</Text>
@@ -4900,42 +4971,88 @@ export default function App({ args = [] }) {
                                 <Text color={colors.text} bold>LIMITS NOT SET</Text>
                             </Box>
                         ) : usingProviderBudgets && configuredProviders.length > 0 ? (
-                            <Box flexDirection="column" gap={1} width="100%">
-                                {configuredProviders.map(prov => {
-                                    const pb = providerBudgetsMap[prov];
-                                    const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
+                            <Box flexDirection="column" gap={0} width="100%">
+                                {(() => {
+                                    const cols = stdout?.columns || terminalSize?.columns || 80;
+                                    const isNarrow = cols < 115;
 
-                                    let provTokenCurrent = 0;
-                                    const dailyModels = dailyUsage?.models?.[prov] || {};
-                                    for (const m in dailyModels) {
-                                        provTokenCurrent += dailyModels[m]?.tokens || 0;
+                                    if (isNarrow) {
+                                        // 1-column layout for narrow screens: barW dynamically shrinks with terminal width
+                                        const barW = Math.max(5, Math.min(30, cols - 50));
+                                        return configuredProviders.map((prov) => {
+                                            const pb = providerBudgetsMap[prov];
+                                            let provTokenCurrent = 0;
+                                            const dailyModels = dailyUsage?.models?.[prov] || {};
+                                            for (const m in dailyModels) {
+                                                provTokenCurrent += dailyModels[m]?.tokens || 0;
+                                            }
+
+                                            let provMonthlyCurrent = 0;
+                                            const monthlySource = quotas.resetMode === 'Custom' ? customPeriodUsage : monthlyUsage;
+                                            const monthlyModels = monthlySource?.models?.[prov] || {};
+                                            for (const m in monthlyModels) {
+                                                provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+                                            }
+
+                                            return (
+                                                <Box key={prov} flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
+                                                    <Box marginBottom={0}>
+                                                        <Text color={colors.primary} bold>◆ {prov}</Text>
+                                                    </Box>
+                                                    {renderProgressBar('Daily', provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9)}
+                                                    {renderProgressBar('Monthly', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9)}
+                                                </Box>
+                                            );
+                                        });
                                     }
 
-                                    let provMonthlyCurrent = 0;
-                                    const monthlySource = quotas.resetMode === 'Custom' ? customPeriodUsage : monthlyUsage;
-                                    const monthlyModels = monthlySource?.models?.[prov] || {};
-                                    for (const m in monthlyModels) {
-                                        provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+                                    // 2-column grid layout for wide screens
+                                    const rows = [];
+                                    for (let i = 0; i < configuredProviders.length; i += 2) {
+                                        rows.push(configuredProviders.slice(i, i + 2));
                                     }
+                                    return rows.map((row, rIdx) => (
+                                        <Box key={rIdx} flexDirection="row" width="100%">
+                                            {row.map((prov) => {
+                                                const pb = providerBudgetsMap[prov];
+                                                let provTokenCurrent = 0;
+                                                const dailyModels = dailyUsage?.models?.[prov] || {};
+                                                for (const m in dailyModels) {
+                                                    provTokenCurrent += dailyModels[m]?.tokens || 0;
+                                                }
 
-                                    return (
-                                        <Box key={prov} flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
-                                            <Box marginBottom={0}>
-                                                <Text color={colors.primary} bold>◆ {prov}</Text>
-                                            </Box>
-                                            {renderProgressBar('Daily Requests', provReqCurrent, pb.agentLimit || 99999999, 'cyan')}
-                                            {renderProgressBar('Daily Tokens', provTokenCurrent, pb.tokenLimit || 99999999999999, 'green')}
-                                            {renderProgressBar('Monthly Tokens', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, 'yellow')}
+                                                let provMonthlyCurrent = 0;
+                                                const monthlySource = quotas.resetMode === 'Custom' ? customPeriodUsage : monthlyUsage;
+                                                const monthlyModels = monthlySource?.models?.[prov] || {};
+                                                for (const m in monthlyModels) {
+                                                    provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+                                                }
+
+                                                const isFullWidth = row.length === 1;
+                                                const targetCardCols = isFullWidth ? cols : Math.floor(cols / 2);
+                                                const barW = Math.max(5, Math.min(25, targetCardCols - 36));
+
+                                                return (
+                                                    <Box key={prov} flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width={isFullWidth ? "100%" : "50%"}>
+                                                        <Box marginBottom={0}>
+                                                            <Text color={colors.primary} bold>◆ {prov}</Text>
+                                                        </Box>
+                                                        {renderProgressBar('Daily', provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9)}
+                                                        {renderProgressBar('Monthly', provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9)}
+                                                    </Box>
+                                                );
+                                            })}
                                         </Box>
-                                    );
-                                })}
+                                    ));
+                                })()}
                                 {resetInfo ? (
-                                    <Box marginLeft={4}>
+                                    <Box marginLeft={2} marginTop={1}>
                                         <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
+                                        {resetCountdown ? <Text color={colors.textMuted}>{` ${resetCountdown}`}</Text> : null}
                                     </Box>
                                 ) : (
-                                    <Box marginLeft={4}>
+                                    <Box marginLeft={2} marginTop={1}>
                                         <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.secondary || "blue"} bold>Rolling 30-Day Window</Text>
                                     </Box>
@@ -4943,13 +5060,13 @@ export default function App({ args = [] }) {
                             </Box>
                         ) : (
                             <Box flexDirection="column" borderStyle="single" borderColor={colors.borderMuted} paddingX={1} width="100%">
-                                {renderProgressBar('Daily Requests', reqCurrent, reqLimit, 'cyan')}
                                 {renderProgressBar('Daily Tokens', tokenCurrent, tokenLimit, 'green')}
                                 {renderProgressBar('Monthly Tokens', monthlyCurrent, monthlyLimit, 'yellow')}
                                 {resetInfo ? (
                                     <Box marginLeft={4} marginTop={1}>
                                         <Text color={colors.textMuted}>Monthly Reset: </Text>
                                         <Text color={colors.accent || "magenta"} bold>{resetInfo}</Text>
+                                        {resetCountdown ? <Text color={colors.textMuted}>{` ${resetCountdown}`}</Text> : null}
                                     </Box>
                                 ) : (
                                     <Box marginLeft={4} marginTop={1}>
@@ -5761,7 +5878,7 @@ export default function App({ args = [] }) {
                         initialData={profileData}
                         onSave={(profile) => {
                             setProfileData(profile);
-                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `Profile Updated: ${profile.name.length > 0 ? `${profile.name} ` : ''}${profile.nickname.length > 0 ? `(${profile.nickname})` : ''}` : 'Profile: Nothing to Update' }`, isMeta: true }]);
+                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `Profile Updated: ${profile.name.length > 0 ? `${profile.name} ` : ''}${profile.nickname.length > 0 ? `(${profile.nickname})` : ''}` : 'Profile: Nothing to Update'}`, isMeta: true }]);
                             setActiveView('chat');
                         }}
                         onCancel={() => setActiveView('chat')}
@@ -6063,7 +6180,7 @@ export default function App({ args = [] }) {
                                 })()}
 
                                 <GlintText
-                                    text={tempModelOverride || activeModel.split('/')[1] || activeModel.length > 1 ? activeModel : 'Use \'/model model-id\' to select model' }
+                                    text={activeModel.split('/')[1] || (activeModel.length > 1 ? activeModel : 'Use \'/model model-id\' to select model')}
                                     baseColor={colors.text}
                                     glintColor={colors.textMuted}
                                     glintWidth={3}
@@ -6245,13 +6362,15 @@ export default function App({ args = [] }) {
                         )}
 
                         {confirmExit && (
-                            <Box borderStyle="round" borderColor={colors.borderMuted} paddingX={2} marginY={0} width="100%">
-                                <Text color="red" bold>🔴 EXIT CONFIRMATION: </Text>
-                                <Text color={colors.text}>Press </Text>
-                                <Text color={colors.text} bold>CTRL + C</Text>
-                                <Text color={colors.text}> again to exit ({exitCountdown}s). Press </Text>
-                                <Text color={colors.textMuted} bold>ESC</Text>
-                                <Text color={colors.text}> to cancel.</Text>
+                            <Box borderStyle="round" borderColor={colors.borderMuted} paddingX={1} marginY={0} width="100%">
+                                <Text>
+                                    <Text color="red" bold>🔴 EXIT: </Text>
+                                    <Text color={colors.text}>Press </Text>
+                                    <Text color={colors.text} bold>CTRL+C</Text>
+                                    <Text color={colors.text}> again to exit ({exitCountdown}s) • Press </Text>
+                                    <Text color={colors.textMuted} bold>ESC</Text>
+                                    <Text color={colors.text}> to cancel</Text>
+                                </Text>
                             </Box>
                         )}
 
@@ -6296,7 +6415,7 @@ export default function App({ args = [] }) {
                                 >
                                     <Box paddingX={1} marginBottom={0} justifyContent="space-between" width="100%">
                                         <Text color={colors.text} bold>
-                                {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
+                                            {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? "FILE SUGGESTIONS" : "COMMAND SUGGESTIONS"}
                                         </Text>
                                         {suggestions[0]?.cmd?.startsWith('@') || suggestions[0]?.cmd?.startsWith('\\@') ? (
                                             <Text color={colors.textMuted} italic>

@@ -3,18 +3,23 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.19.2"]
+export const stableVersions = ["3.19.3"]
 
 export const changelogData = {
-    "3.19.2": {
+    "3.19.3": {
         "note": "AUGUST 6.",
         "added": [],
         "changed": [
             "Improved Bi-Directional Communication between Main-Agent & Sub-Agents.",
-            "Modified File Edit tool to reduce parameter ambiguity."
+            "Modified File Edit tool to reduce parameter ambiguity.",
+            "Refactored budget calculation & setup flow to be more natural.",
+            "Re-designed budget UI.",
+            "Removed budgets for request/day. Use Tokens/day & Tokens/month instead.",
+            "Somehow squeezed even more token efficiency."
         ],
         "fixes": [
-            "Bug Fixes."
+            "Fixed a critical bug with context retention with XML/HTML tags in chat.",
+            "Fixed a bug where budgets are not getting applied."
         ]
     },
     "3.19.0": {

@@ -5,7 +5,7 @@ import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@g
 import { Ollama } from 'ollama';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
 import { getTruncatedHistory, loadHistory } from './history.js';
-import { checkQuota, incrementUsage, addToUsage } from './usage.js';
+import { checkQuota, checkQuotaDetailed, incrementUsage, addToUsage } from './usage.js';
 import { dispatchTool } from './tools.js';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { parseArgs } from './arg_parser.js';
@@ -756,9 +756,15 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
             });
 
             if (!response.ok) {
-                const err = await response.json();
-                // console.log(err);
-                const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
+                const errText = await response.text().catch(() => '');
+                let errMsg = response.statusText;
+                try {
+                    const errData = JSON.parse(errText);
+                    errMsg = errData.error?.message || errData.message || JSON.stringify(errData.detail || errData);
+                } catch {
+                    if (errText) errMsg = errText;
+                }
+                const error = new Error(`NVIDIA API Error (${response.status}): ${errMsg}`);
                 error.status = response.status;
                 throw error;
             }
@@ -2513,6 +2519,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     const isMultiModal = isModelMultimodal(modelName);
     if (!client && aiProvider === 'Google') throw new Error('AI not initialized');
 
+    // if (!(await checkQuota('agent', settings))) {
+    //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
+    // }
+
     const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
@@ -3141,6 +3151,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // 1 extra loop for grace period
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+            // Quota Check
+            const quotaCheck = await checkQuotaDetailed('agent', settings);
+            if (!quotaCheck.allowed) {
+                throw new Error(quotaCheck.reason || `Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
+            }
             const currentTurnTools = [];
             wasToolCalledInLastLoop = false
             if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
@@ -3251,18 +3266,36 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         const THINK_CLOSE_PH = '___THINK_CLOSE_TAG___';
                         text = text.replace('<think>', THINK_OPEN_PH).replace('</think>', THINK_CLOSE_PH);
 
-                        // Strip XML-style wrappers: <tag>...[tool:...]...</tag>
-                        text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
-                            if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
-                            return match;
-                        });
-                        // Strip YAML/fence wrappers: ```tool ... [tool:...] ... ```
+                        // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] ... ```
                         text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
                             if (inner.includes('[tool:')) return inner.trim();
                             return match;
                         });
-                        // If the response contains a tool call, also strip any other XML tags in the same response
-                        text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+
+                        // Process string segment by segment: strip junk XML tags outside [tool:...], keeping all content inside [tool:...] 100% untouched
+                        let result = '';
+                        let i = 0;
+                        while (i < text.length) {
+                            const toolIdx = text.indexOf('[tool:', i);
+                            if (toolIdx === -1) {
+                                result += text.substring(i).replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+                                break;
+                            }
+
+                            const beforeTool = text.substring(i, toolIdx);
+                            result += beforeTool.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+
+                            const endToolIdx = text.indexOf(']', toolIdx);
+                            if (endToolIdx === -1) {
+                                result += text.substring(toolIdx);
+                                break;
+                            }
+
+                            // Append tool call intact
+                            result += text.substring(toolIdx, endToolIdx + 1);
+                            i = endToolIdx + 1;
+                        }
+                        text = result;
 
                         // Restore <think> and </think> tags
                         text = text.replaceAll(THINK_OPEN_PH, '<think>').replaceAll(THINK_CLOSE_PH, '</think>');
@@ -3350,10 +3383,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     contents.length = 0;
                     contents.push(...finalContents);
-                    // Quota Check
-                    if (!(await checkQuota('agent', settings))) {
-                        throw new Error("Error: Quota Exausted for Agent");
-                    }
 
                     // [HIGH RELIABILITY FALLBACK SPECTRUM]
                     targetModel = modelName;
@@ -4832,12 +4861,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             }
 
                                             let snippet = '';
-                                            if (verifiedLineCount <= 200) {
+                                            if (verifiedLineCount <= 100) {
                                                 snippet = verifiedLines.join('\n');
                                             } else {
-                                                const head = verifiedLines.slice(0, 100).join('\n');
-                                                const tail = verifiedLines.slice(-100).join('\n');
-                                                snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated for history stability] ...\n\n${tail}`;
+                                                const head = verifiedLines.slice(0, 50).join('\n');
+                                                const tail = verifiedLines.slice(-50).join('\n');
+                                                snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated for history stability] ...\n\n${tail}`;
                                             }
 
                                             let result = "";
@@ -4857,15 +4886,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 }
 
                                                 let snippet = '';
-                                                if (verifiedLineCount <= 200) {
+                                                if (verifiedLineCount <= 100) {
                                                     snippet = verifiedLines.join('\n');
                                                 } else {
-                                                    const head = verifiedLines.slice(0, 100).join('\n');
-                                                    const tail = verifiedLines.slice(-100).join('\n');
-                                                    snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
+                                                    const head = verifiedLines.slice(0, 50).join('\n');
+                                                    const tail = verifiedLines.slice(-50).join('\n');
+                                                    snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
                                                 }
 
-                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}`;
+                                                result = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
                                                 // console.log(result);
                                             }
 
@@ -5153,7 +5182,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().replaceAll('[UI_CONTEXT]', '[CONTEXT]')}`;
+                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().replaceAll('[UI_CONTEXT]', '')}`;
                                 toolResults.push({ role: 'user', text: aiContent, binaryPart });
                                 anyToolExecutedInThisTurn = true;
 
@@ -5544,7 +5573,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
     } catch (err) {
-        const errLog = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return String(err); } })() : String(err);
+        const rawErrStr = err instanceof Error ? (() => { try { return JSON.parse(JSON.parse(err.message).error.message).error.message; } catch { return err.message || String(err); } })() : String(err);
+        const errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
         yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}` };
@@ -5687,7 +5717,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 

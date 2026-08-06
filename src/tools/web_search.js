@@ -10,7 +10,7 @@ import { getPuppeteerConfig } from '../utils/puppeteer_helper.js';
  * Uses a full Chromium instance for JS-heavy rendering and stealth.
  */
 export const web_search = async (argsString) => {
-    const { query, limit = 10, aiMode = false } = parseArgs(argsString);
+    const { query, limit = 5, aiMode = false } = parseArgs(argsString);
     if (!query) return 'ERROR: Missing "query" argument for web_search.';
 
     const maxRetries = 3;

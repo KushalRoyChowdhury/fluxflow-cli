@@ -69,19 +69,19 @@ export const write_file = async (args, context = {}) => {
             return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
         }
 
-        // Prepare a snippet for the UI/History (Top 15 / Bottom 15)
+        // Prepare a snippet for the UI/History (Top 50 / Bottom 50)
         let snippet = '';
-        if (verifiedLineCount <= 200) {
+        if (verifiedLineCount <= 100) {
             snippet = verifiedLines.join('\n');
         } else {
-            const head = verifiedLines.slice(0, 100).join('\n');
-            const tail = verifiedLines.slice(-100).join('\n');
-            snippet = `${head}\n\n... [${verifiedLineCount - 200} lines truncated] ...\n\n${tail}`;
+            const head = verifiedLines.slice(0, 50).join('\n');
+            const tail = verifiedLines.slice(-50).join('\n');
+            snippet = `${head}\n\n... [${verifiedLineCount - 100} lines truncated] ...\n\n${tail}`;
         }
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] saved.\n\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n${snippet}`;
+        return `SUCCESS: File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to write file [${targetPath}]: ${errorMsg}`;

@@ -2662,22 +2662,41 @@ var init_text = __esm({
       const indices = /* @__PURE__ */ new Set();
       const allowMultiple = args.allowMultiple === true || String(args.allowMultiple).toLowerCase() === "true";
       Object.keys(args).forEach((key) => {
-        const m = key.match(/^(searchContent|replaceContent|newContent|content_to_replace|content_to_add)(\d+)?$/);
+        const m = key.match(/^(searchContent|search_content|replaceContent|replace_content|newContent|new_content|content_to_replace|content_to_add|searchBlock|search_block|newBlock|new_block)_?(\d+)?$/i);
         if (m) {
-          const index2 = m[2] ? parseInt(m[2]) : 1;
+          const index2 = m[2] ? parseInt(m[2], 10) : 1;
           indices.add(index2);
         }
       });
       const sortedIndices = Array.from(indices).sort((a, b) => a - b);
-      for (const i of sortedIndices) {
+      const searchNames = ["searchContent", "search_content", "replaceContent", "replace_content", "content_to_replace", "searchBlock", "search_block"];
+      const newNames = ["newContent", "new_content", "content_to_add", "newBlock", "new_block"];
+      const getVal = (index2, searchList, newList) => {
         let r, n;
-        if (i === 1) {
-          r = args.searchContent1 ?? args.searchContent ?? args.replaceContent1 ?? (args.content_to_replace ?? args.replaceContent);
-          n = args.newContent1 ?? (args.content_to_add ?? args.newContent);
-        } else {
-          r = args[`searchContent${i}`] ?? args[`replaceContent${i}`] ?? args[`content_to_replace${i}`];
-          n = args[`newContent${i}`] ?? args[`content_to_add${i}`];
+        for (const name of searchList) {
+          const keysToTry = index2 === 1 ? [`${name}1`, name, `${name}_1`] : [`${name}${index2}`, `${name}_${index2}`];
+          for (const k of keysToTry) {
+            if (args[k] !== void 0) {
+              r = args[k];
+              break;
+            }
+          }
+          if (r !== void 0) break;
         }
+        for (const name of newList) {
+          const keysToTry = index2 === 1 ? [`${name}1`, name, `${name}_1`] : [`${name}${index2}`, `${name}_${index2}`];
+          for (const k of keysToTry) {
+            if (args[k] !== void 0) {
+              n = args[k];
+              break;
+            }
+          }
+          if (n !== void 0) break;
+        }
+        return { r, n };
+      };
+      for (const i of sortedIndices) {
+        const { r, n } = getVal(i, searchNames, newNames);
         if (r !== void 0 && n !== void 0) {
           patchPairs.push({ replace: r, new: n });
         } else if (r !== void 0 || n !== void 0) {
@@ -2921,6 +2940,9 @@ var init_text = __esm({
       if (!patchResults || patchResults.length === 0) return "";
       const allLinesOriginal = originalContent.split(/\r?\n/);
       const allLinesFinal = finalContent.split(/\r?\n/);
+      const maxLineNum = Math.max(allLinesOriginal.length, allLinesFinal.length, 1);
+      const gutterWidth = Math.max(4, String(maxLineNum).length);
+      const fmtNum = (num) => String(num).padStart(gutterWidth, " ");
       let diffText = `[DIFF_START]
 `;
       const separatorLine = "\u2550".repeat(88);
@@ -2933,7 +2955,7 @@ var init_text = __esm({
           const contextStart = Math.max(0, startLineFinal - 4);
           currentFinalLineIdx = contextStart;
           while (currentFinalLineIdx < startLineFinal - 1) {
-            diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ""}
+            diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
             currentFinalLineIdx++;
           }
@@ -2944,7 +2966,7 @@ var init_text = __esm({
           if (gap >= threshold) {
             let afterLimit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
             while (currentFinalLineIdx < afterLimit) {
-              diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ""}
+              diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
               currentFinalLineIdx++;
             }
@@ -2953,13 +2975,13 @@ var init_text = __esm({
             const beforeStart = Math.max(currentFinalLineIdx, startLineFinal - 4);
             currentFinalLineIdx = beforeStart;
             while (currentFinalLineIdx < startLineFinal - 1) {
-              diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ""}
+              diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
               currentFinalLineIdx++;
             }
           } else {
             while (currentFinalLineIdx < startLineFinal - 1) {
-              diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ""}
+              diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
               currentFinalLineIdx++;
             }
@@ -2981,7 +3003,7 @@ var init_text = __esm({
               lineText = origIndent + line.trimStart();
             }
           }
-          diffText += `-${res.originalStartLine + i}|${lineText}
+          diffText += `-${fmtNum(res.originalStartLine + i)} |${lineText}
 `;
         });
         let hunkEndInFinal = currentFinalLineIdx;
@@ -3004,7 +3026,7 @@ var init_text = __esm({
           }
         }
         while (currentFinalLineIdx < hunkEndInFinal) {
-          diffText += `+${currentFinalLineIdx + 1}|${allLinesFinal[currentFinalLineIdx] || ""}
+          diffText += `+${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
           currentFinalLineIdx++;
         }
@@ -3013,7 +3035,7 @@ var init_text = __esm({
       if (lastSuccessfulHunk !== null) {
         let limit = Math.min(allLinesFinal.length, currentFinalLineIdx + 3);
         while (currentFinalLineIdx < limit) {
-          diffText += `[UI_CONTEXT]  ${currentFinalLineIdx + 1} |${allLinesFinal[currentFinalLineIdx] || ""}
+          diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ""}
 `;
           currentFinalLineIdx++;
         }
@@ -3453,7 +3475,7 @@ var init_text = __esm({
     cleanSignals = (text, isThinkRole = false) => {
       if (!text) return text;
       if (isThinkRole) {
-        return text.replace(/^<(think|thought)>/gi, "").replace(/<\/(think|thought)>$/gi, "");
+        return text.replace(/^<(think|thought)>/gi, "").replace(/<\/(think|thought)>$/gi, "").replace(/^\r?\n+/, "").replace(/\r?\n+$/, "");
       }
       let result = text.replace(REGEX_INITIAL_THINK, "</think>").replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) => !bypassBacktick && isInsideBacktick(str, offset) ? match : "");
       if (result && result.includes("[tool:")) {
@@ -6990,7 +7012,7 @@ ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -10495,11 +10517,12 @@ var init_history = __esm({
 // src/utils/usage.js
 import fs11 from "fs-extra";
 import path9 from "path";
-var generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
+var generateSaveId, cachedUsage, writeTimeout, lastWriteTime, isDirty, defaultStats, purgeOldHistory, loadUsageFromFile, flushUsage, queueFlush, initUsage, forceFlushUsage, getDailyUsage, getMonthlyUsage, incrementUsage, runtimeSession, addToUsage, getCustomPeriodUsage, checkQuotaDetailed, checkQuota, getImageQuotaBuckets, getImageQuotaLimit, checkImageQuota, getImageQuotaStats, recordImageGeneration;
 var init_usage = __esm({
   "src/utils/usage.js"() {
     init_paths();
     init_crypto();
+    init_settings();
     generateSaveId = () => Math.random().toString(36).substring(2) + Date.now().toString(36);
     cachedUsage = null;
     writeTimeout = null;
@@ -10936,14 +10959,16 @@ var init_usage = __esm({
       }
       return summed;
     };
-    checkQuota = async (key, settings) => {
-      const tier = settings.apiTier || "Free";
-      const quotas = settings.quotas || {};
+    checkQuotaDetailed = async (key, settings = {}) => {
+      const loadedSettings = await loadSettings().catch(() => ({}));
+      const tier = settings.apiTier || loadedSettings.apiTier || "Free";
+      const quotas = settings.quotas || settings.systemSettings?.quotas || loadedSettings.quotas || {};
+      const providerBudgets = quotas.providerBudgets || {};
+      const useProvider = !!providerBudgets.__useProvider;
+      const currentProvider = settings.aiProvider || loadedSettings.aiProvider || "Google";
+      const isPerProvider = useProvider && !!providerBudgets[currentProvider];
       const resolveAgentLimits = () => {
-        const providerBudgets = quotas.providerBudgets || {};
-        const useProvider = !!providerBudgets.__useProvider;
-        const currentProvider = settings.aiProvider || "Google";
-        if (useProvider && providerBudgets[currentProvider]) {
+        if (isPerProvider) {
           const pb = providerBudgets[currentProvider];
           return {
             agentLimit: typeof pb.agentLimit === "number" && pb.agentLimit > 0 ? pb.agentLimit : 99999999,
@@ -10957,55 +10982,74 @@ var init_usage = __esm({
           monthlyTokenLimit: quotas.monthlyTokenLimit || 99999999999999
         };
       };
-      if (tier === "Free") {
-        if (key === "agent") {
-          const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
-          const dailyUsage = await getDailyUsage();
-          if (dailyUsage.agent + dailyUsage.background >= 999999) return false;
-          const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
-          if (!dailyOk) return false;
-          let monthlyUsage;
-          if (quotas.resetMode === "Custom") {
-            monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
-          } else {
-            monthlyUsage = await getMonthlyUsage();
+      if (key === "agent") {
+        const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
+        const dailyUsage = await getDailyUsage();
+        let monthlyUsage;
+        if (quotas.resetMode === "Custom") {
+          monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
+        } else {
+          monthlyUsage = await getMonthlyUsage();
+        }
+        let dailyAgentCount = 0;
+        let dailyTokenCount = 0;
+        let monthlyTokenCount = 0;
+        if (isPerProvider) {
+          dailyAgentCount = dailyUsage.providerRequests?.[currentProvider] || 0;
+          const dailyModels = dailyUsage.models?.[currentProvider] || {};
+          for (const m in dailyModels) {
+            dailyTokenCount += dailyModels[m]?.tokens || 0;
           }
-          return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
-        }
-        if (key === "background") {
-          const dailyUsage = await getDailyUsage();
-          if (dailyUsage.agent + dailyUsage.background >= 999999) return false;
-          return dailyUsage.background < (quotas.backgroundLimit || 999999);
-        }
-        if (key === "search") {
-          const dailyUsage = await getDailyUsage();
-          return dailyUsage.search < (quotas.searchLimit || 100);
-        }
-      }
-      if (tier === "Paid" || tier === "Custom") {
-        if (key === "agent") {
-          const { agentLimit, tokenLimit, monthlyTokenLimit } = resolveAgentLimits();
-          const dailyUsage = await getDailyUsage();
-          const dailyOk = dailyUsage.agent < agentLimit && (dailyUsage.tokens || 0) < tokenLimit;
-          if (!dailyOk) return false;
-          let monthlyUsage;
-          if (quotas.resetMode === "Custom") {
-            monthlyUsage = await getCustomPeriodUsage(quotas.resetDay || 1);
-          } else {
-            monthlyUsage = await getMonthlyUsage();
+          const monthlyModels = monthlyUsage.models?.[currentProvider] || {};
+          for (const m in monthlyModels) {
+            monthlyTokenCount += monthlyModels[m]?.tokens || 0;
           }
-          return (monthlyUsage.tokens || 0) < monthlyTokenLimit;
+        } else {
+          dailyAgentCount = dailyUsage.agent || 0;
+          dailyTokenCount = dailyUsage.tokens || 0;
+          monthlyTokenCount = monthlyUsage.tokens || 0;
         }
-        if (key === "background") {
-          const dailyUsage = await getDailyUsage();
-          return dailyUsage.background < (quotas.backgroundLimit || 999999);
+        if (tier === "Free" && dailyUsage.agent + dailyUsage.background >= 999999) {
+          return { allowed: false, reason: "Free Tier Daily Usage Limit Exceeded" };
         }
-        if (key === "search") {
-          const dailyUsage = await getDailyUsage();
-          return dailyUsage.search < (quotas.searchLimit || 100);
+        if (dailyAgentCount >= agentLimit) {
+          return {
+            allowed: false,
+            reason: isPerProvider ? `Daily Request Limit Reached for ${currentProvider}` : `Daily Agent Request Limit Reached`
+          };
         }
+        if (dailyTokenCount >= tokenLimit) {
+          return {
+            allowed: false,
+            reason: isPerProvider ? `Daily Token Budget Exhausted for ${currentProvider}` : `Daily Token Budget Exhausted`
+          };
+        }
+        if (monthlyTokenCount >= monthlyTokenLimit) {
+          return {
+            allowed: false,
+            reason: isPerProvider ? `Monthly Token Budget Exhausted for ${currentProvider}` : `Monthly Token Budget Exhausted`
+          };
+        }
+        return { allowed: true };
       }
-      return true;
+      if (key === "background") {
+        const dailyUsage = await getDailyUsage();
+        if (tier === "Free" && dailyUsage.agent + dailyUsage.background >= 999999) {
+          return { allowed: false, reason: "Free Tier Background Limit Exceeded" };
+        }
+        const ok = dailyUsage.background < (quotas.backgroundLimit || 999999);
+        return { allowed: ok, reason: ok ? void 0 : "Background Request Limit Exceeded" };
+      }
+      if (key === "search") {
+        const dailyUsage = await getDailyUsage();
+        const ok = dailyUsage.search < (quotas.searchLimit || 100);
+        return { allowed: ok, reason: ok ? void 0 : "Search Quota Exceeded" };
+      }
+      return { allowed: true };
+    };
+    checkQuota = async (key, settings = {}) => {
+      const res = await checkQuotaDetailed(key, settings);
+      return res.allowed;
     };
     getImageQuotaBuckets = (imageCalls) => {
       const hourMs = 60 * 60 * 1e3;
@@ -11322,7 +11366,7 @@ var init_web_search = __esm({
     init_paths();
     init_puppeteer_helper();
     web_search = async (argsString) => {
-      const { query, limit = 10, aiMode = false } = parseArgs(argsString);
+      const { query, limit = 5, aiMode = false } = parseArgs(argsString);
       if (!query) return 'ERROR: Missing "query" argument for web_search.';
       const maxRetries = 3;
       let lastError = null;
@@ -11895,22 +11939,22 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
           return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
         }
         let snippet = "";
-        if (verifiedLineCount <= 200) {
+        if (verifiedLineCount <= 100) {
           snippet = verifiedLines.join("\n");
         } else {
-          const head = verifiedLines.slice(0, 100).join("\n");
-          const tail = verifiedLines.slice(-100).join("\n");
+          const head = verifiedLines.slice(0, 50).join("\n");
+          const tail = verifiedLines.slice(-50).join("\n");
           snippet = `${head}
 
-... [${verifiedLineCount - 200} lines truncated] ...
+... [${verifiedLineCount - 100} lines truncated] ...
 
 ${tail}`;
         }
         verifiedContent = null;
         return `SUCCESS: File [${targetPath}] saved.
-
 - Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]
 ${ancestry}- Content Preview:
+
 ${snippet}`;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
@@ -15724,8 +15768,15 @@ var init_ai = __esm({
             signal
           });
           if (!response.ok) {
-            const err = await response.json();
-            const error = new Error(`NVIDIA API Error: ${err.error?.message || response.statusText}`);
+            const errText = await response.text().catch(() => "");
+            let errMsg = response.statusText;
+            try {
+              const errData = JSON.parse(errText);
+              errMsg = errData.error?.message || errData.message || JSON.stringify(errData.detail || errData);
+            } catch {
+              if (errText) errMsg = errText;
+            }
+            const error = new Error(`NVIDIA API Error (${response.status}): ${errMsg}`);
             error.status = response.status;
             throw error;
           }
@@ -17808,6 +17859,10 @@ ${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.t
         let fullAgentResponseChunks = [];
         let wasToolCalledInLastLoop = false;
         for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+          const quotaCheck = await checkQuotaDetailed("agent", settings);
+          if (!quotaCheck.allowed) {
+            throw new Error(quotaCheck.reason || `Budget Exhausted for Provider (${aiProvider || "Agent"})`);
+          }
           const currentTurnTools = [];
           wasToolCalledInLastLoop = false;
           if (systemSettings2?.compression === 0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
@@ -17909,15 +17964,29 @@ ${combinedNudge}`;
                 const THINK_OPEN_PH = "___THINK_OPEN_TAG___";
                 const THINK_CLOSE_PH = "___THINK_CLOSE_TAG___";
                 text = text.replace("<think>", THINK_OPEN_PH).replace("</think>", THINK_CLOSE_PH);
-                text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match2, tagName, innerContent) => {
-                  if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
-                  return match2;
-                });
                 text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match2, inner) => {
                   if (inner.includes("[tool:")) return inner.trim();
                   return match2;
                 });
-                text = text.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                let result = "";
+                let i = 0;
+                while (i < text.length) {
+                  const toolIdx = text.indexOf("[tool:", i);
+                  if (toolIdx === -1) {
+                    result += text.substring(i).replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                    break;
+                  }
+                  const beforeTool = text.substring(i, toolIdx);
+                  result += beforeTool.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                  const endToolIdx = text.indexOf("]", toolIdx);
+                  if (endToolIdx === -1) {
+                    result += text.substring(toolIdx);
+                    break;
+                  }
+                  result += text.substring(toolIdx, endToolIdx + 1);
+                  i = endToolIdx + 1;
+                }
+                text = result;
                 text = text.replaceAll(THINK_OPEN_PH, "<think>").replaceAll(THINK_CLOSE_PH, "</think>");
                 return text;
               };
@@ -17991,9 +18060,6 @@ ${combinedNudge}`;
               }
               contents.length = 0;
               contents.push(...finalContents);
-              if (!await checkQuota("agent", settings)) {
-                throw new Error("Error: Quota Exausted for Agent");
-              }
               targetModel = modelName;
               const sysInstructionCacheKey2 = `${chatId}|${aiProvider}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings2?.dynamicDirAwareness}|${!!systemSettings2?.subAgents}`;
               let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey2 && systemInstructionCache.value;
@@ -19332,14 +19398,14 @@ ${oldLines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 `;
                           }
                           let snippet = "";
-                          if (verifiedLineCount <= 200) {
+                          if (verifiedLineCount <= 100) {
                             snippet = verifiedLines.join("\n");
                           } else {
-                            const head = verifiedLines.slice(0, 100).join("\n");
-                            const tail = verifiedLines.slice(-100).join("\n");
+                            const head = verifiedLines.slice(0, 50).join("\n");
+                            const tail = verifiedLines.slice(-50).join("\n");
                             snippet = `${head}
 
-... [${verifiedLineCount - 200} lines truncated for history stability] ...
+... [${verifiedLineCount - 100} lines truncated for history stability] ...
 
 ${tail}`;
                           }
@@ -19362,21 +19428,21 @@ ${oldLines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 `;
                             }
                             let snippet2 = "";
-                            if (verifiedLineCount2 <= 200) {
+                            if (verifiedLineCount2 <= 100) {
                               snippet2 = verifiedLines2.join("\n");
                             } else {
-                              const head = verifiedLines2.slice(0, 100).join("\n");
-                              const tail = verifiedLines2.slice(-100).join("\n");
+                              const head = verifiedLines2.slice(0, 50).join("\n");
+                              const tail = verifiedLines2.slice(-50).join("\n");
                               snippet2 = `${head}
 
-... [${verifiedLineCount2 - 200} lines truncated] ...
+... [${verifiedLineCount2 - 100} lines truncated] ...
 
 ${tail}`;
                             }
                             result2 = `SUCCESS: File [${filePath}] saved via IDE Companion (May have user edits).
-
 - Stats: [${verifiedLineCount2} lines, ${(verifiedSize2 / 1024).toFixed(1)} KB]
 ${ancestry2}- Content Preview:
+
 ${snippet2}`;
                           }
                           const action = normToolName === "write_file" ? "Created" : "Edited";
@@ -19623,7 +19689,7 @@ ${snippet2}`;
                       await incrementUsage("toolFailure");
                       if (settings.onToolResult) settings.onToolResult("failure", normToolName);
                     }
-                    const aiContent = `[TOOL RESULT]: ${(result || "").toString().replaceAll("[UI_CONTEXT]", "[CONTEXT]")}`;
+                    const aiContent = `[TOOL RESULT]: ${(result || "").toString().replaceAll("[UI_CONTEXT]", "")}`;
                     toolResults.push({ role: "user", text: aiContent, binaryPart });
                     anyToolExecutedInThisTurn = true;
                     let uiContent = `[TOOL RESULT]: ${result || ""}`;
@@ -19939,13 +20005,14 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
           wasToolCalledInLastLoop = toolCallPointer > 0 || anyToolExecutedInThisTurn;
         }
       } catch (err) {
-        const errLog = err instanceof Error ? (() => {
+        const rawErrStr = err instanceof Error ? (() => {
           try {
             return JSON.parse(JSON.parse(err.message).error.message).error.message;
           } catch {
-            return String(err);
+            return err.message || String(err);
           }
         })() : String(err);
+        const errLog = rawErrStr.replace(/^(Error:\s*)+/i, "");
         const date = (/* @__PURE__ */ new Date()).toLocaleString();
         const agentErrDir = path26.join(LOGS_DIR, "agent");
         yield { type: "text", content: `\u274C CRITICAL ERROR: ${errLog.includes("fetch failed") ? "Failed to Connect. Check your Internet Connection or Wait a moment" : errLog}` };
@@ -20073,7 +20140,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. "^LINE:start..end$" line ranges MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
@@ -21385,9 +21452,13 @@ function App({ args = [] }) {
   const commitActiveStreamingMessage = () => {
     flushTypewriterNow();
     if (activeStreamingMsgRef.current) {
+      let msgText = flattenString(activeStreamingMsgRef.current.text);
+      if (activeStreamingMsgRef.current.role === "think") {
+        msgText = msgText.replace(/^\r?\n+/, "").replace(/\r?\n+$/, "");
+      }
       const msg = {
         ...activeStreamingMsgRef.current,
-        text: flattenString(activeStreamingMsgRef.current.text),
+        text: msgText,
         isStreaming: false
       };
       setMessages((prev) => {
@@ -21835,6 +21906,8 @@ function App({ args = [] }) {
   const [providerBudgetCursor, setProviderBudgetCursor] = useState15(0);
   const [pbsCursor, setPbsCursor] = useState15(0);
   const [pbsSelected, setPbsSelected] = useState15({});
+  const [pbfFormState, setPbfFormState] = useState15({});
+  const [pbfFieldIndex, setPbfFieldIndex] = useState15(0);
   const [systemSettings2, setSystemSettings] = useState15({ memory: true, theme: "Dark", compression: 0, autoExec: false, autoDeleteHistory: "7d", autoUpdate: false, updateManager: "npm", customUpdateCommand: "" });
   const colors = useMemo2(() => getThemeColors(systemSettings2.theme), [systemSettings2.theme]);
   const [profileData, setProfileData] = useState15({ name: null, nickname: null, instructions: null });
@@ -21958,7 +22031,7 @@ function App({ args = [] }) {
         return [...prev, {
           id: "tier-switch-" + Date.now(),
           role: "system",
-          text: `**[TIER LIMIT]** Auto-switched to ${modelDisplayName}.`,
+          text: `**Switched to ${modelDisplayName}.`,
           isMeta: true
         }];
       });
@@ -22333,7 +22406,7 @@ function App({ args = [] }) {
       return;
     }
     if (activeView === "providerBudgetSelect") {
-      const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
+      const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter", "Ollama"];
       if (key.upArrow) {
         setPbsCursor((c) => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
         return;
@@ -22356,6 +22429,41 @@ function App({ args = [] }) {
         return;
       } else if (key.escape) {
         setActiveView("budgetTypeSelect");
+        return;
+      }
+      return;
+    }
+    if (activeView === "providerBudgetFlow") {
+      const totalFields = providerBudgetQueue.length * 2 + 1;
+      if (key.upArrow) {
+        setPbfFieldIndex((i) => Math.max(0, i - 1));
+        return;
+      } else if (key.downArrow) {
+        setPbfFieldIndex((i) => Math.min(totalFields - 1, i + 1));
+        return;
+      } else if (key.return) {
+        if (pbfFieldIndex === totalFields - 1) {
+          const rawPB = quotas.providerBudgets || {};
+          const cleaned = { __useProvider: true };
+          for (const prov of providerBudgetQueue) {
+            const formProv = pbfFormState[prov] || {};
+            cleaned[prov] = {
+              agentLimit: 9999999999,
+              tokenLimit: parseInt(formProv.tokenLimit, 10) || 0,
+              monthlyTokenLimit: parseInt(formProv.monthlyTokenLimit, 10) || 0
+            };
+          }
+          const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
+          setQuotas(finalCleanedQuotas);
+          saveSettings({ apiTier, quotas: finalCleanedQuotas });
+          const returnMode = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
+          setActiveView(returnMode);
+        } else {
+          setPbfFieldIndex((i) => Math.min(totalFields - 1, i + 1));
+        }
+        return;
+      } else if (key.escape) {
+        setActiveView("providerBudgetSelect");
         return;
       }
       return;
@@ -24530,7 +24638,7 @@ Selection: ${val}`,
               if (afterText.match(/<\/(think|thought)>/i)) {
                 const parts = afterText.split(/<\/(think|thought)>/i);
                 const rawThinkContent = parts[0] || "";
-                const thinkContent = rawThinkContent.replace(/^<(think|thought)>/i, "");
+                const thinkContent = rawThinkContent.replace(/^<(think|thought)[^>]*>\r?\n?/i, "").replace(/\r?\n?$/g, "");
                 const agentContent = parts.slice(2).join("").replace(/<\/?(think|thought)>/gi, "");
                 activeStreamingMsgRef.current.text = flattenString(thinkContent);
                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -24543,7 +24651,7 @@ Selection: ${val}`,
                   appendStreamText(agentContent);
                 }
               } else {
-                let thinkStartText = afterText.replace(/^<(think|thought)>/gi, "");
+                let thinkStartText = afterText.replace(/^<(think|thought)[^>]*>\r?\n?/gi, "");
                 appendStreamText(thinkStartText);
               }
               continue;
@@ -24780,7 +24888,7 @@ Selection: ${val}`,
   }, [suggestionVisibleCount, suggestions.length]);
   useEffect12(() => {
     if (activeView !== "providerBudgetSelect") return;
-    const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter"];
+    const PBS_PROVIDERS = ["Google", "DeepSeek", "Mistral", "NVIDIA", "OpenRouter", "Ollama"];
     const existingBudgets = quotas.providerBudgets || {};
     const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
       acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -24791,74 +24899,19 @@ Selection: ${val}`,
   }, [activeView]);
   useEffect12(() => {
     if (activeView !== "providerBudgetFlow") return;
-    const currentProvider = providerBudgetQueue[providerBudgetCursor];
-    if (!currentProvider) {
-      const returnMode = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
-      const rawPB = quotas.providerBudgets || {};
-      const cleaned = { __useProvider: true };
-      for (const prov of providerBudgetQueue) {
-        if (rawPB[prov]) cleaned[prov] = rawPB[prov];
-      }
-      const finalCleanedQuotas = { ...quotas, providerBudgets: cleaned };
-      setQuotas(finalCleanedQuotas);
-      saveSettings({ apiTier, quotas: finalCleanedQuotas });
-      setActiveView(returnMode);
-      return;
+    const initialForm = {};
+    const existingPBs = quotas.providerBudgets || {};
+    for (const prov of providerBudgetQueue) {
+      const pb = existingPBs[prov] || {};
+      initialForm[prov] = {
+        agentLimit: getPrefilledValue(pb.agentLimit),
+        tokenLimit: getPrefilledValue(pb.tokenLimit),
+        monthlyTokenLimit: getPrefilledValue(pb.monthlyTokenLimit)
+      };
     }
-    const existingPB = (quotas.providerBudgets || {})[currentProvider] || {};
-    const totalProviders = providerBudgetQueue.length;
-    const currentStep = providerBudgetCursor + 1;
-    const providerLabel = `[${currentStep}/${totalProviders}] ${currentProvider}`;
-    const advanceToNext = (finalQuotas) => {
-      if (providerBudgetCursor + 1 < providerBudgetQueue.length) {
-        setProviderBudgetCursor((c) => c + 1);
-        setActiveView("providerBudgetFlow");
-      } else {
-        const rawPB = finalQuotas.providerBudgets || {};
-        const cleaned = { __useProvider: true };
-        for (const prov of providerBudgetQueue) {
-          if (rawPB[prov]) cleaned[prov] = rawPB[prov];
-        }
-        const finalCleanedQuotas = { ...finalQuotas, providerBudgets: cleaned };
-        setQuotas(finalCleanedQuotas);
-        const rm = budgetReturnView === "settings" ? "resetMode" : "budgetResetMode";
-        saveSettings({ apiTier, quotas: finalCleanedQuotas });
-        setActiveView(rm);
-      }
-    };
-    setInputConfig({
-      label: `${providerLabel} \u2014 Daily budget (requests/day):`,
-      key: "providerBudgets",
-      providerKey: currentProvider,
-      subKey: "agentLimit",
-      value: getPrefilledValue(existingPB.agentLimit),
-      returnView: "providerBudgetSelect",
-      next: (newQuotas) => {
-        const updatedPB = (newQuotas.providerBudgets || {})[currentProvider] || {};
-        return {
-          label: `${providerLabel} \u2014 Daily budget (tokens/day):`,
-          key: "providerBudgets",
-          providerKey: currentProvider,
-          subKey: "tokenLimit",
-          value: getPrefilledValue(updatedPB.tokenLimit),
-          returnView: "providerBudgetSelect",
-          next: (q2) => {
-            const pb2 = (q2.providerBudgets || {})[currentProvider] || {};
-            return {
-              label: `${providerLabel} \u2014 Monthly budget (tokens/month):`,
-              key: "providerBudgets",
-              providerKey: currentProvider,
-              subKey: "monthlyTokenLimit",
-              value: getPrefilledValue(pb2.monthlyTokenLimit),
-              returnView: "providerBudgetFlow",
-              onDone: advanceToNext
-            };
-          }
-        };
-      }
-    });
-    setActiveView("input");
-  }, [activeView, providerBudgetCursor]);
+    setPbfFormState(initialForm);
+    setPbfFieldIndex(0);
+  }, [activeView, providerBudgetQueue]);
   const CustomMenuItem = ({ label, isSelected }) => {
     const isCancel = label === "Cancel" || label === "Back" || label.toLowerCase().includes("exit") || label.toLowerCase().includes("back");
     return /* @__PURE__ */ React16.createElement(
@@ -24872,10 +24925,9 @@ Selection: ${val}`,
       /* @__PURE__ */ React16.createElement(Text16, { color: isSelected ? "white" : "gray", bold: isSelected }, isSelected ? "\u276F " : "  ", label)
     );
   };
-  const renderProgressBar = (label, current, limit) => {
+  const renderProgressBar = (label, current, limit, barWidth = 10, paddingLeft = 2, labelWidth = 9) => {
     const actualPercent = limit > 0 ? Math.min(100, current / limit * 100) : 0;
     const percent = Math.round(actualPercent);
-    const barWidth = 15;
     const filledCount = Math.round(percent / 100 * barWidth);
     const barStr = "\u2588".repeat(filledCount) + "\u2591".repeat(Math.max(0, barWidth - filledCount));
     let barColor = colors.success || "green";
@@ -24884,7 +24936,7 @@ Selection: ${val}`,
     } else if (percent > 80) {
       barColor = colors.danger || "red";
     }
-    const isTokens = label.toLowerCase().includes("token");
+    const isTokens = label.toLowerCase().includes("token") || label.toLowerCase().includes("daily") || label.toLowerCase().includes("monthly");
     const displayLimit = shouldClearValue(limit) ? "\u221E" : isTokens ? formatTokens(limit) : limit;
     const displayCurrent = isTokens ? formatTokens(current) : current;
     let displayPercent;
@@ -24895,7 +24947,7 @@ Selection: ${val}`,
     } else {
       displayPercent = `${percent}%`;
     }
-    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft: 4, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: 18 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", displayPercent, " (", displayCurrent, "/", displayLimit, ")"));
+    return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "row", paddingLeft, key: label }, /* @__PURE__ */ React16.createElement(Box14, { width: labelWidth }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, label, ": ")), /* @__PURE__ */ React16.createElement(Text16, { color: barColor }, barStr), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, " ", displayPercent, " (", displayCurrent, "/", displayLimit, ")"));
   };
   const renderActiveView = () => {
     switch (activeView) {
@@ -25136,8 +25188,43 @@ Selection: ${val}`,
           return /* @__PURE__ */ React16.createElement(Box14, { key: prov, backgroundColor: isActive ? colors.highlightBg || "#2a2a2a" : void 0, paddingX: 1, width: "100%", flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? colors.text : colors.textMuted, bold: isActive }, isActive ? "\u276F " : "  "), /* @__PURE__ */ React16.createElement(Text16, { color: isChecked ? colors.success || "green" : colors.textMuted }, isChecked ? "\u2611" : "\u2610"), /* @__PURE__ */ React16.createElement(Text16, { color: isActive ? colors.text : colors.textMuted, bold: isActive }, "  ", prov), isChecked && quotas.providerBudgets?.[prov]?.agentLimit ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary || "cyan" }, " (budget set)") : null);
         }), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "\u2191\u2193 Navigate  \u2022  Space to toggle  \u2022  Enter to confirm  \u2022  ESC to go back"), !anySelected && /* @__PURE__ */ React16.createElement(Text16, { color: colors.warning || "yellow", italic: true }, "  Select at least one provider to continue")));
       }
-      case "providerBudgetFlow":
-        return null;
+      case "providerBudgetFlow": {
+        const fields = [];
+        for (const prov of providerBudgetQueue) {
+          fields.push({ provider: prov, subKey: "tokenLimit", label: "Daily Tokens (tokens/day)" });
+          fields.push({ provider: prov, subKey: "monthlyTokenLimit", label: "Monthly Tokens (tokens/month)" });
+        }
+        const saveButtonIndex = fields.length;
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "PROVIDER BUDGET CONFIGURATION")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, paddingBottom: 0, marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "Set limits for selected providers (leave blank or 0 for no limit)")), providerBudgetQueue.map((prov) => {
+          const provFields = fields.filter((f) => f.provider === prov);
+          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", marginY: 0, paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary || "cyan", bold: true }, `
+\u2500\u2500 ${prov} \u2500\u2500`), provFields.map((field) => {
+            const fieldIdx = fields.findIndex((f) => f.provider === field.provider && f.subKey === field.subKey);
+            const isFocused = pbfFieldIndex === fieldIdx;
+            const currentVal = pbfFormState[field.provider]?.[field.subKey] ?? "";
+            return /* @__PURE__ */ React16.createElement(Box14, { key: field.subKey, paddingLeft: 2, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: isFocused ? colors.text : colors.textMuted, bold: isFocused }, isFocused ? "\u276F " : "  ", field.label.padEnd(30, " "), ": ", " "), isFocused ? /* @__PURE__ */ React16.createElement(
+              TextInput4,
+              {
+                value: currentVal,
+                onChange: (val) => {
+                  setPbfFormState((prev) => ({
+                    ...prev,
+                    [prov]: {
+                      ...prev[prov] || {},
+                      [field.subKey]: val
+                    }
+                  }));
+                },
+                onSubmit: () => {
+                  if (fieldIdx + 1 <= saveButtonIndex) {
+                    setPbfFieldIndex(fieldIdx + 1);
+                  }
+                }
+              }
+            ) : /* @__PURE__ */ React16.createElement(Text16, { color: currentVal ? colors.text : colors.textMuted }, currentVal ? currentVal : "0 (Unlimited)"));
+          }));
+        }), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 2, marginTop: 1 }, pbfFieldIndex === saveButtonIndex ? /* @__PURE__ */ React16.createElement(Box14, { backgroundColor: colors.highlightBg || "#2a2a2a", paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.success || "green", bold: true }, "\u276F [ Save & Apply Budgets ]")) : /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "  [ Save & Apply Budgets ]")), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1, flexDirection: "column" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, "\u2191\u2193 Navigate fields  \u2022  Enter next / save  \u2022  ESC to go back")));
+      }
       case "budgetResetMode":
         return /* @__PURE__ */ React16.createElement(
           CommandMenu,
@@ -25189,33 +25276,72 @@ Selection: ${val}`,
         );
         const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
         let resetInfo = "";
+        let resetCountdown = "";
         if (quotas.resetMode === "Custom") {
           const today2 = /* @__PURE__ */ new Date();
           const resetDay = quotas.resetDay || 1;
+          let resetYear = today2.getFullYear();
           let resetMonth = today2.getMonth();
           if (today2.getDate() >= resetDay) {
             resetMonth += 1;
+            if (resetMonth > 11) {
+              resetMonth = 0;
+              resetYear += 1;
+            }
           }
-          const resetDate = new Date(today2.getFullYear(), resetMonth, resetDay);
-          const monthName = resetDate.toLocaleString("default", { month: "short" });
+          const targetResetDate = new Date(resetYear, resetMonth, resetDay, 0, 0, 0);
+          const monthName = targetResetDate.toLocaleString("default", { month: "short" }).toUpperCase();
           resetInfo = `${monthName}-${resetDay}`;
+          const diffMs = Math.max(0, targetResetDate.getTime() - today2.getTime());
+          const totalHours = Math.floor(diffMs / (1e3 * 60 * 60));
+          const daysLeft = Math.floor(totalHours / 24);
+          const hoursLeft = totalHours % 24;
+          resetCountdown = `(${daysLeft} days: ${hoursLeft} hrs left)`;
         }
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 1, width: "100%" }, configuredProviders.map((prov) => {
-          const pb = providerBudgetsMap[prov];
-          const provReqCurrent = dailyUsage?.providerRequests?.[prov] || 0;
-          let provTokenCurrent = 0;
-          const dailyModels = dailyUsage?.models?.[prov] || {};
-          for (const m in dailyModels) {
-            provTokenCurrent += dailyModels[m]?.tokens || 0;
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, paddingBottom: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 0, width: "100%" }, (() => {
+          const cols = stdout?.columns || terminalSize?.columns || 80;
+          const isNarrow = cols < 115;
+          if (isNarrow) {
+            const barW = Math.max(5, Math.min(30, cols - 50));
+            return configuredProviders.map((prov) => {
+              const pb = providerBudgetsMap[prov];
+              let provTokenCurrent = 0;
+              const dailyModels = dailyUsage?.models?.[prov] || {};
+              for (const m in dailyModels) {
+                provTokenCurrent += dailyModels[m]?.tokens || 0;
+              }
+              let provMonthlyCurrent = 0;
+              const monthlySource = quotas.resetMode === "Custom" ? customPeriodUsage : monthlyUsage;
+              const monthlyModels = monthlySource?.models?.[prov] || {};
+              for (const m in monthlyModels) {
+                provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+              }
+              return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily", provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9), renderProgressBar("Monthly", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9));
+            });
           }
-          let provMonthlyCurrent = 0;
-          const monthlySource = quotas.resetMode === "Custom" ? customPeriodUsage : monthlyUsage;
-          const monthlyModels = monthlySource?.models?.[prov] || {};
-          for (const m in monthlyModels) {
-            provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+          const rows = [];
+          for (let i = 0; i < configuredProviders.length; i += 2) {
+            rows.push(configuredProviders.slice(i, i + 2));
           }
-          return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily Requests", provReqCurrent, pb.agentLimit || 99999999, "cyan"), renderProgressBar("Daily Tokens", provTokenCurrent, pb.tokenLimit || 99999999999999, "green"), renderProgressBar("Monthly Tokens", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, "yellow"));
-        }), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, renderProgressBar("Daily Requests", reqCurrent, reqLimit, "cyan"), renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo)) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))));
+          return rows.map((row, rIdx) => /* @__PURE__ */ React16.createElement(Box14, { key: rIdx, flexDirection: "row", width: "100%" }, row.map((prov) => {
+            const pb = providerBudgetsMap[prov];
+            let provTokenCurrent = 0;
+            const dailyModels = dailyUsage?.models?.[prov] || {};
+            for (const m in dailyModels) {
+              provTokenCurrent += dailyModels[m]?.tokens || 0;
+            }
+            let provMonthlyCurrent = 0;
+            const monthlySource = quotas.resetMode === "Custom" ? customPeriodUsage : monthlyUsage;
+            const monthlyModels = monthlySource?.models?.[prov] || {};
+            for (const m in monthlyModels) {
+              provMonthlyCurrent += monthlyModels[m]?.tokens || 0;
+            }
+            const isFullWidth = row.length === 1;
+            const targetCardCols = isFullWidth ? cols : Math.floor(cols / 2);
+            const barW = Math.max(5, Math.min(25, targetCardCols - 36));
+            return /* @__PURE__ */ React16.createElement(Box14, { key: prov, flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: isFullWidth ? "100%" : "50%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 0 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.primary, bold: true }, "\u25C6 ", prov)), renderProgressBar("Daily", provTokenCurrent, pb.tokenLimit || 99999999999999, barW, 2, 9), renderProgressBar("Monthly", provMonthlyCurrent, pb.monthlyTokenLimit || 99999999999999, barW, 2, 9));
+          })));
+        })(), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo), resetCountdown ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, ` ${resetCountdown}`) : null) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 2, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))) : /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "single", borderColor: colors.borderMuted, paddingX: 1, width: "100%" }, renderProgressBar("Daily Tokens", tokenCurrent, tokenLimit, "green"), renderProgressBar("Monthly Tokens", monthlyCurrent, monthlyLimit, "yellow"), resetInfo ? /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.accent || "magenta", bold: true }, resetInfo), resetCountdown ? /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, ` ${resetCountdown}`) : null) : /* @__PURE__ */ React16.createElement(Box14, { marginLeft: 4, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "Monthly Reset: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary || "blue", bold: true }, "Rolling 30-Day Window"))));
       }
       case "input":
         return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "DATA CONFIGURATION")), inputConfig?.note && /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginBottom: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, italic: true }, inputConfig.note)), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, flexDirection: "row" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, inputConfig?.label, " "), /* @__PURE__ */ React16.createElement(
@@ -25910,7 +26036,7 @@ Selection: ${val}`,
         })(), /* @__PURE__ */ React16.createElement(
           GlintText_default,
           {
-            text: tempModelOverride || activeModel.split("/")[1] || activeModel.length > 1 ? activeModel : "Use '/model model-id' to select model",
+            text: activeModel.split("/")[1] || (activeModel.length > 1 ? activeModel : "Use '/model model-id' to select model"),
             baseColor: colors.text,
             glintColor: colors.textMuted,
             glintWidth: 3
@@ -25999,7 +26125,7 @@ Selection: ${val}`,
       onSubmit: handleSetup,
       mask: "*"
     }
-  )))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm, ESC to go back)" : "(Press Enter to confirm and initialize, ESC to go back)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 2, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: "red", bold: true }, "\u{1F534} EXIT CONFIRMATION: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "CTRL + C"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " again to exit (", exitCountdown, "s). Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " to cancel.")), suggestions.length > 0 && (() => {
+  )))), /* @__PURE__ */ React16.createElement(Box14, { paddingX: 1, marginTop: 1 }, /* @__PURE__ */ React16.createElement(Text16, { color: "gray", italic: true }, setupStep === 0 ? "(Use arrows to select and Enter to confirm, ESC to go back)" : "(Press Enter to confirm and initialize, ESC to go back)"))) : renderActiveView(), confirmExit && /* @__PURE__ */ React16.createElement(Box14, { borderStyle: "round", borderColor: colors.borderMuted, paddingX: 1, marginY: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, null, /* @__PURE__ */ React16.createElement(Text16, { color: "red", bold: true }, "\u{1F534} EXIT: "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, "Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "CTRL+C"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " again to exit (", exitCountdown, "s) \u2022 Press "), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, bold: true }, "ESC"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.text }, " to cancel"))), suggestions.length > 0 && (() => {
     const windowSize = 5;
     let startIdx = suggestionOffsetRef.current;
     let firstSelectableIndex = 0;
