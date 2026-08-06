@@ -6434,11 +6434,11 @@ export default function App({ args = [] }) {
                                                 url = "https://build.nvidia.com/settings/api-keys";
                                                 label = "billing";
                                             }
-                                            return (
-                                                <Text color={colors.textMuted} dimColor italic>
-                                                    Paid API Strategy has more models. Configure <Text color={colors.secondary} underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
-                                                </Text>
-                                            );
+                                            // return (
+                                            //     <Text color={colors.textMuted} italic>
+                                            //         Paid API Strategy has more models. Configure <Text color={colors.secondary} underline>{`\u001b]8;;${url}\u0007${label}\u001b]8;;\u0007`}</Text> & /settings
+                                            //     </Text>
+                                            // );
                                         })() : null}
                                     </Box>
 

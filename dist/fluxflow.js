@@ -26169,7 +26169,6 @@ Selection: ${val}`,
           url = "https://build.nvidia.com/settings/api-keys";
           label = "billing";
         }
-        return /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted, dimColor: true, italic: true }, "Paid API Strategy has more models. Configure ", /* @__PURE__ */ React16.createElement(Text16, { color: colors.secondary, underline: true }, `\x1B]8;;${url}\x07${label}\x1B]8;;\x07`), " & /settings");
       })() : null),
       visible.slice(0, suggestionVisibleCount).map((s, i) => {
         const actualIdx = startIdx + i;
