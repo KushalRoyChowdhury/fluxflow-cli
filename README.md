@@ -45,14 +45,13 @@ Whether you need a conversational partner or an autonomous developer that can wr
 - **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
 - **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
 - **Two Operating Modes**:
-  - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops (up to 45 iterations) to solve complex coding tasks.
+  - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops, subagents, safety tools to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.
 - **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
-- **Autonomous Subagent System**: Spawns subagents in either blocking mode (`invokeSync`) or asynchronous mode (`invoke`) to offload tasks. Runs with a permanent suite of 10 system tools (e.g. ReadFile, PatchFile, WebSearch, WritePDF), excluding shell commands (`Run` is disabled). Telemetry is quietly tracked in the CLI's active subagents UI block and backed up in transaction-safe restoration records.
-- **High-Reliability Fallback**: Automatic failover to a lighter, high-concurrency model (Gemini 3.1 Flash Lite) during peak traffic to ensure 100% session persistence.
+- **Autonomous Subagent System**: Spawns subagents in either blocking mode (`invokeSync`) or asynchronous mode (`invoke`) to offload tasks. Runs with a permanent suite of system tools (e.g. ReadFile, PatchFile, WebSearch). Telemetry is quietly tracked in the CLI's active subagents UI block and backed up in transaction-safe restoration records.
 
 ## 🚀 Quick Start
 
@@ -104,7 +103,7 @@ fluxflow [options]
 ```
 
 ### Supported Flags:
-- `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.1-pro-preview`). Keps settings file untouched.
+- `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.5-pro`). Keps settings file untouched.
 - `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
 - `--resume <session-id>`: Resume a previous chat session programmatically.
 - `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
@@ -113,8 +112,8 @@ fluxflow [options]
 - `--yolo <on | off>`: Toggle autonomous command execution permission.
 - `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
 - `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
-- `--key <key@google | key@deepseek | key@openrouter>`: Set API key and provider.
-- `--provider <google | deepseek | openrouter>`: Override default provider.
+- `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
+- `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
 
 ---
 
@@ -122,16 +121,15 @@ fluxflow [options]
 
 Flux Flow runs entirely locally on your machine.
 - **Sandbox Presets**: Choose from **Strict**, **Balanced**, **Autonomous**, or **Custom** profiles to fine-tune agent autonomy out of the box.
-- **Granular Command Policies**: Configure Auto-Approve (`Auto` / `Read-Only` / `None`), Auto-Disallow (`Auto` / `Destructive` / `None`), Network Access toggle, and Auto-Approve Git Commits independently.
-- **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`. Sensitive data is encrypted.
+- **Granular Command Policies**: Configure Auto-Approve, Auto-Disallow, Network Access toggle, and Auto-Approve Git Commits independently.
+- **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`.
 - **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
 - **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
-- **API Keys**: You supply your own API keys for your preferred provider: Google GenAI, DeepSeek, or OpenRouter (Experimental).
+- **API Keys**: You supply your own API keys for your preferred provider: Google GenAI, DeepSeek, OpenRouter, Nvidia, Ollama, or Mistral.
 
 ## 🛠️ Built With
 
 - **[React](https://react.dev/) & [Ink](https://github.com/vadimdemedes/ink)**: For the interactive CLI rendering.
-- **[@google/genai](https://www.npmjs.com/package/@google/genai)**: The core AI SDK powering the agent's intelligence.
 - **[chalk](https://www.npmjs.com/package/chalk) & [gradient-string](https://www.npmjs.com/package/gradient-string)**: For terminal styling and aesthetics.
 - **[fs-extra](https://www.npmjs.com/package/fs-extra)**: For robust file system operations.
 
