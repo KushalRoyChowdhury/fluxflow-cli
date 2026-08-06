@@ -360,37 +360,55 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
         for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
-            if (cleanLine === 'data: [DONE]') break;
+            let isDone = false;
+            if (cleanLine === 'data: [DONE]') {
+                isDone = true;
+            } else {
+                try {
+                    const json = JSON.parse(cleanLine.substring(6));
+                    const delta = json.choices?.[0]?.delta;
+                    const usage = json.usage;
+                    if (json.choices?.[0]?.finish_reason) {
+                        isDone = true;
+                    }
 
-            try {
-                const json = JSON.parse(cleanLine.substring(6));
-                const delta = json.choices?.[0]?.delta;
-                const usage = json.usage;
-
-                if (usage) {
-                    latestUsageMetadata = {
-                        totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
-                        promptTokenCount: usage.prompt_tokens || 0,
-                        candidatesTokenCount: usage.completion_tokens || 0,
-                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
-                        thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
-                    };
-                    hasNewData = true;
-                }
-
-                if (delta) {
-                    // DeepSeek uses reasoning_content
-                    const thought = delta.reasoning_content || null;
-                    if (thought) {
-                        pendingParts.push({ text: thought, thought: true });
+                    if (usage) {
+                        latestUsageMetadata = {
+                            totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                            promptTokenCount: usage.prompt_tokens || 0,
+                            candidatesTokenCount: usage.completion_tokens || 0,
+                            cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                            thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                        };
                         hasNewData = true;
                     }
-                    if (delta.content) {
-                        pendingParts.push({ text: delta.content });
-                        hasNewData = true;
+
+                    if (delta) {
+                        // DeepSeek uses reasoning_content
+                        const thought = delta.reasoning_content || null;
+                        if (thought) {
+                            pendingParts.push({ text: thought, thought: true });
+                            hasNewData = true;
+                        }
+                        if (delta.content) {
+                            pendingParts.push({ text: delta.content });
+                            hasNewData = true;
+                        }
                     }
-                }
-            } catch (e) { }
+                } catch (e) { }
+            }
+
+            if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+                pendingParts = [];
+                lastFlushTime = Date.now();
+                hasNewData = false;
+            }
+
+            if (isDone) break;
         }
 
         if (Date.now() - lastFlushTime >= 150 && hasNewData) {
@@ -505,36 +523,54 @@ const getMistralStream = async function* (apiKey, model, contents, systemInstruc
         for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
-            if (cleanLine === 'data: [DONE]') break;
+            let isDone = false;
+            if (cleanLine === 'data: [DONE]') {
+                isDone = true;
+            } else {
+                try {
+                    const json = JSON.parse(cleanLine.substring(6));
+                    const delta = json.choices?.[0]?.delta;
+                    const usage = json.usage;
+                    if (json.choices?.[0]?.finish_reason) {
+                        isDone = true;
+                    }
 
-            try {
-                const json = JSON.parse(cleanLine.substring(6));
-                const delta = json.choices?.[0]?.delta;
-                const usage = json.usage;
-
-                if (usage) {
-                    latestUsageMetadata = {
-                        totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
-                        promptTokenCount: usage.prompt_tokens || 0,
-                        candidatesTokenCount: usage.completion_tokens || 0,
-                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
-                        thoughtsTokenCount: 0
-                    };
-                    hasNewData = true;
-                }
-
-                if (delta) {
-                    // Mistral streams thinking content in delta.thinking
-                    if (delta.thinking) {
-                        pendingParts.push({ text: delta.thinking, thought: true });
+                    if (usage) {
+                        latestUsageMetadata = {
+                            totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
+                            promptTokenCount: usage.prompt_tokens || 0,
+                            candidatesTokenCount: usage.completion_tokens || 0,
+                            cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                            thoughtsTokenCount: 0
+                        };
                         hasNewData = true;
                     }
-                    if (delta.content) {
-                        pendingParts.push({ text: delta.content });
-                        hasNewData = true;
+
+                    if (delta) {
+                        // Mistral streams thinking content in delta.thinking
+                        if (delta.thinking) {
+                            pendingParts.push({ text: delta.thinking, thought: true });
+                            hasNewData = true;
+                        }
+                        if (delta.content) {
+                            pendingParts.push({ text: delta.content });
+                            hasNewData = true;
+                        }
                     }
-                }
-            } catch (e) { }
+                } catch (e) { }
+            }
+
+            if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+                pendingParts = [];
+                lastFlushTime = Date.now();
+                hasNewData = false;
+            }
+
+            if (isDone) break;
         }
 
         if (Date.now() - lastFlushTime >= 150 && hasNewData) {
@@ -754,9 +790,14 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                 // fs.appendFileSync("NVIDIA_STREAM_DEBUG.txt", `${decoder.decode(value)}\n\n`); // [DEBUGGING POINT]
                 buffer = lines.pop();
 
+                let isDone = false;
                 for (const line of lines) {
                     const trimmed = line.trim();
-                    if (!trimmed || trimmed === 'data: [DONE]') continue;
+                    if (!trimmed) continue;
+                    if (trimmed === 'data: [DONE]') {
+                        isDone = true;
+                        break;
+                    }
                     if (trimmed.startsWith('data: ')) {
                         let json;
                         try {
@@ -767,6 +808,10 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
 
                         if (json.error) {
                             throw new Error(`NVIDIA Stream Error: ${json.error.message || JSON.stringify(json.error)}`);
+                        }
+
+                        if (json.choices?.[0]?.finish_reason) {
+                            isDone = true;
                         }
 
                         try {
@@ -797,7 +842,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                     }
                 }
 
-                if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+                if ((isDone || Date.now() - lastFlushTime >= 350) && hasNewData) {
                     // fs.appendFileSync('debug.log', JSON.stringify(pendingParts) + '\n');
                     yield {
                         candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
@@ -808,6 +853,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                     lastFlushTime = Date.now();
                     hasNewData = false;
                 }
+
+                if (isDone) break;
             }
 
             // Stream completed successfully
@@ -1062,48 +1109,56 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
-            if (cleanLine === 'data: [DONE]') break;
+            let isDone = false;
+            if (cleanLine === 'data: [DONE]') {
+                isDone = true;
+            } else {
+                try {
+                    const json = JSON.parse(cleanLine.substring(6));
+                    const delta = json.choices?.[0]?.delta;
+                    const usage = json.usage;
+                    if (json.choices?.[0]?.finish_reason) {
+                        isDone = true;
+                    }
 
-            try {
-                const json = JSON.parse(cleanLine.substring(6));
-                const delta = json.choices?.[0]?.delta;
-                const usage = json.usage;
-
-                if (usage) {
-                    latestUsageMetadata = {
-                        totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
-                        promptTokenCount: usage.prompt_tokens || 0,
-                        candidatesTokenCount: usage.completion_tokens || 0,
-                        cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || usage.prompt_tokens_details?.cache_read_input_tokens || usage.cache_read_input_tokens || 0,
-                        thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
-                    };
-                    hasNewData = true;
-                }
-
-                if (delta) {
-                    const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map(d => d.text).join('') : null);
-                    if (thought) {
-                        pendingParts.push({ text: thought, thought: true });
+                    if (usage) {
+                        latestUsageMetadata = {
+                            totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
+                            promptTokenCount: usage.prompt_tokens || 0,
+                            candidatesTokenCount: usage.completion_tokens || 0,
+                            cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || usage.prompt_tokens_details?.cache_read_input_tokens || usage.cache_read_input_tokens || 0,
+                            thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                        };
                         hasNewData = true;
                     }
-                    if (delta.content) {
-                        pendingParts.push({ text: delta.content });
-                        hasNewData = true;
+
+                    if (delta) {
+                        const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map(d => d.text).join('') : null);
+                        if (thought) {
+                            pendingParts.push({ text: thought, thought: true });
+                            hasNewData = true;
+                        }
+                        if (delta.content) {
+                            pendingParts.push({ text: delta.content });
+                            hasNewData = true;
+                        }
                     }
+                } catch (e) {
+                    // Ignore parse errors for partial chunks
                 }
-            } catch (e) {
-                // Ignore parse errors for partial chunks
             }
-        }
 
-        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
-            yield {
-                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
-                usageMetadata: latestUsageMetadata
-            };
-            pendingParts = [];
-            lastFlushTime = Date.now();
-            hasNewData = false;
+            if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+                pendingParts = [];
+                lastFlushTime = Date.now();
+                hasNewData = false;
+            }
+
+            if (isDone) break;
         }
     }
 };
@@ -1193,20 +1248,31 @@ const getOllamaStream = async function* (apiKey, model, contents, systemInstruct
         }
 
         if (chunk.done) {
-            // Ollama prompt_eval_duration is in nanoseconds. Under ~75ms (75,000,000 ns) indicates prompt cache reuse
-            const evalNs = chunk.prompt_eval_duration || 0;
-            const isCached = evalNs > 0 && evalNs < 75000000;
+            // 1. First check explicit fields returned by newer Ollama versions
+            let cachedCount = chunk.prompt_cached_count || 0;
+
+            // 2. Fallback to duration heuristic if explicit field is missing
+            if (!cachedCount && chunk.prompt_eval_count) {
+                const evalNs = chunk.prompt_eval_duration || 0;
+                // Under ~75ms typically implies cache hits
+                if (evalNs > 0 && evalNs < 75000000) {
+                    cachedCount = chunk.prompt_eval_count;
+                }
+            }
+
             latestUsageMetadata = {
                 totalTokenCount: (chunk.prompt_eval_count || 0) + (chunk.eval_count || 0),
                 promptTokenCount: chunk.prompt_eval_count || 0,
                 candidatesTokenCount: chunk.eval_count || 0,
-                cachedContentTokenCount: (chunk.prompt_eval_count && isCached) ? chunk.prompt_eval_count : 0,
-                thoughtsTokenCount: 0
+                cachedContentTokenCount: cachedCount,
+                thoughtsTokenCount: 0 // Note: Ollama does not natively return a separate sub-count for thoughts yet
             };
             hasNewData = true;
         }
 
-        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+        // Force an immediate flush if it's the final chunk (chunk.done),
+        // ignoring the 150ms throttle rule so metadata isn't stranded.
+        if (chunk.done || (Date.now() - lastFlushTime >= 150 && hasNewData)) {
             yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -1216,6 +1282,7 @@ const getOllamaStream = async function* (apiKey, model, contents, systemInstruct
             hasNewData = false;
         }
     }
+
 
     if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
         yield {
@@ -3182,7 +3249,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         // Deterministically protect <think> and </think> tags so they are never stripped
                         const THINK_OPEN_PH = '___THINK_OPEN_TAG___';
                         const THINK_CLOSE_PH = '___THINK_CLOSE_TAG___';
-                        text = text.replaceAll('<think>', THINK_OPEN_PH).replaceAll('</think>', THINK_CLOSE_PH);
+                        text = text.replace('<think>', THINK_OPEN_PH).replace('</think>', THINK_CLOSE_PH);
 
                         // Strip XML-style wrappers: <tag>...[tool:...]...</tag>
                         text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
@@ -5528,6 +5595,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'openrouter') return 'OpenRouter';
         if (lower === 'nvidia') return 'NVIDIA';
         if (lower === 'mistral') return 'Mistral';
+        if (lower === 'ollama') return 'Ollama';
         return null;
     };
 
@@ -5602,6 +5670,7 @@ TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Need text or huge files? SearchKeyword > Full Read
+- MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - Restricted Shell Access, No Deletion
 - ONLY valid tools and syntax defined below are allowed
 

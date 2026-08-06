@@ -85,6 +85,10 @@ export default function StartupArgs() {
                     <strong><code>--external-access &lt;on|off&gt;</code></strong><br />
                     Toggle permission to let the agent read files outside the Current Working Directory (CWD).
                 </li>
+                <li>
+                    <strong><code>--external-data &lt;path&gt;</code></strong><br />
+                    Anchor and pivot external data sanctuary operations (logs, history, encrypted memories) to a specified custom directory path upon startup.
+                </li>
             </ul>
 
             <h2 id="utility-flags">Utility Flags</h2>

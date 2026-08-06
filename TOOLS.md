@@ -1,3 +1,6 @@
+##### **THIS DOCUMENTATION FILE IS OUTDATED & NO LONGER MAINTAINED. TO SEE LATEST TOOLS DOCUMENTATION & AVAILABILITY VISIT: [FluxFlow Tools Documentation](https://fluxflow-cli.onrender.com/tools/)**
+##### [Changelog](https://fluxflow-cli.onrender.com/changelog.html)
+
 # 🧰 Agent Tools & Capabilities
 
 Flux Flow provides a robust set of tools that allow the AI to interact with the file system, execute code, and search the web. The availability of these tools depends on the active operating mode.

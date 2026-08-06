@@ -1,3 +1,6 @@
+##### **THIS DOCUMENTATION FILE IS OUTDATED & NO LONGER MAINTAINED. TO SEE LATEST ARCHITECTURAL DOCUMENTATION & CHANGES VISIT: [FluxFlow Architecture Documentation](https://fluxflow-cli.onrender.com/architecture/)**
+##### [Changelog](https://fluxflow-cli.onrender.com/changelog.html)
+
 # 🏛️ Architecture & Design
 
 Flux Flow is built on a modern, reactive stack that brings web-like development paradigms to the terminal. It utilizes a custom agentic loop for reasoning and a unique dual-model system for background processing.

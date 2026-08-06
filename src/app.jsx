@@ -738,7 +738,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -747,6 +747,7 @@ export default function App({ args = [] }) {
                     if (lower === 'openrouter') return 'OpenRouter';
                     if (lower === 'nvidia') return 'NVIDIA';
                     if (lower === 'mistral') return 'Mistral';
+                    if (lower === 'ollama') return 'Ollama';
                     return null;
                 };
 

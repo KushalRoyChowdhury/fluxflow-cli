@@ -29,7 +29,8 @@ TOOL RULES:
 ${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY
-- Need text or huge files? SearchKeyword > Full Read
+- Need text or HUGE file? SearchKeyword > Full Read
+- MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 ` : ""}
 - COMMUNICATION WITH USER -
 - [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short

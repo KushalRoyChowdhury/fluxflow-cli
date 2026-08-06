@@ -145,7 +145,7 @@ ${forcedReasoning || (thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
 - Subtly Personalize with  RELEVENT CONTEXTUAL MEMORIES. Auto Saves\n` : ''}
--- SECURITY RULES --
+-- SECURITY POLICIES --
 - Sensitive files? Ask before Read${isSystemDir ? '\n- PROTECTED DIRECTORY' : ''}
 
 -- CHAT FORMATTING --

@@ -1,3 +1,6 @@
+##### **THIS DOCUMENTATION FILE IS OUTDATED & NO LONGER MAINTAINED. TO SEE LATEST UI FEATURES & CHANGES VISIT: [FluxFlow Documentation](https://fluxflow-cli.onrender.com/)**
+##### [Changelog](https://fluxflow-cli.onrender.com/changelog.html)
+
 # 🎮 User Interface & Interaction Features
 
 Flux Flow is designed to be a high-performance terminal application. Beyond basic chat, it includes a variety of advanced UI features and human-in-the-loop controls to keep you in command of the agent.

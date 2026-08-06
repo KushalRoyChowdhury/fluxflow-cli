@@ -6977,7 +6977,8 @@ TOOL RULES:
 ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
 - Tool denied? Ask for guidance \u2190 MANDATORY
-- Need text or huge files? SearchKeyword > Full Read
+- Need text or HUGE file? SearchKeyword > Full Read
+- MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 ` : ""}
 - COMMUNICATION WITH USER -
 - [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
@@ -9863,7 +9864,7 @@ ${projectContextBlock}${isMemoryEnabled ? `
 -- MEMORY RULES --
 - Subtly Personalize with  RELEVENT CONTEXTUAL MEMORIES. Auto Saves
 ` : ""}
--- SECURITY RULES --
+-- SECURITY POLICIES --
 - Sensitive files? Ask before Read${isSystemDir ? "\n- PROTECTED DIRECTORY" : ""}
 
 -- CHAT FORMATTING --
@@ -15372,34 +15373,51 @@ var init_ai = __esm({
         for (const line of lines) {
           const cleanLine = line.trim();
           if (!cleanLine || !cleanLine.startsWith("data: ")) continue;
-          if (cleanLine === "data: [DONE]") break;
-          try {
-            const json = JSON.parse(cleanLine.substring(6));
-            const delta = json.choices?.[0]?.delta;
-            const usage = json.usage;
-            if (usage) {
-              latestUsageMetadata = {
-                totalTokenCount: usage.total_tokens || usage.prompt_tokens + usage.completion_tokens,
-                promptTokenCount: usage.prompt_tokens || 0,
-                candidatesTokenCount: usage.completion_tokens || 0,
-                cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
-                thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
-              };
-              hasNewData = true;
-            }
-            if (delta) {
-              const thought = delta.reasoning_content || null;
-              if (thought) {
-                pendingParts.push({ text: thought, thought: true });
+          let isDone = false;
+          if (cleanLine === "data: [DONE]") {
+            isDone = true;
+          } else {
+            try {
+              const json = JSON.parse(cleanLine.substring(6));
+              const delta = json.choices?.[0]?.delta;
+              const usage = json.usage;
+              if (json.choices?.[0]?.finish_reason) {
+                isDone = true;
+              }
+              if (usage) {
+                latestUsageMetadata = {
+                  totalTokenCount: usage.total_tokens || usage.prompt_tokens + usage.completion_tokens,
+                  promptTokenCount: usage.prompt_tokens || 0,
+                  candidatesTokenCount: usage.completion_tokens || 0,
+                  cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                  thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                };
                 hasNewData = true;
               }
-              if (delta.content) {
-                pendingParts.push({ text: delta.content });
-                hasNewData = true;
+              if (delta) {
+                const thought = delta.reasoning_content || null;
+                if (thought) {
+                  pendingParts.push({ text: thought, thought: true });
+                  hasNewData = true;
+                }
+                if (delta.content) {
+                  pendingParts.push({ text: delta.content });
+                  hasNewData = true;
+                }
               }
+            } catch (e) {
             }
-          } catch (e) {
           }
+          if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+            yield {
+              candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+              usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+          }
+          if (isDone) break;
         }
         if (Date.now() - lastFlushTime >= 150 && hasNewData) {
           yield {
@@ -15497,33 +15515,50 @@ var init_ai = __esm({
         for (const line of lines) {
           const cleanLine = line.trim();
           if (!cleanLine || !cleanLine.startsWith("data: ")) continue;
-          if (cleanLine === "data: [DONE]") break;
-          try {
-            const json = JSON.parse(cleanLine.substring(6));
-            const delta = json.choices?.[0]?.delta;
-            const usage = json.usage;
-            if (usage) {
-              latestUsageMetadata = {
-                totalTokenCount: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
-                promptTokenCount: usage.prompt_tokens || 0,
-                candidatesTokenCount: usage.completion_tokens || 0,
-                cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
-                thoughtsTokenCount: 0
-              };
-              hasNewData = true;
-            }
-            if (delta) {
-              if (delta.thinking) {
-                pendingParts.push({ text: delta.thinking, thought: true });
+          let isDone = false;
+          if (cleanLine === "data: [DONE]") {
+            isDone = true;
+          } else {
+            try {
+              const json = JSON.parse(cleanLine.substring(6));
+              const delta = json.choices?.[0]?.delta;
+              const usage = json.usage;
+              if (json.choices?.[0]?.finish_reason) {
+                isDone = true;
+              }
+              if (usage) {
+                latestUsageMetadata = {
+                  totalTokenCount: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+                  promptTokenCount: usage.prompt_tokens || 0,
+                  candidatesTokenCount: usage.completion_tokens || 0,
+                  cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                  thoughtsTokenCount: 0
+                };
                 hasNewData = true;
               }
-              if (delta.content) {
-                pendingParts.push({ text: delta.content });
-                hasNewData = true;
+              if (delta) {
+                if (delta.thinking) {
+                  pendingParts.push({ text: delta.thinking, thought: true });
+                  hasNewData = true;
+                }
+                if (delta.content) {
+                  pendingParts.push({ text: delta.content });
+                  hasNewData = true;
+                }
               }
+            } catch (e) {
             }
-          } catch (e) {
           }
+          if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+            yield {
+              candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+              usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+          }
+          if (isDone) break;
         }
         if (Date.now() - lastFlushTime >= 150 && hasNewData) {
           yield {
@@ -15716,9 +15751,14 @@ var init_ai = __esm({
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split("\n");
             buffer = lines.pop();
+            let isDone = false;
             for (const line of lines) {
               const trimmed = line.trim();
-              if (!trimmed || trimmed === "data: [DONE]") continue;
+              if (!trimmed) continue;
+              if (trimmed === "data: [DONE]") {
+                isDone = true;
+                break;
+              }
               if (trimmed.startsWith("data: ")) {
                 let json;
                 try {
@@ -15728,6 +15768,9 @@ var init_ai = __esm({
                 }
                 if (json.error) {
                   throw new Error(`NVIDIA Stream Error: ${json.error.message || JSON.stringify(json.error)}`);
+                }
+                if (json.choices?.[0]?.finish_reason) {
+                  isDone = true;
                 }
                 try {
                   const usage = json.usage;
@@ -15755,7 +15798,7 @@ var init_ai = __esm({
                 }
               }
             }
-            if (Date.now() - lastFlushTime >= 350 && hasNewData) {
+            if ((isDone || Date.now() - lastFlushTime >= 350) && hasNewData) {
               yield {
                 candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
                 usageMetadata: latestUsageMetadata
@@ -15765,6 +15808,7 @@ var init_ai = __esm({
               lastFlushTime = Date.now();
               hasNewData = false;
             }
+            if (isDone) break;
           }
           break;
         } catch (error) {
@@ -15982,43 +16026,51 @@ var init_ai = __esm({
         for (const line of lines) {
           const cleanLine = line.trim();
           if (!cleanLine || !cleanLine.startsWith("data: ")) continue;
-          if (cleanLine === "data: [DONE]") break;
-          try {
-            const json = JSON.parse(cleanLine.substring(6));
-            const delta = json.choices?.[0]?.delta;
-            const usage = json.usage;
-            if (usage) {
-              latestUsageMetadata = {
-                totalTokenCount: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
-                promptTokenCount: usage.prompt_tokens || 0,
-                candidatesTokenCount: usage.completion_tokens || 0,
-                cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || usage.prompt_tokens_details?.cache_read_input_tokens || usage.cache_read_input_tokens || 0,
-                thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
-              };
-              hasNewData = true;
-            }
-            if (delta) {
-              const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map((d) => d.text).join("") : null);
-              if (thought) {
-                pendingParts.push({ text: thought, thought: true });
+          let isDone = false;
+          if (cleanLine === "data: [DONE]") {
+            isDone = true;
+          } else {
+            try {
+              const json = JSON.parse(cleanLine.substring(6));
+              const delta = json.choices?.[0]?.delta;
+              const usage = json.usage;
+              if (json.choices?.[0]?.finish_reason) {
+                isDone = true;
+              }
+              if (usage) {
+                latestUsageMetadata = {
+                  totalTokenCount: usage.total_tokens || (usage.prompt_tokens || 0) + (usage.completion_tokens || 0),
+                  promptTokenCount: usage.prompt_tokens || 0,
+                  candidatesTokenCount: usage.completion_tokens || 0,
+                  cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || usage.prompt_tokens_details?.cache_read_input_tokens || usage.cache_read_input_tokens || 0,
+                  thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                };
                 hasNewData = true;
               }
-              if (delta.content) {
-                pendingParts.push({ text: delta.content });
-                hasNewData = true;
+              if (delta) {
+                const thought = delta.reasoning || (delta.reasoning_details ? delta.reasoning_details.map((d) => d.text).join("") : null);
+                if (thought) {
+                  pendingParts.push({ text: thought, thought: true });
+                  hasNewData = true;
+                }
+                if (delta.content) {
+                  pendingParts.push({ text: delta.content });
+                  hasNewData = true;
+                }
               }
+            } catch (e) {
             }
-          } catch (e) {
           }
-        }
-        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
-          yield {
-            candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
-            usageMetadata: latestUsageMetadata
-          };
-          pendingParts = [];
-          lastFlushTime = Date.now();
-          hasNewData = false;
+          if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+            yield {
+              candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+              usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+          }
+          if (isDone) break;
         }
       }
     };
@@ -16091,18 +16143,24 @@ var init_ai = __esm({
           hasNewData = true;
         }
         if (chunk.done) {
-          const evalNs = chunk.prompt_eval_duration || 0;
-          const isCached = evalNs > 0 && evalNs < 75e6;
+          let cachedCount = chunk.prompt_cached_count || 0;
+          if (!cachedCount && chunk.prompt_eval_count) {
+            const evalNs = chunk.prompt_eval_duration || 0;
+            if (evalNs > 0 && evalNs < 75e6) {
+              cachedCount = chunk.prompt_eval_count;
+            }
+          }
           latestUsageMetadata = {
             totalTokenCount: (chunk.prompt_eval_count || 0) + (chunk.eval_count || 0),
             promptTokenCount: chunk.prompt_eval_count || 0,
             candidatesTokenCount: chunk.eval_count || 0,
-            cachedContentTokenCount: chunk.prompt_eval_count && isCached ? chunk.prompt_eval_count : 0,
+            cachedContentTokenCount: cachedCount,
             thoughtsTokenCount: 0
+            // Note: Ollama does not natively return a separate sub-count for thoughts yet
           };
           hasNewData = true;
         }
-        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+        if (chunk.done || Date.now() - lastFlushTime >= 150 && hasNewData) {
           yield {
             candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
             usageMetadata: latestUsageMetadata
@@ -17850,7 +17908,7 @@ ${combinedNudge}`;
                 if (!text || !text.includes("[tool:")) return text;
                 const THINK_OPEN_PH = "___THINK_OPEN_TAG___";
                 const THINK_CLOSE_PH = "___THINK_CLOSE_TAG___";
-                text = text.replaceAll("<think>", THINK_OPEN_PH).replaceAll("</think>", THINK_CLOSE_PH);
+                text = text.replace("<think>", THINK_OPEN_PH).replace("</think>", THINK_CLOSE_PH);
                 text = text.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match2, tagName, innerContent) => {
                   if (innerContent && innerContent.includes("[tool:")) return innerContent.trim();
                   return match2;
@@ -19933,6 +19991,7 @@ Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
         if (lower === "openrouter") return "OpenRouter";
         if (lower === "nvidia") return "NVIDIA";
         if (lower === "mistral") return "Mistral";
+        if (lower === "ollama") return "Ollama";
         return null;
       };
       const envSubagentProvider = normalizeProvider(envSubagentProviderRaw);
@@ -19997,6 +20056,7 @@ TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (\u226415 blocks) \u2190 PRIORITY
 - Need text or huge files? SearchKeyword > Full Read
+- MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - Restricted Shell Access, No Deletion
 - ONLY valid tools and syntax defined below are allowed
 
@@ -21439,7 +21499,7 @@ function App({ args = [] }) {
         }
         const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
         const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
-        const ALL_PROVIDERS = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral"];
+        const ALL_PROVIDERS = ["Google", "DeepSeek", "OpenRouter", "NVIDIA", "Mistral", "Ollama"];
         const normalizeProvider = (pStr) => {
           if (!pStr) return null;
           const lower = pStr.toLowerCase();
@@ -21448,6 +21508,7 @@ function App({ args = [] }) {
           if (lower === "openrouter") return "OpenRouter";
           if (lower === "nvidia") return "NVIDIA";
           if (lower === "mistral") return "Mistral";
+          if (lower === "ollama") return "Ollama";
           return null;
         };
         const envProvider = normalizeProvider(envProviderRaw);
