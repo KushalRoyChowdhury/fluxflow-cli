@@ -2446,7 +2446,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: aiProvider === 'Ollama' ? [] : getModels(aiProvider, apiTier)
+            subs: getModels(aiProvider, apiTier)
         },
         {
             cmd: '/wildcard-tooling',
