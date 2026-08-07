@@ -50,12 +50,12 @@ export const parseArgs = (argsString) => {
                 // We must be careful not to end prematurely if a newline happens to be followed by something that looks like a key
                 const afterRaw = argsString.substring(qIdx + 1);
                 const after = afterRaw.trim();
-                
-                // STRICTER LOGICAL END: 
+
+                // STRICTER LOGICAL END:
                 // A quote is ONLY a logical end if it's followed by:
                 // 1. A comma AND then another key= (e.g. "path", content=)
                 // 2. A closing parenthesis that marks the end of the tool call (e.g. "path") ]]
-                const isLogicalEnd = 
+                const isLogicalEnd =
                     after === '' ||                    // End of entire string
                     /^,\s*\w+\s*=/.test(after) ||       // Next argument separator (comma followed by key=)
                     (after.startsWith(')') && (after.length === 1 || /^\)\s*([,\]\s]|\[\[?tool:)/i.test(after))); // Robust Tool End
@@ -74,7 +74,7 @@ export const parseArgs = (argsString) => {
                     end = qIdx;
                     break;
                 }
-                
+
                 // Not a logical end, skip this quote and keep searching
                 searchIndex = qIdx + 1;
             }
@@ -90,7 +90,7 @@ export const parseArgs = (argsString) => {
 
             // High-fidelity unescaping
             const isPathKey = key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase());
-            
+
             // Standard unescaping logic for all strings:
             // Uses a single-pass regex to avoid order-of-operation issues (e.g. \\n becoming \n)
             value = value.replace(/\\(.)/g, (match, char) => {
@@ -173,7 +173,7 @@ export const parseArgs = (argsString) => {
         if (value === 'true') value = true;
         else if (value === 'false') value = false;
         else if (typeof value === 'string' && !isNaN(value) && value.trim() !== '') value = Number(value);
-        
+
         // [PATH-SENTRY] Path Sanitization
         if (typeof value === 'string' && (key.toLowerCase().includes('path') || ['dest', 'source', 'to', 'from'].includes(key.toLowerCase()))) {
             value = value.replace(/\x0C/g, '\\f').replace(/\x0D/g, '\\r').replace(/\x0B/g, '\\v').replace(/\x08/g, '\\b');

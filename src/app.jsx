@@ -4770,7 +4770,7 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
                         <Box paddingX={1} marginBottom={1}>
-                            <Text color={colors.text} bold>SELECT PROVIDERS TO SET BUDGETS FOR</Text>
+                            <Text color={colors.text} bold>SELECT PROVIDERS TO SET LIMMITS FOR</Text>
                         </Box>
                         {PROVIDERS_LIST.map((prov, i) => {
                             const isActive = i === pbsCursor;
@@ -4810,8 +4810,8 @@ export default function App({ args = [] }) {
 
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
-                        <Box paddingX={1} marginBottom={1}>
-                            <Text color={colors.text} bold>PROVIDER BUDGET CONFIGURATION</Text>
+                        <Box paddingX={1} marginBottom={0}>
+                            <Text color={colors.text} bold>PROVIDER LIMIT CONFIGURATION</Text>
                         </Box>
                         <Box paddingX={1} paddingBottom={0} marginBottom={0}>
                             <Text color={colors.textMuted} italic>Set limits for selected providers (leave blank or 0 for no limit)</Text>
@@ -4868,7 +4868,7 @@ export default function App({ args = [] }) {
                                     <Text color={colors.success || "green"} bold>❯ [ Save & Apply Budgets ]</Text>
                                 </Box>
                             ) : (
-                                <Text color={colors.textMuted}>  [ Save & Apply Budgets ]</Text>
+                                <Text color={colors.textMuted}>   [ Save & Apply Budgets ]</Text>
                             )}
                         </Box>
 
@@ -4961,7 +4961,7 @@ export default function App({ args = [] }) {
                 }
 
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} paddingBottom={0} width="100%">
+                    <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} paddingBottom={0} paddingTop={0} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
                             <Text color={colors.text} bold underline>USAGE LIMITS</Text>
                             <Text color={colors.textMuted}>[ ESC to Close ]</Text>

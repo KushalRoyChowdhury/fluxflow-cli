@@ -408,25 +408,25 @@ export const THEMES = {
         textInverted: 'black',
         textExclusive: '#B5B8D9',
         textMutedExclusive: '#D4DEE7',
-        
+
         // Borders
         border: 'white',
         borderMuted: 'gray',
         borderDim: 'grey',
-        
+
         // Backgrounds
         bg: undefined,
         cardBg: '#1e1e1e',
         highlightBg: '#2a2a2a',
         activeBg: '#3a3a3a',
-        
+
         // Input Box Colors
         inputBg: '#555555',
         inputBorder: '#555555',
         inputText: 'white',
         inputPlaceholder: '#cccccc',
         inputPrompt: 'white',
-        
+
         // Code & Message Component Colors
         codeBg: '#1a1a1a',
         codeBorder: '#444444',
@@ -447,7 +447,7 @@ export const THEMES = {
         diffAdditionNum: '#68d98c',
         diffRemovalPrefix: '#ff4d4d',
         diffAdditionPrefix: '#4dff88',
-        
+
         // Accents & Indicators
         primary: 'white',
         secondary: 'cyan',
@@ -456,7 +456,7 @@ export const THEMES = {
         warning: 'yellow',
         danger: 'red',
         info: 'blue',
-        
+
         // Status Indicators
         statusOn: 'white',
         statusOff: 'gray',
@@ -475,25 +475,25 @@ export const THEMES = {
         textMuted: 'gray',
         textDim: 'grey',
         textInverted: 'white',
-        
+
         // Borders
         border: 'black',
         borderMuted: 'gray',
         borderDim: 'grey',
-        
+
         // Backgrounds
         bg: undefined,
         cardBg: '#e5e5e5',
         highlightBg: '#d4d4d4',
         activeBg: '#c0c0c0',
-        
+
         // Input Box Colors
         inputBg: '#d0d0d0',
         inputBorder: '#d0d0d0',
         inputText: 'black',
         inputPlaceholder: '#555555',
         inputPrompt: 'black',
-        
+
         // Code & Message Component Colors
         codeBg: '#e8e8e8',
         codeBorder: '#b0b0b0',
@@ -514,7 +514,7 @@ export const THEMES = {
         diffAdditionNum: '#188028',
         diffRemovalPrefix: '#d01010',
         diffAdditionPrefix: '#109020',
-        
+
         // Accents & Indicators
         primary: 'black',
         secondary: 'blue',
@@ -523,7 +523,7 @@ export const THEMES = {
         warning: 'yellow',
         danger: 'red',
         info: 'blue',
-        
+
         // Status Indicators
         statusOn: 'black',
         statusOff: 'gray',
@@ -542,25 +542,25 @@ export const THEMES = {
         textMuted: '#8b949e',
         textDim: '#6e7681',
         textInverted: '#0d1117',
-        
+
         // Borders
         border: '#30363d',
         borderMuted: '#30363d',
         borderDim: '#21262d',
-        
+
         // Backgrounds
         bg: undefined,
         cardBg: '#161b22',
         highlightBg: '#21262d',
         activeBg: '#30363d',
-        
+
         // Input Box Colors
         inputBg: '#21262d',
         inputBorder: '#21262d',
         inputText: '#c9d1d9',
         inputPlaceholder: '#8b949e',
         inputPrompt: '#58a6ff',
-        
+
         // Code & Message Component Colors
         codeBg: '#0d1117',
         codeBorder: '#30363d',
@@ -581,7 +581,7 @@ export const THEMES = {
         diffAdditionNum: '#3fb950',
         diffRemovalPrefix: '#f85149',
         diffAdditionPrefix: '#3fb950',
-        
+
         // Accents & Indicators
         primary: '#c9d1d9',
         secondary: '#58a6ff',
@@ -590,7 +590,7 @@ export const THEMES = {
         warning: '#d29922',
         danger: '#f85149',
         info: '#58a6ff',
-        
+
         // Status Indicators
         statusOn: '#58a6ff',
         statusOff: '#8b949e',
@@ -609,25 +609,25 @@ export const THEMES = {
         textMuted: '#57606a',
         textDim: '#6e7781',
         textInverted: '#ffffff',
-        
+
         // Borders
         border: '#d0d7de',
         borderMuted: '#d0d7de',
         borderDim: '#e1e4e8',
-        
+
         // Backgrounds
         bg: undefined,
         cardBg: '#f6f8fa',
         highlightBg: '#eaeef2',
         activeBg: '#d0d7de',
-        
+
         // Input Box Colors
         inputBg: '#eaeef2',
         inputBorder: '#eaeef2',
         inputText: '#24292f',
         inputPlaceholder: '#57606a',
         inputPrompt: '#0969da',
-        
+
         // Code & Message Component Colors
         codeBg: '#ffffff',
         codeBorder: '#d0d7de',
@@ -648,7 +648,7 @@ export const THEMES = {
         diffAdditionNum: '#1a7f37',
         diffRemovalPrefix: '#cf222e',
         diffAdditionPrefix: '#1a7f37',
-        
+
         // Accents & Indicators
         primary: '#24292f',
         secondary: '#0969da',
@@ -657,7 +657,7 @@ export const THEMES = {
         warning: '#9a6700',
         danger: '#cf222e',
         info: '#0969da',
-        
+
         // Status Indicators
         statusOn: '#0969da',
         statusOff: '#57606a',
@@ -676,25 +676,25 @@ export const THEMES = {
         textMuted: 'gray',
         textDim: 'grey',
         textInverted: 'black',
-        
+
         // Borders
         border: 'gray',
         borderMuted: 'gray',
         borderDim: 'grey',
-        
+
         // Backgrounds (All transparent / undefined)
         bg: undefined,
         cardBg: undefined,
         highlightBg: '#2a2a2a',
         activeBg: '#3a3a3a',
-        
+
         // Input Box Colors
         inputBg: '#555555',
         inputBorder: '#555555',
         inputText: 'white',
         inputPlaceholder: '#cccccc',
         inputPrompt: 'white',
-        
+
         // Code & Message Component Colors
         codeBg: undefined,
         codeBorder: 'gray',
@@ -715,7 +715,7 @@ export const THEMES = {
         diffAdditionNum: '#66ff66',
         diffRemovalPrefix: '#ff4d4d',
         diffAdditionPrefix: '#4dff88',
-        
+
         // Accents & Indicators
         primary: 'white',
         secondary: 'cyan',
@@ -724,7 +724,7 @@ export const THEMES = {
         warning: 'yellow',
         danger: 'red',
         info: 'blue',
-        
+
         // Status Indicators
         statusOn: 'white',
         statusOff: 'gray',
@@ -743,25 +743,25 @@ export const THEMES = {
         textMuted: 'gray',
         textDim: 'grey',
         textInverted: 'white',
-        
+
         // Borders
         border: 'gray',
         borderMuted: 'gray',
         borderDim: 'grey',
-        
+
         // Backgrounds (All transparent / undefined)
         bg: undefined,
         cardBg: undefined,
         highlightBg: '#d4d4d4',
         activeBg: '#c0c0c0',
-        
+
         // Input Box Colors
         inputBg: '#d0d0d0',
         inputBorder: '#d0d0d0',
         inputText: 'black',
         inputPlaceholder: '#555555',
         inputPrompt: 'black',
-        
+
         // Code & Message Component Colors
         codeBg: undefined,
         codeBorder: 'gray',
@@ -782,7 +782,7 @@ export const THEMES = {
         diffAdditionNum: '#188028',
         diffRemovalPrefix: '#d01010',
         diffAdditionPrefix: '#109020',
-        
+
         // Accents & Indicators
         primary: 'black',
         secondary: 'blue',
@@ -791,7 +791,7 @@ export const THEMES = {
         warning: 'yellow',
         danger: 'red',
         info: 'blue',
-        
+
         // Status Indicators
         statusOn: 'black',
         statusOff: 'gray',
@@ -921,7 +921,7 @@ export const resetChaosTheme = () => {
 
 /**
  * Returns theme colors for a given theme name (defaults to 'Dark')
- * @param {string} themeName 
+ * @param {string} themeName
  * @returns {object} Theme color palette object
  */
 export const getThemeColors = (themeName = 'Dark') => {
