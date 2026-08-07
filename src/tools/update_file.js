@@ -3,6 +3,7 @@ import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
 import { applyPatches, generateHighFidelityDiff, parsePatchPairs } from '../utils/text.js';
+import { loadSettings } from '../utils/settings.js';
 
 /**
  * Update File Tool (Smart Patching)
@@ -53,7 +54,8 @@ export const update_file = async (args, context = {}) => {
         fs.writeFileSync(absolutePath, finalContent, 'utf8');
 
         // --- REPORTING ---
-        const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
+        const { systemSettings } = await loadSettings();
+        const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12, systemSettings?.compressToolResults);
         if (failures.length > 0) {
             return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.\n\nFailures:\n${failures.map(f => `  • ${f.error}`).join('\n')}\n\n${diffText}`;
         }

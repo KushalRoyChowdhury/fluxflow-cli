@@ -45,7 +45,8 @@ const DEFAULT_SETTINGS = {
         SubAgentProvider: '',
         dynamicDirAwareness: false,
         indentationTree: true,
-        ollamaEndpoint: 'Cloud'
+        ollamaEndpoint: 'Cloud',
+        compressToolResults: false
     },
     profileData: {
         name: null,

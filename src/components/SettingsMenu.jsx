@@ -300,6 +300,7 @@ export default function SettingsMenu({
                     { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Dynamic Directory Awareness', value: 'dynamicDirAwareness', status: systemSettings.dynamicDirAwareness ? 'ON' : 'OFF' },
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
+                    { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
@@ -568,6 +569,12 @@ export default function SettingsMenu({
         } else if (item.value === 'indentationTree') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, indentationTree: s.indentationTree === false ? true : false };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'compressToolResults') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, compressToolResults: !s.compressToolResults };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

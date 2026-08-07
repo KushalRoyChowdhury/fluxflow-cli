@@ -462,7 +462,7 @@ export const applyPatches = (content, patches, options = {}) => {
     return { content: finalContent, results };
 };
 
-export const generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8) => {
+export const generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8, compressToolResults = false) => {
     if (!patchResults || patchResults.length === 0) return "";
 
     const allLinesOriginal = originalContent.split(/\r?\n/);
@@ -579,6 +579,21 @@ export const generateHighFidelityDiff = (originalContent, finalContent, patchRes
             diffText += `[UI_CONTEXT] ${fmtNum(currentFinalLineIdx + 1)} |${allLinesFinal[currentFinalLineIdx] || ''}\n`;
             currentFinalLineIdx++;
         }
+    }
+
+    if (compressToolResults) {
+        const header = `[DIFF_START]\n`;
+        const body = diffText.substring(header.length);
+        const sep = `[UI_CONTEXT] ${separatorLine}\n`;
+        const blocks = body.split(sep);
+        const processedBlocks = blocks.map(block => {
+            const lines = block.split('\n').filter(l => l.trim() !== '');
+            if (lines.length > 45) {
+                return `[[VERIFIED]]\n${block}\n[[/VERIFIED]]`;
+            }
+            return block;
+        });
+        diffText = header + processedBlocks.join(sep);
     }
 
     diffText += `[DIFF_END]`;

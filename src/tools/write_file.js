@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseArgs } from '../utils/arg_parser.js';
 import { RevertManager } from '../utils/revert.js';
+import { loadSettings } from '../utils/settings.js';
 
 /**
  * Write File Tool
@@ -66,7 +67,7 @@ export const write_file = async (args, context = {}) => {
         // Explicit check for silent failures
         if (verifiedSize === 0 && originalSize > 0) {
             verifiedContent = null; // Flush
-            return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
+            return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk!`;
         }
 
         // Prepare a snippet for the UI/History (Top 50 / Bottom 50)
@@ -81,7 +82,19 @@ export const write_file = async (args, context = {}) => {
 
         verifiedContent = null; // Neural Flush: Signal GC that we are done with the massive string
 
-        return `SUCCESS: File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
+        const { systemSettings } = await loadSettings();
+        let resultString = `SUCCESS: File [${targetPath}] saved.\n- Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]\n${ancestry}- Content Preview:\n\n${snippet}`;
+
+        if (systemSettings?.compressToolResults && verifiedLineCount > 60) {
+            const contentLines = finalContent.split(/\r?\n/);
+            const headMatches = contentLines.slice(0, 25).join('\n') === verifiedLines.slice(0, 25).join('\n');
+            const tailMatches = contentLines.slice(-25).join('\n') === verifiedLines.slice(-25).join('\n');
+            if (headMatches && tailMatches) {
+                resultString = `[[SAME]]\n${resultString}`;
+            }
+        }
+
+        return resultString;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to write file [${targetPath}]: ${errorMsg}`;

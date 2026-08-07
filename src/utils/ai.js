@@ -55,6 +55,11 @@ const RE_KIMI_JSON_PAIR      = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|nu
 const RE_KIMI_SECTION_BEGIN  = /<\|\s*tool_calls_section_begin\s*\|>/gi;
 const RE_KIMI_SECTION_END    = /<\|\s*tool_calls_section_end\s*\|>/gi;
 
+// ─── Tool Call Wrapper Stripper – pre-compiled regexes ───
+const RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
+const RE_XML_TAG_OPEN            = /<(\w+)(?:[^>]*)>\r?\n?/gi;
+const RE_XML_TAG_CLOSE           = /\r?\n?<\/\w+(?:[^>]*)>/gi;
+
 let client = null;
 
 let globalSettings = {};
@@ -3267,7 +3272,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         text = text.replace('<think>', THINK_OPEN_PH).replace('</think>', THINK_CLOSE_PH);
 
                         // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] ... ```
-                        text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+                        text = text.replace(RE_TOOL_WRAPPER_CODE_FENCE, (match, inner) => {
                             if (inner.includes('[tool:')) return inner.trim();
                             return match;
                         });
@@ -3278,12 +3283,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         while (i < text.length) {
                             const toolIdx = text.indexOf('[tool:', i);
                             if (toolIdx === -1) {
-                                result += text.substring(i).replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+                                result += text.substring(i).replace(RE_XML_TAG_OPEN, '').replace(RE_XML_TAG_CLOSE, '');
                                 break;
                             }
 
                             const beforeTool = text.substring(i, toolIdx);
-                            result += beforeTool.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
+                            result += beforeTool.replace(RE_XML_TAG_OPEN, '').replace(RE_XML_TAG_CLOSE, '');
 
                             const endToolIdx = text.indexOf(']', toolIdx);
                             if (endToolIdx === -1) {
@@ -3301,6 +3306,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         text = text.replaceAll(THINK_OPEN_PH, '<think>').replaceAll(THINK_CLOSE_PH, '</think>');
                         return text;
                     };
+
                     const contents = modifiedHistory
                         .filter(msg => (msg.role === 'user' || msg.role === 'agent' || msg.role === 'system') && !String(msg.id).startsWith('welcome') && !msg.isMeta && !msg.isTerminalRecord && !(msg.text && msg.text.startsWith('[TERMINAL_RECORD]')))
                         .map((msg, idx, arr) => {
@@ -4871,7 +4877,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                             let result = "";
                                             if (normToolName === 'update_file') {
-                                                const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12);
+                                                const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
                                                 result = `SUCCESS: File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.\n\n${diffReport}`;
                                             } else {
                                                 // write_file reporting style
@@ -5182,11 +5188,26 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                const aiContent = `[TOOL RESULT]: ${(result || '').toString().replaceAll('[UI_CONTEXT]', '')}`;
-                                toolResults.push({ role: 'user', text: aiContent, binaryPart });
-                                anyToolExecutedInThisTurn = true;
+                                 const rawResult = (result || '').toString().replaceAll('[UI_CONTEXT]', '');
+                                 let processedResult = rawResult;
+                                 if (processedResult.includes('[[VERIFIED]]')) {
+                                     processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
+                                 }
 
-                                let uiContent = `[TOOL RESULT]: ${result || ''}`;
+                                 let aiContent;
+                                 if (processedResult.startsWith('[[SAME]]')) {
+                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                     const lines = cleanText.split(/\r?\n/);
+                                     const successLines = lines.filter(l => l.startsWith('SUCCESS:') || l.trim().startsWith('- Stats:'));
+                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                     aiContent = `[TOOL RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                                 } else {
+                                     aiContent = `[TOOL RESULT]: ${processedResult}`;
+                                 }
+                                 toolResults.push({ role: 'user', text: aiContent, binaryPart });
+                                 anyToolExecutedInThisTurn = true;
+
+                                let uiContent = `[TOOL RESULT]: ${result.replaceAll('[[VERIFIED]]\n', '').replaceAll('\n[[/VERIFIED]]', '') || ''}`;
                                 if (normToolName === 'view_file' || normToolName === 'web_scrape' || normToolName === 'file_map') {
                                     uiContent = `[TOOL RESULT]: ${label} (Context Locked for UI Clarity)`;
                                 }
@@ -5404,12 +5425,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
                                 if (TERMINATION_SIGNAL) break;
-                                yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
+                                yield { type: 'status', content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]...` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
                             yield { type: 'status', content: `Error Occured. Recovering Stream...` };
                         } else {
-                            throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
+                            throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)\nError log can be found in \`/export logs\``);
                         }
                     } else {
                         // CONNECTION RETRY
@@ -5417,18 +5438,20 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             retryCount++;
                             inStreamRetryCount = 1;      // [BUGFIX] - Reset stream recovery budget on connection retry!
                             accumulatedContext = '';     // [BUGFIX] - Clear stream recovery checkpoint on connection retry!
-                            const waitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
+                            const baseWaitTime = Math.min(1000 * Math.pow(2, retryCount - 1), 32000);
+                            const jitter = 0.8 + Math.random() * 0.4;
+                            const waitTime = Math.round(baseWaitTime * jitter);
                             isInitialAttempt = true;
                             yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1000).toFixed(0)}s]` };
                             // show live decremental countdown
                             for (let i = waitTime / 1000; i > 0; i--) {
                                 if (TERMINATION_SIGNAL) break;
-                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]` };
+                                yield { type: 'status', content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]` };
                                 await new Promise(resolve => setTimeout(resolve, 1000));
                             }
                             yield { type: 'status', content: `Trying to reach ${modelName}` };
                         } else {
-                            throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)\nError Log can be found in ${path.join(LOGS_DIR, 'agent', 'error.log')}`);
+                            throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)\nError log can be found in \`/export logs\``);
                         }
                     }
                 }
@@ -5717,7 +5740,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Line Range MUST for large blocks AND escape sequences. ^...$ MUST for line ranges. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 

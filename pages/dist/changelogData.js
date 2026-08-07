@@ -3,9 +3,15 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.19.5"]
+export const stableVersions = ["3.20.0"]
 
 export const changelogData = {
+    "3.20.0": {
+        "note": "AUGUST 7.",
+        "added": ["Added \"Compact Tool Results\". Save tokens which turned on, but error detection accuracy might get affected."],
+        "changed": [],
+        "fixes": []
+    },
     "3.19.5": {
         "note": "AUGUST 6.",
         "added": [],

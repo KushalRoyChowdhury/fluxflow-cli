@@ -795,7 +795,8 @@ var init_settings = __esm({
         SubAgentProvider: "",
         dynamicDirAwareness: false,
         indentationTree: true,
-        ollamaEndpoint: "Cloud"
+        ollamaEndpoint: "Cloud",
+        compressToolResults: false
       },
       profileData: {
         name: null,
@@ -2936,7 +2937,7 @@ var init_text = __esm({
       }
       return { content: finalContent, results };
     };
-    generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8) => {
+    generateHighFidelityDiff = (originalContent, finalContent, patchResults, threshold = 8, compressToolResults = false) => {
       if (!patchResults || patchResults.length === 0) return "";
       const allLinesOriginal = originalContent.split(/\r?\n/);
       const allLinesFinal = finalContent.split(/\r?\n/);
@@ -3039,6 +3040,24 @@ var init_text = __esm({
 `;
           currentFinalLineIdx++;
         }
+      }
+      if (compressToolResults) {
+        const header = `[DIFF_START]
+`;
+        const body = diffText.substring(header.length);
+        const sep = `[UI_CONTEXT] ${separatorLine}
+`;
+        const blocks = body.split(sep);
+        const processedBlocks = blocks.map((block) => {
+          const lines = block.split("\n").filter((l) => l.trim() !== "");
+          if (lines.length > 45) {
+            return `[[VERIFIED]]
+${block}
+[[/VERIFIED]]`;
+          }
+          return block;
+        });
+        diffText = header + processedBlocks.join(sep);
       }
       diffText += `[DIFF_END]`;
       return flattenString(diffText);
@@ -7012,7 +7031,7 @@ ${mode === "Flux" ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== "Google" ? `${isMultiModal ? `Supports images/docs` : ""}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Line Range MUST for large blocks AND escape sequences. ^...$ MUST for line ranges. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
@@ -7917,7 +7936,8 @@ function SettingsMenu({
           { label: "Sub-Agent Model", value: "subAgentModel", status: systemSettings2.CustomSubAgent && systemSettings2.SubAgentModel ? systemSettings2.SubAgentModel : "Default" },
           { label: "Preserve Thinking", value: "preserveThinking", status: systemSettings2.preserveThinking !== false ? "ON" : "OFF" },
           { label: "Dynamic Directory Awareness", value: "dynamicDirAwareness", status: systemSettings2.dynamicDirAwareness ? "ON" : "OFF" },
-          { label: "Directory Tree Design", value: "indentationTree", status: systemSettings2.indentationTree !== false ? "Modern" : "Classic (deprecated)" }
+          { label: "Directory Tree Design", value: "indentationTree", status: systemSettings2.indentationTree !== false ? "Modern" : "Classic (deprecated)" },
+          { label: "Compact Large Tool Results", value: "compressToolResults", status: systemSettings2.compressToolResults ? "ON" : "OFF" }
           // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
         ];
       default:
@@ -8175,6 +8195,12 @@ function SettingsMenu({
     } else if (item.value === "indentationTree") {
       setSystemSettings((s) => {
         const newSysSettings = { ...s, indentationTree: s.indentationTree === false ? true : false };
+        saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
+        return newSysSettings;
+      });
+    } else if (item.value === "compressToolResults") {
+      setSystemSettings((s) => {
+        const newSysSettings = { ...s, compressToolResults: !s.compressToolResults };
         saveSettings2({ systemSettings: newSysSettings, apiTier, quotas });
         return newSysSettings;
       });
@@ -11897,6 +11923,7 @@ var init_write_file = __esm({
   "src/tools/write_file.js"() {
     init_arg_parser();
     init_revert();
+    init_settings();
     write_file = async (args, context = {}) => {
       let { path: targetPath, content } = parseArgs(args);
       if (!targetPath) return 'ERROR: Missing "path" argument for write_file.';
@@ -11936,7 +11963,7 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
         const verifiedLineCount = verifiedLines.length;
         if (verifiedSize === 0 && originalSize > 0) {
           verifiedContent = null;
-          return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk despite success report!`;
+          return `ERROR: CRITICAL FAILURE: Verification failed. File [${targetPath}] is empty on disk!`;
         }
         let snippet = "";
         if (verifiedLineCount <= 100) {
@@ -11951,11 +11978,22 @@ ${lines.map((l, i) => `${i + 1} | ${l}`).join("\n")}
 ${tail}`;
         }
         verifiedContent = null;
-        return `SUCCESS: File [${targetPath}] saved.
+        const { systemSettings: systemSettings2 } = await loadSettings();
+        let resultString = `SUCCESS: File [${targetPath}] saved.
 - Stats: [${verifiedLineCount} lines, ${(verifiedSize / 1024).toFixed(1)} KB]
 ${ancestry}- Content Preview:
 
 ${snippet}`;
+        if (systemSettings2?.compressToolResults && verifiedLineCount > 60) {
+          const contentLines = finalContent.split(/\r?\n/);
+          const headMatches = contentLines.slice(0, 25).join("\n") === verifiedLines.slice(0, 25).join("\n");
+          const tailMatches = contentLines.slice(-25).join("\n") === verifiedLines.slice(-25).join("\n");
+          if (headMatches && tailMatches) {
+            resultString = `[[SAME]]
+${resultString}`;
+          }
+        }
+        return resultString;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
         return `ERROR: Failed to write file [${targetPath}]: ${errorMsg}`;
@@ -11973,6 +12011,7 @@ var init_update_file = __esm({
     init_arg_parser();
     init_revert();
     init_text();
+    init_settings();
     update_file = async (args, context = {}) => {
       const parsed = parseArgs(args);
       const targetPath = parsed.path;
@@ -12000,7 +12039,8 @@ ${failures.map((f) => `  \u2022 ${f.error}`).join("\n")}`;
         }
         await RevertManager.recordFileChange(absolutePath, originalContent);
         fs16.writeFileSync(absolutePath, finalContent, "utf8");
-        const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12);
+        const { systemSettings: systemSettings2 } = await loadSettings();
+        const diffText = generateHighFidelityDiff(originalContent, finalContent, results, 12, systemSettings2?.compressToolResults);
         if (failures.length > 0) {
           return `SUCCESS: File [${targetPath}] updated with some blocks failed. [${successes.length}/${patchPairs.length}] blocks applied.
 
@@ -15113,7 +15153,7 @@ import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from "@google/genai";
 import path26, { normalize } from "path";
 import fs28 from "fs";
-var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, getOllamaStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
+var RE_STUTTER_CODE_BLOCK_CLOSED, RE_STUTTER_CODE_BLOCK_OPEN, RE_STUTTER_INLINE_CODE, RE_STUTTER_TABLE_ROW, RE_STUTTER_WORD_BOUNDARY, RE_STUTTER_NON_ALNUM, RE_TOOL_CALL_FUNC, RE_TOOL_CALL_ANY, RE_TOOL_PARTIAL_ARGS_FALLBACK, RE_STRIP_QUOTES, RE_BACKSLASH_SLASH, RE_STRIP_THINK_CLOSED, RE_STRIP_THINK_OPEN, RE_STRIP_THINK_SIMPLE, RE_STRIP_THINK_FULL, RE_BACKTICK_SPAN, RE_BACKTICK_OPEN, RE_KIMI_TOOL_CALL, RE_KIMI_JSON_PAIR, RE_KIMI_SECTION_BEGIN, RE_KIMI_SECTION_END, RE_TOOL_WRAPPER_CODE_FENCE, RE_XML_TAG_OPEN, RE_XML_TAG_CLOSE, client, globalSettings, systemInstructionCache, colorMainWords, withRetry, TERMINATION_SIGNAL, getCleanGroupedLength, stripAnsi2, fetchWithBackoff, getDeepSeekStream, getMistralStream, getNVIDIAStream, wrapNvidiaStreamWithQueueDepth, getOpenRouterStream, getOllamaStream, signalTermination, isTerminationSignaled, TOOL_LABELS2, getToolDetail, getGoogleClient, runJanitorTask, getActiveToolContext, getContextSafeText, contextSafeReplace, getSanitizedText, translateKimiToolCalls, REGEX_PLACEHOLDER_ARG, REGEX_PLACEHOLDER_VAL, isPlaceholderVal, detectToolCalls, initAI, generateSimpleContent, consolidatePastMemories, compressHistory, deleteChatSummary, getAIStream, runSubagent;
 var init_ai = __esm({
   async "src/utils/ai.js"() {
     init_dist();
@@ -15160,6 +15200,9 @@ var init_ai = __esm({
     RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
     RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
     RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
+    RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
+    RE_XML_TAG_OPEN = /<(\w+)(?:[^>]*)>\r?\n?/gi;
+    RE_XML_TAG_CLOSE = /\r?\n?<\/\w+(?:[^>]*)>/gi;
     client = null;
     globalSettings = {};
     systemInstructionCache = { key: null, value: null };
@@ -17964,7 +18007,7 @@ ${combinedNudge}`;
                 const THINK_OPEN_PH = "___THINK_OPEN_TAG___";
                 const THINK_CLOSE_PH = "___THINK_CLOSE_TAG___";
                 text = text.replace("<think>", THINK_OPEN_PH).replace("</think>", THINK_CLOSE_PH);
-                text = text.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match2, inner) => {
+                text = text.replace(RE_TOOL_WRAPPER_CODE_FENCE, (match2, inner) => {
                   if (inner.includes("[tool:")) return inner.trim();
                   return match2;
                 });
@@ -17973,11 +18016,11 @@ ${combinedNudge}`;
                 while (i < text.length) {
                   const toolIdx = text.indexOf("[tool:", i);
                   if (toolIdx === -1) {
-                    result += text.substring(i).replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                    result += text.substring(i).replace(RE_XML_TAG_OPEN, "").replace(RE_XML_TAG_CLOSE, "");
                     break;
                   }
                   const beforeTool = text.substring(i, toolIdx);
-                  result += beforeTool.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, "").replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, "");
+                  result += beforeTool.replace(RE_XML_TAG_OPEN, "").replace(RE_XML_TAG_CLOSE, "");
                   const endToolIdx = text.indexOf("]", toolIdx);
                   if (endToolIdx === -1) {
                     result += text.substring(toolIdx);
@@ -19411,7 +19454,7 @@ ${tail}`;
                           }
                           let result2 = "";
                           if (normToolName === "update_file") {
-                            const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12);
+                            const diffReport = generateHighFidelityDiff(originalContentForReporting, finalContent, patchResults, 12, settings?.compressToolResults || globalSettings?.systemSettings?.compressToolResults);
                             result2 = `SUCCESS: File [${filePath}] updated via IDE Companion (May have user edits). [${patchResults.length}/${requestedPatchCount}] blocks applied.
 
 ${diffReport}`;
@@ -19689,10 +19732,25 @@ ${snippet2}`;
                       await incrementUsage("toolFailure");
                       if (settings.onToolResult) settings.onToolResult("failure", normToolName);
                     }
-                    const aiContent = `[TOOL RESULT]: ${(result || "").toString().replaceAll("[UI_CONTEXT]", "")}`;
+                    const rawResult = (result || "").toString().replaceAll("[UI_CONTEXT]", "");
+                    let processedResult = rawResult;
+                    if (processedResult.includes("[[VERIFIED]]")) {
+                      processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, "[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n");
+                    }
+                    let aiContent;
+                    if (processedResult.startsWith("[[SAME]]")) {
+                      const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, "");
+                      const lines = cleanText.split(/\r?\n/);
+                      const successLines = lines.filter((l) => l.startsWith("SUCCESS:") || l.trim().startsWith("- Stats:"));
+                      const headerPart = successLines.length > 0 ? successLines.join("\n") : lines.slice(0, 2).join("\n");
+                      aiContent = `[TOOL RESULT]: ${headerPart}
+[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                    } else {
+                      aiContent = `[TOOL RESULT]: ${processedResult}`;
+                    }
                     toolResults.push({ role: "user", text: aiContent, binaryPart });
                     anyToolExecutedInThisTurn = true;
-                    let uiContent = `[TOOL RESULT]: ${result || ""}`;
+                    let uiContent = `[TOOL RESULT]: ${result.replaceAll("[[VERIFIED]]\n", "").replaceAll("\n[[/VERIFIED]]", "") || ""}`;
                     if (normToolName === "view_file" || normToolName === "web_scrape" || normToolName === "file_map") {
                       uiContent = `[TOOL RESULT]: ${label} (Context Locked for UI Clarity)`;
                     }
@@ -19870,31 +19928,33 @@ ${recoveryText}`
                   }
                   for (let i = waitTime / 1e3; i > 0; i--) {
                     if (TERMINATION_SIGNAL) break;
-                    yield { type: "status", content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i}s]...` };
+                    yield { type: "status", content: `Error Occured. Recovering Stream (${inStreamRetryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]...` };
                     await new Promise((resolve2) => setTimeout(resolve2, 1e3));
                   }
                   yield { type: "status", content: `Error Occured. Recovering Stream...` };
                 } else {
                   throw new Error(`Stream collapsed too many times. (Failed to resolve ${MAX_RETRIES} times)
-Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
+Error log can be found in \`/export logs\``);
                 }
               } else {
                 if (retryCount <= MAX_RETRIES) {
                   retryCount++;
                   inStreamRetryCount = 1;
                   accumulatedContext = "";
-                  const waitTime = Math.min(1e3 * Math.pow(2, retryCount - 1), 32e3);
+                  const baseWaitTime = Math.min(1e3 * Math.pow(2, retryCount - 1), 32e3);
+                  const jitter = 0.8 + Math.random() * 0.4;
+                  const waitTime = Math.round(baseWaitTime * jitter);
                   isInitialAttempt = true;
                   yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${(waitTime / 1e3).toFixed(0)}s]` };
                   for (let i = waitTime / 1e3; i > 0; i--) {
                     if (TERMINATION_SIGNAL) break;
-                    yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i}s]` };
+                    yield { type: "status", content: `Trying to reach ${modelName} (${retryCount}/${MAX_RETRIES}) [Retrying in ${i.toFixed(0)}s]` };
                     await new Promise((resolve2) => setTimeout(resolve2, 1e3));
                   }
                   yield { type: "status", content: `Trying to reach ${modelName}` };
                 } else {
                   throw new Error(`Model ${modelName} cannot be reached. (Failed ${MAX_RETRIES} times)
-Error Log can be found in ${path26.join(LOGS_DIR, "agent", "error.log")}`);
+Error log can be found in \`/export logs\``);
                 }
               }
             }
@@ -20140,7 +20200,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL DIFF. Line Ranges "^LINE:start..end$" MUST for multi-line selection or escape sequences. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Line Range MUST for large blocks AND escape sequences. ^...$ MUST for line ranges. Verify diffs
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user`.trim();
       const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
