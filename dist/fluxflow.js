@@ -3487,7 +3487,7 @@ ${block}
       }
       return inCode;
     };
-    REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?<\/(think|thought)>|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gmi;
+    REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|<(think|thought)>[\s\S]*?<\/(think|thought)>|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
     REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
     REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
     bypassBacktick = false;
@@ -7035,7 +7035,7 @@ ${mode === "Flux" ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path se
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
 - [tool:functions.Run(command="...")]. Runs ${osDetected === "Windows" ? isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD` : `BASH`} command. Destructive/Irreversible ops \u2192 Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[ARRAY OF STRINGS], markDone=[ARRAY OF TASKS])]. Task list, no Markdown in arrays. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to complete tasks. **UPDATE EVERY TURN WHEN CREATED**
+- [tool:functions.Todo(method="create/append/get", tasks=[STRING ARRAY], markDone=[TASK ID ARRAY])]. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to mark complete. UPDATE EVERY TURN WHEN CREATED
 ${_cachedAdvanceRollback ? `
 - EMERGENCY TOOLS -
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` \u2192 revert: \`turn_2\`). Reason explicitly
@@ -25358,7 +25358,7 @@ Selection: ${val}`,
           const hoursLeft = totalHours % 24;
           resetCountdown = `(${daysLeft} days: ${hoursLeft} hrs left)`;
         }
-        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, paddingBottom: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "BUDGET LIMIT STATUS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 0, width: "100%" }, (() => {
+        return /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", borderStyle: "round", borderColor: colors.borderMuted, padding: 1, paddingBottom: 0, width: "100%" }, /* @__PURE__ */ React16.createElement(Box14, { marginBottom: 1, justifyContent: "space-between", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true, underline: true }, "USAGE LIMITS"), /* @__PURE__ */ React16.createElement(Text16, { color: colors.textMuted }, "[ ESC to Close ]")), limitsNotSet ? /* @__PURE__ */ React16.createElement(Box14, { padding: 1, justifyContent: "center", alignItems: "center", width: "100%" }, /* @__PURE__ */ React16.createElement(Text16, { color: colors.text, bold: true }, "LIMITS NOT SET")) : usingProviderBudgets && configuredProviders.length > 0 ? /* @__PURE__ */ React16.createElement(Box14, { flexDirection: "column", gap: 0, width: "100%" }, (() => {
           const cols = stdout?.columns || terminalSize?.columns || 80;
           const isNarrow = cols < 115;
           if (isNarrow) {

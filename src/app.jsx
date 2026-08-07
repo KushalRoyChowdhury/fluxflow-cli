@@ -4963,7 +4963,7 @@ export default function App({ args = [] }) {
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={1} paddingBottom={0} width="100%">
                         <Box marginBottom={1} justifyContent="space-between" width="100%">
-                            <Text color={colors.text} bold underline>BUDGET LIMIT STATUS</Text>
+                            <Text color={colors.text} bold underline>USAGE LIMITS</Text>
                             <Text color={colors.textMuted}>[ ESC to Close ]</Text>
                         </Box>
                         {limitsNotSet ? (
