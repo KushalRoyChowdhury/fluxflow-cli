@@ -28,9 +28,9 @@ export default function Introduction() {
 
             <h2 id="why-fluxflow">Why FluxFlow?</h2>
             <ul>
-                <li><strong>Multi-Provider Support</strong> — Choose between Google GenAI (Gemini/Gemma), DeepSeek, NVIDIA, or OpenRouter.</li>
+                <li><strong>Multi-Provider Support</strong> — Google Gemini/Gemma, DeepSeek, NVIDIA, OpenRouter, Mistral or Ollama (anything based on your taste, we dont judge here)</li>
                 <li><strong>High-Fidelity IDE Companion</strong> — Pairs with a dedicated VS Code extension featuring proactive error detection & smarter context awareness.</li>
-                <li><strong>Native Multimodality</strong> — The agent can "see"! Analyze images and PDF documents natively with high context retention *(Only on Supported models).</li>
+                <li><strong>Native Multimodality</strong> — The agent can "see"! Analyze images and PDF documents natively with high context retention *(Only on Supported multimodal models).</li>
                 <li><strong>Document Engineering</strong> — Generate professional, branded PDF and DOCX documents on the fly.</li>
                 <li><strong>Codebase Time Travel</strong> — Refactor with fearlessness using transaction-based secure snapshots for instant file reversion.</li>
             </ul>

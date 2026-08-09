@@ -1292,7 +1292,7 @@ export const changelogData = {
     "1.5.0": {
         "note": "The *Multimodal* Era.",
         "added": [
-            "Native Multimodal Support (PDF, JPG, PNG, WEBP).",
+            "Native Multimodal Support on supported models (PDF, JPG, PNG, WEBP).",
             "High-Fidelity Context Retention for non-text assets.",
             "Added `WritePdf` tool to Generate Professional & Creative PDF Documents on the fly."
         ],
@@ -1465,7 +1465,7 @@ export const changelogData = {
         "fixes": []
     },
     "1.0.0": {
-        "note": "APRIL 24 - Initial Release.",
+        "note": "2026 APRIL 24 - Initial Release.",
         "added": [
             "Initial release of **Flux Flow CLI**",
             "Agentic CLI with *Gemini* integration",
