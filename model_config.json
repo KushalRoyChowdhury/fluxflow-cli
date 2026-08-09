@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "release": 20260806,
+    "version": 0,
+    "release": 20260810
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -24,7 +24,18 @@
             "default_free": "",
             "default_paid": "",
             "models": {
-                "Free": [],
+                "Free": [
+                    {
+                        "cmd": "gemma4:31b-cloud",
+                        "multimodal": true,
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "gemma4:cloud",
+                        "multimodal": true,
+                        "desc": ""
+                    }
+                ],
                 "Paid": []
             }
         },
@@ -372,7 +383,7 @@
                         "desc": ""
                     },
                     {
-                        "cmd": "deepseek-ai/deepseek-v4-flash",
+                        "cmd": "deepseek-ai/deepseek-v4-flash-0731",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
@@ -498,7 +509,7 @@
                         "desc": ""
                     },
                     {
-                        "cmd": "deepseek-ai/deepseek-v4-flash",
+                        "cmd": "deepseek-ai/deepseek-v4-flash-0731",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
