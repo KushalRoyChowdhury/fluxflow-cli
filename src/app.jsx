@@ -962,7 +962,7 @@ export default function App({ args = [] }) {
         if (manual) {
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
-                return [...prev, { id: 'check-' + Date.now(), role: 'system', text: '[SYSTEM] Checking for updates...', isMeta: true }];
+                return [...prev, { id: 'check-' + Date.now(), role: 'system', text: '✦ Checking for updates...', isMeta: true }];
             });
         }
         try {
@@ -998,14 +998,14 @@ export default function App({ args = [] }) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
                     const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}-stable` : versionFluxflow;
-                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `[SYSTEM] Flux Flow is already up to date (${displayVer}).`, isMeta: true }];
+                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `⠀⠀└─ Already up to date (${displayVer}).\n⠀`, isMeta: true }];
                 });
             }
         } catch (err) {
             if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `ERROR: Failed to check for updates: ${err.message}`, isMeta: true }];
+                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `⠀⠀└─ Failed to check for updates: ${err.message}.\n⠀`, isMeta: true }];
                 });
             }
         }
@@ -1077,7 +1077,7 @@ export default function App({ args = [] }) {
                 return [...prev, {
                     id: 'kb-success-' + Date.now(),
                     role: 'system',
-                    text: `✅ Successfully configured Shift+Enter in your ${ideName} keybindings!`,
+                    text: `✦ Successfully configured Shift+Enter in your ${ideName} keybindings!\n`,
                     isMeta: true
                 }];
             });
@@ -1087,7 +1087,7 @@ export default function App({ args = [] }) {
                 return [...prev, {
                     id: 'kb-error-' + Date.now(),
                     role: 'system',
-                    text: `❌ Failed to update keybindings: ${err.message}`,
+                    text: `✦ Failed to update keybindings: ${err.message}.\n⠀`,
                     isMeta: true
                 }];
             });
@@ -1175,7 +1175,7 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (wildcardTooling) {
             setWildcardTooling(false);
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `[SYSTEM] Wildcard tooling disabled`, isMeta: true }]; });
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀└─ Status: Disabled.\n⠀`, isMeta: true }]; });
         }
     }, [activeModel]);
 
@@ -1233,7 +1233,7 @@ export default function App({ args = [] }) {
 
         setActiveModel(defaultModel);
         saveSettings({ apiTier, activeModel: defaultModel });
-        if (modelDisplayName) {
+        if (modelDisplayName && false) {
             setMessages(prev => {
                 setCompletedIndex(prev.length + 1);
                 return [...prev, {
@@ -1823,7 +1823,7 @@ export default function App({ args = [] }) {
                                     } else {
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '🛈 Nothing to revert to.', isMeta: true }];
+                                            return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: '✦ Nothing to revert to.\n⠀', isMeta: true }];
                                         });
                                     }
                                 });
@@ -1986,12 +1986,12 @@ export default function App({ args = [] }) {
             if (!checkPuppeteerReady()) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '[SYSTEM] Installing Required dependencies... (One-time setup)', isMeta: true }];
+                    return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '✦ Installing Required dependencies... (One-time setup)', isMeta: true }];
                 });
                 await installPuppeteerBrowser();
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '[SYSTEM] All dependencies installed successfully.', isMeta: true }];
+                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '⠀⠀└─ All dependencies installed successfully.\n⠀', isMeta: true }];
                 });
             }
 
@@ -2055,7 +2055,7 @@ export default function App({ args = [] }) {
                     ...prev,
                     {
                         role: 'system',
-                        text: '[SYSTEM] Memory is not available with Custom Endpoints',
+                        text: '✦ MEMORY\n⠀⠀└─ Currently not available.\n⠀',
                         isMeta: true
                     }
                 ]);
@@ -2112,12 +2112,16 @@ export default function App({ args = [] }) {
                 fs.remove(path.join(DATA_DIR, 'playground')).catch(() => { });
             }
 
-            // 4. Check for updates
-            performVersionCheck(false, freshSettings);
+            // 4. Check for updates (deferred to prevent blocking boot paint)
+            setTimeout(() => {
+                performVersionCheck(false, freshSettings);
+            }, 1000);
 
-            // 5. Prime usage cache and handle resume flag
-            await initUsage();
-            await RevertManager.recoverCrashedTransaction();
+            // 5. Prime usage cache and handle resume flag concurrently
+            await Promise.all([
+                initUsage(),
+                RevertManager.recoverCrashedTransaction()
+            ]);
 
             if (parsedArgs.resume) {
                 const h = await loadHistory();
@@ -2139,12 +2143,12 @@ export default function App({ args = [] }) {
                     setMessages(resumedMsgs);
                     setActiveView('chat');
                     setMessages(prev => {
-                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `SESSION RESUMED VIA CLI: [${id}]`, isMeta: true }];
+                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ '${id}'.\n⠀`, isMeta: true }];
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;
                     });
                 } else {
-                    setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `ERROR: Chat session [${id}] not found. Started new session.`, isMeta: true }]);
+                    setMessages(prev => [...prev, { id: 'sys-err-' + Date.now(), role: 'system', text: `✦ Chat session [${id}] not found. Started new session.\n⠀`, isMeta: true }]);
                 }
             }
 
@@ -2164,7 +2168,7 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const newMsgs = [...prev, {
                             id: 'playground-' + Date.now(), role: 'system',
-                            text: `[PLAYGROUND] Session restored. CWD locked to: ${playgroundDir}`,
+                            text: `✦ PLAYGROUND Session restored\n⠀⠀└─ CWD locked to: '${playgroundDir}'.\n⠀`,
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -2175,7 +2179,7 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const newMsgs = [...prev, {
                             id: 'playground-' + Date.now(), role: 'system',
-                            text: `[PLAYGROUND] Mode active. CWD locked to: FluxFlow/playground`,
+                            text: `✦ PLAYGROUND Mode active\n⠀⠀└─ CWD locked to: 'FluxFlow/playground'.\n⠀`,
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -2322,13 +2326,13 @@ export default function App({ args = [] }) {
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `${aiProvider} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n[SYSTEM] Ollama Endpoint automatically switched to Local.' : ''} Initialization complete.`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '✦⠀'}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
                 {
                     role: 'system',
-                    text: `INVALID KEY: ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
+                    text: `✦ INVALID KEY\n⠀⠀└─ ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
                     isMeta: true
                 }
             ]);
@@ -2352,13 +2356,13 @@ export default function App({ args = [] }) {
                 await forceFlushUsage();
 
                 // Optional: Force save chat state to history
-                // saveChat(chatId, `Auto-Saved ${new Date().toLocaleTimeString()}`, messages);
+                // saveChat(chatId, null, messages);
             };
             flush();
 
             const timer = setTimeout(() => {
                 process.exit(0);
-            }, 1700); // Give user 1.7s to see the final stats dashboard
+            }, 200); // Give user 0.2s to see the final stats dashboard [SAMLL ENOUGH]
             return () => clearTimeout(timer);
         }
     }, [activeView]);
@@ -2541,7 +2545,7 @@ export default function App({ args = [] }) {
                 if (question.length <= 3) {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '[RESTRICTED] Inquiry question must be more than 3 characters.', isMeta: true }];
+                        return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀└─ Inquiry question must be more than 3 characters.\n⠀', isMeta: true }];
                     });
                     setInput('');
                     return;
@@ -2549,7 +2553,7 @@ export default function App({ args = [] }) {
             } else if (hintText.startsWith('/')) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '[RESTRICTED] Steering Hints cannot start with /', isMeta: true }];
+                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀└─ Steering Hints cannot start with \'/\'.\n⠀', isMeta: true }];
                 });
                 setInput('');
                 return;
@@ -2620,10 +2624,10 @@ export default function App({ args = [] }) {
                                 }
 
                                 setMessages(resumedMsgs);
-                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `SESSION RESUMED: [${targetId}]`, isMeta: true }]);
+                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ ${targetId}.\n⠀`, isMeta: true }]);
                                 setCompletedIndex(0);
                             } else {
-                                setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `ERROR: Session [${targetId}] not found.` }]);
+                                setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `✦ ERROR: Session [${targetId}] not found.\n⠀`, isMeta: true }]);
                             }
                         };
                         resumeSession();
@@ -2637,14 +2641,14 @@ export default function App({ args = [] }) {
                     if (!parsedArgs.playground) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[PLAYGROUND] /move command is only available in playground mode.`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ '/move' is only available in playground mode.\n⠀`, isMeta: true }];
                         });
                         break;
                     }
                     if (!parsedArgs.originalCwd) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[PLAYGROUND] Error: Original CWD not found.`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ Original CWD not found.\n⠀`, isMeta: true }];
                         });
                         break;
                     }
@@ -2656,7 +2660,7 @@ export default function App({ args = [] }) {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[PLAYGROUND] Exporting playground content to ${dest}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ EXPORTING PLAYGROUND CONTENT\n⠀⠀└─ ${dest}\n`, isMeta: true }];
                             });
                             await fs.ensureDir(dest);
                             const excludeDirs = ['node_modules', '.git', '.venv', 'venv', 'env', '.next', 'dist', 'build', '.cache'];
@@ -2672,12 +2676,12 @@ export default function App({ args = [] }) {
 
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[PLAYGROUND] Successfully copied playground content to ${dest}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ SUCCESS\n⠀⠀└─ playground content copied to ${dest}\n`, isMeta: true }];
                             });
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[PLAYGROUND] Failed to move content: ${err.message}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ FAILED TO MOVE CONTENT\n⠀⠀└─ ${err.message}\n`, isMeta: true }];
                             });
                         }
                     };
@@ -2720,7 +2724,7 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const newMsgs = [...prev, {
                                         id: 'playground-' + Date.now(), role: 'system',
-                                        text: `[PLAYGROUND] Session ended. Restored Working Directory to ${parsedArgs.originalCwd}`,
+                                        text: `✦ PLAYGROUND\n⠀⠀└─ Restored Working Directory to ${parsedArgs.originalCwd}\n`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(newMsgs.length);
@@ -2735,7 +2739,7 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const newMsgs = [...prev, {
                                         id: 'playground-' + Date.now(), role: 'system',
-                                        text: `[PLAYGROUND] Failed to clear session: ${DATA_DIR + '/playground'}`,
+                                        text: `✦ PLAYGROUND\n⠀⠀└─ Failed to clear session: ${DATA_DIR + '/playground'}`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(newMsgs.length);
@@ -2777,7 +2781,7 @@ export default function App({ args = [] }) {
                             const s = emojiSpace(2);
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: `Nothing to revert to.`, isMeta: true }];
+                                return [...prev, { id: 'revert-empty-' + Date.now(), role: 'system', text: `✦ Nothing to revert to.\n⠀`, isMeta: true }];
                             });
                         }
                     });
@@ -2805,13 +2809,13 @@ export default function App({ args = [] }) {
                             setThinkingLevel('High');
                         }
                         const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Mode switched to ${newMode}`, isMeta: true }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
                     }
                     break;
                 }
-                case '/image': {
+                case '/image_deprecated': {
                     if (parts[1]?.toLowerCase() === 'stats') {
                         const s = emojiSpace(2);
                         if (imageSettings.keyType === 'Custom') {
@@ -2958,9 +2962,9 @@ export default function App({ args = [] }) {
                         let forceMsg = '';
                         if (isForce) {
                             if (process.env.NVIDIA_BASE_URL) {
-                                forceMsg = ' Enabled Forced Reasoning';
+                                forceMsg = '⠀⠀└─ Enabled Forced Reasoning.\n⠀';
                             } else {
-                                forceMsg = ' --force is not supported in this context';
+                                forceMsg = '⠀⠀└─ --force is not supported in this context.\n⠀';
                             }
                             process.env.forcedReasoning = 'true';
                         }
@@ -2969,12 +2973,12 @@ export default function App({ args = [] }) {
                         if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[RESTRICTED] "${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.${forceMsg}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED⠀⠀└─"${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.${forceMsg}.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
                             const s = emojiSpace(1);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Thinking level set to ${formattedLevel}${isBypass ? ` (Bypass Activated)` : ''}${forceMsg}`, isMeta: true }]; });
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀└─ ${activeModel}.\n⠀⠀└─ Thinking Level: ${formattedLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀└─ bypassed.\n⠀` : ''
                         }
                     } else {
                         setActiveView('thinking');
@@ -3012,7 +3016,7 @@ export default function App({ args = [] }) {
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `[ERROR] Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.`,
+                                    text: `✦ ERROR\n⠀⠀└─ Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.\n⠀`,
                                     isMeta: true
                                 }];
                             });
@@ -3021,7 +3025,7 @@ export default function App({ args = [] }) {
                         if (mod) {
                             const freeDefault = getDefaultModel('Google', 'Free');
                             const paidDefault = getDefaultModel('Google', 'Paid');
-                            if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google') {
+                            if (mod === freeDefault && apiTier !== 'Free' && aiProvider === 'Google' && false) {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
                                     return [...prev, {
@@ -3034,7 +3038,7 @@ export default function App({ args = [] }) {
                                 setActiveModel(paidDefault);
                             } else {
                                 setActiveModel(mod);
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Model switched to ${mod}${aiProvider === 'Ollama' ? ` (Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'})` : ''}`, isMeta: true }]; });
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀└─ ${mod}\n⠀⠀└─ Thinking Level: ${thinkingLevel}${aiProvider === 'Ollama' ? `\n⠀⠀└─ Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}` : ''}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -3045,7 +3049,7 @@ export default function App({ args = [] }) {
                 case '/wildcard-tooling': {
                     setWildcardTooling(prev => {
                         const next = !prev;
-                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `[SYSTEM] Wildcard tooling ${next ? 'enabled' : 'disabled'}`, isMeta: true }]; });
+                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀└─ Status: ${next ? 'Enabled' : 'Disabled'}\n⠀`, isMeta: true }]; });
                         return next;
                     });
                     break;
@@ -3103,7 +3107,7 @@ export default function App({ args = [] }) {
                     }
                     const name = parts.slice(1).join(' ') || promptDefault || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[MEMORY] Chat saved as "${name}" (ID: ${chatId})`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved\n⠀⠀└─ "${name}" (ID: ${chatId})\n⠀`, isMeta: true }]; });
                     break;
                 }
                 case '/export': {
@@ -3139,11 +3143,11 @@ export default function App({ args = [] }) {
                         const history = await loadHistory();
                         const list = Object.entries(history)
                             .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
-                            .map(([id, info]) => `• ${id}: ${info.name}`)
+                            .map(([id, info]) => `⠀⠀└─ ${id}: ${info.name}${id === chatId ? ' (current)' : ''}`)
                             .join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[HISTORY] Saved Chats:\n${list || 'No saved chats found.'}`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved Chats:\n${list || '⠀⠀└─ No saved chats found.'}\n⠀`, isMeta: true }];
                         });
                     };
                     run();
@@ -3158,7 +3162,7 @@ export default function App({ args = [] }) {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: '[NUCLEAR] Initiating reset...', isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: '✦ Initiating reset...\n⠀⠀└─ Clearing logs, secrets, and settings.\n⠀', isMeta: true }];
                             });
 
                             if (fs.existsSync(LOGS_DIR)) fs.removeSync(LOGS_DIR);
@@ -3178,7 +3182,7 @@ export default function App({ args = [] }) {
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[RESET ERROR] Failed to clear data: ${err.message}` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Failed to clear data: ${err.message}.\n⠀` }];
                             });
                         }
                     };
@@ -3202,7 +3206,7 @@ export default function App({ args = [] }) {
                     exec(`${command} ${CHANGELOG_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening changelog: ${CHANGELOG_URL}`, isMeta: true }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Changelog\n⠀⠀└─ ${CHANGELOG_URL}.`, isMeta: true }];
                     });
                     break;
                 }
@@ -3210,7 +3214,7 @@ export default function App({ args = [] }) {
                     if (!DOCS_URL) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Documentation URL is not configured.`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Documentation URL is not configured.`, isMeta: true }];
                         });
                         break;
                     }
@@ -3219,7 +3223,7 @@ export default function App({ args = [] }) {
                     exec(`${command} ${DOCS_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `[BROWSER] Opening documentation: ${DOCS_URL}`, isMeta: true }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Documentation\n⠀⠀└─ ${DOCS_URL}.\n⠀`, isMeta: true }];
                     });
                     break;
                 }
@@ -3261,12 +3265,12 @@ export default function App({ args = [] }) {
                         saveSettings({ apiTier: 'Free', quotas: defaultQuotas });
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✅ [BUDGET] Budgets and limits reset to default values successfully.`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Budgets reset successfully.\n⠀`, isMeta: true }];
                         });
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `Usage: /budget <Set|View|Reset>`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Usage: /budget <Set|View|Reset>.\n⠀`, isMeta: true }];
                         });
                     }
                     break;
@@ -3317,7 +3321,7 @@ export default function App({ args = [] }) {
                     const randomQuote = GEMINI_QUOTES[Math.floor(Math.random() * GEMINI_QUOTES.length)];
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `✨ [GEMINI CLI] ${randomQuote}` }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✨ GEMINI CLI\n⠀⠀└─ ${randomQuote}\n⠀` }];
                     });
                     setInput('');
                     break;
@@ -3326,14 +3330,14 @@ export default function App({ args = [] }) {
                     setInput('');
                     const cleanCount = messages.filter(m => (m.role === 'user' || m.role === 'agent' || m.role === 'system') && !String(m.id).startsWith('welcome') && !m.isMeta).length;
                     const tokens = sessionStats?.tokens || 0;
-                    if (cleanCount < 64 || tokens < 32768) {
+                    if (cleanCount < 64 || tokens < 16384) {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
                             return [...prev, {
                                 id: Date.now(),
                                 role: 'system',
-                                text: `[SYSTEM] Compression skipped: History requires at least 100 messages and 32k tokens (current: ${cleanCount}/100 msgs, ${tokens}/32768 tokens).`,
+                                text: `✦ Compression skipped\n⠀⠀└─ History requires at least 64 messages and 16k tokens\n⠀⠀  └─ Current: ${cleanCount}/64 msgs, ${tokens}/16384 tokens.\n⠀`,
                                 isMeta: true
                             }];
                         });
@@ -3344,7 +3348,7 @@ export default function App({ args = [] }) {
                         const s = emojiSpace(2);
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Compacting session history...`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Compacting session history...`, isMeta: true }];
                         });
 
                         try {
@@ -3365,7 +3369,7 @@ export default function App({ args = [] }) {
                                     const finalMsgs = [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `[SYSTEM] Chat History compacted saving tokens.`,
+                                        text: `⠀⠀└─ Chat History compacted saving tokens.\n⠀`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(finalMsgs.length);
@@ -3374,13 +3378,13 @@ export default function App({ args = [] }) {
                             } else {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: '[SYSTEM] Compaction failed.', isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: '⠀⠀└─ Compaction failed.\n⠀', isMeta: true }];
                                 });
                             }
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Error during compaction: ${err.message}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `⠀⠀└─ Error during compaction: ${err.message}\n⠀`, isMeta: true }];
                             });
                         } finally {
                             setIsCompressing(false);
@@ -3417,7 +3421,7 @@ export default function App({ args = [] }) {
                         const finalMsgs = [...updatedMessages, {
                             id: Date.now(),
                             role: 'system',
-                            text: `[SYSTEM] Truncated ${truncatedCount} tool result(s) in chat history.`,
+                            text: `✦ Tool Truncation...\n⠀⠀└─ Truncated ${truncatedCount} tool result(s).\n⠀`,
                             isMeta: true
                         }];
                         saveChat(chatId, null, finalMsgs);
@@ -3434,12 +3438,11 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/btw': {
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] /btw only available when agent is working`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ '/btw' only available when agent is working\n⠀`, isMeta: true }]; });
                     break;
                 }
                 default:
-                    const s = emojiSpace(2);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `[SYSTEM] Unknown command: ${cmd}`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Unknown command: '${cmd}'\n⠀`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
@@ -3830,7 +3833,7 @@ export default function App({ args = [] }) {
                             if (isBridgeConnected()) {
                                 sendStatus(packet.content);
                             }
-                            setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `[SYSTEM] ${packet.content}`, isMeta: true }]);
+                            setMessages(prev => [...prev, { id: 'condense-' + Date.now(), role: 'system', text: `✦ ${packet.content}\n⠀`, isMeta: true }]);
                             continue;
                         }
                         if (packet.type === 'summary_injected') {
@@ -4593,7 +4596,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `[SYSTEM] Switched to ${selectedProvider}! Key loaded from Cache. ${defaultModel ? `Model set to ${defaultModel}` : ''}.${selectedProvider === 'Ollama' ? '\n[SYSTEM] Memory is not available with Ollama Provider' : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL ? '\n[SYSTEM] Memory is not available with Custom Endpoints' : ''}`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${thinkingLevel ? `\n⠀⠀└─ Thinking Level: ${thinkingLevel}.` : ''}${selectedProvider === 'Ollama' && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Ollama.' : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5180,7 +5183,7 @@ export default function App({ args = [] }) {
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `${prov} API Key saved successfully! ${defaultModel ? `Model set to ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n[SYSTEM] Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' ? '\n[SYSTEM] Memory is not available with Ollama Provider' : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n[SYSTEM] Memory is not available' : ''}`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' ? '\n⠀⠀└─ Memory is not available with Ollama' : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -5752,7 +5755,7 @@ export default function App({ args = [] }) {
                                             const finalMsgs = [...prev, {
                                                 id: 'revert-ok-' + Date.now(),
                                                 role: 'system',
-                                                text: `[ROLLBACK SUCCESSFUL] Reverted prompt loaded to input box.`,
+                                                text: `✦ Rollback Successful\n⠀⠀└─ Reverted prompt loaded to input box.\n⠀`,
                                                 isMeta: true
                                             }];
                                             setCompletedIndex(finalMsgs.length);
@@ -5767,7 +5770,7 @@ export default function App({ args = [] }) {
                                         const finalMsgs = [...prev, {
                                             id: 'revert-err-' + Date.now(),
                                             role: 'system',
-                                            text: `[ROLLBACK ERROR] ${err.message}`,
+                                            text: `✦ ERROR\n⠀⠀└─ ${err.message}\n⠀`,
                                             isMeta: true
                                         }];
                                         setCompletedIndex(finalMsgs.length);
@@ -5815,7 +5818,7 @@ export default function App({ args = [] }) {
                                     setMessages(resumedMsgs);
                                     setActiveView('chat');
                                     setMessages(prev => {
-                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `SESSION RESUMED: [${id}]`, isMeta: true }];
+                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ ${id}\n⠀`, isMeta: true }];
                                         setCompletedIndex(newMsgs.length);
                                         return newMsgs;
                                     });
@@ -5878,7 +5881,7 @@ export default function App({ args = [] }) {
                         initialData={profileData}
                         onSave={(profile) => {
                             setProfileData(profile);
-                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `Profile Updated: ${profile.name.length > 0 ? `${profile.name} ` : ''}${profile.nickname.length > 0 ? `(${profile.nickname})` : ''}` : 'Profile: Nothing to Update'}`, isMeta: true }]);
+                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `✦ Profile Updated${profile.name.length > 0 ? `\n⠀⠀└─ Name: ${profile.name} ` : ''}${profile.nickname.length > 0 ? `\n⠀⠀└─ Nickname: ${profile.nickname}` : ''}` : '✦ Profile\n⠀⠀└─ Nothing to Update'}\n\n✦ Custom Instructions\n${profile.instructions.length > 0 ? `⠀⠀└─ ${profile.instructions.substring(0, 30)}${profile.instructions.length > 30 ? '...' : ''}` : '⠀⠀└─ No Instructions Provided.'}\n⠀`, isMeta: true }]);
                             setActiveView('chat');
                         }}
                         onCancel={() => setActiveView('chat')}

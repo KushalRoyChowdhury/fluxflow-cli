@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 /**
- * AUTO-HEAP SCALER (6GB)
+ * AUTO-HEAP SCALER
  * This ensures the agent can handle massive sessions and large project scans
  * without hitting Node's default memory limits.
  */

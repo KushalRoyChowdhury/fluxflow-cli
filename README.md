@@ -4,7 +4,7 @@
 <p align="left">
   <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v3-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D20-green?style=plastic" alt="Node Compatibility"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D24-green?style=plastic" alt="Node Compatibility"></a>
 </p>
 
 **A Beautiful, Autonomous Terminal AI Agent**

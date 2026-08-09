@@ -3,9 +3,22 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.20.0"]
+export const stableVersions = ["3.21.0"]
 
 export const changelogData = {
+    "3.21.0": {
+        "note": "AUGUST 9.",
+        "added": [
+            "Redesigned few UI components to look more natural."
+        ],
+        "changed": [
+            "**Updated minimum requirements for FluxFlow v3.21+: Node v24 and above.**",
+            "Renamed older `SearchKeyword` tool to `CodeSearch` & improved it while we are there.",
+            "Improved cold-boot speed by 42% & exit by 80% (First boot and exit may take longer due to caching).",
+            "Improved in-app performance & resource utilzation."
+        ],
+        "fixes": []
+    },
     "3.20.0": {
         "note": "AUGUST 8.",
         "added": ["Added \"Compact Tool Results\" feature. Save tokens when turned on, but error detection accuracy might get affected."],

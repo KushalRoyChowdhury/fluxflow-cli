@@ -73,6 +73,8 @@ const TOOL_MAP = {
     WriteDoc: write_docx,
     Run: exec_command,
     SearchKeyword: search_keyword,
+    CodeSearch: search_keyword,
+    code_search: search_keyword,
     Memory: memory,
     Chat: chat,
     GenerateImage: generate_image,

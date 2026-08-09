@@ -107,35 +107,37 @@ rebuildMultimodalSet();
 export const getModelConfig = () => activeConfig;
 
 export const loadRemoteModelConfig = async () => {
-    try {
-        const url = 'https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/model_config.json';
-        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.providers && data.fallbacks && data.release) {
-                const isNewerVersion = typeof data.version === 'number' && data.version > activeConfig.version;
-                const isNewerRelease = typeof data.release === 'number' && data.release > activeConfig.release;
-                if (isNewerVersion || isNewerRelease) {
-                    activeConfig = data;
-                    rebuildMultimodalSet();
+    // Return immediately to not block startup, doing the fetch and save in the background
+    (async () => {
+        try {
+            const url = 'https://raw.githubusercontent.com/KushalRoyChowdhury/fluxflow-cli/main/model_config.json';
+            const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.providers && data.fallbacks && data.release) {
+                    const isNewerVersion = typeof data.version === 'number' && data.version > activeConfig.version;
+                    const isNewerRelease = typeof data.release === 'number' && data.release > activeConfig.release;
+                    if (isNewerVersion || isNewerRelease) {
+                        activeConfig = data;
+                        rebuildMultimodalSet();
 
-                    // Always write update to the user-specific homedir data sanctuary path
-                    try {
-                        if (!fs.existsSync(FLUXFLOW_DIR)) {
-                            fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+                        // Always write update to the user-specific homedir data sanctuary path
+                        try {
+                            if (!fs.existsSync(FLUXFLOW_DIR)) {
+                                fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+                            }
+                            fs.writeFileSync(userConfigPath, JSON.stringify(data, null, 2), 'utf-8');
+                        } catch (writeErr) {
+                            // Silently ignore write failures if homedir is read-only
                         }
-                        fs.writeFileSync(userConfigPath, JSON.stringify(data, null, 2), 'utf-8');
-                    } catch (writeErr) {
-                        // Silently ignore write failures if homedir is read-only
                     }
-                    return true;
                 }
             }
+        } catch (e) {
+            // Fallback silently to default bundled config
         }
-    } catch (e) {
-        // Fallback silently to default bundled config
-    }
-    return false;
+    })();
+    return true;
 };
 
 let customOllamaMultimodal = false;

@@ -35,6 +35,8 @@ export const emergency_rollback = async (args, context = {}) => {
             'web_search': 'WebSearch',
             'web_scrape': 'WebScrape',
             'search_keyword': 'SearchKeyword',
+            'CodeSearch': 'SearchKeyword',
+            'code_search': 'SearchKeyword',
             'write_pdf': 'WritePDF',
             'write_docx': 'WriteDoc',
             'generate_image': 'GenerateImage',

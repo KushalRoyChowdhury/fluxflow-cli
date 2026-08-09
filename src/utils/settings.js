@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS = {
         }
     },
     systemSettings: {
-        memory: true,
+        memory: false,
         theme: 'Dark',
         compression: 0.0,
         autoExec: false,

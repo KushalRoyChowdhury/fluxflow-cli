@@ -29,24 +29,25 @@ TOOL RULES:
 ${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY
-- Need text or HUGE file? SearchKeyword > Full Read
+- Need text or HUGE file? CodeSearch > Full Read
 - MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
+- DONT HALLUCINATE TOOL RESULTS, VERIFY, FIX ERRORS
 ` : ""}
 - COMMUNICATION WITH USER -
 - [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
 
 - WEB TOOLS -
-- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
+- [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
 - [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : ''}` : `Supports images/docs`}
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Line Range MUST for large blocks AND escape sequences. ^...$ MUST for line ranges. Verify diffs
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3")]. DIR Contents + File Size. Minimize recursion
+- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL searchContent. Line Ranges MUST for large searchContent AND escape sequences. ^...$ MUST for line ranges
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
-- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
+- [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool default: false", regex="bool default: auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[STRING ARRAY], markDone=[TASK ID ARRAY])]. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. \`tasks\` & \`markDone\` optional with \`get\`. Use \`get + markDone\` to mark complete. UPDATE EVERY TURN WHEN CREATED
+- [tool:functions.Todo(method="create/append/get", tasks=[STRING ARRAY], markDone=[TASK ID ARRAY])]. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. Use \`get + markDone\` to mark complete. UPDATE EVERY TURN WHEN CREATED
 ${_cachedAdvanceRollback ? `
 - EMERGENCY TOOLS -
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly

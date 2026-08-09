@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import fg from 'fast-glob';
+import { Minimatch } from 'minimatch';
 import { parseArgs } from '../utils/arg_parser.js';
 import fsSync from 'fs';
 
@@ -224,57 +225,85 @@ export const search_keyword = async (args) => {
         let pathArgType = null; // 'file' | 'dir' | 'glob' | null
 
         if (pathArg) {
-            const isGlob = fg.isDynamicPattern(pathArg) || /[*?{}[\]()|+]/.test(pathArg);
-            if (isGlob) {
+            // Support multiple patterns via semicolon separation, enabling negative globs (!pattern) without breaking brace expansion
+            const patterns = pathArg.split(';').map(p => p.trim()).filter(Boolean);
+            const hasNegation = patterns.some(p => p.startsWith('!'));
+            const isGlob = patterns.some(p => fg.isDynamicPattern(p) || /[*?{}[\]()|+]/.test(p));
+           if (isGlob) {
                 pathArgType = 'glob';
                 const posixPath = pathArg.replace(/\\/g, '/');
+                const posixPatterns = patterns.map(p => p.replace(/\\/g, '/'));
                 const globExcludes = excludes.map(ex => ex.startsWith('.') ? `**/*${ex}` : `**/${ex}/**`);
-                
-                const hasRegexSyntax = /[\(\)\|]|\.\*/.test(posixPath);
-                let matchedPaths = [];
-                if (!hasRegexSyntax) {
-                    try {
-                        matchedPaths = await fg(posixPath, {
-                            cwd: rootDir,
-                            ignore: globExcludes,
-                            dot: true,
-                            onlyFiles: true,
-                            absolute: false
-                        });
-                    } catch {
-                        matchedPaths = [];
-                    }
-                }
+                const isNegativeOnly = hasNegation && !patterns.some(p => !p.startsWith('!'));
 
-                // If fast-glob was skipped or returned 0 matches and path has regex syntax, fallback to RegExp file filtering
-                if (matchedPaths.length === 0 && (hasRegexSyntax || fg.isDynamicPattern(posixPath))) {
-                    // Extract static base directory before regex characters
-                    const baseDirMatch = posixPath.match(/^([^\*\?\(\)\|\[\]\s]+)\//);
-                    const scanDir = (baseDirMatch && !/[\*\?\(\)\|\[\]]/.test(baseDirMatch[1]))
-                        ? path.resolve(rootDir, baseDirMatch[1])
-                        : rootDir;
-                    const allFiles = await getFilesRecursively(scanDir, excludes, rootDir);
-                    
-                    try {
-                        let cleanRegexStr = posixPath.replace(/^\.\//, '');
-                        // Fix common model regex path patterns like `.*read_folder.*/.js` or `.*/.js` where `.*/.` was meant to match `.js` or `/\w+\.js`
-                        cleanRegexStr = cleanRegexStr.replace(/\.\*\/(\\\.|[^\/])/g, '.*$1');
-                        if (!cleanRegexStr.startsWith('^') && !cleanRegexStr.startsWith('.*')) {
-                            cleanRegexStr = `.*${cleanRegexStr}`;
-                        }
-                        const pathRegex = new RegExp(cleanRegexStr.endsWith('$') ? cleanRegexStr : `${cleanRegexStr}$`, 'i');
-                        filesToSearch = allFiles.filter(f => {
-                            const rel = f.relativePath.replace(/\\/g, '/');
-                            return pathRegex.test(rel);
+                if (isNegativeOnly) {
+                    // Negative-only patterns: use recursive walker (prunes excludes during traversal, avoids node_modules walk)
+                    const allFiles = await getFilesRecursively(rootDir, excludes, rootDir);
+                    // Normalize: directory patterns like "src/" -> "src/**" to match contents
+                    const normalizePattern = (p) => p.endsWith('/') ? p + '**' : p;
+                    const negPatterns = posixPatterns.filter(p => p.startsWith('!')).map(p => normalizePattern(p.slice(1)));
+                    const posPatterns = posixPatterns.filter(p => !p.startsWith('!')).map(normalizePattern);
+
+                    filesToSearch = allFiles.filter(f => {
+                        const rel = f.relativePath.replace(/\\/g, '/');
+                        // Must match at least one positive pattern (or all if none specified)
+                        const posMatch = posPatterns.length === 0 || posPatterns.some(p => {
+                            try { return new Minimatch(p).match(rel); } catch { return false; }
                         });
-                    } catch {
-                        filesToSearch = [];
-                    }
+                        // Must NOT match any negative pattern
+                        const negMatch = negPatterns.some(p => {
+                            try { return new Minimatch(p).match(rel); } catch { return false; }
+                        });
+                        return posMatch && !negMatch;
+                    });
                 } else {
-                    filesToSearch = matchedPaths.map(relP => ({
-                        fullPath: path.resolve(rootDir, relP),
-                        relativePath: relP
-                    }));
+                    // Mixed/positive patterns: fast-glob natively handles braces + negation in arrays
+                    const hasRegexSyntax = posixPatterns.some(p => /[\(\)\|]|\.\*/.test(p));
+                    let matchedPaths = [];
+                    if (!hasRegexSyntax) {
+                        try {
+                            matchedPaths = await fg(posixPatterns, {
+                                cwd: rootDir,
+                                ignore: globExcludes,
+                                dot: true,
+                                onlyFiles: true,
+                                absolute: false
+                            });
+                        } catch {
+                            matchedPaths = [];
+                        }
+                    }
+
+                    // If fast-glob was skipped or returned 0 matches and path has regex syntax, fallback to RegExp file filtering
+                    if (matchedPaths.length === 0 && (hasRegexSyntax || fg.isDynamicPattern(posixPath))) {
+                        // Extract static base directory before regex characters
+                        const baseDirMatch = posixPath.match(/^([^\*\?\(\)\|\[\]\s]+)\//);
+                        const scanDir = (baseDirMatch && !/[\*\?\(\)\|\[\]]/.test(baseDirMatch[1]))
+                            ? path.resolve(rootDir, baseDirMatch[1])
+                            : rootDir;
+                        const allFiles = await getFilesRecursively(scanDir, excludes, rootDir);
+
+                        try {
+                            let cleanRegexStr = posixPath.replace(/^\.\//, '');
+                            // Fix common model regex path patterns like `.*read_folder.*/.js` or `.*/.js` where `.*/.` was meant to match `.js` or `/\w+\.js`
+                            cleanRegexStr = cleanRegexStr.replace(/\.\*\/(\\.|[^\/])/g, '.*$1');
+                            if (!cleanRegexStr.startsWith('^') && !cleanRegexStr.startsWith('.*')) {
+                                cleanRegexStr = `.*${cleanRegexStr}`;
+                            }
+                            const pathRegex = new RegExp(cleanRegexStr.endsWith('$') ? cleanRegexStr : `${cleanRegexStr}$`, 'i');
+                            filesToSearch = allFiles.filter(f => {
+                                const rel = f.relativePath.replace(/\\/g, '/');
+                                return pathRegex.test(rel);
+                            });
+                        } catch {
+                            filesToSearch = [];
+                        }
+                    } else {
+                        filesToSearch = matchedPaths.map(relP => ({
+                            fullPath: path.resolve(rootDir, relP),
+                            relativePath: relP
+                        }));
+                    }
                 }
             } else {
                 // Strip trailing slash so both "src/utils" and "src/utils/" work

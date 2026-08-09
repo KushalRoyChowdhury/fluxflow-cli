@@ -203,7 +203,19 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     if ((aiProvider === 'NVIDIA' && (activeModel?.includes('glm') || activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium'))) || aiProvider === 'Mistral') {
         maxLimit = 128000;
     } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (activeModel.includes('deepseek') || activeModel.includes('seed')))) {
-        maxLimit = 409600;
+        const hc = process.env.HIGH_CONTEXT;
+        if (hc && hc !== 'false') {
+            const val = parseInt(hc, 10);
+            if (!isNaN(val) && val >= 256000 && val <= 1000000) {
+                maxLimit = val;
+            } else {
+                maxLimit = 262144; // fallback default
+            }
+        } else if (hc === 'false') {
+            maxLimit = 262144;
+        } else {
+            maxLimit = 262144;
+        }
     }
 
     return (

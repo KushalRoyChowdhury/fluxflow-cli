@@ -32,33 +32,33 @@ import { bypassBacktick } from './text.js';
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
 const RE_STUTTER_CODE_BLOCK_CLOSED = /```[\s\S]*?```/g;
-const RE_STUTTER_CODE_BLOCK_OPEN   = /```[\s\S]*$/g;
-const RE_STUTTER_INLINE_CODE       = /`[^`]+`/g;
-const RE_STUTTER_TABLE_ROW         = /^\|.*\|$/gm;
-const RE_STUTTER_WORD_BOUNDARY     = /^[^\w]+|[^\w]+$/g;
-const RE_STUTTER_NON_ALNUM         = /[^a-z0-9]/gi;
+const RE_STUTTER_CODE_BLOCK_OPEN = /```[\s\S]*$/g;
+const RE_STUTTER_INLINE_CODE = /`[^`]+`/g;
+const RE_STUTTER_TABLE_ROW = /^\|.*\|$/gm;
+const RE_STUTTER_WORD_BOUNDARY = /^[^\w]+|[^\w]+$/g;
+const RE_STUTTER_NON_ALNUM = /[^a-z0-9]/gi;
 
 // ─── Live Streaming / Tool Sniffing – pre-compiled regexes ───
-const RE_TOOL_CALL_FUNC      = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
-const RE_TOOL_CALL_ANY       = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_FUNC = /\[\s*tool:functions\.([a-z0-9_]+)\s*\(/gi;
+const RE_TOOL_CALL_ANY = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]+)\s*\(/gi;
 const RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
-const RE_STRIP_QUOTES        = /["']/g;
-const RE_BACKSLASH_SLASH     = /\\/g;
-const RE_STRIP_THINK_CLOSED  = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi;
-const RE_STRIP_THINK_OPEN    = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi;
-const RE_STRIP_THINK_SIMPLE  = /(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi;
-const RE_STRIP_THINK_FULL    = /(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi;
-const RE_BACKTICK_SPAN       = /`[^`]*`/g;
-const RE_BACKTICK_OPEN       = /`[^`]*$/;  // unclosed span — handles streaming (closing backtick not yet received)
-const RE_KIMI_TOOL_CALL      = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
-const RE_KIMI_JSON_PAIR      = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
-const RE_KIMI_SECTION_BEGIN  = /<\|\s*tool_calls_section_begin\s*\|>/gi;
-const RE_KIMI_SECTION_END    = /<\|\s*tool_calls_section_end\s*\|>/gi;
+const RE_STRIP_QUOTES = /["']/g;
+const RE_BACKSLASH_SLASH = /\\/g;
+const RE_STRIP_THINK_CLOSED = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi;
+const RE_STRIP_THINK_OPEN = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi;
+const RE_STRIP_THINK_SIMPLE = /(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi;
+const RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi;
+const RE_BACKTICK_SPAN = /`[^`]*`/g;
+const RE_BACKTICK_OPEN = /`[^`]*$/;  // unclosed span — handles streaming (closing backtick not yet received)
+const RE_KIMI_TOOL_CALL = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
+const RE_KIMI_JSON_PAIR = /"([^"]+)"\s*:\s*(?:"([^"]*)"|(\d+)|true|false|null)/g;
+const RE_KIMI_SECTION_BEGIN = /<\|\s*tool_calls_section_begin\s*\|>/gi;
+const RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
 
 // ─── Tool Call Wrapper Stripper – pre-compiled regexes ───
 const RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
-const RE_XML_TAG_OPEN            = /<(\w+)(?:[^>]*)>\r?\n?/gi;
-const RE_XML_TAG_CLOSE           = /\r?\n?<\/\w+(?:[^>]*)>/gi;
+const RE_XML_TAG_OPEN = /<(\w+)(?:[^>]*)>\r?\n?/gi;
+const RE_XML_TAG_CLOSE = /\r?\n?<\/\w+(?:[^>]*)>/gi;
 
 let client = null;
 
@@ -1755,7 +1755,7 @@ const getActiveToolContext = (text) => {
     // character offsets remain valid for subsequent index math.
     const scanText = bypassBacktick ? cleanText : cleanText
         .replace(RE_BACKTICK_SPAN, (m) => ' '.repeat(m.length))
-        .replace(RE_BACKTICK_OPEN,  (m) => ' '.repeat(m.length));
+        .replace(RE_BACKTICK_OPEN, (m) => ' '.repeat(m.length));
 
     RE_TOOL_CALL_FUNC.lastIndex = 0;
     let match;
@@ -1945,6 +1945,8 @@ const translateKimiToolCalls = (text) => {
         'run': 'Run',
         'execcommand': 'Run',
         'searchkeyword': 'SearchKeyword',
+        'codesearch': 'CodeSearch',
+        'code_search': 'CodeSearch',
         'websearch': 'WebSearch',
         'webscrape': 'WebScrape',
         'readfolder': 'ReadFolder',
@@ -2601,15 +2603,34 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         });
 
         // Truncation & Condensation Logic (Compression 0.0)
+        const hc = process.env.HIGH_CONTEXT;
         let contextCompressionCount = 255000;
         let contextTruncationCount = 260000;
+        if (hc && hc !== 'false') {
+            const val = parseInt(hc, 10);
+            if (!isNaN(val) && val >= 256000 && val <= 1000000) {
+                contextTruncationCount = val;
+                contextCompressionCount = Math.round(val * 0.85);
+            }
+        }
 
         if ((aiProvider === 'NVIDIA' && (modelName?.includes('glm') || modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium'))) || aiProvider === 'Mistral') {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
         } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (modelName.includes('deepseek') || modelName.includes('seed')))) {
-            contextCompressionCount = 403000;
-            contextTruncationCount = 408000;
+            if (hc && hc !== 'false') {
+                const val = parseInt(process.env.HIGH_CONTEXT, 10);
+                if (!isNaN(val) && val >= 256000 && val <= 1000000) {
+                    contextTruncationCount = val;
+                    contextCompressionCount = Math.round(val * 0.85);
+                } else {
+                    contextCompressionCount = 255000;
+                    contextTruncationCount = 262144;
+                }
+            } else {
+                contextCompressionCount = 255000;
+                contextTruncationCount = 262144;
+            }
         }
 
         if ((sessionStats?.tokens || 0) > contextCompressionCount) {
@@ -3118,9 +3139,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
-        const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, MUST output the EXACT STRING you WOULD have produced & wait for system to respond\n' : '';
+        const wildcardToolingPrompt = wildcardTooling ? '**You cannot execute tools\nInstead in chat, output the exact string you WOULD have produced & wait for system response**\n' : '';
 
-        const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRING SYNTAX '[tool:functions.ToolName(arg="value")]' IN CHAT [/SYSTEM]\n${wildcardToolingPrompt}${taggedContextStr}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRING SYNTAX '[tool:functions.ToolName(arg="value")]' IN CHAT [/SYSTEM]\n${taggedContextStr}${wildcardToolingPrompt}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -3173,7 +3194,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 try {
                     const { clearPendingNudges } = await import('./subagent_state.js');
                     clearPendingNudges();
-                } catch (e) {}
+                } catch (e) { }
                 yield { type: 'status', content: 'Request Cancelled' };
                 yield { type: 'text', content: '\n\n\u001b[33mⓘ Request Cancelled\u001b[0m' };
                 break;
@@ -3192,7 +3213,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     }
                     yield { type: 'status', content: 'Subagent Update' };
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             // Check for incoming Steering Hints
             if (steeringCallback) {
@@ -3936,7 +3957,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
-                                    'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory',
+                                    'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory',
                                     'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
@@ -4018,6 +4039,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'write_docx': 'Creating',
                                             'SearchKeyword': 'Searching',
                                             'search_keyword': 'Searching',
+                                            'CodeSearch': 'Searching',
+                                            'code_search': 'Searching',
                                             'Run': 'Executing',
                                             'Ask': 'User Input Required',
                                             'Memory': 'Updating Memory',
@@ -4204,7 +4227,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -5188,24 +5211,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (settings.onToolResult) settings.onToolResult('failure', normToolName);
                                 }
 
-                                 const rawResult = (result || '').toString().replaceAll('[UI_CONTEXT]', '');
-                                 let processedResult = rawResult;
-                                 if (processedResult.includes('[[VERIFIED]]')) {
-                                     processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
-                                 }
+                                const rawResult = (result || '').toString().replaceAll('[UI_CONTEXT]', '');
+                                let processedResult = rawResult;
+                                if (processedResult.includes('[[VERIFIED]]')) {
+                                    processedResult = processedResult.replace(/\[\[VERIFIED\]\][\s\S]*?\[\[\/VERIFIED\]\]/g, '[SYSTEM NOTE]: Patch Block matched & applied successfully. Large Block omitted to conserve context.\n');
+                                }
 
-                                 let aiContent;
-                                 if (processedResult.startsWith('[[SAME]]')) {
-                                     const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
-                                     const lines = cleanText.split(/\r?\n/);
-                                     const successLines = lines.filter(l => l.startsWith('SUCCESS:') || l.trim().startsWith('- Stats:'));
-                                     const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
-                                     aiContent = `[TOOL RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
-                                 } else {
-                                     aiContent = `[TOOL RESULT]: ${processedResult}`;
-                                 }
-                                 toolResults.push({ role: 'user', text: aiContent, binaryPart });
-                                 anyToolExecutedInThisTurn = true;
+                                let aiContent;
+                                if (processedResult.startsWith('[[SAME]]')) {
+                                    const cleanText = processedResult.replace(/^\[\[SAME\]\]\s*\r?\n?/, '');
+                                    const lines = cleanText.split(/\r?\n/);
+                                    const successLines = lines.filter(l => l.startsWith('SUCCESS:') || l.trim().startsWith('- Stats:'));
+                                    const headerPart = successLines.length > 0 ? successLines.join('\n') : lines.slice(0, 2).join('\n');
+                                    aiContent = `[TOOL RESULT]: ${headerPart}\n[SYSTEM NOTE]: Content verified and persisted to disk. Full preview omitted to conserve context.`;
+                                } else {
+                                    aiContent = `[TOOL RESULT]: ${processedResult}`;
+                                }
+                                toolResults.push({ role: 'user', text: aiContent, binaryPart });
+                                anyToolExecutedInThisTurn = true;
 
                                 let uiContent = `[TOOL RESULT]: ${result.replaceAll('[[VERIFIED]]\n', '').replaceAll('\n[[/VERIFIED]]', '') || ''}`;
                                 if (normToolName === 'view_file' || normToolName === 'web_scrape' || normToolName === 'file_map') {
@@ -5722,9 +5745,10 @@ TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' SYN
 TOOL RULES:
 - JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
-- Need text or huge files? SearchKeyword > Full Read
+- Need text or huge files? CodeSearch > Full Read
 - MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - Restricted Shell Access, No Deletion
+- DONT HALLUCINATE TOOL RESULTS, VERIFY, FIX ERRORS
 - ONLY valid tools and syntax defined below are allowed
 
 **PROVIDED TOOLS**
@@ -5733,14 +5757,14 @@ TOOL RULES:
 ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 -- Web Tools --
-- [tool:functions.WebSearch(query="...", aiMode="bool optional, default: false", limit="integer 3-10, aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
+- [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
 - [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
 -- Workspace Tools --
-- [tool:functions.SearchKeyword(keyword="...", path="optional, dir/file/glob/regex", fuzzy="bool optional, default: false", regex="bool optional, default: auto")]. path scopes search. Find definitions, logic, relevant code
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3 optional, default: 1")]. DIR Contents + File Size. Minimize recursion
+- [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool default: false", regex="bool default: auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3")]. DIR Contents + File Size. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. View files
-- [tool:functions.PatchFile(path="...", allowMultiple="bool optional, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Line Range MUST for large blocks AND escape sequences. ^...$ MUST for line ranges. Verify diffs
+- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL searchContent. Line Ranges MUST for large searchContent AND escape sequences. ^...$ MUST for line ranges
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `WINDOWS POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user`.trim();
 
@@ -5888,7 +5912,7 @@ Current Time: ${time}
                 label = `✔ \x1b[95mScraped\x1b[0m: ${url}`;
             }
 
-            else if (normalizedToolName === 'search_keyword' || normalizedToolName === 'searchkeyword') {
+            else if (normalizedToolName === 'search_keyword' || normalizedToolName === 'searchkeyword' || normalizedToolName === 'codesearch' || normalizedToolName === 'code_search') {
                 const pArgs = parseArgs(toolCall.args);
                 const keyword = pArgs.keyword || '';
                 const keywordPath = pArgs.path || '';

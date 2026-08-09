@@ -20,9 +20,9 @@ export default function GettingStarted() {
 
             <h2 id="prerequisites">Prerequisites</h2>
             <ul>
-                <li><strong>Node.js</strong> — v18 or higher (v20+ recommended)</li>
+                <li><strong>Node.js</strong> — v24 or higher</li>
                 <li><strong>Package Manager</strong> — npm, yarn, or pnpm</li>
-                <li><strong>AI API Key</strong> — Google Gemini, DeepSeek, NVIDIA, or OpenRouter</li>
+                <li><strong>AI API Key</strong> — Google Gemini, DeepSeek, NVIDIA, OpenRouter, Mistral or Ollama (anything based on your taste, we dont judge here)</li>
             </ul>
 
             <h2 id="installation">Installation Options</h2>
