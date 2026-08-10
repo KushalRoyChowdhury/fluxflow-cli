@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260812,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -33,17 +33,17 @@
                     {
                         "cmd": "gemma4:cloud",
                         "multimodal": true,
-                        "desc": "31B (Multimodal) [Level 1]"
+                        "desc": "31B     (Multimodal) [Level 1]"
                     },
                     {
                         "cmd": "gpt-oss:20b-cloud",
                         "multimodal": false,
-                        "desc": "20B A3B (Text Only) [Level 1]"
+                        "desc": "20B A3B (Text Only)  [Level 1]"
                     },
                     {
                         "cmd": "nemotron-3-nano:30b-cloud",
                         "multimodal": false,
-                        "desc": "30B A4B (Text Only) [Level 1]"
+                        "desc": "30B A4B (Text Only)  [Level 1]"
                     }
                 ],
                 "Paid": []
