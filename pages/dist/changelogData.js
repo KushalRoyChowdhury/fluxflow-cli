@@ -3,30 +3,18 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.21.1"]
+export const stableVersions = ["3.21.0"]
 
 export const changelogData = {
-    "3.21.1": {
-        "note": "AUGUST 10.",
-        "added": [
-            "Added compatibility for `Node v22` (caching may not work, for reliable performance `Node v24+` is recomended)."
-        ],
-        "changed": [
-            "Improved model selector."
-        ],
-        "fixes": [
-            "Bug Fixes."
-        ]
-    },
     "3.21.0": {
         "note": "AUGUST 9.",
         "added": [
             "Redesigned few UI components to look more natural."
         ],
         "changed": [
-            "**Updated minimum requirements for `FluxFlow v3.21+`: `Node v24` and above.**",
-            "Renamed older `SearchKeyword` tool to `CodeSearch` & improved it while we are there.",
-            "Improved cold-boot speed by 42% & exit by 80% (First boot and exit may take longer due to caching).",
+            "**Updated minimum requirements for `FluxFlow v3.21+`: `Node v22+`.**",
+            "Renamed agent's older `SearchKeyword` tool with `CodeSearch` & improved it while we are there.",
+            "Improved app's boot times by 42%.",
             "Improved in-app performance & resource utilzation."
         ],
         "fixes": []
