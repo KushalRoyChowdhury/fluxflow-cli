@@ -1,5 +1,5 @@
 {
-    "version": 1,
+    "version": 2,
     "release": 20260812,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -12,7 +12,7 @@
         "mistral_janitor_fallback": "mistral-small-2506",
         "mistral_level_1": "mistral-medium-2505",
         "nvidia_janitor_fallback": "mistralai/mistral-nemotron",
-        "nvidia_chat_summarizer_fallback": "google/diffusiongemma-26b-a4b-it",
+        "nvidia_chat_summarizer_fallback": "nvidia/nemotron-3-super-120b-a12b",
         "google_level_1": "gemini-3-flash-preview",
         "google_level_2": "gemini-3.5-flash",
         "gemma_emergency": "gemma-4-31b-it",
