@@ -34,6 +34,11 @@
                         "cmd": "gemma4:cloud",
                         "multimodal": true,
                         "desc": ""
+                    },
+                    {
+                        "cmd": "gpt-oss:20b-cloud",
+                        "multimodal": false,
+                        "desc": ""
                     }
                 ],
                 "Paid": []
@@ -416,15 +421,6 @@
                         "desc": "Mega Fast"
                     },
                     {
-                        "cmd": "\n--- Mistral Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "mistralai/mistral-large-3-675b-instruct-2512",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
                         "cmd": "\n--- OpenAI Models ---",
                         "desc": ""
                     },
@@ -540,15 +536,6 @@
                         "cmd": "google/diffusiongemma-26b-a4b-it",
                         "multimodal": false,
                         "desc": "Mega Fast"
-                    },
-                    {
-                        "cmd": "\n--- Mistral Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "mistralai/mistral-large-3-675b-instruct-2512",
-                        "multimodal": true,
-                        "desc": "Multimodal"
                     },
                     {
                         "cmd": "\n--- OpenAI Models ---",
