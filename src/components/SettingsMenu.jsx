@@ -6,6 +6,7 @@ import { getThemeColors, THEMES } from '../utils/theme.js';
 import { getModels } from '../data/model_config.js';
 import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
+import { DATA_DIR } from '../utils/paths.js';
 
 const themeOptions = [...Object.keys(THEMES), 'Mystery'];
 
@@ -104,7 +105,7 @@ export default function SettingsMenu({
                 try {
                     const k = await getProviderAPIKey(p);
                     if (k) keyMap[p] = true;
-                } catch (e) {}
+                } catch (e) { }
             }
             setActiveProviderKeys(keyMap);
         };
@@ -897,7 +898,7 @@ export default function SettingsMenu({
                 <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={activeColumn === 'items' ? colors.border : colors.borderMuted} paddingX={1} marginLeft={1} paddingY={0}>
                     <Box marginBottom={1}>
                         <Text color={activeColumn === 'items' ? colors.text : colors.textDim} bold underline>
-                            {CATEGORIES[selectedCategoryIndex].label.toUpperCase()} SETTINGS
+                            {CATEGORIES[selectedCategoryIndex].label.toUpperCase().includes('EXIT') ? 'Runtime Information' : `${CATEGORIES[selectedCategoryIndex].label} Settings`}
                         </Text>
                     </Box>
 
@@ -1009,20 +1010,78 @@ export default function SettingsMenu({
                         })()
                     ) : (
                         <Box paddingX={1} flexDirection="column" width="100%">
-                            <Text color="gray" italic>
-                                {CATEGORIES[selectedCategoryIndex].desc}
-                            </Text>
-                            {currentCatId === 'exit' && (
+                            {currentCatId === 'exit' ? (
                                 <>
-                                    <Box key="pty-notice" marginTop={19} paddingX={0}>
-                                        <Text color={colors.text}>
-                                            {isPtyAvailable ? "✓ Advance Interactive Terminal Supported" : "⚠ Interactive Terminal is Limited"}
+                                    {/* System Info Panel */}
+                                    <Box flexDirection="column" marginBottom={1}>
+                                            {/* OS */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>OS{' '}</Text>
+                                                <Text color="gray">{'..................... '}</Text>
+                                                <Text color={colors.text}>{process.env.OS || process.platform || 'N/A'}</Text>
+                                            </Box>
+
+                                            {/* Computer Name */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>Computer Name{' '}</Text>
+                                                <Text color="gray">{'.......... '}</Text>
+                                                <Text color={colors.text}>{process.env.COMPUTERNAME || process.env.HOSTNAME || 'N/A'}</Text>
+                                            </Box>
+
+                                            {/* Processor Count */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>Processor Count{' '}</Text>
+                                                <Text color="gray">{'........ '}</Text>
+                                                <Text color={colors.text}>{process.env.NUMBER_OF_PROCESSORS || 'N/A'}</Text>
+                                            </Box>
+
+                                            {/* Node.js Version */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>Node.js Version{' '}</Text>
+                                                <Text color="gray">{'........ '}</Text>
+                                                <Text color={colors.text}>v{process.versions.node}</Text>
+                                            </Box>
+
+                                            {/* V8 Version */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>V8 Version{' '}</Text>
+                                                <Text color="gray">{'...... ...... '}</Text>
+                                                <Text color={colors.text}>v{process.versions.v8}</Text>
+                                            </Box>
+
+                                            {/* Data Directory */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>Data Directory{' '}</Text>
+                                                <Text color="gray">{'......... '}</Text>
+                                                <Text color={colors.text}>~/.fluxflow, {DATA_DIR.replaceAll('\\\\', '/')}</Text>
+                                            </Box>
+
+                                            {/* Viewport */}
+                                            <Box flexDirection="row">
+                                                <Text color={colors.textDim}>Viewport{' '}</Text>
+                                                <Text color="gray">{'............... '}</Text>
+                                                <Text color={colors.text}>{process.stdout.rows || '?'} rows × {process.stdout.columns || '?'} cols {process.stdout.columns < 90 ? '(too small width)' : ''}</Text>
+                                            </Box>
+
+                                            {/* Memory Load */}
+                                            <Box flexDirection="row" marginBottom={0}>
+                                                <Text color={colors.textDim}>Memory Load{' '}</Text>
+                                                <Text color="gray">{'............ '}</Text>
+                                                <Text color={colors.text}>{currentMemory}/{maxMemory} {memoryUnit}</Text>
+                                            </Box>
+                                    </Box>
+
+                                    {/* PTY Status */}
+                                    <Box key="pty-notice" paddingX={0} marginTop={0}>
+                                        <Text color={isPtyAvailable ? colors.statusOn : colors.warning}>
+                                            {isPtyAvailable ? '✓ Advance Interactive Terminal Supported' : '⚠ Interactive Terminal is Limited'}
                                         </Text>
                                     </Box>
-                                    <Box key="memory-load-2026" paddingX={0}>
-                                        <Text color="gray">Memory Load: {currentMemory}/{maxMemory} {memoryUnit}</Text>
-                                    </Box>
                                 </>
+                            ) : (
+                                <Text color="gray" italic>
+                                    {CATEGORIES[selectedCategoryIndex].desc}
+                                </Text>
                             )}
                         </Box>
                     )}

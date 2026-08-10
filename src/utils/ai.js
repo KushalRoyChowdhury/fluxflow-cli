@@ -2615,26 +2615,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
         }
 
+        // ~128k fixed cap for limited-context models; all others use ~256k default (set above),
+        // with HIGH_CONTEXT optionally extending beyond 256k.
         if ((aiProvider === 'NVIDIA' && (modelName?.includes('glm') || modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium'))) || aiProvider === 'Mistral') {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
-        } else if (aiProvider === 'DeepSeek' || (aiProvider === 'Google' && apiTier === 'Paid') || (aiProvider === 'NVIDIA' && (modelName.includes('deepseek') || modelName.includes('seed')))) {
-            if (hc && hc !== 'false') {
-                const val = parseInt(process.env.HIGH_CONTEXT, 10);
-                if (!isNaN(val) && val >= 256000 && val <= 1000000) {
-                    contextTruncationCount = val;
-                    contextCompressionCount = Math.round(val * 0.85);
-                } else {
-                    contextCompressionCount = 255000;
-                    contextTruncationCount = 262144;
-                }
-            } else {
-                contextCompressionCount = 255000;
-                contextTruncationCount = 262144;
-            }
         }
 
-        if ((sessionStats?.tokens || 0) > contextCompressionCount) {
+        if (aiProvider !== 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
             const newSummary = await compressHistory(settings, modifiedHistory, true);
             if (newSummary) {

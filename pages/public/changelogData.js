@@ -3,13 +3,14 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.21.0"]
+export const stableVersions = ["3.22.0"]
 
 export const changelogData = {
-    "3.21.0": {
-        "note": "AUGUST 9.",
+    "3.22.0": {
+        "note": "AUGUST 11.",
         "added": [
-            "Redesigned few UI components to look more natural."
+            "Redesigned few UI components to look more natural.",
+            "Runtime Information section in settings."
         ],
         "changed": [
             "**Updated minimum requirements for `FluxFlow v3.21+`: `Node v22+`.**",
