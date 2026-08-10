@@ -2326,7 +2326,7 @@ export default function App({ args = [] }) {
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '✦⠀'}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2450,7 +2450,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: getModels(aiProvider, apiTier)
+            subs: (aiProvider === 'Ollama' && (apiKey === 'LOCAL' || !apiKey)) ? [] : getModels(aiProvider, apiTier)
         },
         {
             cmd: '/wildcard-tooling',
@@ -4560,12 +4560,12 @@ export default function App({ args = [] }) {
                     <CommandMenu
                         title="SELECT AI PROVIDER"
                         items={[
-                            { label: 'Google (Free/Paid)', value: 'Google' },
-                            { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
-                            { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
-                            { label: 'Ollama (Cloud/Local)', value: 'Ollama' },
-                            { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
-                            { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                            { label: 'Google', value: 'Google' },
+                            { label: 'Nvidia', value: 'NVIDIA' },
+                            { label: 'DeepSeek', value: 'DeepSeek' },
+                            { label: 'Ollama', value: 'Ollama' },
+                            { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
+                            { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
                             { label: 'Back', value: providerReturnView }
                         ]}
                         theme={systemSettings.theme}
@@ -4618,46 +4618,37 @@ export default function App({ args = [] }) {
 
             case 'apiTier': {
                 return (
-                    <Box flexDirection="column" borderStyle="round" borderColor="white" padding={0} width="100%">
-                        <Box paddingX={1} marginBottom={1}>
-                            <Text color="white" bold>SELECT API MODE FOR {aiProvider.toUpperCase()}</Text>
-                        </Box>
-
-                        <SelectInput
-                            items={[
-                                { label: 'Free Mode (For Free APIs)     [Free Models Only]', value: 'Free' },
-                                { label: `Paid Mode (For Billing APIs)  [Premium Models Unlocked] ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
-                                { label: 'Back', value: 'settings' }
-                            ]}
-                            onSelect={(item) => {
-                                if (item.value === 'settings' || item.value === 'Back') {
-                                    setActiveView('settings');
-                                    return;
-                                }
-
-                                const newTier = item.value;
-                                setApiTier(newTier);
-
-                                const updatedProviderTiers = {
-                                    ...(quotas.providerTiers || {}),
-                                    [aiProvider]: newTier
-                                };
-                                const newQuotas = {
-                                    ...quotas,
-                                    providerTiers: updatedProviderTiers
-                                };
-                                setQuotas(newQuotas);
-                                saveSettings({ apiTier: newTier, quotas: newQuotas });
+                    <CommandMenu
+                        title={`Show Paid models from ${aiProvider.toUpperCase()}?`}
+                        subtitle="Curated model list. Can use anything if typed manually."
+                        items={[
+                            { label: 'No  (For Free APIs)    [Shows Free model list]', value: 'Free' },
+                            { label: `Yes (For Billing APIs) [Shows Paid model list] ${apiTier === 'Paid' ? '●' : ''}`, value: 'Paid' },
+                            { label: 'Back', value: 'settings' }
+                        ]}
+                        theme={systemSettings.theme}
+                        onSelect={(item) => {
+                            if (item.value === 'settings' || item.value === 'Back') {
                                 setActiveView('settings');
-                            }}
-                            itemComponent={CustomMenuItem}
-                            indicatorComponent={() => null}
-                        />
+                                return;
+                            }
 
-                        <Box paddingX={1} marginTop={1}>
-                            <Text color="gray" italic>(Arrows to select • Enter to confirm)</Text>
-                        </Box>
-                    </Box>
+                            const newTier = item.value;
+                            setApiTier(newTier);
+
+                            const updatedProviderTiers = {
+                                ...(quotas.providerTiers || {}),
+                                [aiProvider]: newTier
+                            };
+                            const newQuotas = {
+                                ...quotas,
+                                providerTiers: updatedProviderTiers
+                            };
+                            setQuotas(newQuotas);
+                            saveSettings({ apiTier: newTier, quotas: newQuotas });
+                            setActiveView('settings');
+                        }}
+                    />
                 );
             }
 
@@ -5641,7 +5632,7 @@ export default function App({ args = [] }) {
                                 setApiKey(null); // Re-triggers manual setup mode
                                 setActiveView('chat');
                                 const s = emojiSpace(2);
-                                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `[ACTION] Flux waiting for new API Key...` }]);
+                                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Flux waiting for new API Key...\n⠀` }]);
                             } else if (item.value === 'remove') {
                                 setActiveView('deleteKey');
                             } else {
@@ -6322,12 +6313,12 @@ export default function App({ args = [] }) {
                                             <Box marginTop={1}>
                                                 <CommandMenu
                                                     items={[
-                                                        { label: 'Google (Free/Paid)', value: 'Google' },
-                                                        { label: 'Nvidia (Free/Custom)', value: 'NVIDIA' },
-                                                        { label: 'DeepSeek (Paid)', value: 'DeepSeek' },
-                                                        { label: 'Ollama (Cloud/Local)', value: 'Ollama' },
-                                                        { label: 'Mistral (Free/Paid) [EXPERIMENTAL]', value: 'Mistral' },
-                                                        { label: 'OpenRouter (Free/Paid) [EXPERIMENTAL]', value: 'OpenRouter' },
+                                                        { label: 'Google', value: 'Google' },
+                                                        { label: 'Nvidia', value: 'NVIDIA' },
+                                                        { label: 'DeepSeek', value: 'DeepSeek' },
+                                                        { label: 'Ollama', value: 'Ollama' },
+                                                        { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
+                                                        { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
                                                     ]}
                                                     onSelect={(item) => {
                                                         setAiProvider(item.value);

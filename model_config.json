@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260811,
+    "release": 20260812,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -26,19 +26,24 @@
             "models": {
                 "Free": [
                     {
-                        "cmd": "gemma4:31b-cloud",
+                        "cmd": "--- Few Cloud Models to Try ---",
                         "multimodal": true,
                         "desc": ""
                     },
                     {
                         "cmd": "gemma4:cloud",
                         "multimodal": true,
-                        "desc": ""
+                        "desc": "31B (Multimodal) [Level 1]"
                     },
                     {
                         "cmd": "gpt-oss:20b-cloud",
                         "multimodal": false,
-                        "desc": ""
+                        "desc": "20B A3B (Text Only) [Level 1]"
+                    },
+                    {
+                        "cmd": "nemotron-3-nano:30b-cloud",
+                        "multimodal": false,
+                        "desc": "30B A4B (Text Only) [Level 1]"
                     }
                 ],
                 "Paid": []
@@ -99,57 +104,7 @@
                         "desc": "Enable Lab  Models to access (Text Only) [EXPERIMENTAL]"
                     }
                 ],
-                "Paid": [
-                    {
-                        "cmd": "--- Mistral Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "open-mistral-nemo",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-3b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-8b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-14b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "mistral-small-2506",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [Experimental]"
-                    },
-                    {
-                        "cmd": "devstral-2512",
-                        "multimodal": false,
-                        "desc": "Devstral Coding (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "mistral-medium-2508",
-                        "multimodal": true,
-                        "desc": "Mistral Medium (Multimodal)"
-                    },
-                    {
-                        "cmd": "mistral-large-2512",
-                        "multimodal": true,
-                        "desc": "Mistral Large (Multimodal)"
-                    },
-                    {
-                        "cmd": "labs-leanstral-1-5-1",
-                        "multimodal": false,
-                        "desc": "Enable Lab  Models to access (Text Only) [EXPERIMENTAL]"
-                    }
-                ]
+                "Paid": []
             }
         },
         "OpenRouter": {
@@ -459,12 +414,17 @@
                     {
                         "cmd": "nvidia/nemotron-3-ultra-550b-a55b",
                         "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
+                        "desc": "Text Only"
                     },
                     {
                         "cmd": "nvidia/nemotron-3-super-120b-a12b",
                         "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-nano-30b-a3b",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     },
                     {
                         "cmd": "\n--- Meta Models ---",
@@ -499,123 +459,7 @@
                         "desc": "Text Only [EXPERIMENTAL]"
                     }
                 ],
-                "Paid": [
-                    {
-                        "cmd": "--- DeepSeek Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "deepseek-ai/deepseek-v4-flash-0731",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "deepseek-ai/deepseek-v4-pro",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- StepFun Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "stepfun-ai/step-3.7-flash",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "\n--- Google Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "google/gemma-4-31b-it",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "google/diffusiongemma-26b-a4b-it",
-                        "multimodal": false,
-                        "desc": "Mega Fast"
-                    },
-                    {
-                        "cmd": "\n--- OpenAI Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "openai/gpt-oss-20b",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "openai/gpt-oss-120b",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Z-AI Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "z-ai/glm-5.2",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- MiniMax Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "minimaxai/minimax-m3",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- NVIDIA Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "nvidia/nemotron-3-ultra-550b-a55b",
-                        "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "nvidia/nemotron-3-super-120b-a12b",
-                        "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "\n--- Meta Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "meta/llama-3.3-70b-instruct",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "meta/llama-3.2-90b-vision-instruct",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "\n--- Thinking Machines Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "thinkingmachines/inkling",
-                        "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "\n--- PoolSide Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "poolside/laguna-xs-2.1",
-                        "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
-                    }
-                ]
+                "Paid": []
             }
         },
         "Google": {

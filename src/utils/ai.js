@@ -748,6 +748,7 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
     }
 
     while (attempts < maxAttempts) {
+        // fs.appendFileSync("NVIDIA_REQUEST.txt", `${JSON.stringify(body)}\n\n`);
         attempts++;
         try {
             const response = await fetchWithBackoff(_baseUrl, {
@@ -5623,7 +5624,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
-        yield { type: 'text', content: `❌ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}` };
+        yield { type: 'text', content: `✦ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}\n⠀` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
         fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}\n\n----------------------------------------------------------------------\n\n`);
 

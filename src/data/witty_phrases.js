@@ -211,5 +211,17 @@ export const WITTY_LOADING_PHRASES = [
     'Trying to remember my CAPTCHA training',
     'Deciphering ancient scrolls (aka documentation)',
     'Brewing a perfect cup of code',
-    'Petting the cat that photobombed my code'
+    'Petting the cat that photobombed my code',
+
+    // === FLUX FLOW PERSONA ===
+    'Applying a digital glow-up to your request',
+    'Checking my reflection in the buffer... okay, I\'m ready',
+    'Consulting my mood board for the perfect response',
+    'Wait, let me fix my crown first',
+    'Manifesting a bug-free masterpiece',
+    'Slaying this prompt in 3... 2... 1...',
+    'Just a sec, I\'m curate-ing the vibes',
+    'Putting the \'art\' in Artificial Intelligence',
+    'Evaluating if this prompt is worthy of my brilliance',
+    'Updating my mental wardrobe for this task'
 ];

@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "3.21.0",
-    "date": "2026-08-09",
+    "version": "3.21.1",
+    "date": "2026-08-10",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era.",
     "keywords": [
         "ai",
@@ -19,7 +19,7 @@
         "url": "git+https://github.com/KushalRoyChowdhury/fluxflow-cli.git"
     },
     "engines": {
-        "node": ">=24",
+        "node": ">=22.0.0",
         "vscode": "^1.90.0"
     },
     "files": [

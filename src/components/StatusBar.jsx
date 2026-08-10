@@ -255,35 +255,39 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
             {/* 🔋 PERFORMANCE & TELEMETRY ZONE */}
             <Box>
                 {isProcessing ? (
-                        <Box>
-                            <Text color={dotColor}>●</Text>
+                    <Box>
+                        <Text color={dotColor}>●</Text>
                         {showTPMEstimate && (
                             <>
                                 <Text color={colors.textMuted} bold> {displayedWps} tps</Text>
                                 <Text color={colors.textMuted} dimColor> ┃</Text>
                             </>
                         )}
-                        </Box>
+                    </Box>
                 ) : null}
-                <Box marginX={1}>
-                    <Text color={colors.text}>
-                        {formatTokens(tokensTotal)}{' '}
-                        {(() => {
-                            const pct = (tokens / maxLimit) * 100;
-                            const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
-                            return <Text color={color} dimColor>{pct.toFixed(0)}%</Text>;
-                        })()}
-                    </Text>
-                </Box>
+                {tokens > 0 &&
+                    <>
+                        <Box marginX={1}>
+                            <Text color={colors.text}>
+                                {formatTokens(tokensTotal)}{' '}
+                                {(() => {
+                                    const pct = (tokens / maxLimit) * 100;
+                                    const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
+                                    return <Text color={color} dimColor>{pct.toFixed(0)}%</Text>;
+                                })()}
+                            </Text>
+                        </Box>
 
-                <Text color={colors.textMuted} dimColor>┃</Text>
+                        <Text color={colors.textMuted} dimColor>┃</Text>
+                    </>}
 
                 <Box marginLeft={1}>
                     <Text color={colors.textMuted} bold>{memoryUsage} {memoryUnit}</Text>
                     {/* <Text color={colors.textMuted} bold>{memoryUsage}/{memoryLimit} {memoryUnit}</Text> */}
-                    {(apiTier === 'Custom' || apiTier === 'Paid') && (
+
+                    {/* {(apiTier === 'Custom' || apiTier === 'Paid') && (
                         <Box><Text color={colors.textMuted} dimColor> ┃ </Text><Text color={colors.textMuted} bold>PAID</Text></Box>
-                    )}
+                    )} */}
                 </Box>
             </Box>
         </Box>

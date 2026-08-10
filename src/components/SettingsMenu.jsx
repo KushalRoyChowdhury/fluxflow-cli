@@ -13,7 +13,7 @@ const CATEGORIES = [
     { id: 'appearance', label: 'Appearance', desc: 'Customize UI theme & rendering options' },
     { id: 'memory', label: 'Memory', desc: 'Manage system context & agent\'s memory' },
     { id: 'other', label: 'Miscellaneous', desc: 'Miscellaneous preferences' },
-    { id: 'providers', label: 'Providers', desc: 'Configure AI models & API key strategies' },
+    { id: 'providers', label: 'Providers', desc: 'Configure AI models' },
     { id: 'security', label: 'Security', desc: 'Configure permissions & data safety' },
     { id: 'updater', label: 'Updater', desc: 'Manage application updates' },
     { id: 'exit', label: 'Exit Settings', desc: 'Return to chat view' }
@@ -251,7 +251,16 @@ export default function SettingsMenu({
             case 'providers': {
                 const items = [
                     { label: 'Current Provider', value: 'aiProvider', status: aiProvider },
-                    { label: 'Key Strategy', value: 'apiTier', status: apiTier === 'Free' ? 'Free' : (quotas?.providerBudgets?.__useProvider ? 'Paid' : 'Paid') }
+                    ...(
+                        aiProvider.toLowerCase() === 'google' ||
+                            aiProvider.toLowerCase() === 'openrouter'
+                            ? [{
+                                label: 'Show Paid Models?',
+                                value: 'apiTier',
+                                status: apiTier === 'Free' ? 'No' : 'Yes'
+                            }]
+                            : []
+                    )
                 ];
                 if (aiProvider === 'Ollama') {
                     items.push({
