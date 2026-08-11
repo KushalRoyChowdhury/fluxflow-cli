@@ -46,7 +46,8 @@ const DEFAULT_SETTINGS = {
         dynamicDirAwareness: false,
         indentationTree: true,
         ollamaEndpoint: 'Cloud',
-        compressToolResults: false
+        compressToolResults: false,
+        autoTruncateResults: false
     },
     profileData: {
         name: null,

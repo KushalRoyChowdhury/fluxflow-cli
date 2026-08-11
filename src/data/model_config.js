@@ -69,9 +69,11 @@ if (!activeConfig) {
 }
 
 let multimodalModelsSet = new Set();
+let reasoningModelsSet = new Set();
 
 const rebuildMultimodalSet = () => {
     const nextSet = new Set();
+    const nextReasoningSet = new Set();
     if (activeConfig.providers) {
         for (const providerKey of Object.keys(activeConfig.providers)) {
             const provider = activeConfig.providers[providerKey];
@@ -81,8 +83,14 @@ const rebuildMultimodalSet = () => {
                     const list = provider.models[tier];
                     if (Array.isArray(list)) {
                         for (const m of list) {
-                            if (m && m.cmd && m.multimodal === true) {
-                                nextSet.add(m.cmd.trim().toLowerCase());
+                            if (m && m.cmd) {
+                                const cmdLower = m.cmd.trim().toLowerCase();
+                                if (m.multimodal === true) {
+                                    nextSet.add(cmdLower);
+                                }
+                                if (m.hasReasoning === true) {
+                                    nextReasoningSet.add(cmdLower);
+                                }
                             }
                         }
                     }
@@ -99,6 +107,7 @@ const rebuildMultimodalSet = () => {
         }
     }
     multimodalModelsSet = nextSet;
+    reasoningModelsSet = nextReasoningSet;
 };
 
 // Initialize the set at startup
@@ -159,6 +168,12 @@ export const isModelMultimodal = (model) => {
     if (lower.startsWith('gemini-') || lower.startsWith('gemma-')) return true;
 
     return false;
+};
+
+export const hasModelReasoning = (model) => {
+    if (!model) return false;
+    const lower = model.trim().toLowerCase();
+    return reasoningModelsSet.has(lower);
 };
 
 export const getModels = (provider, apiTier) => {

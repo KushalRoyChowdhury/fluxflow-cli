@@ -1183,8 +1183,12 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
-            const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'Mistral';
-            setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
+            if (aiProvider === 'Mistral') {
+                setThinkingLevel('Fast');
+            } else {
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA';
+                setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
+            }
         } else {
             if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
                 if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
@@ -2426,11 +2430,8 @@ export default function App({ args = [] }) {
                         ]
                         : aiProvider === 'Mistral'
                             ? [
-                                { cmd: 'Fast', desc: 'None (No Reasoning)' },
-                                { cmd: 'Low', desc: 'Minimal Reasoning' },
-                                { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                                { cmd: 'High', desc: 'Deep Reasoning' },
-                                { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                                { cmd: 'Fast', desc: 'Reasoning Disabled' },
+                                { cmd: 'xHigh', desc: 'Deep Reasoning' }
                             ]
                             : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
                                 ? [
@@ -3402,19 +3403,19 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...Result Truncated by System on User Command')) {
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command')) {
                                 return m;
                             }
                             truncatedCount++;
                             if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
                                 return {
                                     ...m,
-                                    fullText: '[TOOL RESULT]: SUCCESS: ...Result Truncated by System on User Command'
+                                    fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
                                 };
                             }
                             return {
                                 ...m,
-                                fullText: '[TOOL RESULT]: ...Result Truncated by System on User Command'
+                                fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
                             };
                         });
 
@@ -3533,30 +3534,40 @@ export default function App({ args = [] }) {
                                 i++;
                             }
 
-                            // Emit messages in natural order — no classification or reordering.
-                            // Only merge adjacent same-role messages (required for API strict-alternation).
+                            const turnToolCalls = [];
+                            const turnToolResults = [];
+                            const turnFinalResponses = [];
+
                             turnMessages.forEach(tm => {
                                 const isResult = tm.role === 'system' && (
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
                                     tm.text?.startsWith('ERROR:')
                                 );
-
-                                const emitRole = isResult ? 'system' : 'agent';
                                 const rawText = (tm.text || '').trim();
                                 if (!rawText) return;
 
-                                const emitText = isResult && !rawText.startsWith('[TOOL RESULT]')
-                                    ? `[TOOL RESULT]: ${rawText}`
-                                    : rawText;
-
-                                const last = cleanHistoryForAI[cleanHistoryForAI.length - 1];
-                                if (last && last.role === emitRole) {
-                                    last.text = last.text + '\n\n' + emitText;
-                                } else {
-                                    cleanHistoryForAI.push({ role: emitRole, text: emitText });
+                                if (isResult) {
+                                    const emitText = !rawText.startsWith('[TOOL RESULT]') ? `[TOOL RESULT]: ${rawText}` : rawText;
+                                    turnToolResults.push(emitText);
+                                } else if (tm.role === 'agent') {
+                                    if (rawText.toLowerCase().includes('tool:functions.') || rawText.toLowerCase().includes('agent:generalist.')) {
+                                        turnToolCalls.push(rawText);
+                                    } else {
+                                        turnFinalResponses.push(rawText);
+                                    }
                                 }
                             });
+
+                            if (turnToolCalls.length > 0) {
+                                cleanHistoryForAI.push({ role: 'agent', text: turnToolCalls.join('\n') });
+                            }
+                            if (turnToolResults.length > 0) {
+                                cleanHistoryForAI.push({ role: 'system', text: turnToolResults.join('\n\n') });
+                            }
+                            if (turnFinalResponses.length > 0) {
+                                cleanHistoryForAI.push({ role: 'agent', text: turnFinalResponses.join('\n\n') });
+                            }
                         }
                     }
                     const stream = getAIStream(
@@ -3902,6 +3913,33 @@ export default function App({ args = [] }) {
 
                             clearBlocksCache();
 
+                            if (systemSettings?.autoTruncateResults) {
+                                setMessages(prev => {
+                                    const updatedMessages = prev.map(m => {
+                                        const fullTextStr = m.fullText || m.text || '';
+                                        if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
+                                            return m;
+                                        }
+                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command')) {
+                                            return m;
+                                        }
+                                        if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
+                                            return {
+                                                ...m,
+                                                fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
+                                            };
+                                        }
+                                        return {
+                                            ...m,
+                                            fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
+                                        };
+                                    });
+                                    saveChat(chatId, null, updatedMessages);
+                                    setCompletedIndex(updatedMessages.length);
+                                    return updatedMessages;
+                                });
+                            }
+
                             runJanitorTask(
                                 { profile: profileData, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider, apiKey },
                                 packet.data.agentText,
@@ -3978,7 +4016,7 @@ export default function App({ args = [] }) {
                             commitActiveStreamingMessage();
                             setMessages(prev => {
                                 const newMsgs = [...prev, {
-                                    id: 'tool-' + Date.now(),
+                                    id: 'tool-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
                                     role: 'system',
                                     text: flattenString(packet.content),
                                     fullText: flattenString(packet.aiContent), // Preserve raw data for next turn
@@ -4281,7 +4319,31 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const totalDuration = Date.now() - apiStart;
                         let foundLastAgent = false;
-                        const newMsgs = [...prev].reverse().map(m => {
+                        let msgsToProcess = prev;
+
+                        if (systemSettings.autoTruncateResults) {
+                            msgsToProcess = msgsToProcess.map(m => {
+                                const fullTextStr = m.fullText || m.text || '';
+                                if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
+                                    return m;
+                                }
+                                if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command')) {
+                                    return m;
+                                }
+                                if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
+                                    return {
+                                        ...m,
+                                        fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
+                                    };
+                                }
+                                return {
+                                    ...m,
+                                    fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
+                                };
+                            });
+                        }
+
+                        const newMsgs = [...msgsToProcess].reverse().map(m => {
                             let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
 
                             // Flatten final strings to free V8 ConsString memory permanently

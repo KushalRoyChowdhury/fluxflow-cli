@@ -3,9 +3,21 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.22.0"]
+export const stableVersions = ["3.23.0"]
 
 export const changelogData = {
+    "3.23.0": {
+        "note": "AUGUST 12",
+        "added": [
+            "Added auto tool-truncation (opt-in), to save MASSIVE amount of tokens! *and costs*."
+        ],
+        "changed": [
+            "Reasoning improvement on supported mistral models on mistral api."
+        ],
+        "fixes": [
+            "Bug fixes on turn alteration."
+        ]
+    },
     "3.22.0": {
         "note": "AUGUST 11.",
         "added": [
@@ -18,7 +30,9 @@ export const changelogData = {
             "Improved app's boot times by 42%.",
             "Improved in-app performance & resource utilzation."
         ],
-        "fixes": []
+        "fixes": [
+            "Bug Fixes."
+        ]
     },
     "3.20.0": {
         "note": "AUGUST 8.",

@@ -208,7 +208,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         }
     }
     // ~128k fixed cap for limited-context models; HIGH_CONTEXT is ignored for these.
-    if ((aiProvider === 'NVIDIA' && (activeModel?.includes('glm') || activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium'))) || aiProvider === 'Mistral') {
+    if ((aiProvider === 'NVIDIA' && (activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium') || activeModel.includes('muse'))) || aiProvider === 'Mistral') {
         maxLimit = 128000;
     }
 

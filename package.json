@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "3.22.0",
-    "date": "2026-08-11",
+    "version": "3.23.0",
+    "date": "2026-08-12",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era.",
     "keywords": [
         "ai",
@@ -41,7 +41,7 @@
     },
     "scripts": {
         "start": "tsx ./src/cli.jsx",
-        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --splitting --minify --tree-shaking=true --chunk-names=chunks/[name]-[hash] --outdir=./dist --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv --external:fast-glob --external:turndown --external:turndown-plugin-gfm && copy package.json dist\\package.json && copy src\\entry.js dist\\entry.js"
+        "build": "esbuild ./src/cli.jsx --bundle --platform=node --format=esm --splitting --minify --tree-shaking=true --chunk-names=chunks/[name]-[hash] --outdir=./dist --external:react --external:ink --external:chalk --external:fs-extra --external:gradient-string --external:ink-text-input --external:ink-select-input --external:@google/genai --external:zod --external:nanoid --external:puppeteer --external:pdf-lib --external:node-pty --external:html-to-docx --external:typescript --external:ws --external:web-tree-sitter --external:diff --external:dotenv --external:fast-glob --external:turndown --external:turndown-plugin-gfm && copy package.json dist\\package.json && copy src\\entry.js dist\\entry.js && copy model_config.json dist\\model_config.json"
     },
     "dependencies": {
         "@google/genai": "^1.52.0",

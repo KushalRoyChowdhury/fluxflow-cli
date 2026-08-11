@@ -925,19 +925,13 @@ export const CodeRenderer = React.memo(({ text, columns = 80, theme = 'Dark' }) 
                             <Box
                                 key={i}
                                 flexDirection="column"
-                                marginY={1}
-                                borderStyle="single"
-                                borderLeft={true}
-                                borderRight={false}
-                                borderTop={false}
-                                borderBottom={false}
-                                borderColor={colors.codeBorder}
+                                marginY={0}
                                 paddingLeft={2}
                                 paddingRight={0}
                                 width="100%"
                             >
                                 <Box>
-                                    <Text color="gray" bold>▶_ {lang.toUpperCase() || 'CODE'}</Text>
+                                    <Text color="gray" bold>▶_ {lang.toUpperCase() || 'TEXT'}</Text>
                                 </Box>
                                 <Box flexDirection="column" width="100%">
                                     {codeLines.map((line, idx) => {
@@ -1487,8 +1481,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
 
     if (type === 'code-fence-open') {
         const borderProps = {
-            borderStyle: 'single', borderLeft: true, borderRight: false,
-            borderTop: false, borderBottom: false, borderColor: colors.codeBorder, paddingLeft: 2, width: '100%'
+            paddingLeft: 2, width: '100%'
         };
         return (
             <Box flexDirection="column" marginTop={0} marginBottom={0} width="100%">
@@ -1496,7 +1489,7 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Text> </Text>
                 </Box>
                 <Box flexDirection="row" {...borderProps}>
-                    <Text color="gray" bold>▶_ {(text || 'CODE').toUpperCase()}</Text>
+                    <Text color="gray" bold>▶_ {(text || 'TEXT').toUpperCase()}</Text>
                 </Box>
             </Box>
         );
@@ -1513,8 +1506,6 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
                     <Box
                         key={subIdx}
                         flexDirection="row"
-                        borderStyle="single"
-                        borderLeft borderRight={false} borderTop={false} borderBottom={false}
                         borderColor={colors.codeBorder}
                         paddingLeft={2}
                         width="100%"
@@ -1535,9 +1526,6 @@ export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, ai
         return (
             <Box
                 flexDirection="row"
-                borderStyle="single"
-                borderLeft borderRight={false} borderTop={false} borderBottom={false}
-                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 marginBottom={1}
                 width="100%"

@@ -22,18 +22,19 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
     return `
--- TOOL DEFINITIONS --
-TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' SYNTAX STRING IN CHAT ← MANDATORY
+-- TOOL DEFINITIONS (STRING BASED PROTOCOL) --
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' STRUCTURED STRING IN CHAT RESPONSE ← MANDATORY
 TOOL RULES:
 - MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
-${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
+${mode === 'Flux' ? `- JSON ESCAPE LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY
 - Need text or HUGE file? CodeSearch > Full Read
 - MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - DONT HALLUCINATE TOOL RESULTS, VERIFY, FIX ERRORS
+- Stuck on syntax error? Tell User > Time waste
 ` : ""}
-- COMMUNICATION WITH USER -
+- USER COMMUNICATION -
 - [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
 
 - WEB TOOLS -
@@ -42,26 +43,26 @@ ${mode === 'Flux' ? `- JSON ESCAPE ALL LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENT
 
 ${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : ''}` : `Supports images/docs`}
-- [tool:functions.ReadFolder(path="...", recurse="integer 1-3")]. DIR Contents + File Size. Minimize recursion
+- [tool:functions.ReadFolder(path="...", recurse="integer 1-3")]. Minimize recursion
 - [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL searchContent. Line Ranges MUST for large searchContent AND escape sequences. ^...$ MUST for line ranges
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
-- [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool default: false", regex="bool default: auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
+- [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `POWERSHELL` : `WINDOWS CMD`) : `BASH`} command. Destructive/Irreversible ops → Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[STRING ARRAY], markDone=[TASK ID ARRAY])]. Analyze request: ONLY if long multi-task, break it down & create Todos BEFORE starting. Use \`get + markDone\` to mark complete. UPDATE EVERY TURN WHEN CREATED
+- [tool:functions.Todo(method="create/append/get", tasks=[STRING ARRAY], markDone=[TASK ARRAY])]. If long multi-task: create Todos before starting. \`get + markDone\` to mark complete. UPDATE EVERY TURN WHEN CREATED
 ${_cachedAdvanceRollback ? `
 - EMERGENCY TOOLS -
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
 - [tool:functions.EmergencyRollback(method="getCheckpoint/forceRevert", id="...")]. Rollback workspace in THIS agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`id\` omitted for \`getCheckpoint\`\n` : ''}${enableSubAgents ? `
 - SUB AGENT TOOLS -
-**PROACTIVE sub-agent use HIGHLY RECOMMENDED. Prefer for any task with even slight benefit, no user nudge needed**
+**PROACTIVE use HIGHLY RECOMMENDED. Prefer for any task, no user nudge needed**
 Invocations:
 • Invoke (async/background, ≤7 parallel). Parallelize long tasks. May take time
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- [tool:functions.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies & folder structure
-- [tool:functions.Await(id="...", timeout="integer seconds, default: 120")]. Event-driven wait
-- [tool:functions.GetProgress(id="...")]. Poll \`getProgress\` sparingly; NO initial poll. Work or await. Never end while subagent runs
+- [tool:functions.InvokeSync/Invoke(title="...", task="...")]. Task must be detailed: exact file paths, imports/exports, dependencies
+- [tool:functions.Await(id="...", timeout="integer")]. Event-driven wait
+- [tool:functions.GetProgress(id="...")]. Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
 - [tool:functions.Steer(id="...", message="...")]. Inject additional instruction or redirection into active async subagent
-- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or clearly incorrect` : ''}`.trim()
+- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`.trim()
 :
 
 
