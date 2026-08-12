@@ -575,6 +575,7 @@ export default function App({ args = [] }) {
     const maxScrollRef = useRef(0);
     const persistedModelRef = useRef(null);
     const activeStreamingMsgRef = useRef(null);
+    const tabDebounceRef = useRef(0);
     const [renderTick, setRenderTick] = useState(0);
     const forceRender = () => setRenderTick(t => t + 1);
 
@@ -1897,6 +1898,17 @@ export default function App({ args = [] }) {
                 }
                 setSelectedIndex(0);
                 setInputKey(prev => prev + 1);
+                return;
+            } else if (input.trim() === '') {
+                // Switch modes when input is empty and TAB is pressed (with 1s debounce)
+                const now = Date.now();
+                if (now - tabDebounceRef.current < 1000) {
+                    return;
+                }
+                tabDebounceRef.current = now;
+                const newMode = mode === 'Flux' ? 'Flow' : 'Flux';
+                setMode(newMode);
+                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }]);
                 return;
             }
         }
