@@ -4319,31 +4319,8 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const totalDuration = Date.now() - apiStart;
                         let foundLastAgent = false;
-                        let msgsToProcess = prev;
 
-                        if (systemSettings.autoTruncateResults) {
-                            msgsToProcess = msgsToProcess.map(m => {
-                                const fullTextStr = m.fullText || m.text || '';
-                                if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
-                                    return m;
-                                }
-                                if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command')) {
-                                    return m;
-                                }
-                                if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
-                                    return {
-                                        ...m,
-                                        fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
-                                    };
-                                }
-                                return {
-                                    ...m,
-                                    fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
-                                };
-                            });
-                        }
-
-                        const newMsgs = [...msgsToProcess].reverse().map(m => {
+                        const newMsgs = [...prev].reverse().map(m => {
                             let updated = m.isStreaming ? { ...m, isStreaming: false } : m;
 
                             // Flatten final strings to free V8 ConsString memory permanently

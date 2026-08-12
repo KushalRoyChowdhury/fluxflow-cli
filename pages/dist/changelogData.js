@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["3.23.0"]
+export const stableVersions = ["3.23.1"]
 
 export const changelogData = {
+    "3.23.1": {
+        "note": "AUGUST 13",
+        "added": [],
+        "changed": [
+            "Improved Auto-Truncation."
+        ],
+        "fixes": []
+    },
     "3.23.0": {
         "note": "AUGUST 12",
         "added": [

@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260813,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -442,8 +442,22 @@
                         "desc": "Text Only"
                     },
                     {
+                        "cmd": "\n--- Mistral Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "mistralai/mistral-nemotron",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
                         "cmd": "\n--- Meta Models ---",
                         "desc": ""
+                    },
+                    {
+                        "cmd": "meta/llama-3.1-70b-instruct",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     },
                     {
                         "cmd": "meta/llama-3.3-70b-instruct",

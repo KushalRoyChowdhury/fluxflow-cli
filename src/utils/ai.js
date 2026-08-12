@@ -3296,10 +3296,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     } else {
                         // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
-                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]`;
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]`;
                         } else {
                             // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
-                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
+                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]` });
                         }
                     }
                     yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
