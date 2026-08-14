@@ -221,11 +221,13 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
         >
             {/* 🛠️ MODE & CWD TELEMETRY ZONE */}
             <Box>
-                {mode.toLowerCase() === 'flow' && (
+                {mode.toLowerCase() !== 'flux' && (
                     <>
                         <Box marginRight={1}>
-                            <Text color={colors.text} bold>{mode.toUpperCase()}</Text>
-                            <Text color={colors.textMuted}> (Limited Tools)</Text>
+                            {/* <Text color={colors.text} bold>{mode.toUpperCase()}</Text> */}
+                            <Text color={colors.textMuted}>
+                                {mode.toLowerCase() === 'flow' ? 'Chat' : mode.toLowerCase() === 'icu' ? 'Computer Use' : 'Dev + CU'}
+                            </Text>
                         </Box>
 
                         <Text color={colors.textMuted} dimColor>┃ </Text>

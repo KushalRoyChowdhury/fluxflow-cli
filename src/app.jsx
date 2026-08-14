@@ -32,7 +32,7 @@ import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
-import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setOllamaMultimodal } from './data/model_config.js';
+import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setOllamaMultimodal, isModelMultimodal } from './data/model_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -1902,12 +1902,19 @@ export default function App({ args = [] }) {
             } else if (input.trim() === '') {
                 // Switch modes when input is empty and TAB is pressed (with 1s debounce)
                 const now = Date.now();
-                if (now - tabDebounceRef.current < 1000) {
+                if (now - tabDebounceRef.current < 500) {
                     return;
                 }
                 tabDebounceRef.current = now;
-                const newMode = mode === 'Flux' ? 'Flow' : 'Flux';
+                const modes = ['Flux', 'Flow', 'ICU'];
+                const nextIdx = (modes.indexOf(mode) + 1) % modes.length;
+                const newMode = modes[nextIdx >= 0 ? nextIdx : 0];
                 setMode(newMode);
+                if (newMode === 'Flow') {
+                    setThinkingLevel('Fast');
+                } else if (newMode === 'Flux' || newMode === 'ICU') {
+                    setThinkingLevel('High');
+                }
                 setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }]);
                 return;
             }
@@ -2463,7 +2470,11 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: (aiProvider === 'Ollama' && (apiKey === 'LOCAL' || !apiKey)) ? [] : getModels(aiProvider, apiTier)
+            subs: (aiProvider === 'Ollama' && (apiKey === 'LOCAL' || !apiKey))
+                ? []
+                : (mode === 'ICU'
+                    ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
+                    : getModels(aiProvider, apiTier))
         },
         {
             cmd: '/wildcard-tooling',
@@ -2474,9 +2485,11 @@ export default function App({ args = [] }) {
             desc: 'Select AI Provider'
         },
         {
-            cmd: '/mode', desc: 'Toggle Flux/Flow modes', subs: [
+            cmd: '/mode', desc: 'Toggle Flux/Flow/ICU modes', subs: [
                 { cmd: 'flux', desc: 'Enable Dev toolset' },
-                { cmd: 'flow', desc: 'Enable Chat mode' }
+                { cmd: 'flow', desc: 'Enable Chat mode' },
+                { cmd: 'icu', desc: 'Interactive Computer Use' },
+                { cmd: 'fluxcu', desc: 'Autonomous Flux Computer Use (Coming Soon)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -2814,15 +2827,24 @@ export default function App({ args = [] }) {
                 }
                 case '/mode': {
                     if (parts[1]) {
-                        const newMode = parts[1].toLowerCase() === 'flow' ? 'Flow' : 'Flux';
+                        const targetParam = parts[1].toLowerCase();
+                        let newMode = 'Flux';
+                        if (targetParam === 'flow') newMode = 'Flow';
+                        else if (targetParam === 'icu') newMode = 'ICU';
+                        else if (targetParam === 'fluxcu') {
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ FluxCU (Autonomous Computer Use) mode is coming soon!\n⠀`, isMeta: true }]; });
+                            return;
+                        }
+                        else if (targetParam === 'flux') newMode = 'Flux';
+
                         setMode(newMode);
                         if (newMode === 'Flow') {
                             setThinkingLevel('Fast');
-                        } else if (newMode === 'Flux') {
+                        } else {
                             setThinkingLevel('High');
                         }
                         const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}.\n⠀`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
                     }
@@ -4137,39 +4159,54 @@ export default function App({ args = [] }) {
                             }
                         }
 
-                        // 1. Detect transition to THINK mode (Handles <think> or <thought>)
-                        const hasThinkTag = chunkLower.includes('<think') || chunkLower.includes('<thought');
+                        // 1. Detect transition to THINK mode (Handles <think>, <thought>, <|channel>thought, etc.)
+                        const RE_STREAM_THINK_OPEN = /(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
+                        const RE_STREAM_THINK_CLOSE = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/i;
+                        const RE_STREAM_ALL_THINK_TAGS = /(?:<\/?(think|thought|thoughts)[^>]*>|<\|channel>thought|<channel\|>|\[\/?(think|thought|thoughts)\])/gi;
+
                         const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
+                        const curAgentText = (activeStreamingMsgRef.current?.role === 'agent') ? (activeStreamingMsgRef.current.text || '') : '';
+                        const combinedText = curAgentText + chunkText;
 
-                        if (hasThinkTag && canThink) {
-                            const match = chunkText.match(/<(think|thought)/i);
+                        if (canThink && (RE_STREAM_THINK_OPEN.test(chunkText) || RE_STREAM_THINK_OPEN.test(combinedText))) {
+                            const fullTextToProcess = RE_STREAM_THINK_OPEN.test(chunkText) ? chunkText : combinedText;
+                            const isCombined = (fullTextToProcess === combinedText && curAgentText.length > 0);
+                            const match = fullTextToProcess.match(RE_STREAM_THINK_OPEN);
                             const tagIndex = match.index;
-                            const beforeText = chunkText.substring(0, tagIndex);
-                            const afterText = chunkText.substring(tagIndex);
+                            const tagLen = match[0].length;
+                            const beforeText = fullTextToProcess.substring(0, tagIndex);
+                            const afterText = fullTextToProcess.substring(tagIndex + tagLen);
 
-                            if (beforeText) {
-                                if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
-                                    activeStreamingMsgRef.current = { id: 'agent-' + Date.now(), role: 'agent', text: flattenString(beforeText), isStreaming: true };
+                            if (beforeText && beforeText.trim()) {
+                                if (isCombined && activeStreamingMsgRef.current) {
+                                    activeStreamingMsgRef.current.text = flattenString(beforeText);
                                 } else {
-                                    activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + beforeText);
+                                    if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
+                                        activeStreamingMsgRef.current = { id: 'agent-' + Date.now(), role: 'agent', text: flattenString(beforeText), isStreaming: true };
+                                    } else {
+                                        activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + beforeText);
+                                    }
                                 }
+                                flushTypewriterNow();
+                                commitActiveStreamingMessage();
+                            } else {
+                                flushTypewriterNow();
+                                activeStreamingMsgRef.current = null;
                             }
-
-                            flushTypewriterNow();
-                            commitActiveStreamingMessage();
 
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
                             currentThinkId = 'think-' + Date.now();
                             activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() };
 
-                            // If this chunk also contains the closing tag </think> or </thought>
-                            if (afterText.match(/<\/(think|thought)>/i)) {
-                                const parts = afterText.split(/<\/(think|thought)>/i);
-                                const rawThinkContent = parts[0] || '';
-                                const thinkContent = rawThinkContent.replace(/^<(think|thought)[^>]*>\r?\n?/i, '').replace(/\r?\n?$/g, '');
-                                // Regex split with capturing group puts captured tag at odd indices, so text after tag is at index 2+
-                                const agentContent = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
+                            // If this chunk also contains the closing tag
+                            if (RE_STREAM_THINK_CLOSE.test(afterText)) {
+                                const closeMatch = afterText.match(RE_STREAM_THINK_CLOSE);
+                                const closeTagIndex = closeMatch.index;
+                                const closeTagLen = closeMatch[0].length;
+                                const rawThinkContent = afterText.substring(0, closeTagIndex);
+                                const thinkContent = rawThinkContent.replace(RE_STREAM_ALL_THINK_TAGS, '').replace(/^\r?\n+/, '').replace(/\r?\n+$/, '');
+                                const agentContent = afterText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
 
                                 activeStreamingMsgRef.current.text = flattenString(thinkContent);
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -4183,17 +4220,21 @@ export default function App({ args = [] }) {
                                     appendStreamText(agentContent);
                                 }
                             } else {
-                                let thinkStartText = afterText.replace(/^<(think|thought)[^>]*>\r?\n?/gi, '');
-                                appendStreamText(thinkStartText);
+                                let thinkStartText = afterText.replace(RE_STREAM_ALL_THINK_TAGS, '').replace(/^\r?\n+/, '');
+                                if (thinkStartText) {
+                                    appendStreamText(thinkStartText);
+                                }
                             }
                             continue;
                         }
 
-                        // 2. Aggressive Transition Analysis (Handles </think> or </thought>)
-                        if ((chunkLower.includes('</think>') || chunkLower.includes('</thought>')) && activeStreamingMsgRef.current?.role === 'think') {
-                            const parts = chunkText.split(/<\/(think|thought)>/gi);
-                            const thinkPart = parts[0] || '';
-                            const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
+                        // 2. Aggressive Transition Analysis (Handles closing think tags)
+                        if (RE_STREAM_THINK_CLOSE.test(chunkText) && activeStreamingMsgRef.current?.role === 'think') {
+                            const closeMatch = chunkText.match(RE_STREAM_THINK_CLOSE);
+                            const closeTagIndex = closeMatch.index;
+                            const closeTagLen = closeMatch[0].length;
+                            const thinkPart = chunkText.substring(0, closeTagIndex).replace(RE_STREAM_ALL_THINK_TAGS, '');
+                            const agentPart = chunkText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
 
                             // Flush queue FIRST so queued tokens appear before this chunk's tail text
                             flushTypewriterNow();
@@ -4206,7 +4247,9 @@ export default function App({ args = [] }) {
                             inThinkMode = false;
                             currentAgentId = 'agent-' + Date.now();
                             activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
-                            appendStreamText(agentPart);
+                            if (agentPart) {
+                                appendStreamText(agentPart);
+                            }
                             continue;
                         }
 
@@ -4215,10 +4258,12 @@ export default function App({ args = [] }) {
                             // Flush queue FIRST so ref.text is complete before deriving thinkPart
                             flushTypewriterNow();
                             const newText = activeStreamingMsgRef.current.text + chunkText;
-                            if (/<\/(think|thought)>/i.test(newText)) {
-                                const parts = newText.split(/<\/(think|thought)>/gi);
-                                const thinkPart = parts[0] || '';
-                                const agentPart = parts.slice(2).join('').replace(/<\/?(think|thought)>/gi, '');
+                            if (RE_STREAM_THINK_CLOSE.test(newText)) {
+                                const closeMatch = newText.match(RE_STREAM_THINK_CLOSE);
+                                const closeTagIndex = closeMatch.index;
+                                const closeTagLen = closeMatch[0].length;
+                                const thinkPart = newText.substring(0, closeTagIndex).replace(RE_STREAM_ALL_THINK_TAGS, '');
+                                const agentPart = newText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
 
                                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -4229,7 +4274,9 @@ export default function App({ args = [] }) {
                                 inThinkMode = false;
                                 currentAgentId = 'agent-' + Date.now();
                                 activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
-                                appendStreamText(agentPart);
+                                if (agentPart) {
+                                    appendStreamText(agentPart);
+                                }
                             } else {
                                 appendStreamText(chunkText);
                             }
@@ -6038,6 +6085,39 @@ export default function App({ args = [] }) {
                             />
                         </Box>
                     </Box>
+                );
+            case 'mode':
+                return (
+                    <CommandMenu
+                        title="SELECT EXECUTION MODE"
+                        items={[
+                            { label: `Flux     (Dev Toolset Mode) ${mode === 'Flux' ? '●' : ''}`, value: 'Flux' },
+                            { label: `Flow     (Chat / Conversation Mode) ${mode === 'Flow' ? '●' : ''}`, value: 'Flow' },
+                            { label: `ICU      (Interactive Computer Use) ${mode === 'ICU' ? '●' : ''}`, value: 'ICU' },
+                            { label: `FluxCU   (Autonomous Flux Computer Use) ${mode === 'FluxCU' ? '●' : ''}`, value: 'FluxCU' },
+                            { label: 'Back', value: 'chat' }
+                        ]}
+                        theme={systemSettings.theme}
+                        onSelect={(item) => {
+                            if (item.value === 'chat' || item.value === 'Back') {
+                                setActiveView('chat');
+                                return;
+                            }
+                            const newMode = item.value;
+                            setMode(newMode);
+                            if (newMode === 'Flow') {
+                                setThinkingLevel('Fast');
+                            } else {
+                                setThinkingLevel('High');
+                            }
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }];
+                            });
+                            setActiveView('chat');
+                        }}
+                        onClose={() => setActiveView('chat')}
+                    />
                 );
             case 'updateManager':
                 return (

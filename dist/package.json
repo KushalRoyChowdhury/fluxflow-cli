@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "3.23.1",
-    "date": "2026-08-13",
+    "version": "4.0.0",
+    "date": "2026-08-14",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era.",
     "keywords": [
         "ai",
@@ -45,6 +45,7 @@
     },
     "dependencies": {
         "@google/genai": "^1.52.0",
+        "@nut-tree-fork/nut-js": "^4.2.6",
         "chalk": "^5.6.2",
         "diff": "^9.0.0",
         "dotenv": "^17.4.2",
@@ -64,6 +65,9 @@
         "pdf-lib": "^1.17.1",
         "puppeteer": "24.43.1",
         "react": "^19.2.5",
+        "screenshot-desktop": "^1.15.4",
+        "sharp": "^0.35.3",
+        "tesseract.js": "^7.0.0",
         "turndown": "^7.2.4",
         "turndown-plugin-gfm": "^1.0.2",
         "web-tree-sitter": "^0.25.10",

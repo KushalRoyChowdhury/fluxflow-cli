@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "release": 20260813,
+    "version": 0,
+    "release": 20260814,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -100,12 +100,6 @@
                         "multimodal": true,
                         "hasReasoning": false,
                         "desc": "Mistral Large (Multimodal)"
-                    },
-                    {
-                        "cmd": "glm-5-2",
-                        "multimodal": false,
-                        "hasReasoning": true,
-                        "desc": "GLM Third-Party model (Text Only)"
                     },
                     {
                         "cmd": "labs-leanstral-1-5-1",
@@ -508,12 +502,12 @@
                     {
                         "cmd": "gemma-4-26b-a4b-it",
                         "multimodal": true,
-                        "desc": "Standard & Faster (Multimodal)"
+                        "desc": "Gemma 4 26B (Multimodal)"
                     },
                     {
                         "cmd": "gemma-4-31b-it",
                         "multimodal": true,
-                        "desc": "Standard Default (Multimodal)"
+                        "desc": "Gemma 4 31B (Multimodal)"
                     },
                     {
                         "cmd": "\n--- Gemini 2.5 Models ---",
@@ -544,7 +538,17 @@
                         "desc": "Fast & Lightweight (Multimodal) [Limited Free Quota]"
                     },
                     {
+                        "cmd": "gemini-3.5-flash",
+                        "multimodal": true,
+                        "desc": "Flash Latest (Multimodal) [Limited Free Quota]"
+                    },
+                    {
                         "cmd": "gemini-3.6-flash",
+                        "multimodal": true,
+                        "desc": "Flash Latest (Multimodal) [Limited Free Quota]"
+                    },
+                    {
+                        "cmd": "gemini-3.7-flash",
                         "multimodal": true,
                         "desc": "Flash Latest (Multimodal) [Limited Free Quota]"
                     }
@@ -589,7 +593,7 @@
                         "desc": "Default, Fast & Lightweight (Multimodal)"
                     },
                     {
-                        "cmd": "gemini-3.6-flash",
+                        "cmd": "gemini-3.7-flash",
                         "multimodal": true,
                         "desc": "Flash Latest (Multimodal) [Instability Issues]"
                     },

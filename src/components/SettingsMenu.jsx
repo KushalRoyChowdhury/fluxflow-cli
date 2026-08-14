@@ -6,7 +6,8 @@ import { getThemeColors, THEMES } from '../utils/theme.js';
 import { getModels } from '../data/model_config.js';
 import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
-import { DATA_DIR } from '../utils/paths.js';
+import { DATA_DIR, FLUXFLOW_DIR } from '../utils/paths.js';
+import os from 'os';
 
 const themeOptions = [...Object.keys(THEMES), 'Mystery'];
 
@@ -1060,7 +1061,8 @@ export default function SettingsMenu({
                                             <Box flexDirection="row">
                                                 <Text color={colors.textDim}>Data Directory{' '}</Text>
                                                 <Text color="gray">{'......... '}</Text>
-                                                <Text color={colors.text}>~/.fluxflow, {DATA_DIR.replaceAll('\\\\', '/')}</Text>
+                                                {FLUXFLOW_DIR === DATA_DIR ? '' : <Text color={colors.text}>{FLUXFLOW_DIR.replaceAll(os.homedir(), '~').replaceAll('\\\\', '/').replaceAll('\\', '/')}, </Text>}
+                                                <Text color={colors.text}>{DATA_DIR.replaceAll(os.homedir(), '~').replaceAll('\\\\', '/').replaceAll('\\', '/')}</Text>
                                             </Box>
 
                                             {/* Viewport */}

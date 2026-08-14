@@ -13,6 +13,7 @@ const headings = [
     { id: 'self-healing', text: 'System Integrity & Self-Healing', level: 2 },
     { id: 'ide-bridge', text: 'IDE Bridge (Companion)', level: 2 },
     { id: 'multimodal-pipeline', text: 'Multimodal Pipeline', level: 2 },
+    { id: 'computer-use', text: 'Computer Use & GUI Automation', level: 2 },
     { id: 'persistence-safety', text: 'Persistence, Data Sanctuary & Safety', level: 2 },
 ]
 
@@ -121,7 +122,39 @@ export default function Architecture() {
                 Native image and PDF processing pipeline that injects visual representations directly into multimodal models.
             </p>
 
-            <h2 id="persistence-safety">Persistence, Data Sanctuary & Safety</h2>
+            <h2 id="computer-use">Computer Use &amp; GUI Automation (ICU Mode)</h2>
+            <p>
+                FluxFlow features a zero-dependency, millisecond-latency <strong>Computer Use (Autonomous GUI Interaction)</strong> engine that enables multimodal frontier models to perceive, reason about, and interact with operating system desktop interfaces in real-time.
+            </p>
+            <ul>
+                <li>
+                    <strong>Viewport Stillness &amp; Stability Check</strong> — Before visual analysis, the screen capture engine captures two frames spaced <code>500ms</code> apart. If the binary buffers match, the viewport is confirmed stable. If dynamic animations or page loads are in progress, it applies a <code>3s</code> backoff before proceeding (max 2 cycles).
+                </li>
+                <li>
+                    <strong>Native Pixel Variance &amp; Set-of-Marks (SoM) Grid Overlay</strong> — Instead of heavyweight neural object detection models, FluxFlow uses <code>sharp</code> to compute raw pixel grayscale variance across a 720p normalized canvas in ~4ms. High-variance regions (icons, buttons, text lines) are isolated and marked with high-contrast yellow numbering (<code>#FFFF00</code> with black stroke outline).
+                </li>
+                <li>
+                    <strong>2-Pass Hybrid Visual Clustering</strong> —
+                    <ul>
+                        <li><em>Step 1 (2D Isolated Clustering):</em> Merges multi-cell icon/button elements (up to 4&times;4 cells, e.g., desktop shortcuts, taskbar tiles, setting controls) into single unified bounding boxes.</li>
+                        <li><em>Step 2 (Seam-Aware Vertical Pair Merging):</em> Merges vertically adjacent active pairs. It samples pixel density across the center seam: if clean, badges sit centered directly on the seam line; if text crosses the seam, the badge automatically dodges into the clearer cell with strict 2px boundary clamping.</li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Dynamic Text-Avoidance Y-Shifting</strong> — For single-cell badges, a 3-band vertical variance check (top 33%, center 33%, bottom 33%) detects text baselines and shifts yellow marks UP (<code>-8px</code>) or DOWN into empty background gaps, ensuring text labels remain 100% legible.
+                </li>
+                <li>
+                    <strong>Native Hardware Control (<code>@nut-tree-fork/nut-js</code>)</strong> — Automates mouse cursor movements, single/double clicks, drags, mouse-wheel scrolling, keyboard typing, and function key shortcuts (<code>F1</code>&ndash;<code>F12</code>, <code>Alt+F4</code>, <code>Ctrl+C</code>) mapped directly to native OS input events.
+                </li>
+                <li>
+                    <strong>Full-Screen Nearest-Neighbor OCR Auto-Correction</strong> — When an action specifies an <code>intendedClickText</code>, the engine performs a full-screen Tesseract OCR scan, locates all matching lines/words, calculates the Euclidean distance to the vision model's target grid mark, and clicks the exact physical pixel center of the matched UI text.
+                </li>
+                <li>
+                    <strong>2-Turn Memory Freshness &amp; Zero-Leak GC</strong> — Gridded screenshots are pruned to a strict 2-turn sliding window in LLM payloads, and image buffers are immediately nullified in memory for instant V8 garbage collection during long automation sessions.
+                </li>
+            </ul>
+
+            <h2 id="persistence-safety">Persistence, Data Sanctuary &amp; Safety</h2>
             <ul>
                 <li><strong>External Data Sanctuary (Redirection)</strong> — Allows anchoring session state, logs, and encrypted memories to an external drive or VeraCrypt volume via <code>externalDataPath</code>.</li>
                 <li><strong>High-Fidelity Lock & Encryption</strong> — Promise-based <code>WRITE_LOCK</code> prevents state race conditions while secrets and memories remain encrypted at rest.</li>
@@ -129,4 +162,3 @@ export default function Architecture() {
         </DocPage>
     )
 }
-

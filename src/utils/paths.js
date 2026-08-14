@@ -64,3 +64,4 @@ export const ACTIVE_TX_FILE = path.join(SECRET_DIR, 'active_tx.json');
 export const PATHS_FILE = path.join(SECRET_DIR, 'path.json');
 export const CONTEXT_FILE = path.join(SECRET_DIR, 'context.json');
 export const PARSER_DIR = path.join(DATA_DIR, 'parsers');
+export const CU_CACHE_DIR = path.join(FLUXFLOW_DIR, '.cache', 'CU');

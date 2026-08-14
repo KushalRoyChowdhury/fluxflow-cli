@@ -17,31 +17,24 @@ export const isPsAvailable = () => {
 
 let _cachedAdvanceRollback = null;
 
+
 export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => {
     if (_cachedAdvanceRollback === null) {
         _cachedAdvanceRollback = advanceRollback;
     }
-    return `
--- TOOL DEFINITIONS (STRING BASED PROTOCOL) --
-TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' STRUCTURED STRING IN CHAT RESPONSE ← MANDATORY
-TOOL RULES:
-- MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
-${mode === 'Flux' ? `- JSON ESCAPE LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
+
+    const fluxInstructions = `- JSON ESCAPE LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - SAME file, MULTIPLE edits? ONE PatchFile (≤15 blocks) ← PRIORITY
 - Tool denied? Ask for guidance ← MANDATORY
 - Need text or HUGE file? CodeSearch > Full Read
 - MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - DONT HALLUCINATE TOOL RESULTS, VERIFY, FIX ERRORS
 - Stuck on syntax error? Tell User > Time waste
-` : ""}
-- USER COMMUNICATION -
-- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
+`;
 
-- WEB TOOLS -
-- [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
-- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
+// =====================================================================================================
 
-${mode === 'Flux' ? `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
+    const fluxTools = `- WORKSPACE TOOLS (path = relative; FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.ReadFile(path="...", startLine="integer", endLine="integer")]. ${aiProvider !== 'Google' ? `${isMultiModal ? `Supports images/docs` : ''}` : `Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="integer 1-3")]. Minimize recursion
 - [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. TARGET MINIMAL searchContent. Line Ranges MUST for large searchContent AND escape sequences. ^...$ MUST for line ranges
@@ -62,22 +55,41 @@ Invocations:
 - [tool:functions.Await(id="...", timeout="integer")]. Event-driven wait
 - [tool:functions.GetProgress(id="...")]. Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
 - [tool:functions.Steer(id="...", message="...")]. Inject additional instruction or redirection into active async subagent
-- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`.trim()
-:
+- [tool:functions.Cancel(id="...")]. Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
 
+// =====================================================================================================
 
-
-
-
-
-
-
-
-
-`- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
+    const flowTools = `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
 - [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
-- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`.trim()}`.trim();
+- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`;
+
+// =====================================================================================================
+
+    const computerTools = `- COMPUTER USE TOOLS (GUI Desktop Automation) -
+- [tool:functions.Click(gridId="integer", type="single/double", button="left/middle/right", intendedClickText="target text")]. Click target grid number, intendedClickText: LITERAL TEXT/ICON ON SCREEN (OCR SCANNBALE, UPTO 3 WORDS). DOUBLE CLICK DESKTOP ICONS
+- [tool:functions.Drag(fromGridId="integer", toGridId="integer")]. Drag mouse from start grid number to target grid number
+- [tool:functions.Scroll(direction="up/down", amount="integer")]. Scroll screen vertically by amount, USE WHEN SCROLLING IS NEEDED
+- [tool:functions.KeyboardTyping(text="string", autoPressEnter="bool")]. Type text string into currently active input. JSON ESCAPE LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
+- [tool:functions.KeyPress(key="key or ;-separated combination, eg: enter, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4")]. Press key, shortcut, function key (f1-f12), or clear active input field.
+- [tool:functions.RecaptureScreen()]. Request fresh gridded screenshot`;
+
+// =====================================================================================================
+
+    return `
+-- TOOL DEFINITIONS (STRING BASED PROTOCOL) --
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' STRUCTURED STRING IN CHAT RESPONSE ← MANDATORY
+TOOL RULES:
+- MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
+${mode === 'Flux' ? `${fluxInstructions}` : ""}
+- USER COMMUNICATION -
+- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
+
+- WEB TOOLS -
+- [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
+- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
+
+${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };
 // [DEPRICATED] - [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")].. Mockups, PDF thumbnails, any visual content
 // [DEPRICATED] - [tool:functions.FileMap(path="...")]. Shows file's code structure

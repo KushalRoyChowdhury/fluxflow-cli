@@ -23,6 +23,7 @@ import { getProviderAPIKey } from './secrets.js';
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
+import { captureGriddedScreenshot } from './screen_grid.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 import { getDirTreeIndentation } from './getDirTree/indentation.js';
 import { getDirTreeBox } from './getDirTree/box.js';
@@ -45,10 +46,18 @@ const RE_TOOL_CALL_ANY = /\[\s*(?:tool:functions\.|agent:generalist\.)([a-z0-9_]
 const RE_TOOL_PARTIAL_ARGS_FALLBACK = /(?:path|targetFile|TargetFile|directory|keyword|id|taskId|title|task)\s*=\s*\\?["']?([^\\"' \),]+)/;
 const RE_STRIP_QUOTES = /["']/g;
 const RE_BACKSLASH_SLASH = /\\/g;
-const RE_STRIP_THINK_CLOSED = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi;
-const RE_STRIP_THINK_OPEN = /(?:<(think|thought)>|\[(think|thought)\])[\s\S]*$/gi;
-const RE_STRIP_THINK_SIMPLE = /(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\]|$)/gi;
-const RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi;
+const RE_CHANNEL_THINK_OPEN = /<\|channel>thought/gi;
+const RE_CHANNEL_THINK_CLOSE = /<channel\|>/gi;
+
+export const convertChannelThinkTags = (str) => {
+    if (typeof str !== 'string') return str;
+    return str.replace(RE_CHANNEL_THINK_OPEN, '<think>').replace(RE_CHANNEL_THINK_CLOSE, '</think>');
+};
+
+const RE_STRIP_THINK_CLOSED = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
+const RE_STRIP_THINK_OPEN = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*$/gi;
+const RE_STRIP_THINK_SIMPLE = /(?:<think>|<\|channel>thought|\[think\])[\s\S]*?(?:<\/think>|<channel\|>|\[\/think\]|$)/gi;
+const RE_STRIP_THINK_FULL = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/gi;
 const RE_BACKTICK_SPAN = /`[^`]*`/g;
 const RE_BACKTICK_OPEN = /`[^`]*$/;  // unclosed span — handles streaming (closing backtick not yet received)
 const RE_KIMI_TOOL_CALL = /<\|\s*tool_call_begin\s*\|>\s*(?:(?:tool|functions)\b[\s._]*)*([a-zA-Z0-9_]+)(?::\d+)?\s*<\|\s*tool_call_argument_begin\s*\|>([\s\S]*?)<\|\s*tool_call_end\s*\|>/gi;
@@ -69,7 +78,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -526,17 +535,17 @@ const getMistralStream = async function* (apiKey, model, contents, systemInstruc
 
     const parseChunkText = (val) => {
         if (!val) return '';
-        if (typeof val === 'string') return val;
+        if (typeof val === 'string') return convertChannelThinkTags(val);
         if (Array.isArray(val)) {
             return val.map(parseChunkText).filter(Boolean).join('');
         }
         if (typeof val === 'object' && val !== null) {
-            if (typeof val.text === 'string') return val.text;
-            if (typeof val.content === 'string') return val.content;
-            if (typeof val.thinking === 'string') return val.thinking;
-            if (typeof val.reasoning_content === 'string') return val.reasoning_content;
-            if (typeof val.reasoning === 'string') return val.reasoning;
-            if (typeof val.value === 'string') return val.value;
+            if (typeof val.text === 'string') return convertChannelThinkTags(val.text);
+            if (typeof val.content === 'string') return convertChannelThinkTags(val.content);
+            if (typeof val.thinking === 'string') return convertChannelThinkTags(val.thinking);
+            if (typeof val.reasoning_content === 'string') return convertChannelThinkTags(val.reasoning_content);
+            if (typeof val.reasoning === 'string') return convertChannelThinkTags(val.reasoning);
+            if (typeof val.value === 'string') return convertChannelThinkTags(val.value);
 
             if (val.text) return parseChunkText(val.text);
             if (val.content) return parseChunkText(val.content);
@@ -547,7 +556,7 @@ const getMistralStream = async function* (apiKey, model, contents, systemInstruc
 
             return '';
         }
-        return String(val);
+        return convertChannelThinkTags(String(val));
     };
 
     while (true) {
@@ -1265,8 +1274,9 @@ const getOllamaStream = async function* (apiKey, model, contents, systemInstruct
         if (Array.isArray(content.parts)) {
             text = content.parts.map(p => p.text || '').filter(Boolean).join('\n');
             for (const p of content.parts) {
-                if (p.inline_data && p.inline_data.data) {
-                    images.push(p.inline_data.data);
+                const imgObj = p.inlineData || p.inline_data;
+                if (imgObj && imgObj.data) {
+                    images.push(imgObj.data);
                 }
             }
         } else {
@@ -1416,7 +1426,19 @@ const TOOL_LABELS = {
     'answer': 'Answering Sub-Agent',
     'Answer': 'Answering Sub-Agent',
     'steer': 'Steering Sub-Agent',
-    'Steer': 'Steering Sub-Agent'
+    'Steer': 'Steering Sub-Agent',
+    'Click': 'Clicking',
+    'click': 'Clicking',
+    'Drag': 'Dragging',
+    'drag': 'Dragging',
+    'Scroll': 'Scrolling',
+    'scroll': 'Scrolling',
+    'KeyboardTyping': 'Typing',
+    'keyboard_typing': 'Typing',
+    'KeyPress': 'Pressing Key',
+    'key_press': 'Pressing Key',
+    'RecaptureScreen': 'Recapturing Screen',
+    'recapture_screen': 'Recapturing Screen'
 };
 
 const getToolDetail = (toolName, argsStr) => {
@@ -3233,7 +3255,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         }
 
         let lastUsage = null;
-        const MAX_LOOPS = mode === 'Flux' ? 100 : 10;
+        let MAX_LOOPS = mode === 'Flux' ? 100 : 10;
+        MAX_LOOPS = mode.toLowerCase().includes('cu') ? 250 : MAX_LOOPS;
         const MAX_RETRIES = 16;
         yield { type: 'status', content: 'Connecting' };
 
@@ -3251,11 +3274,56 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             }
             const currentTurnTools = [];
             wasToolCalledInLastLoop = false
+
+            // Auto-capture screenshot for vision feedback in ICU or FluxCU modes
+            if (mode === 'ICU' || mode === 'FluxCU') {
+                try {
+                    yield { type: 'status', content: 'Capturing Screen' };
+                    // wait 3s to give time
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const screenshotData = await captureGriddedScreenshot();
+                    if (screenshotData && screenshotData.base64) {
+                        const screenshotMsg = `[SYSTEM] 16:9 Gridded Screen Feedback Captured. Use numeric coordinates [/SYSTEM]`;
+                        const visionPart = {
+                            inlineData: {
+                                mimeType: screenshotData.mimeType,
+                                data: screenshotData.base64
+                            }
+                        };
+
+                        // Strip old vision inlineData parts from previous turns to prevent accumulated image payload bloat
+                        for (const msg of modifiedHistory) {
+                            if (Array.isArray(msg.parts)) {
+                                msg.parts = msg.parts.filter(p => !p.inlineData);
+                            }
+                        }
+
+                        if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
+                            const lastMsg = modifiedHistory[modifiedHistory.length - 1];
+                            if (typeof lastMsg.text === 'string') {
+                                lastMsg.text += `\n\n${screenshotMsg}`;
+                                if (!Array.isArray(lastMsg.parts)) lastMsg.parts = [{ text: lastMsg.text }];
+                                lastMsg.parts.push(visionPart);
+                            }
+                        } else {
+                            modifiedHistory.push({
+                                role: 'user',
+                                text: screenshotMsg,
+                                parts: [{ text: screenshotMsg }, visionPart]
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Vision screenshot capture error:', err);
+                }
+            }
             if (systemSettings?.compression === 0.0 && (sessionStats?.tokens || 0) > contextTruncationCount) {
                 modifiedHistory = getTruncatedHistory(modifiedHistory, 6);
             }
             if (loop > 0) {
                 yield { type: 'status', content: 'Working' };
+            } else {
+                yield { type: 'status', content: 'Connecting' };
             }
             if (TERMINATION_SIGNAL) {
                 try {
@@ -3409,7 +3477,27 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 text = text.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
                                 text = text.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
                             }
-                            const parts = [{ text }];
+                            let parts = [];
+                            if (Array.isArray(msg.parts) && msg.parts.length > 0) {
+                                parts = msg.parts.map(p => {
+                                    if (p.text) {
+                                        let pt = p.text;
+                                        if (!isMemoryEnabled) {
+                                            pt = pt.replace(/\s*\n*\s*\[Prompted on:.*?\]/gi, '').trim();
+                                        }
+                                        if (msg.role === 'agent') {
+                                            pt = stripToolCallWrappers(pt);
+                                            pt = pt.replace(/\[turn:\s*finish\]/gi, '').replace(/\[\[END\]\]/gi, '').trim();
+                                            pt = pt.replaceAll('\u001b[33mⓘ Request Cancelled\u001b[0m', '*User Cancelled Response Generation*');
+                                        }
+                                        return { text: pt };
+                                    }
+                                    return p;
+                                });
+                            } else {
+                                parts = [{ text }];
+                            }
+
                             if (msg.binaryPart && isModelMultimodal(targetModel)) {
                                 // 2-Turn Freshness Check: Only include binary data if it appeared within the last 2 physical user turns
                                 const physicalUserTurnsAfter = arr.slice(idx + 1).filter(m => m.role === 'user' && !m.text?.startsWith('[TOOL RESULT]')).length;
@@ -3950,8 +4038,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 chunkText += '</think>';
                                 inThinkingState = false;
                             }
-                            chunkText += t;
                         }
+                        chunkText = convertChannelThinkTags(chunkText);
 
                         const chunkWordCount = chunkText ? chunkText.trim().split(/\s+/).filter(Boolean).length : 0;
 
@@ -4133,7 +4221,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'Answer': 'Answering Sub-Agent',
                                             'answer': 'Answering Sub-Agent',
                                             'Steer': 'Steering Sub-Agent',
-                                            'steer': 'Steering Sub-Agent'
+                                            'steer': 'Steering Sub-Agent',
+                                            'Click': 'Clicking',
+                                            'click': 'Clicking',
+                                            'Drag': 'Dragging',
+                                            'drag': 'Dragging',
+                                            'Scroll': 'Scrolling',
+                                            'scroll': 'Scrolling',
+                                            'KeyboardTyping': 'Typing',
+                                            'keyboard_typing': 'Typing',
+                                            'KeyPress': 'Pressing Key',
+                                            'key_press': 'Pressing Key',
+                                            'RecaptureScreen': 'Recapturing Screen',
+                                            'recapture_screen': 'Recapturing Screen'
                                         };
                                         const toolTitle = TOOL_TITLES[potentialTool] || 'Working';
                                         process.stdout.write(`\u001b]0;${toolTitle}...\u0007`);
@@ -4166,7 +4266,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 if ((aiProvider.toLowerCase().includes('google') || aiProvider.toLowerCase().includes('mistral')) && ((targetModel || "").toLowerCase().startsWith('gemma') || (targetModel || "").toLowerCase().includes('stral'))) {
                                     const thinkingCaps = {
                                         'low': 256,
-                                        'medium': 768,
+                                        'medium': 1024,
                                         'high': 8192,
                                         'max': 16384,
                                         'xhigh': 16384,
@@ -4301,7 +4401,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel', 'EmergencyRollback': 'EmergencyRollback'
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
+                                    'Click': 'click', 'click': 'click', 'Drag': 'drag', 'drag': 'drag', 'Scroll': 'scroll', 'scroll': 'scroll', 'KeyboardTyping': 'keyboard_typing', 'keyboard_typing': 'keyboard_typing', 'KeyPress': 'key_press', 'key_press': 'key_press', 'RecaptureScreen': 'recapture_screen', 'recapture_screen': 'recapture_screen',
+                                    'EmergencyRollback': 'EmergencyRollback'
                                 };
                                 const normToolName = NORMALIZE_MAP[toolCall.toolName] || toolCall.toolName;
 
@@ -4312,7 +4414,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                 // START VISUAL FEEDBACK FOR TOOLS
                                 let label = '';
-                                if (normToolName === 'web_search') {
+                                if (normToolName === 'click') {
+                                    const p = parseArgs(toolCall.args);
+                                    label = `✔  Clicked: ${p.intendedClickText ? `${p.intendedClickText}` : ''}`;
+                                } else if (normToolName === 'drag') {
+                                    const p = parseArgs(toolCall.args);
+                                    label = `✔  Dragged: Cell ${p.fromGridId || ''} → Cell ${p.toGridId || ''}`;
+                                } else if (normToolName === 'scroll') {
+                                    const p = parseArgs(toolCall.args);
+                                    label = `✔  Scrolled: ${p.direction || 'down'} (${p.amount || 1})`;
+                                } else if (normToolName === 'keyboard_typing') {
+                                    const p = parseArgs(toolCall.args);
+                                    label = `✔  Typed: ${p.text ? `"${p.text.length > 20 ? p.text.substring(0, 20) + '...' : p.text}"` : ''}`;
+                                } else if (normToolName === 'key_press') {
+                                    const p = parseArgs(toolCall.args);
+                                    label = `✔  Pressed Key: ${p.key || ''}`;
+                                } else if (normToolName === 'recapture_screen') {
+                                    label = `✔  Recaptured Screen`;
+                                } else if (normToolName === 'web_search') {
                                     const { query, limit = 10, aiMode = false } = parseArgs(toolCall.args);
                                     label = `${query ? '✔' : '✘'}  ${aiMode ? 'AI Search' : 'Searched'}: ${query ? `${query}` : 'No Search Query'}${aiMode === false && query ? ` → ${limit}` : ''}`;
                                 } else if (normToolName === 'web_scrape') {

@@ -347,14 +347,14 @@ export const handleExport = async (parts, { chatId, messages }) => {
         return {
             success: true,
             type: 'chat',
-            message: `[EXPORT] Current chat exported to "${result.exportFile}"`
+            message: `✦ Chat Exported\n⠀⠀└─ ${result.exportFile}\n⠀`
         };
     } else if (subCategory === 'logs') {
         const result = await exportErrorLogs();
         return {
             success: true,
             type: 'logs',
-            message: `[EXPORT LOGS] Exported ${result.entryCount} error log entries (FluxFlow: ${result.fluxflowCount}, Memory: ${result.memoryCount}) to "${result.exportFile}"`
+            message: `✦ Error Logs Exported\n⠀⠀└─ ${result.exportFile}\n⠀`
         };
     } else {
         return {

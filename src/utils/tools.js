@@ -25,6 +25,13 @@ import { emergency_rollback } from '../tools/emergency_rollback.js';
 import { awaitSubagent } from '../tools/awaitSubagent.js';
 import { answerSubagent } from '../tools/answerSubagent.js';
 import { steerSubagent } from '../tools/steerSubagent.js';
+import { computer_action } from '../tools/computer_action.js';
+import { click } from '../tools/click.js';
+import { drag } from '../tools/drag.js';
+import { scroll } from '../tools/scroll.js';
+import { keyboard_typing } from '../tools/keyboard_typing.js';
+import { key_press } from '../tools/key_press.js';
+import { recapture_screen } from '../tools/recapture_screen.js';
 
 
 const TOOL_MAP = {
@@ -52,6 +59,28 @@ const TOOL_MAP = {
     awaitSubagent,
     answerSubagent,
     steerSubagent,
+    computer_action,
+    computer_use: computer_action,
+    ComputerAction: computer_action,
+    ComputerUse: computer_action,
+
+    // New Dedicated Computer Use Tools
+    click,
+    Click: click,
+    drag,
+    Drag: drag,
+    scroll,
+    Scroll: scroll,
+    keyboard_typing,
+    KeyboardTyping: keyboard_typing,
+    keyboardtyping: keyboard_typing,
+    key_press,
+    KeyPress: key_press,
+    keypress: key_press,
+    recapture_screen,
+    RecaptureScreen: recapture_screen,
+    recapturescreen: recapture_screen,
+
     invoke_sync: invokeSync,
     get_progress: getProgress,
     await_subagent: awaitSubagent,
@@ -110,6 +139,9 @@ export const dispatchTool = async (toolName, args, context = {}) => {
     const systemTools = ['memory', 'chat', 'savesummary', 'addmemscore', 'add_mem_score', 'ask', 'web_search', 'web_scrape', 'await'];
     const isSystem = systemTools.some(t => normalized.includes(t)) || normalized === 'ask';
 
+    const cuTools = ['click', 'drag', 'scroll', 'keyboardtyping', 'keyboard_typing', 'keypress', 'key_press', 'recapturescreen', 'recapture_screen', 'computer'];
+    const isCUTool = cuTools.some(t => normalized.includes(t));
+
     if (!isSystem) {
         // 2. MODE-SPECIFIC RESTRICTIONS
         if (mode === 'flow') {
@@ -118,11 +150,16 @@ export const dispatchTool = async (toolName, args, context = {}) => {
             if (!isCreative) {
                 return `ERROR: Tool [${toolName}] is a Workspace Tool and NOT available in Flow mode. Tell user to switch (\`/mode flux\`) to use this tool.`;
             }
+        } else if (mode === 'icu') {
+            // ICU Mode: Only Computer Use tools allowed
+            if (!isCUTool) {
+                return `ERROR: Tool [${toolName}] is not available in Computer Use mode. ICU mode only supports Computer Use tools (Click, Drag, Scroll, KeyboardTyping, KeyPress, RecaptureScreen).`;
+            }
         } else {
-            // Flux Mode: Workspace tools allowed, Creative tools restricted
+            // Flux & FluxCU Mode: Workspace tools allowed, Creative tools restricted
             const isCreative = normalized.includes('write_pdf') || normalized.includes('write_docx') || normalized.includes('generate_image');
             if (isCreative) {
-                return `ERROR: Tool [${toolName}] is not available in Flux mode. Tell user to switch (\`/mode flow\`) for document generation.`;
+                return `ERROR: Tool [${toolName}] is not available in ${context.mode || 'Flux'} mode. Tell user to switch (\`/mode flow\`) for document generation.`;
             }
         }
     }
