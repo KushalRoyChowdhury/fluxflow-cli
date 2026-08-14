@@ -3,10 +3,10 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.0.0"]
+export const stableVersions = ["4.0.1"]
 
 export const changelogData = {
-    "4.0.0": {
+    "4.0.1": {
         "note": "AUGUST 14",
         "added": [
             "Introducing **Computer Use (Autonomous GUI Interaction)**\n• Full set of actions including mouse control, typing, etc.\n• Any multimodal reasoning models supported.\n• Uses on-device computer vision for clustering.\n**NOTE:**\n• Higher Token usage.\n• Currently limited to english only.\n• Don't use in sensitive tasks.",
