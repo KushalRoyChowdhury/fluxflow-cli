@@ -911,10 +911,11 @@ export default function App({ args = [] }) {
             } else if (arg === '--mode' && args[i + 1]) {
                 const val = args[i + 1];
                 const lower = val.toLowerCase();
-                if (['flux', 'flow'].includes(lower)) {
+                if (['flux', 'flow', 'icu', 'computer'].includes(lower)) {
                     let mapped = 'Flux';
                     if (lower === 'flux') mapped = 'Flux';
                     else if (lower === 'flow') mapped = 'Flow';
+                    else if (lower === 'icu' || lower === 'computer') mapped = 'ICU';
                     parsed.mode = mapped;
                 }
                 i++;
