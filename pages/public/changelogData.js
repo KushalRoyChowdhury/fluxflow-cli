@@ -9,10 +9,12 @@ export const changelogData = {
     "4.0.1": {
         "note": "AUGUST 14",
         "added": [
-            "Introducing **Computer Use (Autonomous GUI Interaction)**\n• Full set of actions including mouse control, typing, etc.\n• Any multimodal reasoning models supported.\n• Uses on-device computer vision for clustering.\n**NOTE:**\n• Higher Token usage.\n• Currently limited to english only.\n• Don't use in sensitive tasks.",
+            "Introducing **Computer Use (GUI Interaction)**\n• Full set of actions including mouse control, typing, etc.\n• Any multimodal reasoning models supported.\n• Uses on-device computer vision for clustering.\n**NOTE:**\n• Higher Token usage.\n• Currently limited to english only.\n• Don't use in sensitive tasks.",
             "Easier mode switch with TAB."
         ],
-        "changed": [],
+        "changed": [
+            "Full Autonomous Computer Use coming soon."
+        ],
         "fixes": [
             "Fixed a issue where reasoning wasn't visible with multimodal inputs in Ollama integration."
         ]
