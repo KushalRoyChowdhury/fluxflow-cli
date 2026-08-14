@@ -47,7 +47,8 @@ Whether you need a conversational partner or an autonomous developer that can wr
 - **Two Operating Modes**:
   - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops, subagents, safety tools to solve complex coding tasks.
   - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
-  - **Use Computer (GUI Automation)**: Agents can control your computer, including mouse and keyboard.
+  - **Computer Use (GUI Automation)**: Agents can control computer GUI, with mouse and keyboard.
+  - **FluxCU/Omni (Automated Workflow Engine)**: Agents can control computer GUI for automated workflows and tasks, with mouse and keyboard.
 - **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
 - **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
 - **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity coding standards and complex workflows.

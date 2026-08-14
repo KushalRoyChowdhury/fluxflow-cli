@@ -348,14 +348,43 @@ let screenshotCounter = 1;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Retrieves the currently active display index from settings (0 = Primary, 1 = Secondary / Display 2).
+ */
+export async function getActiveDisplay() {
+    try {
+        const { loadSettings } = await import('./settings.js');
+        const settings = await loadSettings();
+        return Number(settings.display || 0);
+    } catch (e) {
+        return 0;
+    }
+}
+
+/**
+ * Returns screenshot-desktop options targeting the user-selected display screen.
+ */
+async function getScreenshotOptions() {
+    const displayIndex = await getActiveDisplay();
+    try {
+        const displays = await screenshotDesktop.listDisplays();
+        if (displays && displays.length > 0) {
+            const targetDisplay = displays[displayIndex] || displays[0];
+            return { format: 'png', screen: targetDisplay.id };
+        }
+    } catch (e) {}
+    return { format: 'png' };
+}
+
+/**
  * Captures a stable desktop screenshot by verifying viewport stillness (500ms stability check with 3s backoff, max 2 retry loops).
  */
 async function captureStableScreenshot() {
     let attempts = 0;
+    const snapOpts = await getScreenshotOptions();
     while (attempts < 2) {
-        const first = await screenshotDesktop({ format: 'png' });
+        const first = await screenshotDesktop(snapOpts);
         await sleep(500);
-        const second = await screenshotDesktop({ format: 'png' });
+        const second = await screenshotDesktop(snapOpts);
 
         // If viewport is completely stable between 500ms intervals
         if (first.equals(second)) {
@@ -371,7 +400,7 @@ async function captureStableScreenshot() {
 
     // Final fallback after 2 cycles
     await sleep(3000);
-    return await screenshotDesktop({ format: 'png' });
+    return await screenshotDesktop(snapOpts);
 }
 
 /**
@@ -503,6 +532,23 @@ export async function gridToNativeCoordinates(target, actualScreenWidth, actualS
 
     let screenW = actualScreenWidth;
     let screenH = actualScreenHeight;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    const displayIndex = await getActiveDisplay();
+    try {
+        const displays = await screenshotDesktop.listDisplays();
+        if (displays && displays.length > 0) {
+            const targetDisplay = displays[displayIndex] || displays[0];
+            if (targetDisplay.width && targetDisplay.height) {
+                screenW = targetDisplay.width;
+                screenH = targetDisplay.height;
+            }
+            if (targetDisplay.left !== undefined) offsetX = targetDisplay.left;
+            if (targetDisplay.top !== undefined) offsetY = targetDisplay.top;
+        }
+    } catch (e) {}
+
     if (!screenW || !screenH) {
         try {
             screenW = await screen.width();
@@ -516,13 +562,15 @@ export async function gridToNativeCoordinates(target, actualScreenWidth, actualS
     const scaleX = screenW / GRID_CONFIG.TARGET_WIDTH;
     const scaleY = screenH / GRID_CONFIG.TARGET_HEIGHT;
 
-    const nativeX = Math.round(point720.x * scaleX);
-    const nativeY = Math.round(point720.y * scaleY);
+    const nativeX = Math.round(point720.x * scaleX) + offsetX;
+    const nativeY = Math.round(point720.y * scaleY) + offsetY;
 
     return {
-        x: Math.max(0, Math.min(screenW - 1, nativeX)),
-        y: Math.max(0, Math.min(screenH - 1, nativeY)),
+        x: nativeX,
+        y: nativeY,
         screenW,
-        screenH
+        screenH,
+        offsetX,
+        offsetY
     };
 }

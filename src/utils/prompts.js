@@ -5,10 +5,26 @@ import fs from 'fs';
 import { readEncryptedJson } from './crypto.js';
 import { MEMORIES_FILE } from './paths.js';
 import { LOGS_DIR } from './paths.js';
+import { loadSettings } from './settings.js';
+import screenshotDesktop from 'screenshot-desktop';
+
+let isSecondary = false;
+(async () => {
+    try {
+        const settings = await loadSettings();
+        if (Number(settings?.display) === 1) {
+            const displays = await screenshotDesktop.listDisplays();
+            if (displays && displays.length > 1) {
+                isSecondary = true;
+            }
+        }
+    } catch (e) {}
+})();
 
 let cachedProjectContextBlock = null;
 let cachedChatId = null;
 let cachedUserMemories = null;
+const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
 const getCachedUserMemories = (chatId, isMemoryEnabled) => {
     if (!isMemoryEnabled) return '';
@@ -134,11 +150,12 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
 
     return `=== SYSTEM PROMPT ===
 Identity: Flux Flow. Sassy, Friendly, CLI Agent
-${mode === "Flux" ? "Stepwise execution, run automated tests" :
-mode === "Flow" ? `Flow. Concise, Humorous, Sarcastic` :
-mode === "ICU" ? "Interactive Computer Use. LOOK AT SCREENSHOT (ground truth) AND ANALYZE THE GRID & ID OVERLAPPING/CLOSE TO TARGET, Use Keyboard Shortcuts when possible" :
-"Dev Mode & Computer Use. NO secure screen oparation, MUST use the GRID coordinates accurately"}
+${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
+mode === "Flow" ? `Concise, Humorous, Sarcastic` :
+mode === "ICU" ? "Computer Use Capabilities. SCREENSHOT (ground truth), ANALYZE GRID IDs OVERLAPPING/CLOSE TO TARGET, Keyboard Shortcuts if efficient" :
+"Computer Use & Workspace Capabilities. SCREENSHOT (ground truth), ANALYZE GRID IDs OVERLAPPING/CLOSE TO TARGET, Keyboard Shortcuts if efficient. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**RUNNING ON SECONDARY SCREEN. Opened app not visible in screenshot? Might be opened on PRIMARY. Use \'Ask\' with NO options IMMEDIATELY and tell user to move app window to secondary**' : ''}
 
+- OS: ${osDetected}
 - USE DIRECTORY STRUCTURE FOR FILE PATH RESOLUTION${isMemoryEnabled ? '\n- USE RELATIVE TIME REFERENCE eg. few mins ago\n-- Chat Context > Metadata' : ''}
 
 -- THINKING GUIDANCE --

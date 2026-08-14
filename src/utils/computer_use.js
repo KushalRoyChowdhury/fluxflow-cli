@@ -1,9 +1,23 @@
-import { mouse, keyboard, Button, Key, Point } from '@nut-tree-fork/nut-js';
+import { mouse, keyboard, Button, Key, Point, clipboard } from '@nut-tree-fork/nut-js';
 import { gridToNativeCoordinates } from './screen_grid.js';
 
 // Configure default mouse speed for smooth/reliable automation
 mouse.config.autoDelayMs = 50;
 keyboard.config.autoDelayMs = 50;
+
+/**
+ * Releases all modifier keys to prevent sticky keys (Ctrl, Alt, Shift, Meta/Cmd).
+ */
+async function releaseAllModifiers() {
+    try {
+        await keyboard.releaseKey(
+            Key.LeftControl, Key.RightControl,
+            Key.LeftAlt, Key.RightAlt,
+            Key.LeftShift, Key.RightShift,
+            Key.LeftSuper, Key.RightSuper
+        );
+    } catch (e) {}
+}
 
 /**
  * Executes a mouse action given either a grid code (e.g. "G2", "H10") or explicit coordinates.
@@ -43,13 +57,31 @@ export async function executeMouseAction(action, target, options = {}) {
                 return `SUCCESS: Dragged mouse from (${fromCoords.x}, ${fromCoords.y}) to (${toCoords.x}, ${toCoords.y})`;
             }
             case 'scroll': {
-                const amount = options.amount || 100;
-                if (options.direction === 'up') {
-                    await mouse.scrollUp(amount);
-                } else {
-                    await mouse.scrollDown(amount);
+                const targetPoint = coords || await gridToNativeCoordinates({ x: 640, y: 360 });
+                if (targetPoint) {
+                    await mouse.setPosition(new Point(targetPoint.x, targetPoint.y));
+                    // Small delay to let the OS recognize the hovered window/sub-element
+                    await new Promise(r => setTimeout(r, 60));
                 }
-                return `SUCCESS: Scrolled ${options.direction || 'down'} by ${amount}px`;
+                
+                let rawAmount = parseInt(options.amount, 10);
+                if (isNaN(rawAmount) || rawAmount <= 0) rawAmount = 5;
+                
+                // Nut-js on Windows SendInput expects WHEEL_DELTA units (120 per notch) or integer steps.
+                // Sending in a sequential loop guarantees Chromium / Windows window messages process each notch.
+                const count = rawAmount > 50 ? Math.min(20, Math.max(1, Math.round(rawAmount / 100))) : Math.min(20, rawAmount);
+                const isUp = options.direction === 'up';
+
+                for (let i = 0; i < count; i++) {
+                    if (isUp) {
+                        await mouse.scrollUp(120);
+                    } else {
+                        await mouse.scrollDown(120);
+                    }
+                    await new Promise(r => setTimeout(r, 20));
+                }
+
+                return `SUCCESS: Scrolled ${options.direction || 'down'} (${count} notches${coords ? ` at target (${coords.x}, ${coords.y})` : ' at screen center'})`;
             }
             default:
                 return `ERROR: Unsupported mouse action "${action}"`;
@@ -109,8 +141,21 @@ export async function executeKeyboardAction(action, input, options = {}) {
         switch (action.toLowerCase()) {
             case 'type': {
                 if (typeof input !== 'string') return `ERROR: Type action requires a valid string input`;
-                await keyboard.type(input);
+                
+                // 1. Ensure no modifier keys (Ctrl/Alt/Shift) are stuck down
+                await releaseAllModifiers();
+
+                // 2. Set text to clipboard and paste instantly
+                await clipboard.setContent(input);
+                const isMac = process.platform === 'darwin';
+                const pasteMod = isMac ? Key.LeftSuper : Key.LeftControl;
+                
+                await keyboard.pressKey(pasteMod, Key.V);
+                await keyboard.releaseKey(pasteMod, Key.V);
+                await releaseAllModifiers();
+
                 if (options.autoPressEnter) {
+                    await new Promise(r => setTimeout(r, 50));
                     await keyboard.type(Key.Enter);
                     return `SUCCESS: Typed text input ("${input.length > 20 ? input.substring(0, 20) + '...' : input}") and pressed Enter`;
                 }

@@ -3,9 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.0.1"]
+export const stableVersions = ["4.1.0"]
 
 export const changelogData = {
+    "4.1.0": {
+        "note": "AUGUST 15",
+        "added": [
+            "Added Full Autonomous Computer Use with File System/Development Tools.\n**NOTE:**\n• EVEN HIGHER Token usage.\n• Don't using in sensitive tasks/environments."
+        ],
+        "changed": [],
+        "fixes": [
+            "Several bug fixes and performance improvements with GUI Use tools."
+        ]
+    },
     "4.0.1": {
         "note": "AUGUST 14",
         "added": [

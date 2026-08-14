@@ -4,6 +4,51 @@ import { gridToNativeCoordinates, parseGridCodeTo720p } from '../utils/screen_gr
 import screenshotDesktop from 'screenshot-desktop';
 import sharp from 'sharp';
 
+import { mouse, Point } from '@nut-tree-fork/nut-js';
+
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Early-capped Levenshtein distance between two strings (battle-tested from search_keyword.js).
+ */
+function levenshtein(a, b, cap = Infinity) {
+    if (a === b) return 0;
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    if (Math.abs(a.length - b.length) > cap) return cap + 1;
+
+    let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        let nextRow = [i];
+        let minInRow = i;
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            const dist = Math.min(
+                nextRow[j - 1] + 1, // insertion
+                row[j] + 1,        // deletion
+                row[j - 1] + cost  // substitution
+            );
+            nextRow.push(dist);
+            if (dist < minInRow) minInRow = dist;
+        }
+        row = nextRow;
+        if (minInRow > cap) return cap + 1;
+    }
+    return row[b.length];
+}
+
+/**
+ * Dynamic proportional threshold for allowed edit distance.
+ */
+function getMaxEditDistance(len) {
+    if (len <= 2) return 0;
+    if (len <= 5) return 1;
+    if (len <= 10) return 2;
+    return Math.min(3, Math.floor(len * 0.25));
+}
+
 /**
  * Click Tool for GUI Automation
  * Accepts gridId, click type, mouse button, and optional intendedClickText for OCR verification.
@@ -26,7 +71,18 @@ export const click = async (args, context = {}) => {
         try {
             const { createWorker } = await import('tesseract.js');
             const targetPoint = gridId ? parseGridCodeTo720p(gridId) : null;
-            const rawBuffer = await screenshotDesktop({ format: 'png' });
+            const { getActiveDisplay } = await import('../utils/screen_grid.js');
+            const displayIndex = await getActiveDisplay();
+            let snapOpts = { format: 'png' };
+            try {
+                const displays = await screenshotDesktop.listDisplays();
+                if (displays && displays.length > 0) {
+                    const targetDisplay = displays[displayIndex] || displays[0];
+                    snapOpts = { format: 'png', screen: targetDisplay.id };
+                }
+            } catch (e) {}
+
+            const rawBuffer = await screenshotDesktop(snapOpts);
             const meta = await sharp(rawBuffer).metadata();
             const screenW = meta.width || 1920;
             const screenH = meta.height || 1080;
@@ -48,21 +104,37 @@ export const click = async (args, context = {}) => {
                 const targetLower = intendedClickText.toLowerCase().trim();
                 const matches = [];
 
-                // 1. Collect all matching lines (for multi-word phrases)
+                // Stage 1: STRICT MATCHING (Exact whole lines, exact whole words, exact token boundaries)
+                // 1A. Exact line match or whole-word phrase containment
                 if (data.lines && data.lines.length > 0) {
                     for (const line of data.lines) {
-                        if (line.text && line.text.toLowerCase().includes(targetLower) && line.bbox) {
+                        const lText = line.text ? line.text.toLowerCase().trim() : '';
+                        if (lText && (lText === targetLower || new RegExp(`\\b${escapeRegex(targetLower)}\\b`, 'i').test(lText)) && line.bbox) {
                             matches.push(line.bbox);
                         }
                     }
                 }
 
-                // 2. Collect all matching words (for single word targets)
+                // 1B. Exact word match
                 if (matches.length === 0 && data.words && data.words.length > 0) {
                     for (const word of data.words) {
-                        const wText = word.text ? word.text.toLowerCase() : '';
-                        if (wText && (wText.includes(targetLower) || targetLower.includes(wText)) && word.bbox) {
+                        const wText = word.text ? word.text.toLowerCase().trim() : '';
+                        if (wText === targetLower && word.bbox) {
                             matches.push(word.bbox);
+                        }
+                    }
+                }
+
+                // Stage 2: MILD FUZZY MATCHING (Only if Strict returned 0 matches; allows small 1-2 char OCR typos)
+                if (matches.length === 0 && data.words && data.words.length > 0) {
+                    const maxAllowedDiff = getMaxEditDistance(targetLower.length);
+                    for (const word of data.words) {
+                        const wText = word.text ? word.text.toLowerCase().trim() : '';
+                        if (wText.length >= 3 && Math.abs(wText.length - targetLower.length) <= maxAllowedDiff) {
+                            const dist = levenshtein(wText, targetLower, maxAllowedDiff);
+                            if (dist <= maxAllowedDiff && word.bbox) {
+                                matches.push(word.bbox);
+                            }
                         }
                     }
                 }
@@ -84,16 +156,21 @@ export const click = async (args, context = {}) => {
                     }
 
                     if (bestMatch) {
-                        // Perform direct click at nearest OCR match native screen coordinates
-                        const mouseRes = await executeMouseAction('click', {
+                        // Convert OCR raw pixel coordinates (screenW x screenH) to 720p space for executeMouseAction
+                        const target720p = {
                             x: Math.round(bestMatch.x * (1280 / screenW)),
                             y: Math.round(bestMatch.y * (720 / screenH))
-                        }, {
+                        };
+
+                        const mouseRes = await executeMouseAction('click', target720p, {
                             button,
                             clickType: type
                         });
 
-                        // Reset cursor to center of screen after successful click
+                        // Small delay to ensure click release registers before moving cursor
+                        await new Promise(r => setTimeout(r, 60));
+
+                        // Reset cursor to center of screen after successful click (just moves cursor, no click)
                         try {
                             await executeMouseAction('move', { x: 640, y: 360 });
                         } catch (e) {}
@@ -107,14 +184,27 @@ export const click = async (args, context = {}) => {
         }
     }
 
+    // Capture cursor position before click to restore it after action completes
+    let prevPosition = null;
+    try {
+        prevPosition = await mouse.getPosition();
+    } catch (e) {}
+
     const clickRes = await executeMouseAction('click', finalTarget, {
         button,
         clickType: type
     });
 
-    // Reset cursor to center of screen after successful click
+    // Small delay to ensure click release registers before restoring cursor
+    await new Promise(r => setTimeout(r, 50));
+
+    // Restore cursor to previous position (or fallback to center if unavailable)
     try {
-        await executeMouseAction('move', { x: 640, y: 360 });
+        if (prevPosition && typeof prevPosition.x === 'number' && typeof prevPosition.y === 'number') {
+            await mouse.setPosition(new Point(prevPosition.x, prevPosition.y));
+        } else {
+            await executeMouseAction('move', { x: 640, y: 360 });
+        }
     } catch (e) {}
 
     return clickRes;

@@ -6,6 +6,7 @@ import { getDefaultModel } from '../data/model_config.js';
 
 const DEFAULT_SETTINGS = {
     mode: 'Flux',
+    display: 0,
     thinkingLevel: 'Medium',
     aiProvider: 'Google',
     activeModel: getDefaultModel('Google', 'Free') || 'gemma-4-31b-it',

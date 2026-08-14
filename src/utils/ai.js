@@ -3223,14 +3223,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             taggedContextStr = '[TAGGED FILE CONTENTS] Auto Read User Tagged files by System, No need to re-read\n' + taggedContextBlocks.join('\n\n') + '\n[/TAGGED FILE CONTENTS]\n';
         }
 
-        const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
-
         // Strip the backslash from the user prompt sent to the model so they see @[file] instead of \@[file]
         const cleanPromptForModel = cleanAgentText.replace(/\\(@\[[^\]]+\])/g, '$1');
 
         const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
 
-        const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}\nOS: ${osDetected}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRUCTURED STRING '[tool:functions.ToolName(arg="value")]' IN CHAT RESPONSE [/SYSTEM]\n${taggedContextStr}${wildcardToolingPrompt}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
+        const firstUserMsg = `[SYSTEM METADATA]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/METADATA]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think> [/SYSTEM]\n" : ""}` : ''}[SYSTEM] EXACT STRUCTURED STRING '[tool:functions.ToolName(arg="value")]' IN CHAT RESPONSE [/SYSTEM]\n${taggedContextStr}${wildcardToolingPrompt}[USER PROMPT] ${cleanPromptForModel.trim()} [/USER PROMPT]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -3589,7 +3587,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     */
 
                     // [SYSTEM INSTRUCTION CACHING]
-                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
                     if (isCacheHit) {
                         currentSystemInstruction = systemInstructionCache.value;

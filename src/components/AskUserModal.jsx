@@ -12,8 +12,15 @@ const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
     let canceled = false;
     let allOptions = [];
 
+    const hasOptions = Array.isArray(options) && options.length > 0;
+
     try {
-        allOptions = [...options, { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }];
+        allOptions = [
+            ...(hasOptions ? options : []),
+            hasOptions
+                ? { id: 'CUSTOM', label: 'Suggest something else...', description: 'Provide a custom response' }
+                : { id: 'CUSTOM', label: 'Your Answer', description: '' }
+        ];
     } catch (e) {
         canceled = true;
     }
@@ -45,11 +52,10 @@ const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
             <Box
                 flexDirection="column"
                 borderStyle="single"
-                borderLeft={true}
+                borderLeft={false}
                 borderRight={false}
                 borderTop={false}
                 borderBottom={false}
-                borderColor={colors.codeBorder}
                 paddingLeft={2}
                 paddingRight={0}
                 paddingTop={1}
@@ -58,7 +64,7 @@ const AskUserModal = ({ question, options, onResolve, theme = 'Dark' }) => {
                 width="100%"
             >
                 <Box paddingX={1}>
-                    <Text color={colors.text} bold>SUGGEST SOMETHING ELSE</Text>
+                    <Text color={colors.text} bold>SUGGEST SOMETHING</Text>
                 </Box>
                 <Box marginTop={1} paddingX={1}>
                     <Text italic color={colors.textMuted}>Replying to: {question}</Text>

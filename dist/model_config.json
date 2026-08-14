@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260814,
+    "release": 20260815,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -79,12 +79,6 @@
                         "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
                     },
                     {
-                        "cmd": "mistral-small-2506",
-                        "multimodal": false,
-                        "hasReasoning": true,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
                         "cmd": "devstral-2512",
                         "multimodal": false,
                         "desc": "Devstral Coding (Text Only) [EXPERIMENTAL]"
@@ -92,7 +86,7 @@
                     {
                         "cmd": "mistral-medium-2508",
                         "multimodal": true,
-                        "hasReasoning": true,
+                        "hasReasoning": false,
                         "desc": "Mistral Medium (Multimodal)"
                     },
                     {

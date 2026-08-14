@@ -99,6 +99,19 @@ const getIDEDirName = (ideName) => {
     }
 };
 
+const MODE_DISPLAY_NAMES = {
+    'Flux': 'Workspace',
+    'Flow': 'Studio',
+    'ICU': 'Computer Use',
+    'FluxCU': 'Omni'
+};
+
+const getModeDisplayName = (mode) => {
+    if (!mode) return 'Workspace';
+    const key = Object.keys(MODE_DISPLAY_NAMES).find(k => k.toLowerCase() === mode.toLowerCase());
+    return key ? MODE_DISPLAY_NAMES[key] : mode;
+};
+
 const getKeybindingsPath = (ideName) => {
     const dirName = getIDEDirName(ideName);
     const home = os.homedir();
@@ -562,6 +575,7 @@ export default function App({ args = [] }) {
     const [inputKey, setInputKey] = useState(0);
     const [isExpanded, setIsExpanded] = useState(false);
     const [mode, setMode] = useState('Flux');
+    const [activeDisplay, setActiveDisplay] = useState(0);
     const [terminalSize, setTerminalSize] = useState({
         columns: stdout?.columns || 80,
         rows: stdout?.rows || 24
@@ -911,11 +925,12 @@ export default function App({ args = [] }) {
             } else if (arg === '--mode' && args[i + 1]) {
                 const val = args[i + 1];
                 const lower = val.toLowerCase();
-                if (['flux', 'flow', 'icu', 'computer'].includes(lower)) {
+                if (['flux', 'flow', 'icu', 'computer', 'fluxcu'].includes(lower)) {
                     let mapped = 'Flux';
                     if (lower === 'flux') mapped = 'Flux';
                     else if (lower === 'flow') mapped = 'Flow';
                     else if (lower === 'icu' || lower === 'computer') mapped = 'ICU';
+                    else if (lower === 'fluxcu') mapped = 'FluxCU';
                     parsed.mode = mapped;
                 }
                 i++;
@@ -975,7 +990,7 @@ export default function App({ args = [] }) {
             if (latestVersion) setLatestVer(latestVersion);
 
             if (latestVersion && latestVersion !== versionFluxflow) {
-                const versionDisplay = latestVersion === stableVersion ? `v${latestVersion}-stable` : `v${latestVersion}`;
+                const versionDisplay = latestVersion === stableVersion ? `v${latestVersion}` : `v${latestVersion}`;
 
                 if (!manual && settingsToUse.autoUpdate) {
                     setActiveView('update');
@@ -999,7 +1014,7 @@ export default function App({ args = [] }) {
             } else if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}-stable` : versionFluxflow;
+                    const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}` : versionFluxflow;
                     return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `⠀⠀└─ Already up to date (${displayVer}).\n⠀`, isMeta: true }];
                 });
             }
@@ -1907,16 +1922,16 @@ export default function App({ args = [] }) {
                     return;
                 }
                 tabDebounceRef.current = now;
-                const modes = ['Flux', 'Flow', 'ICU'];
+                const modes = ['Flux', 'Flow', 'ICU', 'FluxCU'];
                 const nextIdx = (modes.indexOf(mode) + 1) % modes.length;
                 const newMode = modes[nextIdx >= 0 ? nextIdx : 0];
                 setMode(newMode);
                 if (newMode === 'Flow') {
                     setThinkingLevel('Fast');
-                } else if (newMode === 'Flux' || newMode === 'ICU') {
+                } else if (newMode === 'Flux' || newMode === 'ICU' || newMode === 'FluxCU') {
                     setThinkingLevel('High');
                 }
-                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }]);
+                setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}\n⠀`, isMeta: true }]);
                 return;
             }
         }
@@ -2031,6 +2046,7 @@ export default function App({ args = [] }) {
             } else {
                 setMode(saved.mode);
             }
+            setActiveDisplay(saved.display ?? 0);
             if (parsedArgs.thinking) {
                 setThinkingLevel(parsedArgs.thinking);
             } else {
@@ -2473,7 +2489,7 @@ export default function App({ args = [] }) {
             desc: 'Select Agent Model',
             subs: (aiProvider === 'Ollama' && (apiKey === 'LOCAL' || !apiKey))
                 ? []
-                : (mode === 'ICU'
+                : (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
                     ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
                     : getModels(aiProvider, apiTier))
         },
@@ -2486,11 +2502,17 @@ export default function App({ args = [] }) {
             desc: 'Select AI Provider'
         },
         {
-            cmd: '/mode', desc: 'Toggle Flux/Flow/ICU modes', subs: [
-                { cmd: 'flux', desc: 'Enable Dev toolset' },
-                { cmd: 'flow', desc: 'Enable Chat mode' },
-                { cmd: 'icu', desc: 'Interactive Computer Use' },
-                { cmd: 'fluxcu', desc: 'Autonomous Flux Computer Use (Coming Soon)' }
+            cmd: '/mode', desc: 'Switch execution mode', subs: [
+                { cmd: 'flux', display: 'workspace', desc: 'Workspace, files & terminal tools' },
+                { cmd: 'flow', display: 'studio', desc: 'Creative studio, documents, PDF & conversation' },
+                { cmd: 'icu', display: 'computer use', desc: 'Interactive desktop & OS automation' },
+                { cmd: 'fluxcu', display: 'omni', desc: 'Autonomous tools & desktop execution' }
+            ]
+        },
+        {
+            cmd: '/display', desc: 'Select Active Display (Computer Use)', subs: [
+                { cmd: 'primary', desc: 'Primary Display (Display 1)' },
+                { cmd: 'secondary', desc: 'Secondary Display (Display 2)' }
             ]
         },
         { cmd: '/settings', desc: 'Configure system prefs' },
@@ -2832,22 +2854,36 @@ export default function App({ args = [] }) {
                         let newMode = 'Flux';
                         if (targetParam === 'flow') newMode = 'Flow';
                         else if (targetParam === 'icu') newMode = 'ICU';
-                        else if (targetParam === 'fluxcu') {
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ FluxCU (Autonomous Computer Use) mode is coming soon!\n⠀`, isMeta: true }]; });
-                            return;
-                        }
+                        else if (targetParam === 'fluxcu') newMode = 'FluxCU';
                         else if (targetParam === 'flux') newMode = 'Flux';
 
                         setMode(newMode);
                         if (newMode === 'Flow') {
                             setThinkingLevel('Fast');
-                        } else {
-                            setThinkingLevel('High');
                         }
                         const s = emojiSpace(2);
-                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}.\n⠀`, isMeta: true }]; });
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}.\n⠀`, isMeta: true }]; });
                     } else {
                         setActiveView('mode');
+                    }
+                    break;
+                }
+                case '/display': {
+                    if (parts[1]) {
+                        const targetParam = parts[1].toLowerCase();
+                        let newDisplay = 0;
+                        if (targetParam === 'secondary' || targetParam === '1' || targetParam === '2') {
+                            newDisplay = 1;
+                        } else {
+                            newDisplay = 0;
+                        }
+
+                        setActiveDisplay(newDisplay);
+                        saveSettings({ display: newDisplay }).catch(() => {});
+                        const displayName = newDisplay === 0 ? 'Primary (Display 1)' : 'Secondary (Display 2)';
+                        setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Active Computer Use display set to: ${displayName}.\n⠀`, isMeta: true }]; });
+                    } else {
+                        setActiveView('display');
                     }
                     break;
                 }
@@ -6113,7 +6149,35 @@ export default function App({ args = [] }) {
                             }
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${newMode}`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Mode switched to ${getModeDisplayName(newMode)}\n⠀`, isMeta: true }];
+                            });
+                            setActiveView('chat');
+                        }}
+                        onClose={() => setActiveView('chat')}
+                    />
+                );
+            case 'display':
+                return (
+                    <CommandMenu
+                        title="SELECT ACTIVE DISPLAY FOR COMPUTER USE"
+                        items={[
+                            { label: `Primary Display (Display 1) ${activeDisplay === 0 ? '●' : ''}`, value: 0 },
+                            { label: `Secondary Display (Display 2) ${activeDisplay === 1 ? '●' : ''}`, value: 1 },
+                            { label: 'Back', value: 'chat' }
+                        ]}
+                        theme={systemSettings.theme}
+                        onSelect={(item) => {
+                            if (item.value === 'chat' || item.value === 'Back') {
+                                setActiveView('chat');
+                                return;
+                            }
+                            const newDisplay = Number(item.value);
+                            setActiveDisplay(newDisplay);
+                            saveSettings({ display: newDisplay }).catch(() => {});
+                            const displayName = newDisplay === 0 ? 'Primary (Display 1)' : 'Secondary (Display 2)';
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Active Computer Use display set to: ${displayName}`, isMeta: true }];
                             });
                             setActiveView('chat');
                         }}
@@ -6589,12 +6653,12 @@ export default function App({ args = [] }) {
                                                         color={isDivider ? colors.textDim : (isGemmaDisabled ? colors.textMuted : (isActive ? colors.text : colors.textDim))}
                                                         bold={false}
                                                     >
-                                                        {s.cmd && (s.cmd.startsWith('@[') || s.cmd.startsWith('\\@[')) && s.cmd.endsWith(']') ? (() => {
+                                                        {s.display || (s.cmd && (s.cmd.startsWith('@[') || s.cmd.startsWith('\\@[')) && s.cmd.endsWith(']') ? (() => {
                                                             // Handle both @[...] and \@[...]
                                                             const pathPart = s.cmd.startsWith('\\@[') ? s.cmd.slice(3, -1) : s.cmd.slice(2, -1);
                                                             const parts = pathPart.split(/[/\\]/);
                                                             return parts[parts.length - 1];
-                                                        })() : (s.cmd && s.cmd.includes('/') ? s.cmd.split('/').pop() : s.cmd)}
+                                                        })() : (s.cmd && s.cmd.includes('/') ? s.cmd.split('/').pop() : s.cmd))}
                                                     </Text>
                                                 </Box>
                                                 <Box flexGrow={1}>

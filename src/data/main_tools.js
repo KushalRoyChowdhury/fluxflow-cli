@@ -29,7 +29,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - Need text or HUGE file? CodeSearch > Full Read
 - MUST AVOID UNNECESSARY LARGE-FILE CHUNK READS
 - DONT HALLUCINATE TOOL RESULTS, VERIFY, FIX ERRORS
-- Stuck on syntax error? Tell User > Time waste
+- Stuck on syntax error? TELL USER > Waste Time
 `;
 
 // =====================================================================================================
@@ -61,15 +61,14 @@ Invocations:
 
     const flowTools = `- CREATIVE TOOLS (path = relative to CWD & WILL BE FIRST ARGUMENT, path separator: '/') -
 - [tool:functions.WritePDF(path="...", content="...", orientation="...")]. PROACTIVE A4 PAGE BREAKS MUST IN CSS. HTML/CSS for PREMIUM layout, stable margins & headers/footers, NO WATERMARKS
-- [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers
-- WORKSPACE & SUB AGENT TOOLS ARE NOT AVAILABLE IN FLOW`;
+- [tool:functions.WriteDoc(path="...", content="...")]. A4 Word document, NO WATERMARKS, stable margins & headers/footers`;
 
 // =====================================================================================================
 
     const computerTools = `- COMPUTER USE TOOLS (GUI Desktop Automation) -
 - [tool:functions.Click(gridId="integer", type="single/double", button="left/middle/right", intendedClickText="target text")]. Click target grid number, intendedClickText: LITERAL TEXT/ICON ON SCREEN (OCR SCANNBALE, UPTO 3 WORDS). DOUBLE CLICK DESKTOP ICONS
 - [tool:functions.Drag(fromGridId="integer", toGridId="integer")]. Drag mouse from start grid number to target grid number
-- [tool:functions.Scroll(direction="up/down", amount="integer")]. Scroll screen vertically by amount, USE WHEN SCROLLING IS NEEDED
+- [tool:functions.Scroll(direction="up/down", amount="int 1-10", gridId="mouse hover area")]. Scroll viewport vertically
 - [tool:functions.KeyboardTyping(text="string", autoPressEnter="bool")]. Type text string into currently active input. JSON ESCAPE LITERAL ESCAPE SEQUENCES IN TOOL ARGUMENTS
 - [tool:functions.KeyPress(key="key or ;-separated combination, eg: enter, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4")]. Press key, shortcut, function key (f1-f12), or clear active input field.
 - [tool:functions.RecaptureScreen()]. Request fresh gridded screenshot`;
@@ -77,11 +76,11 @@ Invocations:
 // =====================================================================================================
 
     return `
--- TOOL DEFINITIONS (STRING BASED PROTOCOL) --
-TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' STRUCTURED STRING IN CHAT RESPONSE ← MANDATORY
+-- AVAILABLE TOOLS (STRING BASED PROTOCOL) --
+TO USE TOOLS, MUST OUTPUT EXACTLY '[tool:functions.ToolName(arg1="value1")]' STRUCTURED STRING IN CHAT RESPONSE ← STRICT
 TOOL RULES:
-- MAX 3 TOOL CALLS/TURN${mode === 'Flux' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
-${mode === 'Flux' ? `${fluxInstructions}` : ""}
+- MAX 3 TOOL CALLS/TURN${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Todo: 3+, Run: max 1 or 2 consecutive)' : ''}
+${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 - USER COMMUNICATION -
 - [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity: MUST for path divergence, security risk. Ask, don't finish/guess. Keep titles short
 
@@ -89,7 +88,7 @@ ${mode === 'Flux' ? `${fluxInstructions}` : ""}
 - [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Usage: unknown info/docs. aiMode: LLM search
 - [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
 
-${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
+${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };
 // [DEPRICATED] - [tool:functions.GenerateImage(path="... png", prompt="detailed", ratio="16:9, 9:16, 1:1")].. Mockups, PDF thumbnails, any visual content
 // [DEPRICATED] - [tool:functions.FileMap(path="...")]. Shows file's code structure
