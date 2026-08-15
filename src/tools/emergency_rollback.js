@@ -42,6 +42,8 @@ export const emergency_rollback = async (args, context = {}) => {
             'generate_image': 'GenerateImage',
             'file_map': 'FileMap',
             'todo': 'Todo',
+            'goal': 'Goal',
+            'Goal': 'Goal',
             'await': 'Await',
             'ask': 'Ask',
             'ask_user': 'Ask',

@@ -1417,6 +1417,8 @@ const TOOL_LABELS = {
     'generate_image': 'Generating',
     'todo': 'Planning',
     'Todo': 'Planning',
+    'goal': 'Planning',
+    'Goal': 'Planning',
     'invoke_sync': 'Sub-Agent Working',
     'invoke': 'Starting Agent',
     'get_progress': 'Checking Progress',
@@ -2057,6 +2059,7 @@ const translateKimiToolCalls = (text) => {
         'filemap': 'FileMap',
         'generateimage': 'GenerateImage',
         'todo': 'Todo',
+        'goal': 'Goal',
         'ask': 'Ask'
     };
 
@@ -3362,10 +3365,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     } else {
                         // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
-                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]`;
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]`;
                         } else {
                             // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
-                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]` });
+                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]` });
                         }
                     }
                     yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
@@ -4118,7 +4121,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory',
-                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
+                                    'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Cancel': 'cancel', 'Await': 'await', 'Answer': 'answer', 'Steer': 'steer', 'steer': 'steer'
                                 };
                                 const potentialTool = NORMALIZE_MAP[toolContext.toolName] || toolContext.toolName;
                                 const partialArgs = toolContext.args || '';
@@ -4399,7 +4402,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
+                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
                                     'Click': 'click', 'click': 'click', 'Drag': 'drag', 'drag': 'drag', 'Scroll': 'scroll', 'scroll': 'scroll', 'KeyboardTyping': 'keyboard_typing', 'keyboard_typing': 'keyboard_typing', 'KeyPress': 'key_press', 'key_press': 'key_press', 'RecaptureScreen': 'recapture_screen', 'recapture_screen': 'recapture_screen',
                                     'EmergencyRollback': 'EmergencyRollback'
                                 };
@@ -5350,13 +5353,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     };
 
                                     if (method === 'create') {
-                                        uiTitle = '\x1b[32m→\x1b[0m Created Plan';
+                                        uiTitle = '\x1b[32m→\x1b[0m Created Goals';
                                         listItems = normalizeList(tasks).map(item => `\x1b[90m○\x1b[0m ${item}`);
                                     } else if (method === 'append') {
-                                        uiTitle = '\x1b[34m➕\x1b[0m Added Plan';
+                                        uiTitle = '\x1b[34m➕\x1b[0m Added New Goals';
                                         listItems = normalizeList(tasks).map(item => `\x1b[90m○\x1b[0m ${item}`);
                                     } else if (method === 'get') {
-                                        uiTitle = markDone ? '\x1b[36m↻\x1b[0m Updated Plan' : '\x1b[35m•\x1b[0m Reviewed Plan';
+                                        uiTitle = markDone ? '\x1b[36m↻\x1b[0m Updated Goals' : '\x1b[35m•\x1b[0m Reviewed Goals';
                                         const content = (result || '').split('\n').slice(1).join('\n');
                                         listItems = content.split('\n')
                                             .filter(line => line.trim().startsWith('- ['))

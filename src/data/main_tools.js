@@ -41,7 +41,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user
-- [tool:functions.Todo(method="create/append/get", tasks=[string array], markDone=[task array])]. If long multi-task: create Todos before starting. \`get + markDone\` to mark complete. Update every turn when created
+- [tool:functions.Goal(method="create/append/get", tasks=[string array], markDone=[task array])]. If long multi-task: create Goals before starting. \`get + markDone\` to mark complete. Update every turn when created
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
