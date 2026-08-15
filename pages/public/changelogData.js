@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.1.0"]
+export const stableVersions = ["4.1.1"]
 
 export const changelogData = {
+    "4.1.1": {
+        "note": "AUGUST 16",
+        "added": [],
+        "changed": [],
+        "fixes": [
+            "Improved GUI Tools.",
+            "Improved 'Omni' mode with improved capabilities.",
+            "Better Instruction Tuning.",
+            "Improved System Prompt efficiency."
+        ]
+    },
     "4.1.0": {
         "note": "AUGUST 15",
         "added": [

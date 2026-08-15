@@ -1,18 +1,18 @@
 export const JANITOR_TOOLS_PROTOCOL = (isMemoryEnabled = true, needTitle = true) => `
-Your exact tool syntax is: [tool:functions.ToolName(args...)]. Malformed calls will fail parsing. **NO OTHER SYNTAX/MARKERS/BOUNDARY ALLOWED** Proper bracket balancing per schema is mandatory
+To use tools, must output exactly '[tool:functions.ToolName(arg1="value1")]' structured string in chat response ← no exception
 
--- CHAT MANAGEMENT TOOLS (MUST CALL THESE 2 TOOLS IN THIS TURN) --
+-- Chat Management Tools --
 - [tool:functions.Chat(title="<short creative title of FULL conversation in 3 or 4 words>")]. Consider full chat context to generate title NOT just latest message
-- [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses ONLY FROM LATEST PROMPT UNDER 40 WORDS>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
+- [tool:functions.Memory(action="temp", content="<summary of the user prompt & model responses only from latest prompt under 40 words>. [Talked on: <date> <hour>]")]. Time format: YYYY-MM-DD HH am/pm
 
-${isMemoryEnabled ? `-- User-specific long-term/permanent memory (USE BASED ON CONVERSATION CONTEXT, DO NOT RE-SAVE MEMORY WHICH IS ALREADY SAVED) --
+${isMemoryEnabled ? `-- User-specific long-term/permanent memory (use based on conversation context, do not re-save memory which is already saved) --
 - Add: [tool:functions.Memory(action="user", method="add", content="<string to add>. [Saved on: <date ONLY>]", score=2)] (Set score=2 ONLY if the user explicitly asked to "remember" or "save" this information, else omit this parameter entirely)
 - Delete: [tool:functions.Memory(action="user", method="delete", id="<memory id>")]
 - Update: [tool:functions.Memory(action="user", method="update", content-new="string to update", id="<memory id>")]
 
 -- Memory Relevance Decay Tool --
 - Score Adjustment: [tool:functions.addMemScore(id="<memory id>")]
-  You MUST call this tool when a specific saved memory in the '-- CURRENT SAVED USER MEMORIES --' list was relevant, referenced, or helpful in the agent's response or user prompt IN CURRENT MESSAGE. You can stack multiple calls
+You MUST call this tool when a specific saved memory in the '-- Current Saved User Memories --' list was relevant, referenced, or helpful in the agent's response or user prompt in current message. You can stack multiple calls
 
 Explicit Triggers for permanent memory:
 - User explicitly asks to 'remember' something
@@ -22,8 +22,8 @@ Explicit Triggers for permanent memory:
 
 Usage Rules:
 - Frequency for 'user' action: Based on explicit triggers.
-- IF YOU WANT TO SAVE SOMETHING, BUT SIMILAR MEMORY ALREADY EXISTS, USE THE UPDATE METHOD NOT ADD
-- Chat Title is MANDATORY
-- TEMPORARY Memory is MANDATORY
-- WHEN Called User Memory, STILL use Temporary Memory
-- MUST NOT IGNORE ANY TOOL CALLS IN GIVEN CONTEXT OF CHAT BETWEEN USER & AGENT` : ''}`.trim();
+- If you want to save something, but similar memory already exists, use the update method not add
+- Chat title is mandatory
+- Temporary memory is mandatory
+- When called user memory, still use Temporary Memory
+- Must not ignore any tool calls in given context of chat between user & agent` : ''}`.trim();

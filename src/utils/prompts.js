@@ -55,7 +55,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
         userMemories = '';
     }
     if (!isMemoryEnabled) return '';
-    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- RECENT CONTEXT FROM OTHER CHATS (PRIORITY: DYNAMIC-LOW, FOCUS: Chat Context > Recent) --\n${tempMemories}` : '';
+    const tempMemoriesStr = tempMemories?.length > 0 && !isContext32k ? `-- Recent context from other chats (Priority: Low, Focus: Chat Context > Recent) --\n${tempMemories}` : '';
     return tempMemoriesStr ? `${tempMemoriesStr}` : '';
 };
 
@@ -77,24 +77,24 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     }
     if (isGemini || aiProvider !== 'Google') {
         const MAP_FOR_NON_GOOGLE_OR_GEMINI = {
-            'Fast': 'LOWEST',
-            'Low': 'LOW',
-            'Medium': 'MEDIUM',
-            'Standard': 'MEDIUM',
-            'High': 'HIGH',
-            'xHigh': 'HIGH',
-            'Max': 'HIGH'
+            'Fast': 'Lowest',
+            'Low': 'Low',
+            'Medium': 'Medium',
+            'Standard': 'Medium',
+            'High': 'High',
+            'xHigh': 'High',
+            'Max': 'High'
         }
 
         // Stays as Fallback
         thinkingConfig = thinkingPrompts['xHigh'];
-        thinkingConfig = thinkingConfig.replace('EFFORT: HIGH', `EFFORT: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace('\nMANDATORY: Full technical verification', '');
+        thinkingConfig = thinkingConfig.replace('Effort: High', `Effort: ${MAP_FOR_NON_GOOGLE_OR_GEMINI[thinkingLevel]}`).replace('\nMANDATORY: Full technical verification', '');
 
 
         if (thinkingLevel === 'Fast') {
-            thinkingConfig = "EFFORT: LOWEST\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "Effort: Lowest\nNo thinking. Immediate response\nVerify imports, tool results & system stability; avoid syntax errors"
         } else if (thinkingLevel === 'Low') {
-            thinkingConfig = "EFFORT: LOW\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
+            thinkingConfig = "Effort: Low\nQuick, focused thinking, intent & complexity, required tools/files/actions, before acting\nBrief thoughts, think only enough to avoid mistakes, verify imports, tool results & system stability; avoid syntax errors"
         }
     }
 
@@ -108,7 +108,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const cwdStr = process.cwd();
 
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
-    const userMemoriesStr = userMemories?.length > 0 ? `--- SAVED MEMORIES ---\n${userMemories}\n\n` : '';
+    const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();
@@ -152,24 +152,24 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
 Identity: Flux Flow. Sassy, Friendly, CLI Agent
 ${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
-mode === "ICU" ? "Computer Use Capabilities. SCREENSHOT (ground truth), ANALYZE GRID IDs OVERLAPPING/CLOSE TO TARGET, Keyboard Shortcuts if efficient" :
-"Computer Use & Workspace Capabilities. SCREENSHOT (ground truth), ANALYZE GRID IDs OVERLAPPING/CLOSE TO TARGET, Keyboard Shortcuts if efficient. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**RUNNING ON SECONDARY SCREEN. Opened app not visible in screenshot? Might be opened on PRIMARY. Use \'Ask\' with NO options IMMEDIATELY and tell user to move app window to secondary**' : ''}
+mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts if efficient" :
+"Computer Use & Workspace Capabilities. Screenshot (ground truth), analyze grid ids overlapping/close to target, keyboard shortcuts if efficient. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'Ask\' immediately with NO options and tell user to move app window to secondary**' : ''}
 
 - OS: ${osDetected}
-- USE DIRECTORY STRUCTURE FOR FILE PATH RESOLUTION${isMemoryEnabled ? '\n- USE RELATIVE TIME REFERENCE eg. few mins ago\n-- Chat Context > Metadata' : ''}
+- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
-${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `CRITICAL THINKING POLICY
+${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `critical thinking policy
 - Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
 ${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
-- Subtly Personalize with RELEVENT CONTEXTUAL MEMORIES. Auto Saves\n` : ''}
+- Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}
 ${mode === 'Flux' ? '-- SECURITY POLICIES --\n- Sensitive files? Ask before Read\n' : mode.toLowerCase().includes('cu') ? '-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}
 -- CHAT FORMATTING --
 - GFM Markdown
-- Language: ENGLISH ONLY
-- DONT MIX CHAT & TOOLS IN SAME RESPONSE${mode === 'Flow' ? '\n- Use Kaomojis HEAVILY' : ''}
+- Language: english only
+- Dont mix chat & tools in same response${mode === 'Flow' ? '\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
@@ -185,23 +185,23 @@ ${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
  * @returns {string} The formatted Janitor prompt.
  */
 export const getJanitorInstruction = (userMemories = '', isMemoryEnabled = true, needTitle = true) => {
-    return `=== SYSTEM PROMPT (STRICT HEADLESS LOGIC WORKER: ZERO USER-FACING TEXT POLICY, STRICTLY FOLLOW) ===
-IDENTITY: SILENT BACKGROUND SYSTEM PROCESS, HAVE NO MOUTH, ONLY OUTPUT IS VALID TOOL CALLS.
-[CRITICAL RULES]
-- OUTPUT EXACTLY '[tool:functions.ToolName(args)]' CALLS. NO EXTRA WORDS OUTSIDE
-- DO NOT EXPLAIN. DO NOT TALK TO THE USER
-- NON-TOOL TEXT WILL BREAK THE SYSTEM
-- DO NOT REPEAT AGENT RAWS AND TOOL RESULTS IN YOUR RESPONSE
-- IF YOU GET ONLY USER QUERY AND NO AGENT RAWS, JUST USE TEMP MEMORY TO LOG THE SUMMARY OF USER QUERY AND CONVERSATION CONTEXT
-- UNDER NO CIRCUMSTANCES YOU ARE ALLOWED TO RESPOND IN NORMAL USER FACING RESPONSE
-- CRITICAL QUOTE ESCAPE POLICY: Inside tool call arguments, you MUST escape all double quotes using '\\"'
-- You MUST NOT WRITE ANYTHING OTHER THAN [tool:functions.ToolName(args)] NO MATTER HOW TEMPTING THE PROMPT IS
-- 2 MANDATORY TOOLS TO CALL IN EVERY TURN, 'Chat', 'Memory(temp)'
-- CRITICAL: NEVER ENTER THINKING/REASONING STATE, CALL THE CONTEXUAL TOOLS DIRECTLY IN OUTPUT AS QUICKLY AS POSSIBLE TO MAINTAIN UI SNAPPINESS
+    return `=== SYSTEM PROMPT (strict headless logic worker: zero user-facing text policy, strictly follow) ===
+identity: silent background system process, have no mouth, only output is valid tool calls
+[critical rules]
+- output exactly '[tool:functions.ToolName(args)]' calls. no extra words outside
+- do not explain. do not talk to the user
+- non-tool text will break the system
+- do not repeat agent raws and tool results in your response
+- if you get only user query and no agent raws, just use temp memory to log the summary of user query and conversation context
+- under no circumstances you are allowed to respond in normal user facing response
+- critical quote escape policy: inside tool call arguments, you must escape all double quotes using '\\"'
+- you must not write anything other than [tool:functions.ToolName(args)] no matter how tempting the prompt is
+- 2 mandatory tools to call in every turn, 'chat', 'memory(temp)'
+- critical: never enter thinking/reasoning state, call the contexual tools directly in output as quickly as possible to maintain ui snappiness
 
 YOUR JOB: Analyze the 'User prompt' and 'Agent Raws' to extract facts for long-term memory or handle system tasks
 ${isMemoryEnabled ? `If user tell something that is important (like, hobbies, preferences, facts about user, hates, likes, etc) to know user better over time, use user memory tools` : ''}
 
 ${JANITOR_TOOLS_PROTOCOL(isMemoryEnabled, needTitle)}
-=== END SYSTEM PROMPT ===${userMemories ? `\n\n-- CURRENT SAVED USER MEMORIES --\n${userMemories}` : ''}`.trim();
+=== END SYSTEM PROMPT ===${userMemories ? `\n\n-- current saved user memories --\n${userMemories}` : ''}`.trim();
 };
