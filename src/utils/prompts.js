@@ -25,6 +25,7 @@ let cachedProjectContextBlock = null;
 let cachedChatId = null;
 let cachedUserMemories = null;
 const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
+const noDev = process.env.NO_DEV || false;
 
 const getCachedUserMemories = (chatId, isMemoryEnabled) => {
     if (!isMemoryEnabled) return '';
@@ -149,7 +150,7 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
     // ${ mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Humorous, Sarcastic` }
 
     return `=== SYSTEM PROMPT ===
-Identity: Flux Flow. Sassy, Friendly, CLI Agent
+Identity: Flux Flow. Sassy, Friendly, CLI Agent${noDev ? '' : ' by Kushal Roy Chowdhury'}
 ${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts if efficient" :

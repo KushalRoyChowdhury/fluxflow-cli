@@ -2773,7 +2773,7 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const newMsgs = [...prev, {
                                         id: 'playground-' + Date.now(), role: 'system',
-                                        text: `✦ PLAYGROUND\n⠀⠀└─ Restored Working Directory to ${parsedArgs.originalCwd}\n`,
+                                        text: `✦ PLAYGROUND\n⠀⠀└─ Restored Working Directory to ${parsedArgs.originalCwd}\n⠀`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(newMsgs.length);

@@ -50,6 +50,261 @@ function getMaxEditDistance(len) {
 }
 
 /**
+ * Pre-process an image buffer for OCR: upscale 3×, convert to greyscale, and
+ * stretch contrast. This dramatically improves Tesseract accuracy on small UI
+ * text (Chrome navbar, taskbar, etc.) which is typically ≤14px at native res.
+ */
+async function preprocessForOcr(buffer, scale = 3) {
+    const meta = await sharp(buffer).metadata();
+    return sharp(buffer)
+        .resize(Math.round(meta.width * scale), Math.round(meta.height * scale), { kernel: 'lanczos3' })
+        .greyscale()
+        .normalise()
+        .toBuffer();
+}
+
+/**
+ * Parse Tesseract's TSV output (always available) into words and lines arrays.
+ * TSV columns: level, page_num, block_num, par_num, line_num, word_num,
+ *              left, top, width, height, conf, text
+ * Level 5 = word (the only rows we care about here).
+ */
+function parseTsvToWordsAndLines(tsv) {
+    if (!tsv) return { words: [], lines: [] };
+
+    const wordEntries = [];
+    const lineMap = new Map(); // "block_par_line" → { text, bbox, words[] }
+
+    for (const row of tsv.split('\n')) {
+        const parts = row.split('\t');
+        if (parts.length < 12) continue;
+        const lv   = parseInt(parts[0]);
+        if (lv !== 5) continue; // word level only
+        const blockNum = parts[2], parNum = parts[3], lineNum = parts[4];
+        const left  = parseInt(parts[6]);
+        const top   = parseInt(parts[7]);
+        const w     = parseInt(parts[8]);
+        const h     = parseInt(parts[9]);
+        const conf  = parseFloat(parts[10]);
+        const text  = parts.slice(11).join('\t').trim();
+        if (!text || conf < 0) continue; // conf < 0 = non-text element
+
+        const bbox = { x0: left, y0: top, x1: left + w, y1: top + h };
+        const word = { text, confidence: conf, bbox };
+        wordEntries.push(word);
+
+        const key = `${blockNum}_${parNum}_${lineNum}`;
+        if (!lineMap.has(key)) {
+            lineMap.set(key, { words: [], bbox: { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity } });
+        }
+        const entry = lineMap.get(key);
+        entry.words.push(word);
+        entry.bbox.x0 = Math.min(entry.bbox.x0, bbox.x0);
+        entry.bbox.y0 = Math.min(entry.bbox.y0, bbox.y0);
+        entry.bbox.x1 = Math.max(entry.bbox.x1, bbox.x1);
+        entry.bbox.y1 = Math.max(entry.bbox.y1, bbox.y1);
+    }
+
+    const lines = [];
+    for (const entry of lineMap.values()) {
+        if (entry.words.length > 0) {
+            lines.push({
+                text: entry.words.map(w => w.text).join(' '),
+                bbox: entry.bbox,
+                words: entry.words,
+            });
+        }
+    }
+    return { words: wordEntries, lines };
+}
+
+/**
+ * Normalise tesseract data: populate flat words/lines from blocks tree or TSV.
+ * Tesseract.js sometimes omits structured data in the JS objects but always
+ * emits TSV — so TSV parsing is the last-resort fallback.
+ */
+function normaliseOcrData(data) {
+    if (data.words && data.words.length > 0) return; // already good
+
+    // Fallback 1: walk the block tree
+    if (data.blocks && data.blocks.length > 0) {
+        data.words = [];
+        data.lines = [];
+        for (const block of data.blocks) {
+            for (const para of (block.paragraphs || [])) {
+                for (const line of (para.lines || [])) {
+                    if (line.bbox) data.lines.push(line);
+                    for (const word of (line.words || [])) {
+                        if (word.bbox) data.words.push(word);
+                    }
+                }
+            }
+        }
+        if (data.words.length > 0) return;
+    }
+
+    // Fallback 2: parse data.tsv (always emitted by Tesseract regardless of PSM/OEM)
+    if (data.tsv) {
+        const parsed = parseTsvToWordsAndLines(data.tsv);
+        data.words = parsed.words;
+        data.lines = parsed.lines;
+    }
+}
+
+/**
+ * Run the three-stage matching pipeline on tesseract data.
+ * Returns an array of bboxes (already offset-adjusted if offsetX/Y provided).
+ * @param {object} data   - tesseract recognition data (mutated by normaliseOcrData)
+ * @param {string} targetLower - lower-cased search phrase
+ * @param {number} [offsetX=0] - X offset to add (for tile crops)
+ * @param {number} [offsetY=0] - Y offset to add (for tile crops)
+ */
+function extractOcrMatches(data, targetLower, offsetX = 0, offsetY = 0, scale = 1) {
+    normaliseOcrData(data);
+
+    // Convert bbox from preprocessed-image space back to native pixel space, then apply tile offset
+    const shift = bbox => ({
+        x0: Math.round(bbox.x0 / scale) + offsetX,
+        y0: Math.round(bbox.y0 / scale) + offsetY,
+        x1: Math.round(bbox.x1 / scale) + offsetX,
+        y1: Math.round(bbox.y1 / scale) + offsetY,
+    });
+
+    const matches = [];
+
+    // Stage 1A: line-level match → find all matching word spans within the line
+    if (data.lines && data.lines.length > 0) {
+        for (const line of data.lines) {
+            const lText = line.text ? line.text.toLowerCase().trim() : '';
+            if (!lText || !line.bbox) continue;
+
+            const isMatch = lText === targetLower ||
+                new RegExp(`\\b${escapeRegex(targetLower)}\\b`, 'i').test(lText);
+            if (!isMatch) continue;
+
+            const lineWords = line.words || (data.words ? data.words.filter(w =>
+                w.bbox &&
+                w.bbox.x0 >= line.bbox.x0 - 5 && w.bbox.x1 <= line.bbox.x1 + 5 &&
+                w.bbox.y0 >= line.bbox.y0 - 5 && w.bbox.y1 <= line.bbox.y1 + 5
+            ) : []);
+
+            const targetTokens = targetLower.split(/\s+/);
+            const cleanTarget = targetTokens.map(t => t.replace(/[^a-z0-9]/g, '')).join(' ');
+            let foundWordMatch = false;
+
+            if (lineWords.length > 0) {
+                for (let wi = 0; wi <= lineWords.length - targetTokens.length; wi++) {
+                    const windowWords = lineWords.slice(wi, wi + targetTokens.length);
+                    const windowText = windowWords.map(w => (w.text || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '')).join(' ');
+                    if (windowText === cleanTarget || windowText.includes(cleanTarget)) {
+                        const tightBbox = {
+                            x0: Math.min(...windowWords.map(w => w.bbox.x0)),
+                            y0: Math.min(...windowWords.map(w => w.bbox.y0)),
+                            x1: Math.max(...windowWords.map(w => w.bbox.x1)),
+                            y1: Math.max(...windowWords.map(w => w.bbox.y1)),
+                        };
+                        matches.push(shift(tightBbox));
+                        foundWordMatch = true;
+                    }
+                }
+            }
+
+            if (!foundWordMatch) {
+                matches.push(shift(line.bbox));
+            }
+        }
+    }
+
+    // Stage 1B: exact single-word match
+    if (matches.length === 0 && data.words && data.words.length > 0) {
+        for (const word of data.words) {
+            const wText = word.text ? word.text.toLowerCase().trim().replace(/[^a-z0-9]/g, '') : '';
+            const cleanTarget = targetLower.replace(/[^a-z0-9]/g, '');
+            if (wText === cleanTarget && word.bbox) {
+                matches.push(shift(word.bbox));
+            }
+        }
+    }
+
+    // Stage 2: mild fuzzy matching (OCR typos)
+    if (matches.length === 0 && data.words && data.words.length > 0) {
+        const maxAllowedDiff = getMaxEditDistance(targetLower.length);
+        for (const word of data.words) {
+            const wText = word.text ? word.text.toLowerCase().trim() : '';
+            if (wText.length >= 3 && Math.abs(wText.length - targetLower.length) <= maxAllowedDiff) {
+                const dist = levenshtein(wText, targetLower, maxAllowedDiff);
+                if (dist <= maxAllowedDiff && word.bbox) {
+                    matches.push(shift(word.bbox));
+                }
+            }
+        }
+    }
+
+    return matches;
+}
+
+/**
+ * Given a set of matched bboxes (full-screen coords), return the one overlapping or nearest to targetCoords.
+ */
+function pickBestMatch(matches, targetCoords) {
+    let bestMatch = null;
+    let minDistance = Infinity;
+
+    for (const bbox of matches) {
+        const centerX = Math.round((bbox.x0 + bbox.x1) / 2);
+        const centerY = Math.round((bbox.y0 + bbox.y1) / 2);
+
+        // Check if the targetCoords point falls directly inside this bbox
+        const containsPoint = targetCoords.x >= bbox.x0 && targetCoords.x <= bbox.x1 &&
+                              targetCoords.y >= bbox.y0 && targetCoords.y <= bbox.y1;
+
+        const dist = Math.hypot(centerX - targetCoords.x, centerY - targetCoords.y);
+
+        // Direct overlap gets highest priority (effective distance 0)
+        const effectiveScore = containsPoint ? 0 : dist;
+
+        if (effectiveScore < minDistance) {
+            minDistance = effectiveScore;
+            bestMatch = { x: centerX, y: centerY, dist, containsPoint, bbox };
+        }
+    }
+    return bestMatch;
+}
+
+/**
+ * Generate 8 tile definitions (4 cols × 2 rows) for a screen of (screenW, screenH).
+ * Returns tiles sorted by distance of their center from (targetX, targetY),
+ * with the tile that contains the target always first.
+ */
+function getSortedTiles(screenW, screenH, targetX, targetY) {
+    const COLS = 4, ROWS = 2;
+    const tileW = Math.ceil(screenW / COLS);
+    const tileH = Math.ceil(screenH / ROWS);
+    const tiles = [];
+
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const x0 = c * tileW;
+            const y0 = r * tileH;
+            const w = Math.min(tileW, screenW - x0);
+            const h = Math.min(tileH, screenH - y0);
+            const cx = x0 + w / 2;
+            const cy = y0 + h / 2;
+            const containsTarget = targetX >= x0 && targetX < x0 + w && targetY >= y0 && targetY < y0 + h;
+            tiles.push({ x0, y0, w, h, cx, cy, containsTarget });
+        }
+    }
+
+    return tiles.sort((a, b) => {
+        if (a.containsTarget) return -1;
+        if (b.containsTarget) return 1;
+        const da = Math.hypot(a.cx - targetX, a.cy - targetY);
+        const db = Math.hypot(b.cx - targetX, b.cy - targetY);
+        return da - db;
+    });
+}
+
+/**
  * Click Tool for GUI Automation
  * Accepts gridId, click type, mouse button, and optional intendedClickText for OCR verification.
  */
@@ -66,7 +321,7 @@ export const click = async (args, context = {}) => {
 
     let finalTarget = gridId;
 
-    // Full-Screen Nearest-Neighbor OCR Auto-Correction if intendedClickText is provided
+    // OCR Auto-Correction if intendedClickText is provided
     if (intendedClickText) {
         try {
             const { createWorker } = await import('tesseract.js');
@@ -88,101 +343,89 @@ export const click = async (args, context = {}) => {
             const screenH = meta.height || 1080;
 
             const targetCoords = targetPoint
-                ? await gridToNativeCoordinates(targetPoint, screenW, screenH)
+                ? {
+                    x: Math.round(targetPoint.x * (screenW / 1280)),
+                    y: Math.round(targetPoint.y * (screenH / 720))
+                }
                 : { x: screenW / 2, y: screenH / 2 };
 
             const fs = await import('fs-extra');
             const { CU_CACHE_DIR } = await import('../utils/paths.js');
             fs.ensureDirSync(CU_CACHE_DIR);
-            const worker = await createWorker('eng', 1, {
-                cachePath: CU_CACHE_DIR
-            });
-            const { data } = await worker.recognize(rawBuffer);
-            await worker.terminate();
 
-            if (data && data.text) {
-                const targetLower = intendedClickText.toLowerCase().trim();
-                const matches = [];
+            const targetLower = intendedClickText.toLowerCase().trim();
 
-                // Stage 1: STRICT MATCHING (Exact whole lines, exact whole words, exact token boundaries)
-                // 1A. Exact line match or whole-word phrase containment
-                if (data.lines && data.lines.length > 0) {
-                    for (const line of data.lines) {
-                        const lText = line.text ? line.text.toLowerCase().trim() : '';
-                        if (lText && (lText === targetLower || new RegExp(`\\b${escapeRegex(targetLower)}\\b`, 'i').test(lText)) && line.bbox) {
-                            matches.push(line.bbox);
-                        }
-                    }
-                }
+            // ─── PASS 1: Full-screen OCR ───────────────────────────────────────────
+            const worker = await createWorker('eng', 1, { cachePath: CU_CACHE_DIR });
+            const fullProcessed = await preprocessForOcr(rawBuffer, 2);
+            // In tesseract.js v5/v6/v7, { tsv: true, blocks: true } must be explicitly requested in the 3rd arg
+            const { data: fullData } = await worker.recognize(fullProcessed, {}, { tsv: true, blocks: true });
 
-                // 1B. Exact word match
-                if (matches.length === 0 && data.words && data.words.length > 0) {
-                    for (const word of data.words) {
-                        const wText = word.text ? word.text.toLowerCase().trim() : '';
-                        if (wText === targetLower && word.bbox) {
-                            matches.push(word.bbox);
-                        }
-                    }
-                }
+            // Threshold: if full-screen match is within this many screenshot px (or directly overlapping), trust it
+            const FULL_SCREEN_TRUST_PX = targetPoint ? 140 : 400;
 
-                // Stage 2: MILD FUZZY MATCHING (Only if Strict returned 0 matches; allows small 1-2 char OCR typos)
-                if (matches.length === 0 && data.words && data.words.length > 0) {
-                    const maxAllowedDiff = getMaxEditDistance(targetLower.length);
-                    for (const word of data.words) {
-                        const wText = word.text ? word.text.toLowerCase().trim() : '';
-                        if (wText.length >= 3 && Math.abs(wText.length - targetLower.length) <= maxAllowedDiff) {
-                            const dist = levenshtein(wText, targetLower, maxAllowedDiff);
-                            if (dist <= maxAllowedDiff && word.bbox) {
-                                matches.push(word.bbox);
-                            }
-                        }
-                    }
-                }
+            let bestMatch = null;
+            let matchSource = '';
 
-                if (matches.length > 0) {
-                    // 3. Find nearest match using Euclidean distance to targetCoords
-                    let bestMatch = null;
-                    let minDistance = Infinity;
+            if (fullData && fullData.text) {
+                const fullMatches = extractOcrMatches(fullData, targetLower, 0, 0, 2);
 
-                    for (const bbox of matches) {
-                        const centerX = Math.round((bbox.x0 + bbox.x1) / 2);
-                        const centerY = Math.round((bbox.y0 + bbox.y1) / 2);
-                        const dist = Math.hypot(centerX - targetCoords.x, centerY - targetCoords.y);
-
-                        if (dist < minDistance) {
-                            minDistance = dist;
-                            bestMatch = { x: centerX, y: centerY };
-                        }
-                    }
-
-                    if (bestMatch) {
-                        // Convert OCR raw pixel coordinates (screenW x screenH) to 720p space for executeMouseAction
-                        const target720p = {
-                            x: Math.round(bestMatch.x * (1280 / screenW)),
-                            y: Math.round(bestMatch.y * (720 / screenH))
-                        };
-
-                        const mouseRes = await executeMouseAction('click', target720p, {
-                            button,
-                            clickType: type
-                        });
-
-                        // Small delay to ensure click release registers before moving cursor
-                        await new Promise(r => setTimeout(r, 60));
-
-                        // Reset cursor to center of screen after successful click (just moves cursor, no click)
-                        try {
-                            await executeMouseAction('move', { x: 640, y: 360 });
-                        } catch (e) {}
-
-                        return `${mouseRes} (Full-screen OCR nearest match for "${intendedClickText}" at ${Math.round(minDistance)}px distance)`;
+                if (fullMatches.length > 0) {
+                    const candidate = pickBestMatch(fullMatches, targetCoords);
+                    if (candidate && (candidate.containsPoint || candidate.dist <= FULL_SCREEN_TRUST_PX)) {
+                        bestMatch = candidate;
+                        matchSource = `full-screen OCR`;
                     }
                 }
             }
+
+            // ─── PASS 2: Tiled OCR (4×2 grid, sorted closest-tile-first) ──────────
+            if (!bestMatch) {
+                const tiles = getSortedTiles(screenW, screenH, targetCoords.x, targetCoords.y);
+
+                for (let ti = 0; ti < tiles.length; ti++) {
+                    const tile = tiles[ti];
+
+                    const tileRaw = await sharp(rawBuffer)
+                        .extract({ left: tile.x0, top: tile.y0, width: tile.w, height: tile.h })
+                        .toBuffer();
+                    // Upscale 3× so small UI text becomes readable by Tesseract
+                    const tileBuffer = await preprocessForOcr(tileRaw, 3);
+
+                    const { data: tileData } = await worker.recognize(tileBuffer, {}, { tsv: true, blocks: true });
+                    if (!tileData || !tileData.text) continue;
+
+                    // Matches come back with offset applied to full-screen coords
+                    const tileMatches = extractOcrMatches(tileData, targetLower, tile.x0, tile.y0, 3);
+
+                    if (tileMatches.length > 0) {
+                        bestMatch = pickBestMatch(tileMatches, targetCoords);
+                        matchSource = `tile ${ti + 1} OCR (${tile.containsTarget ? 'target tile' : `offset ${tile.x0},${tile.y0}`})`;
+                        break;
+                    }
+                }
+            }
+
+            await worker.terminate();
+
+            if (bestMatch) {
+                const target720p = {
+                    x: Math.round(bestMatch.x * (1280 / screenW)),
+                    y: Math.round(bestMatch.y * (720 / screenH))
+                };
+
+                const mouseRes = await executeMouseAction('click', target720p, { button, clickType: type });
+                // await new Promise(r => setTimeout(r, 60));
+                // try { await executeMouseAction('move', { x: 640, y: 360 }); } catch (e) {}
+
+                return `${mouseRes} (${matchSource} for "${intendedClickText}" at ${Math.round(bestMatch.dist)}px distance)`;
+            }
+
         } catch (ocrErr) {
-            // Fall back to gridId if OCR fails or tesseract is unavailable
+            // Fall back to gridId
         }
     }
+
 
     // Capture cursor position before click to restore it after action completes
     let prevPosition = null;
@@ -196,16 +439,16 @@ export const click = async (args, context = {}) => {
     });
 
     // Small delay to ensure click release registers before restoring cursor
-    await new Promise(r => setTimeout(r, 50));
+    // await new Promise(r => setTimeout(r, 50));
 
-    // Restore cursor to previous position (or fallback to center if unavailable)
-    try {
-        if (prevPosition && typeof prevPosition.x === 'number' && typeof prevPosition.y === 'number') {
-            await mouse.setPosition(new Point(prevPosition.x, prevPosition.y));
-        } else {
-            await executeMouseAction('move', { x: 640, y: 360 });
-        }
-    } catch (e) {}
+    // // Restore cursor to previous position (or fallback to center if unavailable)
+    // try {
+    //     if (prevPosition && typeof prevPosition.x === 'number' && typeof prevPosition.y === 'number') {
+    //         await mouse.setPosition(new Point(prevPosition.x, prevPosition.y));
+    //     } else {
+    //         await executeMouseAction('move', { x: 640, y: 360 });
+    //     }
+    // } catch (e) {}
 
     return clickRes;
 };
