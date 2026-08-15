@@ -3281,7 +3281,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 try {
                     yield { type: 'status', content: 'Capturing Screen' };
                     // wait 3s to give time
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     const screenshotData = await captureGriddedScreenshot();
                     if (screenshotData && screenshotData.base64) {
                         const screenshotMsg = `[system] Fresh Gridded Screen Feedback Captured. Use numeric coordinates. Old screenshots will be removed when new screenshot is captured, summarize in text if context is needed later [/system]`;

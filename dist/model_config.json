@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260815,
+    "release": 20260816,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -428,6 +428,11 @@
                         "cmd": "nvidia/nemotron-3.5-lightning-30b-a3b",
                         "multimodal": false,
                         "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+                        "multimodal": true,
+                        "desc": "Multimodal"
                     },
                     {
                         "cmd": "\n--- Mistral Models ---",
