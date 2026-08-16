@@ -5,6 +5,7 @@ import os from 'os';
 import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
+dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 
 /**
  * AUTO-HEAP SCALER

@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.2.0"]
+export const stableVersions = ["4.2.1", "4.2.0"]
 
 export const changelogData = {
+    "4.2.1": {
+        "note": "AUGUST 17",
+        "added": [
+            "Support for custom env file `fluxflow.env` to avoid polluting main .env"
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.2.0": {
         "note": "AUGUST 17",
         "added": [

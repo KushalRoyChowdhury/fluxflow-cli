@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
+dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { Ollama } from 'ollama';
