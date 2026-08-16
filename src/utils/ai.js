@@ -170,41 +170,55 @@ export const getCleanGroupedLength = (rawHistory) => {
                 i++;
             }
 
-            const toolCalls = [];
-            const toolResults = [];
-            const finalResponses = [];
+            let turnAgentParts = [];
+            let turnSystemResults = [];
+            let isContinuingModelTurn = false;
+
+            const flushTurn = () => {
+                if (turnAgentParts.length > 0) {
+                    cleanHistoryForAI.push({ role: 'agent', text: 'combined' });
+                    turnAgentParts = [];
+                }
+                if (turnSystemResults.length > 0) {
+                    cleanHistoryForAI.push({ role: 'system', text: 'combined' });
+                    turnSystemResults = [];
+                }
+                isContinuingModelTurn = false;
+            };
 
             turnMessages.forEach(tm => {
-                const textLower = (tm.text || '').toLowerCase();
-                const hasTool = textLower.includes('tool:functions.') || textLower.includes('agent:generalist.');
                 const isResult = tm.role === 'system' && (
                     tm.text?.startsWith('[TOOL RESULT]') ||
                     tm.text?.startsWith('SUCCESS:') ||
-                    tm.text?.startsWith('ERROR:')
+                    tm.text?.startsWith('ERROR:') ||
+                    tm.fullText?.startsWith('[TOOL RESULT]') ||
+                    tm.fullText?.startsWith('SUCCESS:') ||
+                    tm.fullText?.startsWith('ERROR:')
                 );
+                const rawOriginalText = tm.fullText || tm.text || '';
+                const rawTrimmedText = rawOriginalText.trim();
+                if (!rawTrimmedText && !tm.binaryPart) return;
 
-                if (tm.role === 'agent') {
-                    if (hasTool) {
-                        toolCalls.push(tm.text);
-                    } else {
-                        finalResponses.push(tm.text);
+                if (isResult) {
+                    turnSystemResults.push(rawTrimmedText);
+                } else if (tm.role === 'agent') {
+                    if (!isContinuingModelTurn && turnSystemResults.length > 0) {
+                        flushTurn();
                     }
-                } else if (isResult) {
-                    toolResults.push(tm.text);
-                } else {
-                    finalResponses.push(tm.text);
+
+                    const endsWithNewline = rawOriginalText.endsWith('\n');
+                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:functions.') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
+
+                    turnAgentParts.push(rawTrimmedText);
+                    if (hasToolCall && endsWithNewline) {
+                        isContinuingModelTurn = true;
+                    } else {
+                        isContinuingModelTurn = false;
+                    }
                 }
             });
 
-            if (toolCalls.length > 0) {
-                cleanHistoryForAI.push({ role: 'agent', text: 'combined' });
-            }
-            if (toolResults.length > 0) {
-                cleanHistoryForAI.push({ role: 'system', text: 'combined' });
-            }
-            if (finalResponses.length > 0) {
-                cleanHistoryForAI.push({ role: 'agent', text: 'combined' });
-            }
+            flushTurn();
         }
     }
     return cleanHistoryForAI.length;

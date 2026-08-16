@@ -3,16 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.2.1", "4.2.0"]
+export const stableVersions = ["4.2.2"]
 
 export const changelogData = {
-    "4.2.1": {
+    "4.2.2": {
         "note": "AUGUST 17",
         "added": [
             "Support for custom env file `fluxflow.env` to avoid polluting main .env"
         ],
         "changed": [],
-        "fixes": []
+        "fixes": [
+            "Fixes with critical issues with turn context.",
+            "Fixed the issue where new CrofAI models were not showing in sub-agent model selection list."
+        ]
     },
     "4.2.0": {
         "note": "AUGUST 17",

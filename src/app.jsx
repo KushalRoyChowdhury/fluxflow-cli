@@ -3621,40 +3621,68 @@ export default function App({ args = [] }) {
                                 i++;
                             }
 
-                            const turnToolCalls = [];
-                            const turnToolResults = [];
-                            const turnFinalResponses = [];
+                            let turnAgentParts = [];
+                            let turnSystemResults = [];
+                            let turnBinaryPart = null;
+                            let isContinuingModelTurn = false;
+
+                            const flushTurn = () => {
+                                if (turnAgentParts.length > 0) {
+                                    cleanHistoryForAI.push({
+                                        role: 'agent',
+                                        text: turnAgentParts.join('\n').trim()
+                                    });
+                                    turnAgentParts = [];
+                                }
+                                if (turnSystemResults.length > 0) {
+                                    cleanHistoryForAI.push({
+                                        role: 'system',
+                                        text: turnSystemResults.join('\n\n'),
+                                        ...(turnBinaryPart ? { binaryPart: turnBinaryPart } : {})
+                                    });
+                                    turnSystemResults = [];
+                                    turnBinaryPart = null;
+                                }
+                                isContinuingModelTurn = false;
+                            };
 
                             turnMessages.forEach(tm => {
                                 const isResult = tm.role === 'system' && (
                                     tm.text?.startsWith('[TOOL RESULT]') ||
                                     tm.text?.startsWith('SUCCESS:') ||
-                                    tm.text?.startsWith('ERROR:')
+                                    tm.text?.startsWith('ERROR:') ||
+                                    tm.fullText?.startsWith('[TOOL RESULT]') ||
+                                    tm.fullText?.startsWith('SUCCESS:') ||
+                                    tm.fullText?.startsWith('ERROR:')
                                 );
-                                const rawText = (tm.text || '').trim();
-                                if (!rawText) return;
+                                const rawOriginalText = tm.fullText || tm.text || '';
+                                const rawTrimmedText = rawOriginalText.trim();
+                                if (!rawTrimmedText && !tm.binaryPart) return;
 
                                 if (isResult) {
-                                    const emitText = !rawText.startsWith('[TOOL RESULT]') ? `[TOOL RESULT]: ${rawText}` : rawText;
-                                    turnToolResults.push(emitText);
+                                    const emitText = !rawTrimmedText.startsWith('[TOOL RESULT]') ? `[TOOL RESULT]: ${rawTrimmedText}` : rawTrimmedText;
+                                    turnSystemResults.push(emitText);
+                                    if (tm.binaryPart) {
+                                        turnBinaryPart = tm.binaryPart;
+                                    }
                                 } else if (tm.role === 'agent') {
-                                    if (rawText.toLowerCase().includes('tool:functions.') || rawText.toLowerCase().includes('agent:generalist.')) {
-                                        turnToolCalls.push(rawText);
+                                    if (!isContinuingModelTurn && turnSystemResults.length > 0) {
+                                        flushTurn();
+                                    }
+
+                                    const endsWithNewline = rawOriginalText.endsWith('\n');
+                                    const hasToolCall = rawTrimmedText.toLowerCase().includes('tool:functions.') || rawTrimmedText.toLowerCase().includes('agent:generalist.');
+
+                                    turnAgentParts.push(rawTrimmedText);
+                                    if (hasToolCall && endsWithNewline) {
+                                        isContinuingModelTurn = true;
                                     } else {
-                                        turnFinalResponses.push(rawText);
+                                        isContinuingModelTurn = false;
                                     }
                                 }
                             });
 
-                            if (turnToolCalls.length > 0) {
-                                cleanHistoryForAI.push({ role: 'agent', text: turnToolCalls.join('\n') });
-                            }
-                            if (turnToolResults.length > 0) {
-                                cleanHistoryForAI.push({ role: 'system', text: turnToolResults.join('\n\n') });
-                            }
-                            if (turnFinalResponses.length > 0) {
-                                cleanHistoryForAI.push({ role: 'agent', text: turnFinalResponses.join('\n\n') });
-                            }
+                            flushTurn();
                         }
                     }
                     const stream = getAIStream(
