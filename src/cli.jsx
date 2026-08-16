@@ -95,7 +95,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --mode <flux|flow>                   Set startup mode (flux: Agent / flow: Chat)
   --model <model_name>                 Set startup AI model
   --key <key@provider>                 Set API key and provider
-  --provider <google|deepseek|openrouter> Override default provider
+  --provider <google|deepseek|openrouter|nvidia|mistral|ollama|crofai> Override default provider
   --thinking <Fast|Low|Medium|High|xHigh> Set startup thinking level
   --memory <on|off>                    Toggle memory system
   --resume <session_id>                Resume a previous session

@@ -181,6 +181,20 @@ export async function executeKeyboardAction(action, input, options = {}) {
                 await keyboard.type(Key.Backspace);
                 return `SUCCESS: Cleared active text input (Select All + Backspace)`;
             }
+            case 'browser_back': {
+                const isMac = process.platform === 'darwin';
+                if (isMac) {
+                    // macOS: Cmd+Left or Cmd+[
+                    await keyboard.pressKey(Key.LeftSuper, Key.Left);
+                    await keyboard.releaseKey(Key.LeftSuper, Key.Left);
+                } else {
+                    // Windows/Linux: Alt+Left
+                    await keyboard.pressKey(Key.LeftAlt, Key.Left);
+                    await keyboard.releaseKey(Key.LeftAlt, Key.Left);
+                }
+                await releaseAllModifiers();
+                return `SUCCESS: Browser back navigation (${isMac ? 'Cmd+Left' : 'Alt+Left'})`;
+            }
             default:
                 return `ERROR: Unsupported keyboard action "${action}"`;
         }

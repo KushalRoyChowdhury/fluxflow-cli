@@ -1392,6 +1392,173 @@ const getOllamaStream = async function* (apiKey, model, contents, systemInstruct
     }
 };
 
+const getCrofAIStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 0.95) {
+    const messages = [];
+    if (systemInstruction) {
+        messages.push({ role: 'system', content: systemInstruction });
+    }
+
+    for (const content of contents) {
+        const role = content.role === 'user' ? 'user' : 'assistant';
+        const msgContent = [];
+
+        if (Array.isArray(content.parts)) {
+            for (const part of content.parts) {
+                if (part.text) {
+                    msgContent.push({ type: 'text', text: part.text });
+                } else if (part.inlineData && isMultiModal) {
+                    const mimeType = part.inlineData.mimeType;
+                    const data = part.inlineData.data;
+                    const isImage = mimeType.startsWith('image/');
+
+                    if (isImage) {
+                        msgContent.push({
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${data}`
+                            }
+                        });
+                    }
+                }
+            }
+        } else {
+            const text = content.text || '';
+            if (text) msgContent.push({ type: 'text', text });
+        }
+
+        messages.push({
+            role,
+            content: (msgContent.length === 1 && msgContent[0].type === 'text') ? msgContent[0].text : msgContent
+        });
+    }
+
+    const reasoningEffortMap = {
+        'Fast': 'none',
+        'Low': 'low',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
+
+    const requestPayload = {
+        model: model,
+        messages: messages,
+        stream: true,
+        stream_options: { include_usage: true },
+        temperature: temperature,
+        max_completion_tokens: 32768,
+    };
+
+    if (reasoningEffortMap[thinkingLevel]) {
+        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+    }
+
+    const response = await fetchWithBackoff('https://crof.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+        signal: signal
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`CrofAI Error (${response.status}): ${errData.error?.message || response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    let pendingParts = [];
+    let latestUsageMetadata = null;
+    let lastFlushTime = Date.now();
+    let hasNewData = false;
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            if (hasNewData && (pendingParts.length > 0 || latestUsageMetadata)) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: pendingParts } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+            }
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
+            let isDone = false;
+            if (cleanLine === 'data: [DONE]') {
+                isDone = true;
+            } else {
+                try {
+                    const json = JSON.parse(cleanLine.substring(6));
+                    const delta = json.choices?.[0]?.delta;
+                    const usage = json.usage;
+                    if (json.choices?.[0]?.finish_reason) {
+                        isDone = true;
+                    }
+
+                    if (usage) {
+                        latestUsageMetadata = {
+                            totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
+                            promptTokenCount: usage.prompt_tokens || 0,
+                            candidatesTokenCount: usage.completion_tokens || 0,
+                            cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
+                            thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || usage.reasoning_tokens || 0
+                        };
+                        hasNewData = true;
+                    }
+
+                    if (delta) {
+                        const thought = delta.reasoning_content || null;
+                        if (thought) {
+                            pendingParts.push({ text: thought, thought: true });
+                            hasNewData = true;
+                        }
+                        if (delta.content) {
+                            pendingParts.push({ text: delta.content });
+                            hasNewData = true;
+                        }
+                    }
+                } catch (e) { }
+            }
+
+            if ((isDone || Date.now() - lastFlushTime >= 150) && hasNewData) {
+                yield {
+                    candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                    usageMetadata: latestUsageMetadata
+                };
+                pendingParts = [];
+                lastFlushTime = Date.now();
+                hasNewData = false;
+            }
+
+            if (isDone) break;
+        }
+
+        if (Date.now() - lastFlushTime >= 150 && hasNewData) {
+            yield {
+                candidates: pendingParts.length > 0 ? [{ content: { parts: [...pendingParts] } }] : [],
+                usageMetadata: latestUsageMetadata
+            };
+            pendingParts = [];
+            lastFlushTime = Date.now();
+            hasNewData = false;
+        }
+    }
+};
+
 export const signalTermination = () => {
     TERMINATION_SIGNAL = true;
 };
@@ -1479,7 +1646,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -1639,6 +1806,21 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                             useNvidiaFallback ? nvidiaApiKey : apiKey,
                             getFallbackValue('nvidia_janitor_fallback'),
                             // "mistralai/mistral-nemotron", // [DEBUGGING POINT]
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast', // Janitor always minimal
+                            mode,
+                            false,
+                            null,
+                            0.6
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else if (aiProvider === 'CrofAI') {
+                        const stream = getCrofAIStream(
+                            apiKey,
+                            targetModel || 'deepseek-v4-flash-0731',
                             janitorContents,
                             janitorPrompt,
                             'Fast', // Janitor always minimal
@@ -2295,6 +2477,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getMistralStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'NVIDIA') {
                 stream = getNVIDIAStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'CrofAI') {
+                stream = getCrofAIStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const genStream = await googleClient.models.generateContentStream({
@@ -2634,7 +2818,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -3746,6 +3930,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             1.05
                         );
                         stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
+                    } else if (aiProvider === 'CrofAI') {
+                        stream = getCrofAIStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
                     } else {
                         const googleClient = getGoogleClient(settings?.apiKey);
                         const apiCallPromise = googleClient.models.generateContentStream({
@@ -5869,6 +6065,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'nvidia') return 'NVIDIA';
         if (lower === 'mistral') return 'Mistral';
         if (lower === 'ollama') return 'Ollama';
+        if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
         return null;
     };
 

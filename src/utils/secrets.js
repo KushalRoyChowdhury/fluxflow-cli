@@ -30,6 +30,7 @@ export const getProviderAPIKey = async (provider) => {
         if (provider === 'Mistral') return secrets.MISTRAL_API_KEY || null;
         if (provider === 'NVIDIA') return secrets.NVIDIA_API_KEY || null;
         if (provider === 'Ollama') return secrets.OLLAMA_API_KEY || 'LOCAL';
+        if (provider === 'CrofAI' || provider === 'Crof') return secrets.CROFAI_API_KEY || null;
     } catch (e) {}
     return null;
 };
@@ -48,6 +49,8 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('NVIDIA_API_KEY', key);
     } else if (provider === 'Ollama') {
         await saveSecret('OLLAMA_API_KEY', key);
+    } else if (provider === 'CrofAI' || provider === 'Crof') {
+        await saveSecret('CROFAI_API_KEY', key);
     }
 };
 

@@ -70,7 +70,7 @@ Invocations:
 - [tool:functions.Drag(fromGridId="integer", toGridId="integer")]. Drag mouse from start grid number to target grid number
 - [tool:functions.Scroll(direction="up/down", gridId="mouse hover area")]. Scroll viewport vertically
 - [tool:functions.KeyboardTyping(text="string", autoPressEnter="bool")]. Type text string into currently active input. JSON escape literal escape sequences
-- [tool:functions.KeyPress(key="key or ;-separated combination, eg: enter, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4")]. Press key, shortcut, function key (f1-f12), or clear active input field.
+- [tool:functions.KeyPress(key="key or ;-separated combination, eg: enter, back, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4")]. Press key, shortcut, function key (f1-f12), or clear active input field.
 - [tool:functions.RecaptureScreen()]. Request fresh gridded screenshot`;
 
 // =====================================================================================================

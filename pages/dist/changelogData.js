@@ -3,12 +3,14 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.1.4"]
+export const stableVersions = ["4.2.0"]
 
 export const changelogData = {
-    "4.1.4": {
-        "note": "AUGUST 16",
-        "added": [],
+    "4.2.0": {
+        "note": "AUGUST 17",
+        "added": [
+            "Added new AI Provider: CrofAI. Memory with this implementation isn't yet supported."
+        ],
         "changed": [],
         "fixes": [
             "Massively improved Click accuracy.",

@@ -24,7 +24,8 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **DeepSeek** (Deepseek v4 Models)
   - **NVIDIA** (Access to open models)
   - **Ollama** (Local Models / Ollama Cloud Models)
-  - **Mistral** (Access to selected models; *Experimental*)
+  - **Mistral** (Access to selected models)
+  - **CrofAI** (Access to selected models)
   - **OpenRouter** (Access to hundreds of models; *Experimental*)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:

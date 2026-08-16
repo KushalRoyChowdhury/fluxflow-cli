@@ -3,6 +3,7 @@ import DocPage from '../components/DocPage'
 const headings = [
     { id: 'google-gemini', text: 'Google Gemini', level: 2 },
     { id: 'deepseek', text: 'DeepSeek', level: 2 },
+    { id: 'crofai', text: 'CrofAI', level: 2 },
     { id: 'ollama', text: 'Ollama', level: 2 },
     { id: 'mistral', text: 'Mistral', level: 2 },
     { id: 'nvidia', text: 'NVIDIA (NIM)', level: 2 },
@@ -146,6 +147,77 @@ export default function StableModels() {
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-pro</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* CROFAI */}
+            <h2 id="crofai" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                CrofAI
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Access high-speed and cost-effective frontier models hosted on CrofAI infrastructure.
+            </p>
+            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-flash-0731</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Efficient</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">deepseek-v4-pro-0813</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Intelligence Reasoning</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">kimi-k3-eco</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Efficiency Reasoning</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">kimi-k2.6</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">glm-5.2</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Performance Reasoning</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">gemma-4-31b-it</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.6-27b</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.5-397b-a17b</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">High-Capacity Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">qwen3.5-9b</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Fast & Lightweight Multimodal</td>
+                        </tr>
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">greg-1-mini</td>
+                            <td className="py-2.5 px-4"><Badge type="multimodal" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Multimodal</td>
                         </tr>
                     </tbody>
                 </table>

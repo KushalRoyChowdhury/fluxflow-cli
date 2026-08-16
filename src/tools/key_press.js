@@ -19,6 +19,10 @@ export const key_press = async (args, context = {}) => {
         return await executeKeyboardAction('clear_input');
     }
 
+    if (cleanKeyStr === 'back' || cleanKeyStr === 'browser_back' || cleanKeyStr === 'browserBack') {
+        return await executeKeyboardAction('browser_back');
+    }
+
     if (cleanKeyStr.includes(';') || cleanKeyStr.includes('+')) {
         const keysArr = cleanKeyStr.split(/[;+]/).map(k => k.trim()).filter(Boolean);
         return await executeKeyboardAction('key_combination', keysArr);

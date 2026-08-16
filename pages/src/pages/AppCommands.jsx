@@ -45,6 +45,9 @@ export default function AppCommands() {
                     <strong><code>/thinking [fast|low|medium|high|max]</code></strong> — Adjust reasoning depth and thinking level.
                 </li>
                 <li>
+                    <strong><code>/display [index]</code></strong> — Used for Computer Use mode to set which display screen the agent can see and operate on.
+                </li>
+                <li>
                     <strong><code>/btw &lt;question&gt;</code></strong> — Sends a raw inquiry to the agent mid-turn without interrupting the active loop.
                 </li>
             </ul>

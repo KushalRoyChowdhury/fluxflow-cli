@@ -757,7 +757,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -767,6 +767,7 @@ export default function App({ args = [] }) {
                     if (lower === 'nvidia') return 'NVIDIA';
                     if (lower === 'mistral') return 'Mistral';
                     if (lower === 'ollama') return 'Ollama';
+                    if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
                     return null;
                 };
 
@@ -873,12 +874,15 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
                         else if (provPart === 'openrouter') mapped = 'OpenRouter';
                         else if (provPart === 'nvidia') mapped = 'NVIDIA';
+                        else if (provPart === 'mistral') mapped = 'Mistral';
+                        else if (provPart === 'ollama') mapped = 'Ollama';
+                        else if (provPart === 'crof' || provPart === 'crofai') mapped = 'CrofAI';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -950,7 +954,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -958,6 +962,7 @@ export default function App({ args = [] }) {
                     else if (val === 'nvidia') mapped = 'NVIDIA';
                     else if (val === 'mistral') mapped = 'Mistral';
                     else if (val === 'ollama') mapped = 'Ollama';
+                    else if (val === 'crof' || val === 'crofai') mapped = 'CrofAI';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1203,12 +1208,12 @@ export default function App({ args = [] }) {
             if (aiProvider === 'Mistral') {
                 setThinkingLevel('Fast');
             } else {
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA';
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
             }
         } else {
-            if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
-                if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
+            if ((aiProvider === 'Google' || aiProvider === 'CrofAI') && thinkingLevel === 'xHigh') {
+                if ((activeModel && activeModel.toLowerCase().startsWith('gemini-3')) || aiProvider === 'CrofAI') {
                     setThinkingLevel('High');
                 }
             }
@@ -1714,7 +1719,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -2332,6 +2337,10 @@ export default function App({ args = [] }) {
                 prefix: '',
                 minLength: 0,
             },
+            CrofAI: {
+                prefix: '',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2356,6 +2365,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama') {
                 defaultModel = activeModel || '';
+            } else if (aiProvider === 'CrofAI') {
+                defaultModel = getDefaultModel('CrofAI', apiTier) || '';
             }
             setActiveModel(defaultModel);
 
@@ -2364,9 +2375,13 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI') {
+                newSys = { ...newSys, memory: false };
+                setSystemSettings(newSys);
+            }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2469,7 +2484,7 @@ export default function App({ args = [] }) {
                                 { cmd: 'Fast', desc: 'Reasoning Disabled' },
                                 { cmd: 'xHigh', desc: 'Deep Reasoning' }
                             ]
-                            : activeModel && activeModel.toLowerCase().startsWith('gemini-3')
+                            : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI')
                                 ? [
                                     { cmd: 'Fast', desc: 'Fastest' },
                                     { cmd: 'Low', desc: 'Quick Reasoning' },
@@ -3329,7 +3344,8 @@ export default function App({ args = [] }) {
                                 Google: 'Free',
                                 DeepSeek: 'Free',
                                 NVIDIA: 'Free',
-                                OpenRouter: 'Free'
+                                OpenRouter: 'Free',
+                                CrofAI: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -4571,7 +4587,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -4698,6 +4714,7 @@ export default function App({ args = [] }) {
                             { label: 'Google', value: 'Google' },
                             { label: 'Nvidia', value: 'NVIDIA' },
                             { label: 'DeepSeek', value: 'DeepSeek' },
+                            { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Ollama', value: 'Ollama' },
                             { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
                             { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
@@ -4721,7 +4738,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -4731,7 +4748,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${thinkingLevel ? `\n⠀⠀└─ Thinking Level: ${thinkingLevel}.` : ''}${selectedProvider === 'Ollama' && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Ollama.' : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -4894,7 +4911,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5058,7 +5075,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -5302,14 +5319,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' ? '\n⠀⠀└─ Memory is not available with Ollama' : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' ? `\n⠀⠀└─ Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -6512,6 +6529,7 @@ export default function App({ args = [] }) {
                                                         { label: 'Google', value: 'Google' },
                                                         { label: 'Nvidia', value: 'NVIDIA' },
                                                         { label: 'DeepSeek', value: 'DeepSeek' },
+                                                        { label: 'CrofAI', value: 'CrofAI' },
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
                                                         { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
@@ -6623,6 +6641,9 @@ export default function App({ args = [] }) {
                                             } else if (aiProvider === 'NVIDIA') {
                                                 url = "https://build.nvidia.com/settings/api-keys";
                                                 label = "billing";
+                                            } else if (aiProvider === 'CrofAI') {
+                                                url = "https://crof.ai";
+                                                label = "account";
                                             }
                                             // return (
                                             //     <Text color={colors.textMuted} italic>

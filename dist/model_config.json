@@ -1,6 +1,6 @@
 {
-    "version": 0,
-    "release": 20260816,
+    "version": 1,
+    "release": 20260817,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -14,7 +14,7 @@
         "nvidia_janitor_fallback": "mistralai/mistral-nemotron",
         "nvidia_chat_summarizer_fallback": "nvidia/nemotron-3-super-120b-a12b",
         "google_level_1": "gemini-3-flash-preview",
-        "google_level_2": "gemini-3.5-flash",
+        "google_level_2": "gemini-3.7-flash",
         "gemma_emergency": "gemma-4-31b-it",
         "gemma_janitor_fallback_google_openrouter": "google/gemma-4-26b-a4b-it:free",
         "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it"
@@ -44,6 +44,65 @@
                         "cmd": "nemotron-3-nano:30b-cloud",
                         "multimodal": false,
                         "desc": "30B A4B (Text Only)  [Level 1]"
+                    }
+                ],
+                "Paid": []
+            }
+        },
+        "CrofAI": {
+            "default_free": "deepseek-v4-flash-0731",
+            "default_paid": "deepseek-v4-flash-0731",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "deepseek-v4-pro-0813",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "deepseek-v4-flash-0731",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "kimi-k3-eco",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "kimi-k2.6",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "glm-5.2",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "gemma-4-31b-it",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "qwen3.6-27b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "qwen3.5-397b-a17b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "qwen3.5-9b",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
+                        "cmd": "greg-1-mini",
+                        "multimodal": true,
+                        "desc": "Multimodal"
                     }
                 ],
                 "Paid": []
