@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "release": 20260817,
+    "version": 0,
+    "release": 20260818,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -198,6 +198,34 @@
                     },
                     {
                         "cmd": "nvidia/nemotron-3-ultra-550b-a55b:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3-super-120b-a12b:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "nvidia/nemotron-3.5-lightning:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- North Mini Code Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "cohere/north-mini-code:free",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- GLM Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "z-ai/glm-5.2:free",
                         "multimodal": false,
                         "desc": "Text Only"
                     }
