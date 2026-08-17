@@ -1161,8 +1161,12 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         'xHigh': 'high'
     };
 
+    const formattedModel = model.includes(':') 
+        ? `${model.split(':')[0]}:${model.split(':').slice(1).join(':').toLowerCase()}`
+        : model;
+
     const requestPayload = {
-        model: model,
+        model: formattedModel,
         messages: messages,
         stream: true,
         temperature: temperature,

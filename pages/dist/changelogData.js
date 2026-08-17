@@ -3,9 +3,19 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.2.2"]
+export const stableVersions = ["4.2.3"]
 
 export const changelogData = {
+    "4.2.3": {
+        "note": "AUGUST 17",
+        "added": [
+            "Improved OpenRouter Integration. Now supports `model_id:provider` to pick any custom provider, for better cache stability and lower cost."
+        ],
+        "changed": [
+            "Improved responsiveness in Computer Use."
+        ],
+        "fixes": []
+    },
     "4.2.2": {
         "note": "AUGUST 17",
         "added": [
