@@ -1,7 +1,7 @@
 {
     "name": "fluxflow-cli",
-    "version": "4.2.3",
-    "date": "2026-08-17",
+    "version": "4.2.4",
+    "date": "2026-08-18",
     "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era. Now has Computer Use.",
     "keywords": [
         "ai",
@@ -36,7 +36,7 @@
     ],
     "type": "module",
     "bin": {
-        "fluxflow-cli": "dist/cli.js",
+        "fluxflow-jit": "dist/cli.js",
         "fluxflow": "dist/entry.js"
     },
     "scripts": {

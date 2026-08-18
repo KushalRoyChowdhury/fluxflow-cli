@@ -106,17 +106,19 @@ fluxflow [options]
 ```
 
 ### Supported Flags:
-- `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.5-pro`). Keps settings file untouched.
-- `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
-- `--resume <session-id>`: Resume a previous chat session programmatically.
-- `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
-- `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
-- `--auto-del <1d | 7d | 30d>`: Set automated chat log deletion schedule.
-- `--yolo <on | off>`: Toggle autonomous command execution permission.
-- `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
-- `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
-- `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
-- `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
+ - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.5-pro`). Keeps settings file untouched.
+ - `--cwd <path>`: Set the working directory for the session (relative or absolute path).
+ - `--path <path>`: Alias for `--cwd`. Set the working directory for the session.
+ - `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
+ - `--resume <session-id>`: Resume a previous chat session programmatically.
+ - `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
+ - `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
+ - `--auto-del <1d | 7d | 30d>`: Set automated chat log deletion schedule.
+ - `--yolo <on | off>`: Toggle autonomous command execution permission.
+ - `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
+ - `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
+ - `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
+ - `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
 
 ---
 

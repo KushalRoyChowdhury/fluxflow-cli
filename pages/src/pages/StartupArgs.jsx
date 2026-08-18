@@ -34,6 +34,14 @@ export default function StartupArgs() {
                     Set the startup operating mode. <code>flux</code> activates the high-speed developer agent, while <code>flow</code> starts a standard chat session.
                 </li>
                 <li>
+                    <strong><code>--cwd &lt;path&gt;</code></strong><br />
+                    Set the working directory for the session. Accepts relative or absolute paths.
+                </li>
+                <li>
+                    <strong><code>--path &lt;path&gt;</code></strong><br />
+                    Alias for <code>--cwd</code>. Set the working directory for the session.
+                </li>
+                <li>
                     <strong><code>--resume &lt;session_id&gt;</code></strong><br />
                     Programmatically resume a previous chat session using its unique ID.
                 </li>
@@ -111,7 +119,7 @@ export default function StartupArgs() {
                 </li>
                 <li>
                     <strong><code>--update check latest</code></strong><br />
-                    Display the latest version available on npm.
+                    Display the latest vere on npm.
                 </li>
                 <li>
                     <strong><code>--update latest</code></strong><br />

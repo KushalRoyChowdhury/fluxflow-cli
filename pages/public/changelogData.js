@@ -3,9 +3,20 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.2.3"]
+export const stableVersions = ["4.2.4"]
 
 export const changelogData = {
+    "4.2.4": {
+        "note": "AUGUST 19",
+        "added": [
+            "Added new memory management algorithm. May use lower RAM. Can be turned on via `EXPERIMENTAL_MEMORY_MANAGER` flag via ENV variables.",
+            "Added new startup argument `--path path/to/prroject` to open a new FluxFlow instance with a specific path if terminal CWD is different."
+        ],
+        "changed": [],
+        "fixes": [
+            "Improved boot times."
+        ]
+    },
     "4.2.3": {
         "note": "AUGUST 17",
         "added": [

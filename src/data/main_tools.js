@@ -37,7 +37,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     const fluxTools = `**Workspace Tools (path = relative; first argument, path separator: '/')**
 - [tool:functions.ReadFile(path="...", startLine="int", endLine="int")]${aiProvider !== 'Google' ? `${isMultiModal ? `. Supports images/docs` : ''}` : `. Supports images/docs`}
 - [tool:functions.ReadFolder(path="...", recurse="int 1-3")]. Minimize recursion
-- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Target minimal searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
+- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile
 - [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user

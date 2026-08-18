@@ -5,10 +5,6 @@ import { enableCompileCache } from 'node:module';
 
 const cacheDir = path.join(os.homedir(), '.fluxflow', '.cache');
 
-if (process.env.NODE_COMPILE_CACHE === undefined) {
-    process.env.NODE_COMPILE_CACHE = cacheDir;
-}
-
 if (typeof enableCompileCache === 'function') {
     try {
         enableCompileCache(cacheDir);

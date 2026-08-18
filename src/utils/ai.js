@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
+dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { Ollama } from 'ollama';
@@ -1161,7 +1162,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         'xHigh': 'high'
     };
 
-    const formattedModel = model.includes(':') 
+    const formattedModel = model.includes(':')
         ? `${model.split(':')[0]}:${model.split(':').slice(1).join(':').toLowerCase()}`
         : model;
 
@@ -6179,7 +6180,7 @@ ${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT
 - [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
 - [tool:functions.ReadFolder(path="...", recurse="int 1-3")]. Minimize recursion
 - [tool:functions.ReadFile(path="...", startLine="int", endLine="int")]
-- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Target minimal searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
+- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
 - [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
 

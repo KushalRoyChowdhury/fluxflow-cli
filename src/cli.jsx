@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
+dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
 
 /**
  * AUTO-HEAP SCALER
@@ -21,6 +22,8 @@ const calculatedLimit = Math.floor(totalSystemRamMB * SAFETY_MARGIN);
 const _rawArgs = process.argv.slice(2);
 const _allocIdx = _rawArgs.indexOf('--allocation');
 const _allocValue = _allocIdx !== -1 ? parseInt(_rawArgs[_allocIdx + 1], 10) : NaN;
+const experimentalMemory = process.env.EXPERIMENTAL_MEMORY_MANAGER === 'true' || process.env.EXPERIMENTAL_MEMORY_MANAGER === '1' || process.env.EXPERIMENTAL_MEMORY_MANAGER === true || process.env.EXPERIMENTAL_MEMORY_MANAGER === 1 || false;
+const shouldRespawn = !isNaN(_allocValue) || experimentalMemory || false;
 
 if (!isNaN(_allocValue) && _allocValue < 64) {
     console.error(`\n[ERROR] Allocation value '${_allocValue} MB' is too low. Minimum: 64 MB, Recommended: 4096 MB.\n`);
@@ -34,9 +37,9 @@ const HEAP_LIMIT = (!isNaN(_allocValue) && _allocValue > 0)
 
 const isBundled = fileURLToPath(import.meta.url).endsWith('.js');
 
-if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'))) {
+if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size')) && shouldRespawn) {
     if (!Number.isNaN(_allocValue)) {
-        console.log(`\n[MEMORY] Starting with: '${ _allocValue > _maxAllowed ? _maxAllowed : _allocValue } MB' Allocation${ _allocValue > _maxAllowed ? " (Max allowed: '" + _maxAllowed + " MB')" : "" }. Please Wait...`);
+        console.log(`\n[MEMORY] Starting with: '${_allocValue > _maxAllowed ? _maxAllowed : _allocValue} MB' Allocation${_allocValue > _maxAllowed ? " (Max allowed: '" + _maxAllowed + " MB')" : ""}. Please Wait...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
     }
     // else {
@@ -110,10 +113,12 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --help                               Show this help menu
   --help commands                      Show available /commands
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
-  --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
-  --update check                       Check for new updates
-  --update check latest                Show the latest version available on npm
-  --update [latest]                    Update the app to the latest version (latest is default)`);
+ --cwd <path>                         Set working directory to path
+ --path <path>                        Same as --cwd, set working directory
+ --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
+ --update check                       Check for new updates
+ --update check latest                Show the latest version available on npm
+ --update [latest]                    Update the app to the latest version (latest is default)`);
             process.exit(0);
         }
 
@@ -353,10 +358,30 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     console.warn = (...args) => !isNoise(args) && originalWarn(...args);
     console.error = (...args) => !isNoise(args) && originalError(...args);
 
-    // 3. CLEAN SLATE (Non-destructive clear to preserve scrollback and title)
+    // 3. CWD/PATH: Allow setting working directory via --cwd or --path
+    const cwdIndex = args.findIndex(arg => arg === '--cwd' || arg === '--path');
+    if (cwdIndex !== -1 && cwdIndex + 1 < args.length) {
+        const targetCwd = args[cwdIndex + 1];
+        const pathMod = await import('path');
+        const fsMod = await import('fs-extra');
+        const resolvedPath = pathMod.default.resolve(targetCwd);
+        try {
+            if (fsMod.default.existsSync(resolvedPath) && fsMod.default.statSync(resolvedPath).isDirectory()) {
+                process.chdir(resolvedPath);
+            } else {
+                console.error(`[ERROR] Directory not found: "${targetCwd}"`);
+                process.exit(0);
+            }
+        } catch (e) {
+            console.error(`[ERROR] Failed to change directory to "${targetCwd}": ${e.message}`);
+            process.exit(0);
+        }
+    }
+
+    // 4. CLEAN SLATE (Non-destructive clear to preserve scrollback and title)
     process.stdout.write('\x1b[2J\x1b[3J\x1b[H');
 
-    // 4. SET TERMINAL TITLE AND BRACKETED PASTE
+    // 5. SET TERMINAL TITLE AND BRACKETED PASTE
     if (process.stdout.isTTY) {
         process.stdout.write('\x1b]0;FluxFlow\x07');
         process.stdout.write('\x1b]633;P;TerminalTitle=FluxFlow\x07');
@@ -377,7 +402,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
         });
     });
 
-    // 5. PLAYGROUND: pin CWD before first render so StatusBar shows the right path immediately
+    // 6. PLAYGROUND: pin CWD before first render so StatusBar shows the right path immediately
     if (args.includes('--playground')) {
         const originalCwd = process.cwd();
         process.argv.push('--original-cwd', originalCwd);

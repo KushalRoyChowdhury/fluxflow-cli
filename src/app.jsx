@@ -2157,10 +2157,8 @@ export default function App({ args = [] }) {
                 fs.remove(path.join(DATA_DIR, 'playground')).catch(() => { });
             }
 
-            // 4. Check for updates (deferred to prevent blocking boot paint)
-            setTimeout(() => {
-                performVersionCheck(false, freshSettings);
-            }, 1000);
+            // 4. Check for updates
+            performVersionCheck(false, freshSettings);
 
             // 5. Prime usage cache and handle resume flag concurrently
             await Promise.all([
@@ -3060,7 +3058,7 @@ export default function App({ args = [] }) {
                         if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED⠀⠀└─"${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.${forceMsg}.`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─"${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.\n⠀${forceMsg}.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
