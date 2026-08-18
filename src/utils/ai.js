@@ -1162,9 +1162,30 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         'xHigh': 'high'
     };
 
-    const formattedModel = model.includes(':')
-        ? `${model.split(':')[0]}:${model.split(':').slice(1).join(':').toLowerCase()}`
-        : model;
+    let rawModel = model;
+    let serviceTier = null;
+
+    if (rawModel.includes('::')) {
+        const parts = rawModel.split('::');
+        rawModel = parts[0].trim();
+        const tier = parts.slice(1).join('::').toLowerCase().trim();
+        if (['flex', 'priority', 'default'].includes(tier)) {
+            if (tier !== 'default') {
+                serviceTier = tier;
+            }
+        }
+    }
+
+    let formattedModel = rawModel;
+    if (rawModel.includes(':')) {
+        const [modelId, ...providerParts] = rawModel.split(':');
+        const provider = providerParts.join(':').toLowerCase().trim();
+        if (serviceTier) {
+            formattedModel = `${modelId}:${provider}/${serviceTier}`;
+        } else {
+            formattedModel = `${modelId}:${provider}`;
+        }
+    }
 
     const requestPayload = {
         model: formattedModel,
@@ -1179,6 +1200,8 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
     if (effort && thinkingLevel !== 'Fast') {
         requestPayload.reasoning_effort = effort;
     }
+
+    console.log(requestPayload);
 
     const response = await fetchWithBackoff('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
