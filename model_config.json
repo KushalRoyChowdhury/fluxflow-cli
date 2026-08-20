@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260821,
+    "release": 20260822,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -165,7 +165,7 @@
             }
         },
         "Mistral": {
-            "default_free": "mistral-small-2506",
+            "default_free": "mistral-large-2512",
             "default_paid": "devstral-2512",
             "models": {
                 "Free": [
@@ -348,12 +348,12 @@
                         "desc": ""
                     },
                     {
-                        "cmd": "deepseek/deepseek-v4-pro",
+                        "cmd": "deepseek/deepseek-v4-pro-0813",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
                     {
-                        "cmd": "deepseek/deepseek-v4-flash",
+                        "cmd": "deepseek/deepseek-v4-flash-0731",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
@@ -485,11 +485,6 @@
                     },
                     {
                         "cmd": "deepseek-ai/deepseek-v4-flash-0731",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "deepseek-ai/deepseek-v4-pro",
                         "multimodal": false,
                         "desc": "Text Only"
                     },

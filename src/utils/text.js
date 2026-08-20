@@ -1200,8 +1200,6 @@ export const cleanSignals = (text, isThinkRole = false) => {
                 return match;
             });
         }
-        // If the response contains a tool call, also strip any other XML tags in the same response
-        result = result.replace(/<(\w+)(?:[^>]*)>\r?\n?/gi, '').replace(/\r?\n?<\/\w+(?:[^>]*)>/gi, '');
     }
 
     const trigger = 'tool:functions.';
@@ -1301,7 +1299,9 @@ export const cleanSignals = (text, isThinkRole = false) => {
                 }
                 j++;
                 if (j === result.length) {
-                    result = result.substring(0, startIdx);
+                    if (foundStart && balance > 0) {
+                        result = result.substring(0, startIdx);
+                    }
                     return result;
                 }
             }

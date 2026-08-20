@@ -1686,6 +1686,7 @@ const getInferXStream = async function* (apiKey, model, contents, systemInstruct
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
+        // fs.appendFileSync("DEBUG.txt", `${lines}\n\n`);
         buffer = lines.pop();
 
         for (const line of lines) {
@@ -3811,7 +3812,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
-        const firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}` : ''}[system] exact structured string '[tool:functions.toolname(arg="value")]' in chat response [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+        const firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}` : ''}[system] exact tool string '[tool:functions.ToolName(arg="value")]' in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -4451,7 +4452,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     let toolCallBuffer = '';
                     let isBufferingToolCall = false;
-                    let activeBufferType = null; // 'tool', 'end', 'kimi_section', 'kimi_call'
+                    let activeBufferType = null; // 'tool', 'agent', 'end', 'kimi_section', 'kimi_call'
+
+                    const BUFFER_TYPES = {
+                        tool: { startPrefix: '[tool', fullPrefix: '[tool:functions.', endTag: ']' },
+                        agent: { startPrefix: '[agent', fullPrefix: '[agent:generalist.', endTag: ']' },
+                        end: { startPrefix: '[[END]]', fullPrefix: '[[END]]', endTag: '[[END]]' },
+                        kimi_section: { startPrefix: '<|tool_calls_section_begin|>', fullPrefix: '<|tool_calls_section_begin|>', endTag: '<|tool_calls_section_end|>' },
+                        kimi_call: { startPrefix: '<|tool_call_begin|>', fullPrefix: '<|tool_call_begin|>', endTag: '<|tool_call_end|>' }
+                    };
 
                     const getBufferedMessages = (text) => {
                         const msgs = [];
@@ -4520,13 +4529,24 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             } else {
                                 const combined = toolCallBuffer + remaining;
 
-                                // [HEURISTIC] If we're buffering a tool call but it doesn't match the protocol prefix, FLUSH.
-                                // This prevents vanishing output when the model writes code like `[some_array]` or `| [ ] |`.
-                                if (activeBufferType === 'tool' || activeBufferType === 'agent') {
-                                    const protocolPrefix = activeBufferType === 'tool' ? '[tool:functions.' : '[agent:generalist.';
-                                    const startPrefix = activeBufferType === 'tool' ? '[tool' : '[agent';
-                                    // If we have enough chars to check the prefix and it doesn't match, or if it doesn't even start with the prefix
-                                    if (!combined.startsWith(startPrefix) || (combined.length >= protocolPrefix.length && !combined.startsWith(protocolPrefix))) {
+                                // [HEURISTIC] If we're buffering a tag/tool call but it doesn't match the expected prefix, FLUSH immediately.
+                                // This prevents vanishing/frozen output when the model writes code/text like `[some_array]` or ` `<Tag />` or `| [ ] |`.
+                                const cfg = BUFFER_TYPES[activeBufferType];
+                                if (cfg) {
+                                    let isMismatch = false;
+                                    if (combined.length < cfg.startPrefix.length) {
+                                        if (!cfg.startPrefix.startsWith(combined)) {
+                                            isMismatch = true;
+                                        }
+                                    } else {
+                                        if (!combined.startsWith(cfg.startPrefix)) {
+                                            isMismatch = true;
+                                        } else if (combined.length >= cfg.fullPrefix.length && !combined.startsWith(cfg.fullPrefix)) {
+                                            isMismatch = true;
+                                        }
+                                    }
+
+                                    if (isMismatch) {
                                         msgs.push({ type: 'text', content: combined });
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false;
@@ -4537,7 +4557,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 let endIdx = -1;
-                                let endTag = ']';
+                                let endTag = cfg ? cfg.endTag : ']';
                                 if (activeBufferType === 'tool' || activeBufferType === 'agent') {
                                     let balance = 0;
                                     let inString = null;
@@ -4576,15 +4596,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         }
                                     }
                                 } else {
-                                    if (activeBufferType === 'end') endTag = '[[END]]';
-                                    else if (activeBufferType === 'kimi_section') endTag = '<|tool_calls_section_end|>';
-                                    else if (activeBufferType === 'kimi_call') endTag = '<|tool_call_end|>';
                                     endIdx = combined.indexOf(endTag);
                                 }
 
                                 if (endIdx !== -1) {
                                     const endLen = endTag.length;
-                                    if (!activeBufferType.startsWith('kimi')) {
+                                    if (!activeBufferType?.startsWith('kimi')) {
                                         // Standard tools are outputted to frontend (app.jsx intercepts standard ones)
                                         const fullMatch = combined.substring(0, endIdx + endLen);
                                         msgs.push({ type: 'text', content: fullMatch });
@@ -4595,14 +4612,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     remaining = combined.substring(endIdx + endLen);
                                 } else {
                                     // [LIMIT PROTECTION] - Prevent crashes on massive tool calls (e.g. large file writes)
-                                    // Flush/discard buffer if it exceeds limits
-                                    const MAX_BUFFER = activeBufferType.startsWith('kimi') ? 8192 : 512;
+                                    // Flush buffer if it exceeds limits
+                                    const MAX_BUFFER = activeBufferType?.startsWith('kimi') ? 8192 : 512;
                                     if (combined.length > MAX_BUFFER) {
-                                        if (!activeBufferType.startsWith('kimi')) {
-                                            msgs.push({ type: 'text', content: combined });
-                                        }
+                                        msgs.push({ type: 'text', content: combined });
                                         toolCallBuffer = '';
                                         isBufferingToolCall = false; // Give up on this
+                                        activeBufferType = null;
                                     } else {
                                         toolCallBuffer = combined;
                                     }
