@@ -757,7 +757,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -768,6 +768,8 @@ export default function App({ args = [] }) {
                     if (lower === 'mistral') return 'Mistral';
                     if (lower === 'ollama') return 'Ollama';
                     if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
+                    if (lower === 'inferx') return 'InferX';
+                    if (lower === 'sensenova') return 'SenseNova';
                     return null;
                 };
 
@@ -874,7 +876,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -883,6 +885,8 @@ export default function App({ args = [] }) {
                         else if (provPart === 'mistral') mapped = 'Mistral';
                         else if (provPart === 'ollama') mapped = 'Ollama';
                         else if (provPart === 'crof' || provPart === 'crofai') mapped = 'CrofAI';
+                        else if (provPart === 'inferx') mapped = 'InferX';
+                        else if (provPart === 'sensenova') mapped = 'SenseNova';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -954,7 +958,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -963,6 +967,8 @@ export default function App({ args = [] }) {
                     else if (val === 'mistral') mapped = 'Mistral';
                     else if (val === 'ollama') mapped = 'Ollama';
                     else if (val === 'crof' || val === 'crofai') mapped = 'CrofAI';
+                    else if (val === 'inferx') mapped = 'InferX';
+                    else if (val === 'sensenova') mapped = 'SenseNova';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -1208,12 +1214,12 @@ export default function App({ args = [] }) {
             if (aiProvider === 'Mistral') {
                 setThinkingLevel('Fast');
             } else {
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI';
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
             }
         } else {
-            if ((aiProvider === 'Google' || aiProvider === 'CrofAI') && thinkingLevel === 'xHigh') {
-                if ((activeModel && activeModel.toLowerCase().startsWith('gemini-3')) || aiProvider === 'CrofAI') {
+            if ((aiProvider === 'Google' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') && thinkingLevel === 'xHigh') {
+                if ((activeModel && activeModel.toLowerCase().startsWith('gemini-3')) || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
                     setThinkingLevel('High');
                 }
             }
@@ -1719,7 +1725,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -1749,12 +1755,38 @@ export default function App({ args = [] }) {
 
         // Provider Budget Form keyboard handling
         if (activeView === 'providerBudgetFlow') {
-            const totalFields = providerBudgetQueue.length * 2 + 1;
+            const totalRows = providerBudgetQueue.length;
+            const totalFields = totalRows * 2 + 1;
             if (key.upArrow) {
-                setPbfFieldIndex(i => Math.max(0, i - 1));
+                setPbfFieldIndex(i => {
+                    if (i === totalFields - 1) {
+                        return Math.max(0, (totalRows - 1) * 2);
+                    }
+                    if (i >= 2) return i - 2;
+                    return i;
+                });
                 return;
             } else if (key.downArrow) {
-                setPbfFieldIndex(i => Math.min(totalFields - 1, i + 1));
+                setPbfFieldIndex(i => {
+                    if (i === totalFields - 1) return i;
+                    if (i + 2 < totalFields - 1) return i + 2;
+                    return totalFields - 1;
+                });
+                return;
+            } else if (key.leftArrow) {
+                setPbfFieldIndex(i => {
+                    if (i === totalFields - 1) return i;
+                    if (i % 2 === 1) return i - 1;
+                    return i;
+                });
+                return;
+            } else if (key.rightArrow || key.tab) {
+                setPbfFieldIndex(i => {
+                    if (i === totalFields - 1) return i;
+                    if (i % 2 === 0) return i + 1;
+                    if (i + 1 < totalFields) return i + 1;
+                    return i;
+                });
                 return;
             } else if (key.return) {
                 if (pbfFieldIndex === totalFields - 1) {
@@ -2339,6 +2371,14 @@ export default function App({ args = [] }) {
                 prefix: '',
                 minLength: 0,
             },
+            InferX: {
+                prefix: '',
+                minLength: 0,
+            },
+            SenseNova: {
+                prefix: '',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2363,8 +2403,8 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI') {
-                defaultModel = getDefaultModel('CrofAI', apiTier) || '';
+            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
+                defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
 
@@ -2373,13 +2413,13 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI') {
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2482,7 +2522,7 @@ export default function App({ args = [] }) {
                                 { cmd: 'Fast', desc: 'Reasoning Disabled' },
                                 { cmd: 'xHigh', desc: 'Deep Reasoning' }
                             ]
-                            : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI')
+                            : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova')
                                 ? [
                                     { cmd: 'Fast', desc: 'Fastest' },
                                     { cmd: 'Low', desc: 'Quick Reasoning' },
@@ -3343,7 +3383,9 @@ export default function App({ args = [] }) {
                                 DeepSeek: 'Free',
                                 NVIDIA: 'Free',
                                 OpenRouter: 'Free',
-                                CrofAI: 'Free'
+                                CrofAI: 'Free',
+                                InferX: 'Free',
+                                SenseNova: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -4613,7 +4655,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -4736,10 +4778,13 @@ export default function App({ args = [] }) {
                 return (
                     <CommandMenu
                         title="SELECT AI PROVIDER"
+                        searchable={true}
                         items={[
                             { label: 'Google', value: 'Google' },
                             { label: 'Nvidia', value: 'NVIDIA' },
                             { label: 'DeepSeek', value: 'DeepSeek' },
+                            { label: 'InferX', value: 'InferX' },
+                            { label: 'SenseNova', value: 'SenseNova' },
                             { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Ollama', value: 'Ollama' },
                             { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
@@ -4764,7 +4809,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -4774,7 +4819,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -4937,7 +4982,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -4973,68 +5018,112 @@ export default function App({ args = [] }) {
             }
 
             case 'providerBudgetFlow': {
-                const fields = [];
-                for (const prov of providerBudgetQueue) {
-                    fields.push({ provider: prov, subKey: 'tokenLimit', label: 'Daily Tokens (tokens/day)' });
-                    fields.push({ provider: prov, subKey: 'monthlyTokenLimit', label: 'Monthly Tokens (tokens/month)' });
-                }
-                const saveButtonIndex = fields.length;
+                const totalRows = providerBudgetQueue.length;
+                const saveButtonIndex = totalRows * 2;
 
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
-                        <Box paddingX={1} marginBottom={0}>
-                            <Text color={colors.text} bold>PROVIDER LIMIT CONFIGURATION</Text>
-                        </Box>
-                        <Box paddingX={1} paddingBottom={0} marginBottom={0}>
-                            <Text color={colors.textMuted} italic>Set limits for selected providers (leave blank or 0 for no limit)</Text>
+                        <Box paddingX={1} marginBottom={0} justifyContent="space-between" flexDirection="row">
+                            <Text color={colors.text} bold>PROVIDER BUDGET CONFIGURATION</Text>
+                            <Text color={colors.textMuted} italic>(0 or blank = unlimited)</Text>
                         </Box>
 
-                        {providerBudgetQueue.map((prov) => {
-                            const provFields = fields.filter(f => f.provider === prov);
+                        <Box paddingX={1} marginTop={1} flexDirection="row">
+                            <Box width={14}>
+                                <Text color={colors.textMuted} bold>PROVIDER</Text>
+                            </Box>
+                            <Box width={30} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>DAILY TOKENS (/day)</Text>
+                            </Box>
+                            <Box width={30} paddingLeft={1}>
+                                <Text color={colors.textMuted} bold>MONTHLY TOKENS (/month)</Text>
+                            </Box>
+                        </Box>
+
+                        <Box paddingX={1}>
+                            <Text color={colors.borderMuted}>{'─'.repeat(74)}</Text>
+                        </Box>
+
+                        {providerBudgetQueue.map((prov, rowIndex) => {
+                            const dailyIdx = rowIndex * 2;
+                            const monthlyIdx = rowIndex * 2 + 1;
+                            const isDailyFocused = pbfFieldIndex === dailyIdx;
+                            const isMonthlyFocused = pbfFieldIndex === monthlyIdx;
+                            const isRowActive = isDailyFocused || isMonthlyFocused;
+
+                            const dailyVal = pbfFormState[prov]?.tokenLimit ?? '';
+                            const monthlyVal = pbfFormState[prov]?.monthlyTokenLimit ?? '';
+
                             return (
-                                <Box key={prov} flexDirection="column" marginY={0} paddingX={1}>
-                                    <Text color={colors.primary || "cyan"} bold>{`\n── ${prov} ──`}</Text>
-                                    {provFields.map((field) => {
-                                        const fieldIdx = fields.findIndex(f => f.provider === field.provider && f.subKey === field.subKey);
-                                        const isFocused = pbfFieldIndex === fieldIdx;
-                                        const currentVal = pbfFormState[field.provider]?.[field.subKey] ?? '';
-
-                                        return (
-                                            <Box key={field.subKey} paddingLeft={2} flexDirection="row">
-                                                <Text color={isFocused ? colors.text : colors.textMuted} bold={isFocused}>
-                                                    {isFocused ? '❯ ' : '  '}{field.label.padEnd(30, ' ')}: {' '}
-                                                </Text>
-                                                {isFocused ? (
-                                                    <TextInput
-                                                        value={currentVal}
-                                                        onChange={(val) => {
-                                                            setPbfFormState(prev => ({
-                                                                ...prev,
-                                                                [prov]: {
-                                                                    ...(prev[prov] || {}),
-                                                                    [field.subKey]: val
-                                                                }
-                                                            }));
-                                                        }}
-                                                        onSubmit={() => {
-                                                            if (fieldIdx + 1 <= saveButtonIndex) {
-                                                                setPbfFieldIndex(fieldIdx + 1);
+                                <Box key={prov} flexDirection="row" paddingX={1} marginY={0} backgroundColor={isRowActive ? (colors.highlightBg || "#2a2a2a") : undefined}>
+                                    <Box width={14} flexDirection="row">
+                                        <Text color={isRowActive ? (colors.primary || "cyan") : colors.text} bold={isRowActive}>
+                                            {isRowActive ? '❯ ' : '  '}{prov}
+                                        </Text>
+                                    </Box>
+                                    <Box width={30} paddingLeft={1} flexDirection="row">
+                                        {isDailyFocused ? (
+                                            <Box flexDirection="row">
+                                                <Text color={colors.primary || "cyan"} bold>[ </Text>
+                                                <TextInput
+                                                    value={dailyVal}
+                                                    onChange={(val) => {
+                                                        setPbfFormState(prev => ({
+                                                            ...prev,
+                                                            [prov]: {
+                                                                ...(prev[prov] || {}),
+                                                                tokenLimit: val
                                                             }
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <Text color={currentVal ? colors.text : colors.textMuted}>
-                                                        {currentVal ? currentVal : '0 (Unlimited)'}
-                                                    </Text>
-                                                )}
+                                                        }));
+                                                    }}
+                                                    onSubmit={() => {
+                                                        setPbfFieldIndex(monthlyIdx);
+                                                    }}
+                                                />
+                                                <Text color={colors.primary || "cyan"} bold> ]</Text>
                                             </Box>
-                                        );
-                                    })}
+                                        ) : (
+                                            <Text color={dailyVal ? colors.text : colors.textMuted}>
+                                                [ {dailyVal ? dailyVal : '0 (Unlimited)'} ]
+                                            </Text>
+                                        )}
+                                    </Box>
+                                    <Box width={30} paddingLeft={1} flexDirection="row">
+                                        {isMonthlyFocused ? (
+                                            <Box flexDirection="row">
+                                                <Text color={colors.primary || "cyan"} bold>[ </Text>
+                                                <TextInput
+                                                    value={monthlyVal}
+                                                    onChange={(val) => {
+                                                        setPbfFormState(prev => ({
+                                                            ...prev,
+                                                            [prov]: {
+                                                                ...(prev[prov] || {}),
+                                                                monthlyTokenLimit: val
+                                                            }
+                                                        }));
+                                                    }}
+                                                    onSubmit={() => {
+                                                        if (rowIndex + 1 < totalRows) {
+                                                            setPbfFieldIndex((rowIndex + 1) * 2);
+                                                        } else {
+                                                            setPbfFieldIndex(saveButtonIndex);
+                                                        }
+                                                    }}
+                                                />
+                                                <Text color={colors.primary || "cyan"} bold> ]</Text>
+                                            </Box>
+                                        ) : (
+                                            <Text color={monthlyVal ? colors.text : colors.textMuted}>
+                                                [ {monthlyVal ? monthlyVal : '0 (Unlimited)'} ]
+                                            </Text>
+                                        )}
+                                    </Box>
                                 </Box>
                             );
                         })}
 
-                        <Box paddingX={2} marginTop={1}>
+                        <Box paddingX={1} marginTop={1}>
                             {pbfFieldIndex === saveButtonIndex ? (
                                 <Box backgroundColor={colors.highlightBg || "#2a2a2a"} paddingX={1}>
                                     <Text color={colors.success || "green"} bold>❯ [ Save & Apply Budgets ]</Text>
@@ -5045,7 +5134,7 @@ export default function App({ args = [] }) {
                         </Box>
 
                         <Box paddingX={1} marginTop={1} flexDirection="column">
-                            <Text color={colors.textMuted} italic>↑↓ Navigate fields  •  Enter next / save  •  ESC to go back</Text>
+                            <Text color={colors.textMuted} italic>↑↓/←→ Navigate  •  Enter next / save  •  ESC to go back</Text>
                         </Box>
                     </Box>
                 );
@@ -5101,7 +5190,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -5345,14 +5434,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' ? `\n⠀⠀└─ Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' ? `\n⠀⠀└─ Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -5487,32 +5576,34 @@ export default function App({ args = [] }) {
                                         <Box width={25}><Text color={colors.secondary}>Session Duration:</Text></Box>
                                         <Text color={colors.text}>{formatMsDuration(Date.now() - SESSION_START_TIME)}</Text>
                                     </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
-                                        <Text color={colors.text}>{sessionAgentCalls}</Text>
-                                    </Box>
-                                    <Box marginLeft={2}>
-                                        <Box width={23}><Text color={colors.textMuted}>» API Time:</Text></Box>
-                                        <Text color={colors.text}>{formatMsDuration(sessionApiTime)}</Text>
-                                    </Box>
-                                    <Box marginLeft={2}>
-                                        <Box width={23}><Text color={colors.textMuted}>» Tool Time:</Text></Box>
-                                        <Text color={colors.text}>{formatMsDuration(sessionToolTime)}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
-                                        <Text color={colors.text}>{sessionBackgroundCalls}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
-                                        <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Active Context:</Text></Box>
-                                        <Text color={colors.text}>{formatTokens(sessionStats.tokens)}</Text>
-                                    </Box>
+                                    {sessionAgentCalls > 0 && (
+                                        <>
+                                            <Box>
+                                                <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
+                                                <Text color={colors.text}>{sessionAgentCalls}</Text>
+                                            </Box>
+                                            <Box marginLeft={2}>
+                                                <Box width={23}><Text color={colors.textMuted}>» API Time:</Text></Box>
+                                                <Text color={colors.text}>{formatMsDuration(sessionApiTime)}</Text>
+                                            </Box>
+                                            <Box marginLeft={2}>
+                                                <Box width={23}><Text color={colors.textMuted}>» Tool Time:</Text></Box>
+                                                <Text color={colors.text}>{formatMsDuration(sessionToolTime)}</Text>
+                                            </Box>
+                                        </>
+                                    )}
+                                    {sessionBackgroundCalls > 0 && (
+                                        <Box>
+                                            <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
+                                            <Text color={colors.text}>{sessionBackgroundCalls}</Text>
+                                        </Box>
+                                    )}
                                     {sessionTotalTokens > 0 && (
                                         <>
+                                            <Box>
+                                                <Box width={25}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
+                                                <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
+                                            </Box>
                                             <Box marginLeft={2}>
                                                 <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                 <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>
@@ -5530,6 +5621,12 @@ export default function App({ args = [] }) {
                                                 </Box>
                                             )}
                                         </>
+                                    )}
+                                    {sessionStats?.tokens > 0 && (
+                                        <Box>
+                                            <Box width={25}><Text color={colors.secondary}>Active Context:</Text></Box>
+                                            <Text color={colors.text}>{formatTokens(sessionStats.tokens)}</Text>
+                                        </Box>
                                     )}
                                     {sessionImageCount > 0 && (
                                         <>
@@ -5565,20 +5662,24 @@ export default function App({ args = [] }) {
                                         <Box width={25}><Text color={colors.secondary}>{timeLabel}</Text></Box>
                                         <Text color={colors.text}>{formatDuration(u?.duration || 0)}</Text>
                                     </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
-                                        <Text color={colors.text}>{u?.agent || 0}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
-                                        <Text color={colors.text}>{u?.background || 0}</Text>
-                                    </Box>
-                                    <Box>
-                                        <Box width={25}><Text color={colors.secondary}>{tokensLabel}</Text></Box>
-                                        <Text color={colors.text}>{formatTokens(u?.tokens || 0)}</Text>
-                                    </Box>
+                                    {(u?.agent || 0) > 0 && (
+                                        <Box>
+                                            <Box width={25}><Text color={colors.secondary}>Model Requests:</Text></Box>
+                                            <Text color={colors.text}>{u?.agent || 0}</Text>
+                                        </Box>
+                                    )}
+                                    {(u?.background || 0) > 0 && (
+                                        <Box>
+                                            <Box width={25}><Text color={colors.secondary}>Memory Agent:</Text></Box>
+                                            <Text color={colors.text}>{u?.background || 0}</Text>
+                                        </Box>
+                                    )}
                                     {(u?.tokens || 0) > 0 && (
                                         <>
+                                            <Box>
+                                                <Box width={25}><Text color={colors.secondary}>{tokensLabel}</Text></Box>
+                                                <Text color={colors.text}>{formatTokens(u?.tokens || 0)}</Text>
+                                            </Box>
                                             <Box marginLeft={2}>
                                                 <Box width={23}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                 <Text color={colors.text}>{formatTokens((u?.tokens || 0) - (u?.candidateTokens || 0))}</Text>
@@ -6551,10 +6652,13 @@ export default function App({ args = [] }) {
                                             <Text color="white">Select your Preferred Provider:</Text>
                                             <Box marginTop={1}>
                                                 <CommandMenu
+                                                    searchable={true}
                                                     items={[
                                                         { label: 'Google', value: 'Google' },
                                                         { label: 'Nvidia', value: 'NVIDIA' },
                                                         { label: 'DeepSeek', value: 'DeepSeek' },
+                                                        { label: 'InferX', value: 'InferX' },
+                                                        { label: 'SenseNova', value: 'SenseNova' },
                                                         { label: 'CrofAI', value: 'CrofAI' },
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
@@ -6781,12 +6885,12 @@ export default function App({ args = [] }) {
                                             <Box width={20}><Text color={colors.secondary}>Code Changes:</Text></Box>
                                             <Text color={colors.text}><Text color="green">+{runtimeSession.linesAdded}</Text> <Text color="red">-{runtimeSession.linesRemoved}</Text></Text>
                                         </Box>
-                                        <Box>
-                                            <Box width={20}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
-                                            <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
-                                        </Box>
                                         {sessionTotalTokens > 0 && (
                                             <>
+                                                <Box>
+                                                    <Box width={20}><Text color={colors.secondary}>Tokens Consumed:</Text></Box>
+                                                    <Text color={colors.text}>{formatTokens(sessionTotalTokens)}</Text>
+                                                </Box>
                                                 <Box marginLeft={2}>
                                                     <Box width={18}><Text color={colors.textMuted}>» Input Tokens:</Text></Box>
                                                     <Text color={colors.text}>{formatTokens(sessionTotalTokens - sessionTotalCandidateTokens)}</Text>

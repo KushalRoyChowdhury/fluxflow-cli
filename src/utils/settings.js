@@ -23,7 +23,9 @@ const DEFAULT_SETTINGS = {
             Google: 'Free',
             DeepSeek: 'Free',
             NVIDIA: 'Free',
-            OpenRouter: 'Free'
+            OpenRouter: 'Free',
+            InferX: 'Free',
+            SenseNova: 'Free'
         }
     },
     systemSettings: {

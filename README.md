@@ -20,13 +20,15 @@ Whether you need a conversational partner or an autonomous developer that can wr
 ## ✨ Features
 
 - **Multi-Provider Support**: Choose your preferred engine!
-  - **Google GenAI** (Gemini & Gemma models)
-  - **DeepSeek** (Deepseek v4 Models)
-  - **NVIDIA** (Access to open models)
-  - **Ollama** (Local Models / Ollama Cloud Models)
-  - **Mistral** (Access to selected models)
-  - **CrofAI** (Access to selected models)
-  - **OpenRouter** (Access to hundreds of models; *Experimental*)
+  - **Google GenAI**
+  - **DeepSeek**
+  - **NVIDIA**
+  - **Ollama**
+  - **Mistral**
+  - **CrofAI**
+  - **InferX**
+  - **SenseNovaAI**
+  - **OpenRouter** (*Experimental*)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
   - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.

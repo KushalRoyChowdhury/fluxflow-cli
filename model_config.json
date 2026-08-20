@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260818,
+    "release": 20260821,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -17,7 +17,10 @@
         "google_level_2": "gemini-3.7-flash",
         "gemma_emergency": "gemma-4-31b-it",
         "gemma_janitor_fallback_google_openrouter": "google/gemma-4-26b-a4b-it:free",
-        "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it"
+        "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it",
+        "inferx_fallback": "deepseek-v4-flash",
+        "sensenova_fallback": "sensenova-6.8-flash-lite",
+        "crofai_fallback": "deepseek-v4-flash-0731"
     },
     "providers": {
         "Ollama": {
@@ -103,6 +106,59 @@
                         "cmd": "greg-1-mini",
                         "multimodal": true,
                         "desc": "Multimodal"
+                    }
+                ],
+                "Paid": []
+            }
+        },
+        "InferX": {
+            "default_free": "deepseek-v4-flash",
+            "default_paid": "deepseek-v4-flash",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "deepseek-v4-flash",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "Devstral-2-123B-Instruct-2512-int4-AutoRound",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "Qwen3-Coder-Next-FP8",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "Qwen3.6-35B-A3B-FP8",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "Qwen3.8-27B-FP8",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "deepseek-v4-flash-0731",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    }
+                ],
+                "Paid": []
+            }
+        },
+        "SenseNova": {
+            "default_free": "sensenova-6.8-flash-lite",
+            "default_paid": "sensenova-6.8-flash-lite",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "sensenova-6.8-flash-lite",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     }
                 ],
                 "Paid": []

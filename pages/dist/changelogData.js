@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.2.5"]
+export const stableVersions = ["4.3.0"]
 
 export const changelogData = {
+    "4.3.0": {
+        "note": "AUGUST 21",
+        "added": [
+            "Added 2 new providers:\n• InferX.\n• SenseNovaAI."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.2.5": {
         "note": "AUGUST 19",
         "added": [
