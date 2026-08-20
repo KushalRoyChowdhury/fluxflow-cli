@@ -1660,7 +1660,7 @@ const getInferXStream = async function* (apiKey, model, contents, systemInstruct
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(`InferX Error (${response.status}): ${errData.error?.message || response.statusText}`);
+        throw new Error(`InferX Error (${response.status}): ${errData.error?.message || response.statusText || String(errData)}`);
     }
 
     const reader = response.body.getReader();
@@ -3809,7 +3809,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const wildcardToolingPrompt = wildcardTooling ? 'You cannot execute tools\nInstead, output in chat the exact string you WOULD have produced & wait for system response\n' : '';
 
-        const firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma')) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}` : ''}[system] exact structured string '[tool:functions.toolname(arg="value")]' in chat response [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+        const isForceReasoning = process.env.forcedReasoning || false;
+
+        const firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}` : ''}[system] exact structured string '[tool:functions.toolname(arg="value")]' in chat response [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -6208,8 +6210,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // RETRY ONLY ON 500-LEVEL (500, 503, ETC.) AND 408 TIMEOUT ERRORS
                     const status = err.status || err.statusCode || err.code;
+                    const inferxCapacityError = String(err).includes('replicas at capacity');
                     const isRetryable = (
-                        (status && ((status >= 500 && status < 600) || status === 408 || status === 429)) ||
+                        (status && ((status >= 500 && status < 600) || status === 408 || status === 429 || inferxCapacityError)) ||
                         (!status && (
                             /status[ :]+(5\d\d|408|429)/i.test(String(err)) ||
                             /code[ :]+(5\d\d|408|429)/i.test(String(err)) ||
@@ -6570,20 +6573,20 @@ Tool Rules:
 
 # Provided Tools
 **Communication Tools**
-- [tool:functions.Ask(question="...", optionA="title::description", ...MAX4)]. Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
-${isAsync ? `- [tool:functions.AskMain(question="...")]. Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
+- Ask(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+${isAsync ? `- AskMain(question="..."). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- [tool:functions.WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude")]. Proactive use for unknown info/docs. aiMode: LLM search
-- [tool:functions.WebScrape(url="...")]. Proactive use for specific webpage/docs/api
+- WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
+- WebScrape(url="..."). Proactive use for specific webpage/docs/api
 
 **Workspace Tools**
-- [tool:functions.CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto")]. Find definitions, logic, relevant code, standard junk auto-excluded
-- [tool:functions.ReadFolder(path="...", recurse="int 1-3")]. Minimize recursion
-- [tool:functions.ReadFile(path="...", startLine="int", endLine="int")]
-- [tool:functions.PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15)]. Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
-- [tool:functions.WriteFile(path="...", content="...")]. Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
-- [tool:functions.Run(command="...")]. Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
+- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto"). Find definitions, logic, relevant code, standard junk auto-excluded
+- ReadFolder(path="...", recurse="int 1-3"). Minimize recursion
+- ReadFile(path="...", startLine="int", endLine="int")
+- PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
+- WriteFile(path="...", content="..."). Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
+- Run(command="..."). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 You are a subagent helping the main FluxFlow CLI agent

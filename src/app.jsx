@@ -1205,6 +1205,10 @@ export default function App({ args = [] }) {
             setWildcardTooling(false);
             setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀└─ Status: Disabled.\n⠀`, isMeta: true }]; });
         }
+        if (process.env.forcedReasoning) {
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀└─ Status: Disabled.\n⠀`, isMeta: true }]; });
+            process.env.forcedReasoning = false;
+        }
     }, [activeModel]);
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
@@ -3086,7 +3090,7 @@ export default function App({ args = [] }) {
 
                         let forceMsg = '';
                         if (isForce) {
-                            if (process.env.NVIDIA_BASE_URL) {
+                            if (process.env.NVIDIA_BASE_URL || true) {
                                 forceMsg = '⠀⠀└─ Enabled Forced Reasoning.\n⠀';
                             } else {
                                 forceMsg = '⠀⠀└─ --force is not supported in this context.\n⠀';

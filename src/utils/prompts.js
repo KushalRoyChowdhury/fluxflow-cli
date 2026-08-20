@@ -63,7 +63,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId) => {
 
     let forcedReasoning = false;
-    if (process.env.forcedReasoning && process.env.NVIDIA_BASE_URL && aiProvider.toUpperCase() === 'NVIDIA') {
+    if (process.env.forcedReasoning) {
         forcedReasoning = true;
     }
 
