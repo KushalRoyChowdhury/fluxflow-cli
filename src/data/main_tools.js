@@ -77,7 +77,7 @@ Invocations:
 
     return `
 -- TOOLS --
-To use tools, must output exactly '[tool:functions.ToolName(arg1="value1")]' structured string in chat response ← no exception
+You cant execute tools. To call tools, must output exactly '[tool:functions.ToolName(arg1="value1")]' structured string in chat response ← no exception, verify correct syntax/brackets
 Tool Rules:
 - Max 3 tool calls/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Todo: 3+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
