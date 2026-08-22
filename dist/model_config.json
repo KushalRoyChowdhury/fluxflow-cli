@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260822,
+    "release": 20260823,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -18,7 +18,7 @@
         "gemma_emergency": "gemma-4-31b-it",
         "gemma_janitor_fallback_google_openrouter": "google/gemma-4-26b-a4b-it:free",
         "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it",
-        "inferx_fallback": "deepseek-v4-flash",
+        "inferx_fallback": "deepseek-v4-flash-0731",
         "sensenova_fallback": "sensenova-6.8-flash-lite",
         "crofai_fallback": "deepseek-v4-flash-0731"
     },
@@ -112,15 +112,10 @@
             }
         },
         "InferX": {
-            "default_free": "deepseek-v4-flash",
-            "default_paid": "deepseek-v4-flash",
+            "default_free": "Qwen3.6-35B-A3B-FP8",
+            "default_paid": "Qwen3.6-35B-A3B-FP8",
             "models": {
                 "Free": [
-                    {
-                        "cmd": "deepseek-v4-flash",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
                     {
                         "cmd": "Devstral-2-123B-Instruct-2512-int4-AutoRound",
                         "multimodal": false,
@@ -284,6 +279,15 @@
                         "cmd": "z-ai/glm-5.2:free",
                         "multimodal": false,
                         "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "\n--- Stealth Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "stealth/ox-alpha",
+                        "multimodal": true,
+                        "desc": "Multimodal"
                     }
                 ],
                 "Paid": [

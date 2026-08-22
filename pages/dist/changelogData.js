@@ -3,9 +3,17 @@
 // Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
 // ==========================================
 
-export const stableVersions = ["4.3.2"]
+export const stableVersions = ["4.3.3"]
 
 export const changelogData = {
+    "4.3.3": {
+        "note": "AUGUST 23",
+        "added": [],
+        "changed": [],
+        "fixes": [
+            "Improved OpenRouter integration."
+        ]
+    },
     "4.3.2": {
         "note": "AUGUST 21",
         "added": [],

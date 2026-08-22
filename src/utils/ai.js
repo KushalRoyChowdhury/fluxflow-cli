@@ -282,7 +282,18 @@ const fetchWithBackoff = async (url, options, retries = 5, delay = 1000) => {
     return response;
 };
 
-const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+async function hash(input) {
+    const data = new TextEncoder().encode(input);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+
+    return [...new Uint8Array(digest).slice(0, 16)]
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+// =============================== API CALLS ================================
+
+const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -454,8 +465,7 @@ const getDeepSeekStream = async function* (apiKey, model, contents, systemInstru
     }
 };
 
-// Mistral API
-const getMistralStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+const getMistralStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, chatId = null) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -504,12 +514,15 @@ const getMistralStream = async function* (apiKey, model, contents, systemInstruc
         'xHigh': 'high'
     };
 
+    const rawPromptCacheKey = `${apiKey.slice(-5)}${chatId || ''}${thinkingLevel}${model}`;
+    const promptCacheKey = await hash(rawPromptCacheKey);
+
     const requestPayload = {
         model: model,
         messages: messages,
         stream: true,
         temperature: temperature,
-        prompt_cache_key: 'flux-flow-session',
+        prompt_cache_key: promptCacheKey
     };
 
     if (thinkingLevel && thinkingLevel !== 'Fast' && hasModelReasoning(model)) {
@@ -687,7 +700,7 @@ const getMistralStream = async function* (apiKey, model, contents, systemInstruc
     }
 };
 
-const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 1.05) {
+const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal = false, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -982,7 +995,6 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         }
     }
 }
-
 const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
     const queue = [];
     let resolveNext = null;
@@ -1095,7 +1107,7 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
     }
 };
 
-const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, chatId = null) {
     const messages = [];
     if (systemInstruction) {
         messages.push({
@@ -1104,7 +1116,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
                 {
                     type: 'text',
                     text: systemInstruction,
-                    cache_control: { type: 'ephemeral' }
+                    // cache_control: { type: 'ephemeral' }
                 }
             ]
         });
@@ -1186,21 +1198,22 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         }
     }
 
+    const rawId = `${apiKey.slice(-5)}${chatId || ''}${thinkingLevel}${formattedModel}`;
+    const sessionId = await hash(rawId);
+
     const requestPayload = {
         model: formattedModel,
         messages: messages,
         stream: true,
         temperature: temperature,
         cache_control: { type: 'ephemeral' },
-        session_id: 'flux-flow-session'
+        session_id: sessionId
     };
 
     const effort = reasoningEffortMap[thinkingLevel];
     if (effort && thinkingLevel !== 'Fast') {
         requestPayload.reasoning_effort = effort;
     }
-
-    console.log(requestPayload);
 
     const response = await fetchWithBackoff('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -1217,7 +1230,8 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(`OpenRouter Error (${response.status}): ${errData.error?.message || response.statusText}`);
+        // console.log(errData); // check errData.error.message for specifics
+        throw new Error(`OpenRouter Error (${response.status}): ${errData.error?.metadata.raw || errData.error?.message || response.statusText}`);
     }
 
     const reader = response.body.getReader();
@@ -1302,7 +1316,7 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
     }
 };
 
-const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05, endpointType = 'Cloud') {
+const getOllamaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, endpointType = 'Cloud') {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -1434,7 +1448,7 @@ const getOllamaStream = async function* (apiKey, model, contents, systemInstruct
     }
 };
 
-const getCrofAIStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+const getCrofAIStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -1601,7 +1615,7 @@ const getCrofAIStream = async function* (apiKey, model, contents, systemInstruct
     }
 };
 
-const getInferXStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+const getInferXStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -1751,7 +1765,7 @@ const getInferXStream = async function* (apiKey, model, contents, systemInstruct
     }
 };
 
-const getSenseNovaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.05) {
+const getSenseNovaStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -4275,7 +4289,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05,
+                            1.0,
                             systemSettings?.ollamaEndpoint || 'Cloud'
                         );
                     } else if (aiProvider === 'OpenRouter') {
@@ -4288,7 +4302,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0,
+                            chatId
                         );
                     } else if (aiProvider === 'DeepSeek') {
                         stream = getDeepSeekStream(
@@ -4300,7 +4315,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0
                         );
                     } else if (aiProvider === 'Mistral') {
                         stream = getMistralStream(
@@ -4312,7 +4327,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0,
+                            chatId
                         );
                     } else if (aiProvider === 'NVIDIA') {
                         const rawStream = getNVIDIAStream(
@@ -4324,7 +4340,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0
                         );
                         stream = wrapNvidiaStreamWithQueueDepth(rawStream, targetModel);
                     } else if (aiProvider === 'CrofAI') {
@@ -4337,7 +4353,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0
                         );
                     } else if (aiProvider === 'InferX') {
                         stream = getInferXStream(
@@ -4349,7 +4365,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0
                         );
                     } else if (aiProvider === 'SenseNova') {
                         stream = getSenseNovaStream(
@@ -4361,7 +4377,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             mode,
                             isMultiModal,
                             abortController.signal,
-                            1.05
+                            1.0
                         );
                     } else {
                         const googleClient = getGoogleClient(settings?.apiKey);
@@ -6575,7 +6591,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. To call tools, must output exactly '[tool:functions.ToolName(arg1="value1")]' structured string in chat response ← no exception, verify correct syntax/brackets
+You cant execute tools. To call tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, verify correct syntax/brackets
 Tool Rules:
 - JSON escape literal escape sequences in tool arguments
 - Same file, multiple edits? ONE PatchFile (≤15 blocks) ← Priority
