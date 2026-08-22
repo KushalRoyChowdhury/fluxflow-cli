@@ -1220,7 +1220,10 @@ const getOpenRouterStream = async function* (apiKey, model, contents, systemInst
         headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://fluxflow-cli.onrender.com/',
+            // 'HTTP-Referer': 'https://github.com/KushalRoyChowdhury/fluxflow-cli',
             'X-Title': 'FluxFlow CLI',
+            'X-OpenRouter-Title': 'FluxFlow CLI',
             'X-Cache': 'true',
             'X-OpenRouter-Cache': 'true'
         },

@@ -1,12 +1,7 @@
-// ==========================================
-// DATABASE: Update this object for new versions
-// Format: { "VERSION": { "note": "...", "added": [...], "changed": [...], "fixes": [...] } }
-// ==========================================
-
-export const stableVersions = ["4.3.3"]
+export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.3.3": {
+    "4.3.5": {
         "note": "AUGUST 23",
         "added": [],
         "changed": [],
