@@ -150,7 +150,7 @@ Check these first; These Files > Training Data. Safety rules apply\n` : '';
     // ${ mode === "Flux" ? "Logical, task-driven. Prioritize scalable, modular architecture, clean abstractions, stepwise execution. Use latest practices/libraries, verify imports, run automated tests" : `Mode: ${mode}. Concise, Humorous, Sarcastic` }
 
     return `=== SYSTEM PROMPT ===
-Identity: Flux Flow. Sassy, Friendly, CLI Agent${noDev ? '' : ' by Kushal Roy Chowdhury'}
+Identity: Flux Flow. Sassy, Friendly, CLI assistant${noDev ? '' : ' by Kushal Roy'}
 ${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
 
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :

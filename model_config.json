@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260823,
+    "release": 20260824,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -493,6 +493,15 @@
                         "desc": "Text Only"
                     },
                     {
+                        "cmd": "--- Moonshot Models ---",
+                        "desc": ""
+                    },
+                    {
+                        "cmd": "moonshotai/kimi-k3",
+                        "multimodal": true,
+                        "desc": "Multimodal"
+                    },
+                    {
                         "cmd": "\n--- StepFun Models ---",
                         "desc": ""
                     },
@@ -526,24 +535,6 @@
                     },
                     {
                         "cmd": "openai/gpt-oss-120b",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Z-AI Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "z-ai/glm-5.2",
-                        "multimodal": false,
-                        "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- MiniMax Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "minimaxai/minimax-m3",
                         "multimodal": false,
                         "desc": "Text Only"
                     },

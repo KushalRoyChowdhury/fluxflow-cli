@@ -830,10 +830,8 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
         body.chat_template_kwargs = { enable_thinking: isThinking };
     } else if (isNemotron) {
         if (apiLevel === 'High') {
-            body.reasoning_budget = 12000;
             body.chat_template_kwargs = { enable_thinking: true };
         } else if (apiLevel === 'Standard') {
-            body.reasoning_budget = 12000;
             body.chat_template_kwargs = { enable_thinking: true, medium_effort: true };
         } else {
             body.chat_template_kwargs = { enable_thinking: false };
@@ -935,10 +933,6 @@ const getNVIDIAStream = async function* (apiKey, model, contents, systemInstruct
                             throw new Error(`NVIDIA Stream Error: ${json.error.message || JSON.stringify(json.error)}`);
                         }
 
-                        if (json.choices?.[0]?.finish_reason) {
-                            isDone = true;
-                        }
-
                         try {
                             const usage = json.usage;
                             if (usage) {
@@ -1033,7 +1027,7 @@ const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName) {
                     }
                 }
             } else if (!isStreamingStarted) {
-                push({ value: { type: 'status', content: `Queue ${res.status}` }, done: false });
+                // push({ value: { type: 'status', content: `Queue ${res.status}` }, done: false });
             }
         } catch (e) {
             // Network-level error — no status code available, stay silent
@@ -3955,9 +3949,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (hint) {
                     if (hint.startsWith('/btw')) {
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
-                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[system] User question. Resolve this specific query within '[ANSWER]...[/ANSWER]' concisely, naturally [/SYSTEM]\n[question] ${hint.replace('/btw', '').trim()} [/question]`;
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[system] User question. Resolve this specific query within '[ANSWER]...[/ANSWER]' concisely, naturally [/system]\n[question] ${hint.replace('/btw', '').trim()} [/question]`;
                         } else {
-                            // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
+                            // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[system] USER QUESTION. RESOLVE THIS SPECIFIC QUERY WITHIN '[ANSWER] ... [/ANSWER]' CONCISELY, NATURALLY\n**STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/system]\n" : ""}` : ''}[QUESTION] ${hint.replace('/btw', '').trim()} [/QUESTION]` });
                             modifiedHistory.push({ role: 'user', text: `[system] User question. Resolve this specific query within '[ANSWER]...[/ANSWER]' concisely, naturally [/system]\n[question] ${hint.replace('/btw', '').trim()} [/question]` });
                         }
                     } else {
@@ -3965,7 +3959,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
                             modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]`;
                         } else {
-                            // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[SYSTEM] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/SYSTEM]\n" : ""}` : ''}[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
+                            // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[system] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/system]\n" : ""}` : ''}[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
                             modifiedHistory.push({ role: 'user', text: `[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]` });
                         }
                     }
@@ -4220,8 +4214,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     if (isGemmaOrMistral) {
                         const needsThinkingWarning = thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || thinkingLevel !== 'xHigh');
                         const thinkingText = needsThinkingWarning ? '. **strictly maintain thinking policy. do not start a response without <think>...</think>**' : '';
-                        // const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn${thinkingText} [/SYSTEM]`;
-                        const jitInstruction = `\n[SYSTEM] Tool result received. Analyze output and proceed with your turn [/SYSTEM]`;
+                        // const jitInstruction = `\n[system] Tool result received. Analyze output and proceed with your turn${thinkingText} [/system]`;
+                        const jitInstruction = `\n[system] Tool result received. Analyze output and proceed with your turn [/system]`;
                         if (lastUserMsg && lastUserMsg.role === 'user' && lastUserMsg.parts?.[0]?.text?.startsWith('[TOOL RESULT]')) {
                             lastUserMsg.parts[0].text += jitInstruction;
                         }
@@ -6442,9 +6436,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                 if (toolResults.length > 0) {
                     let combinedText = toolResults.map(tr => tr.text).join('\n\n');
                     const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
-                    const attemptedToolsCount = (toolActionableText.match(/\[tool:functions/g) || []).length;
+                    const attemptedToolsCount = (toolActionableText.match(/\[tool:/g) || []).length;
                     if (toolResults.length < attemptedToolsCount) {
-                        combinedText += `\n\n[SYSTEM] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper schema compliance & try failed calls again [/SYSTEM]`;
+                        combinedText += `\n\n[system] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper schema compliance & try failed calls again [/system]`;
                         const missedCount = attemptedToolsCount - toolResults.length;
                         for (let i = 0; i < missedCount; i++) await incrementUsage('toolFailure');
                     }
@@ -6452,11 +6446,13 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });
                 }
             } else {
-                if (wasToolCalledInLastLoop || detectedAnyToolCalls) {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] Failed to execute some tools. Verify proper schema compliance & try again [/SYSTEM]` });
+                const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
+                const attemptedToolsCount = (toolActionableText.match(/\[tool:/g) || []).length;
+                if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
+                    modifiedHistory.push({ role: 'user', text: `[system] Failed to execute ${attemptedToolsCount} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper schema compliance & try again [/system]` });
                     await incrementUsage('toolFailure');
                 } else {
-                    modifiedHistory.push({ role: 'user', text: `[SYSTEM] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/SYSTEM]` });
+                    modifiedHistory.push({ role: 'user', text: `[system] ${isStutteringLoop && !isThinkingLoop ? `STUTTERING DETECTED by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' OVER THINKING' : ' LOOP'} DETECTED by Internal System${isThinkingLoop ? ' for current EFFORT_LEVEL' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/system]` });
                 }
                 isThinkingLoop = false;
                 isStutteringLoop = false;
@@ -6594,7 +6590,7 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. To call tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, verify correct syntax/brackets
+You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, tool:functions must
 Tool Rules:
 - JSON escape literal escape sequences in tool arguments
 - Same file, multiple edits? ONE PatchFile (≤15 blocks) ← Priority
@@ -6612,27 +6608,27 @@ Tool Rules:
 ${isAsync ? `- AskMain(question="..."). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
+- WebSearch(query="...", aiMode="bool, optional", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
 - WebScrape(url="..."). Proactive use for specific webpage/docs/api
 
 **Workspace Tools**
-- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto"). Find definitions, logic, relevant code, standard junk auto-excluded
+- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool, false", regex="bool, auto"). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path="...", recurse="int 1-3"). Minimize recursion
 - ReadFile(path="...", startLine="int", endLine="int")
-- PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
+- PatchFile(path="...", allowMultiple="bool, false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
 - WriteFile(path="...", content="..."). Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
 - Run(command="..."). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
-You are a subagent helping the main FluxFlow CLI agent
+Identity: FluxFlow subagent helping the main Agent
 Your task is: "${task}"
 
 ${providedToolsSection.trimEnd()}
 
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
-Keep main focus on tools and task, not chatting
-On task completion, provide a detailed structured summary preferebly in Tables/Bullet Points with file modified info, if any task failed report back in detail, NO HALLUCINATIONS
+Main focus: tools and task, not chatting
+On completion, provide a detailed summary in Tables/Markdown Format with file modified info. If any task failed report back in detail
 
 CWD: ${process.cwd()}
 Current Time: ${time}

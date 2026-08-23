@@ -37,9 +37,9 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     const fluxTools = `**Workspace Tools (path = relative; first argument, path separator: '/')**
 - ReadFile(path="...", startLine="int", endLine="int")${aiProvider !== 'Google' ? `${isMultiModal ? `. Supports images/docs` : ''}` : `. Supports images/docs`}
 - ReadFolder(path="...", recurse="int 1-3"). Minimize recursion
-- PatchFile(path="...", allowMultiple="bool, default: false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
+- PatchFile(path="...", allowMultiple="bool, false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
 - WriteFile(path="...", content="..."). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool false", regex="bool auto"). Find definitions, logic, relevant code, standard junk auto-excluded
+- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool, false", regex="bool, auto"). Find definitions, logic, relevant code, standard junk auto-excluded
 - Run(command="..."). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user
 - Goal(method="create/append/get", tasks=[string array], markDone=[task array]). If long multi-task: create Goals before starting. \`get + markDone\` to mark complete. Update every turn when created
 ${_cachedAdvanceRollback ? `
@@ -77,7 +77,7 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. To call tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, verify correct syntax/brackets
+You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, tool:functions must
 Tool Rules:
 - Max 3 tool calls/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Todo: 3+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
@@ -85,7 +85,7 @@ ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : "
 - Ask(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
 
 **Web Tools**
-- WebSearch(query="...", aiMode="bool", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
+- WebSearch(query="...", aiMode="bool, optional", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
 - WebScrape(url="..."). Proactive use for specific webpage/docs/api
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
