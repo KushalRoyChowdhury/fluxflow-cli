@@ -1197,11 +1197,7 @@ export default function App({ args = [] }) {
 
     const [tick, setTick] = useState(0); // Only used for SPINNER_FRAMES reference if needed elsewhere, but mainly tick is gone now
     const isFirstRender = useRef(true);
-    const isSecondRender = useRef(true);
-    const isThirdRender = useRef(true);
     const isFirstThinkingRender = useRef(true);
-    const isSecondThinkingRender = useRef(true);
-    const isThirdThinkingRender = useRef(true);
     const prevProviderRef = useRef(aiProvider);
     const originalAllowExternalAccessRef = useRef(false);
     const originalMemoryRef = useRef(true);
@@ -1218,15 +1214,13 @@ export default function App({ args = [] }) {
     }, [activeModel]);
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
+    let timeoutThinkingOne;
+
     useEffect(() => {
-        if (isThirdThinkingRender.current) {
-            isFirstThinkingRender.current = false;
-            setTimeout(() => {
-                isSecondThinkingRender.current = false;
-                setTimeout(() => {
-                    isThirdThinkingRender.current = false;
-                }, 2500);
-            }, 2500);
+        if (isFirstThinkingRender.current) {
+            timeoutThinkingOne = setTimeout(() => {
+                isFirstThinkingRender.current = false;
+            }, 1000);
             return;
         }
 
@@ -1249,28 +1243,22 @@ export default function App({ args = [] }) {
                 }
             }
         }
-    }, [aiProvider, activeModel, thinkingLevel]);
+
+        return () => {
+            clearTimeout(timeoutThinkingOne);
+        };
+    }, [aiProvider, activeModel]);
 
     // [TIER AWARENESS] Auto-switch models if moving between Free and Paid tiers
+    let timeoutTierOne;
+
     useEffect(() => {
         if (!apiKey) return;
 
-        if (isThirdRender.current) {
-            isFirstRender.current = false;
-            setTimeout(() => {
-                isSecondRender.current = false;
-                setTimeout(() => {
-                    isThirdRender.current = false;
-                }, 2500);
-            }, 2500);
-            return;
-        }
-
-        if (isSecondRender.current) {
-            return;
-        }
-
-        if (isThirdRender.current) {
+        if (isFirstRender.current) {
+            timeoutTierOne = setTimeout(() => {
+                isFirstRender.current = false;
+            }, 1500);
             return;
         }
 
@@ -1301,6 +1289,10 @@ export default function App({ args = [] }) {
                 }];
             });
         }
+
+        return () => {
+            clearTimeout(timeoutTierOne);
+        };
     }, [apiTier, aiProvider, apiKey]); // Synchronize with both apiTier, aiProvider, and apiKey
 
     // [ENVIRONMENT AWARENESS] Detect if we are in VS Code, JetBrains, etc.

@@ -1,7 +1,7 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.4.2": {
+    "4.4.3": {
         "note": "AUGUST 25",
         "added": [],
         "changed": [],
