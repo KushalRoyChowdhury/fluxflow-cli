@@ -1029,14 +1029,14 @@ export default function App({ args = [] }) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
                     const displayVer = latestVersion && latestVersion === stableVersion ? `${versionFluxflow}` : versionFluxflow;
-                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `⠀⠀└─ Already up to date (${displayVer}).\n⠀`, isMeta: true }];
+                    return [...prev, { id: 'uptodate-' + Date.now(), role: 'system', text: `⠀⠀\x1b[2m└─\x1b[22m Already up to date (${displayVer}).\n⠀`, isMeta: true }];
                 });
             }
         } catch (err) {
             if (manual) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `⠀⠀└─ Failed to check for updates: ${err.message}.\n⠀`, isMeta: true }];
+                    return [...prev, { id: 'check-err-' + Date.now(), role: 'system', text: `⠀⠀\x1b[2m└─\x1b[22m Failed to check for updates: ${err.message}.\n⠀`, isMeta: true }];
                 });
             }
         }
@@ -1206,10 +1206,10 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (wildcardTooling) {
             setWildcardTooling(false);
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀└─ Status: Disabled.\n⠀`, isMeta: true }]; });
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
         }
         if (process.env.forcedReasoning) {
-            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀└─ Status: Disabled.\n⠀`, isMeta: true }]; });
+            setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Forced Reasoning:\n⠀⠀\x1b[2m└─\x1b[22m Status: Disabled.\n⠀`, isMeta: true }]; });
             process.env.forcedReasoning = false;
         }
     }, [activeModel]);
@@ -2074,7 +2074,7 @@ export default function App({ args = [] }) {
                 await installPuppeteerBrowser();
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '⠀⠀└─ All dependencies installed successfully.\n⠀', isMeta: true }];
+                    return [...prev, { id: 'setup-done-' + Date.now(), role: 'system', text: '⠀⠀\x1b[2m└─\x1b[22m All dependencies installed successfully.\n⠀', isMeta: true }];
                 });
             }
 
@@ -2139,7 +2139,7 @@ export default function App({ args = [] }) {
                     ...prev,
                     {
                         role: 'system',
-                        text: '✦ MEMORY\n⠀⠀└─ Currently not available.\n⠀',
+                        text: '✦ MEMORY\n⠀⠀\x1b[2m└─\x1b[22m Currently not available.\n⠀',
                         isMeta: true
                     }
                 ]);
@@ -2225,7 +2225,7 @@ export default function App({ args = [] }) {
                     setMessages(resumedMsgs);
                     setActiveView('chat');
                     setMessages(prev => {
-                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ '${id}'.\n⠀`, isMeta: true }];
+                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀\x1b[2m└─\x1b[22m '${id}'.\n⠀`, isMeta: true }];
                         setCompletedIndex(newMsgs.length);
                         return newMsgs;
                     });
@@ -2250,7 +2250,7 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const newMsgs = [...prev, {
                             id: 'playground-' + Date.now(), role: 'system',
-                            text: `✦ PLAYGROUND Session restored\n⠀⠀└─ CWD locked to: '${playgroundDir}'.\n⠀`,
+                            text: `✦ PLAYGROUND Session restored\n⠀⠀\x1b[2m└─\x1b[22m CWD locked to: '${playgroundDir}'.\n⠀`,
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -2261,7 +2261,7 @@ export default function App({ args = [] }) {
                     setMessages(prev => {
                         const newMsgs = [...prev, {
                             id: 'playground-' + Date.now(), role: 'system',
-                            text: `✦ PLAYGROUND Mode active\n⠀⠀└─ CWD locked to: 'FluxFlow/playground'.\n⠀`,
+                            text: `✦ PLAYGROUND Mode active\n⠀⠀\x1b[2m└─\x1b[22m CWD locked to: 'FluxFlow/playground'.\n⠀`,
                             isMeta: true
                         }];
                         setCompletedIndex(newMsgs.length);
@@ -2430,13 +2430,13 @@ export default function App({ args = [] }) {
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
                 {
                     role: 'system',
-                    text: `✦ INVALID KEY\n⠀⠀└─ ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
+                    text: `✦ INVALID KEY\n⠀⠀\x1b[2m└─\x1b[22m ${aiProvider} API key must start with "${prefix}" and be at least ${minLength} characters long.`,
                     isMeta: true
                 }
             ]);
@@ -2658,7 +2658,7 @@ export default function App({ args = [] }) {
                 if (question.length <= 3) {
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀└─ Inquiry question must be more than 3 characters.\n⠀', isMeta: true }];
+                        return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m Inquiry question must be more than 3 characters.\n⠀', isMeta: true }];
                     });
                     setInput('');
                     return;
@@ -2666,7 +2666,7 @@ export default function App({ args = [] }) {
             } else if (hintText.startsWith('/')) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
-                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀└─ Steering Hints cannot start with \'/\'.\n⠀', isMeta: true }];
+                    return [...prev, { id: 'hint-err-' + Date.now(), role: 'system', text: '✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m Steering Hints cannot start with \'/\'.\n⠀', isMeta: true }];
                 });
                 setInput('');
                 return;
@@ -2737,7 +2737,7 @@ export default function App({ args = [] }) {
                                 }
 
                                 setMessages(resumedMsgs);
-                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ ${targetId}.\n⠀`, isMeta: true }]);
+                                setMessages(prev => [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀\x1b[2m└─\x1b[22m ${targetId}.\n⠀`, isMeta: true }]);
                                 setCompletedIndex(0);
                             } else {
                                 setMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'system', text: `✦ ERROR: Session [${targetId}] not found.\n⠀`, isMeta: true }]);
@@ -2754,14 +2754,14 @@ export default function App({ args = [] }) {
                     if (!parsedArgs.playground) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ '/move' is only available in playground mode.\n⠀`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m '/move' is only available in playground mode.\n⠀`, isMeta: true }];
                         });
                         break;
                     }
                     if (!parsedArgs.originalCwd) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ Original CWD not found.\n⠀`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m Original CWD not found.\n⠀`, isMeta: true }];
                         });
                         break;
                     }
@@ -2773,7 +2773,7 @@ export default function App({ args = [] }) {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ EXPORTING PLAYGROUND CONTENT\n⠀⠀└─ ${dest}\n`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ EXPORTING PLAYGROUND CONTENT\n⠀⠀\x1b[2m└─\x1b[22m ${dest}\n`, isMeta: true }];
                             });
                             await fs.ensureDir(dest);
                             const excludeDirs = ['node_modules', '.git', '.venv', 'venv', 'env', '.next', 'dist', 'build', '.cache'];
@@ -2789,12 +2789,12 @@ export default function App({ args = [] }) {
 
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ SUCCESS\n⠀⠀└─ playground content copied to ${dest}\n`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ SUCCESS\n⠀⠀\x1b[2m└─\x1b[22m playground content copied to ${dest}\n`, isMeta: true }];
                             });
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ FAILED TO MOVE CONTENT\n⠀⠀└─ ${err.message}\n`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ FAILED TO MOVE CONTENT\n⠀⠀\x1b[2m└─\x1b[22m ${err.message}\n`, isMeta: true }];
                             });
                         }
                     };
@@ -2837,7 +2837,7 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const newMsgs = [...prev, {
                                         id: 'playground-' + Date.now(), role: 'system',
-                                        text: `✦ PLAYGROUND\n⠀⠀└─ Restored Working Directory to ${parsedArgs.originalCwd}\n⠀`,
+                                        text: `✦ PLAYGROUND\n⠀⠀\x1b[2m└─\x1b[22m Restored Working Directory to ${parsedArgs.originalCwd}\n⠀`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(newMsgs.length);
@@ -2852,7 +2852,7 @@ export default function App({ args = [] }) {
                                 setMessages(prev => {
                                     const newMsgs = [...prev, {
                                         id: 'playground-' + Date.now(), role: 'system',
-                                        text: `✦ PLAYGROUND\n⠀⠀└─ Failed to clear session: ${DATA_DIR + '/playground'}`,
+                                        text: `✦ PLAYGROUND\n⠀⠀\x1b[2m└─\x1b[22m Failed to clear session: ${DATA_DIR + '/playground'}`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(newMsgs.length);
@@ -3098,9 +3098,9 @@ export default function App({ args = [] }) {
                         let forceMsg = '';
                         if (isForce) {
                             if (process.env.NVIDIA_BASE_URL || true) {
-                                forceMsg = '⠀⠀└─ Enabled Forced Reasoning.\n⠀';
+                                forceMsg = '⠀⠀\x1b[2m└─\x1b[22m Enabled Forced Reasoning.\n⠀';
                             } else {
-                                forceMsg = '⠀⠀└─ --force is not supported in this context.\n⠀';
+                                forceMsg = '⠀⠀\x1b[2m└─\x1b[22m --force is not supported in this context.\n⠀';
                             }
                             process.env.forcedReasoning = 'true';
                         }
@@ -3109,12 +3109,12 @@ export default function App({ args = [] }) {
                         if (!isBypass && mode === 'Flow' && formattedLevel === 'xHigh') {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─"${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.\n⠀${forceMsg}.`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m"${formattedLevel}" is restricted in Flow mode. Switch to Flux to enable Higher Thinking Levels.\n⠀${forceMsg}.`, isMeta: true }];
                             });
                         } else {
                             setThinkingLevel(formattedLevel);
                             const s = emojiSpace(1);
-                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀└─ ${activeModel}.\n⠀⠀└─ Thinking Level: ${formattedLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀└─ bypassed.\n⠀` : ''
+                            setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${activeModel}.\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${formattedLevel}.\n${forceMsg} ⠀`, isMeta: true }]; }); // isBypass ? `⠀⠀⠀⠀\x1b[2m└─\x1b[22m bypassed.\n⠀` : ''
                         }
                     } else {
                         setActiveView('thinking');
@@ -3152,7 +3152,7 @@ export default function App({ args = [] }) {
                                 return [...prev, {
                                     id: Date.now(),
                                     role: 'system',
-                                    text: `✦ ERROR\n⠀⠀└─ Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.\n⠀`,
+                                    text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.\n⠀`,
                                     isMeta: true
                                 }];
                             });
@@ -3174,7 +3174,7 @@ export default function App({ args = [] }) {
                                 setActiveModel(paidDefault);
                             } else {
                                 setActiveModel(mod);
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀└─ ${mod}\n⠀⠀└─ Thinking Level: ${thinkingLevel}${aiProvider === 'Ollama' ? `\n⠀⠀└─ Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}` : ''}\n⠀`, isMeta: true }]; });
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${thinkingLevel}${aiProvider === 'Ollama' ? `\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}` : ''}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -3185,7 +3185,7 @@ export default function App({ args = [] }) {
                 case '/wildcard-tooling': {
                     setWildcardTooling(prev => {
                         const next = !prev;
-                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀└─ Status: ${next ? 'Enabled' : 'Disabled'}\n⠀`, isMeta: true }]; });
+                        setMessages(m => { setCompletedIndex(m.length + 1); return [...m, { id: Date.now(), role: 'system', text: `✦ Wildcard Tooling:\n⠀⠀\x1b[2m└─\x1b[22m Status: ${next ? 'Enabled' : 'Disabled'}\n⠀`, isMeta: true }]; });
                         return next;
                     });
                     break;
@@ -3243,7 +3243,7 @@ export default function App({ args = [] }) {
                     }
                     const name = parts.slice(1).join(' ') || promptDefault || `Session ${new Date().toLocaleTimeString()}`;
                     saveChat(chatId, name, messages);
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved\n⠀⠀└─ "${name}" (ID: ${chatId})\n⠀`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved\n⠀⠀\x1b[2m└─\x1b[22m "${name}" (ID: ${chatId})\n⠀`, isMeta: true }]; });
                     break;
                 }
                 case '/export': {
@@ -3279,11 +3279,11 @@ export default function App({ args = [] }) {
                         const history = await loadHistory();
                         const list = Object.entries(history)
                             .sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
-                            .map(([id, info]) => `⠀⠀└─ ${id}: ${info.name}${id === chatId ? ' (current)' : ''}`)
+                            .map(([id, info]) => `⠀⠀\x1b[2m└─\x1b[22m ${id}: ${info.name}${id === chatId ? ' (current)' : ''}`)
                             .join('\n');
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved Chats:\n${list || '⠀⠀└─ No saved chats found.'}\n⠀`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ Saved Chats:\n${list || '⠀⠀\x1b[2m└─\x1b[22m No saved chats found.'}\n⠀`, isMeta: true }];
                         });
                     };
                     run();
@@ -3298,7 +3298,7 @@ export default function App({ args = [] }) {
                         try {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: '✦ Initiating reset...\n⠀⠀└─ Clearing logs, secrets, and settings.\n⠀', isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: '✦ Initiating reset...\n⠀⠀\x1b[2m└─\x1b[22m Clearing logs, secrets, and settings.\n⠀', isMeta: true }];
                             });
 
                             if (fs.existsSync(LOGS_DIR)) fs.removeSync(LOGS_DIR);
@@ -3318,7 +3318,7 @@ export default function App({ args = [] }) {
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Failed to clear data: ${err.message}.\n⠀` }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Failed to clear data: ${err.message}.\n⠀` }];
                             });
                         }
                     };
@@ -3342,7 +3342,7 @@ export default function App({ args = [] }) {
                     exec(`${command} ${CHANGELOG_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Changelog\n⠀⠀└─ ${CHANGELOG_URL}.`, isMeta: true }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Changelog\n⠀⠀\x1b[2m└─\x1b[22m ${CHANGELOG_URL}.`, isMeta: true }];
                     });
                     break;
                 }
@@ -3350,7 +3350,7 @@ export default function App({ args = [] }) {
                     if (!DOCS_URL) {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Documentation URL is not configured.`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Documentation URL is not configured.`, isMeta: true }];
                         });
                         break;
                     }
@@ -3359,7 +3359,7 @@ export default function App({ args = [] }) {
                     exec(`${command} ${DOCS_URL}`);
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Documentation\n⠀⠀└─ ${DOCS_URL}.\n⠀`, isMeta: true }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✦ Opening Documentation\n⠀⠀\x1b[2m└─\x1b[22m ${DOCS_URL}.\n⠀`, isMeta: true }];
                     });
                     break;
                 }
@@ -3410,7 +3410,7 @@ export default function App({ args = [] }) {
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Usage: /budget <Set|View|Reset>.\n⠀`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Usage: /budget <Set|View|Reset>.\n⠀`, isMeta: true }];
                         });
                     }
                     break;
@@ -3461,7 +3461,7 @@ export default function App({ args = [] }) {
                     const randomQuote = GEMINI_QUOTES[Math.floor(Math.random() * GEMINI_QUOTES.length)];
                     setMessages(prev => {
                         setCompletedIndex(prev.length + 1);
-                        return [...prev, { id: Date.now(), role: 'system', text: `✨ GEMINI CLI\n⠀⠀└─ ${randomQuote}\n⠀` }];
+                        return [...prev, { id: Date.now(), role: 'system', text: `✨ GEMINI CLI\n⠀⠀\x1b[2m└─\x1b[22m ${randomQuote}\n⠀` }];
                     });
                     setInput('');
                     break;
@@ -3477,7 +3477,7 @@ export default function App({ args = [] }) {
                             return [...prev, {
                                 id: Date.now(),
                                 role: 'system',
-                                text: `✦ Compression skipped\n⠀⠀└─ History requires at least 64 messages and 16k tokens\n⠀⠀  └─ Current: ${cleanCount}/64 msgs, ${tokens}/16384 tokens.\n⠀`,
+                                text: `✦ Compression skipped\n⠀⠀\x1b[2m└─\x1b[22m History requires at least 64 messages and 16k tokens\n⠀⠀  └─ Current: ${cleanCount}/64 msgs, ${tokens}/16384 tokens.\n⠀`,
                                 isMeta: true
                             }];
                         });
@@ -3509,7 +3509,7 @@ export default function App({ args = [] }) {
                                     const finalMsgs = [...prev, {
                                         id: Date.now(),
                                         role: 'system',
-                                        text: `⠀⠀└─ Chat History compacted saving tokens.\n⠀`,
+                                        text: `⠀⠀\x1b[2m└─\x1b[22m Chat History compacted saving tokens.\n⠀`,
                                         isMeta: true
                                     }];
                                     setCompletedIndex(finalMsgs.length);
@@ -3518,13 +3518,13 @@ export default function App({ args = [] }) {
                             } else {
                                 setMessages(prev => {
                                     setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: Date.now(), role: 'system', text: '⠀⠀└─ Compaction failed.\n⠀', isMeta: true }];
+                                    return [...prev, { id: Date.now(), role: 'system', text: '⠀⠀\x1b[2m└─\x1b[22m Compaction failed.\n⠀', isMeta: true }];
                                 });
                             }
                         } catch (err) {
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: Date.now(), role: 'system', text: `⠀⠀└─ Error during compaction: ${err.message}\n⠀`, isMeta: true }];
+                                return [...prev, { id: Date.now(), role: 'system', text: `⠀⠀\x1b[2m└─\x1b[22m Error during compaction: ${err.message}\n⠀`, isMeta: true }];
                             });
                         } finally {
                             setIsCompressing(false);
@@ -3561,7 +3561,7 @@ export default function App({ args = [] }) {
                         const finalMsgs = [...updatedMessages, {
                             id: Date.now(),
                             role: 'system',
-                            text: `✦ Tool Truncation...\n⠀⠀└─ Truncated ${truncatedCount} tool result(s).\n⠀`,
+                            text: `✦ Tool Truncation...\n⠀⠀\x1b[2m└─\x1b[22m Truncated ${truncatedCount} tool result(s).\n⠀`,
                             isMeta: true
                         }];
                         saveChat(chatId, null, finalMsgs);
@@ -3578,11 +3578,11 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/btw': {
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀└─ '/btw' only available when agent is working\n⠀`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ RESTRICTED\n⠀⠀\x1b[2m└─\x1b[22m '/btw' only available when agent is working\n⠀`, isMeta: true }]; });
                     break;
                 }
                 default:
-                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀└─ Unknown command: '${cmd}'\n⠀`, isMeta: true }]; });
+                    setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Unknown command: '${cmd}'\n⠀`, isMeta: true }]; });
             }
         } else {
             // Normal chat message with temporal grounding
@@ -4033,6 +4033,7 @@ export default function App({ args = [] }) {
                         if (packet.type === 'turn_reset') {
                             // Flush any queued typewriter text before resetting
                             flushTypewriterNow();
+                            commitActiveStreamingMessage();
                             // Keep the tick alive — it will resume automatically when a new message ref is set
 
                             currentThinkId = null;
@@ -4832,7 +4833,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5454,7 +5455,7 @@ export default function App({ args = [] }) {
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀└─ Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' ? `\n⠀⠀└─ Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀└─ Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -6038,7 +6039,7 @@ export default function App({ args = [] }) {
                                             const finalMsgs = [...prev, {
                                                 id: 'revert-ok-' + Date.now(),
                                                 role: 'system',
-                                                text: `✦ Rollback Successful\n⠀⠀└─ Reverted prompt loaded to input box.\n⠀`,
+                                                text: `✦ Rollback Successful\n⠀⠀\x1b[2m└─\x1b[22m Reverted prompt loaded to input box.\n⠀`,
                                                 isMeta: true
                                             }];
                                             setCompletedIndex(finalMsgs.length);
@@ -6053,7 +6054,7 @@ export default function App({ args = [] }) {
                                         const finalMsgs = [...prev, {
                                             id: 'revert-err-' + Date.now(),
                                             role: 'system',
-                                            text: `✦ ERROR\n⠀⠀└─ ${err.message}\n⠀`,
+                                            text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m ${err.message}\n⠀`,
                                             isMeta: true
                                         }];
                                         setCompletedIndex(finalMsgs.length);
@@ -6101,7 +6102,7 @@ export default function App({ args = [] }) {
                                     setMessages(resumedMsgs);
                                     setActiveView('chat');
                                     setMessages(prev => {
-                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀└─ ${id}\n⠀`, isMeta: true }];
+                                        const newMsgs = [...prev, { id: 'sys-' + Date.now(), role: 'system', text: `✦ SESSION RESUMED\n⠀⠀\x1b[2m└─\x1b[22m ${id}\n⠀`, isMeta: true }];
                                         setCompletedIndex(newMsgs.length);
                                         return newMsgs;
                                     });
@@ -6164,7 +6165,7 @@ export default function App({ args = [] }) {
                         initialData={profileData}
                         onSave={(profile) => {
                             setProfileData(profile);
-                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `✦ Profile Updated${profile.name.length > 0 ? `\n⠀⠀└─ Name: ${profile.name} ` : ''}${profile.nickname.length > 0 ? `\n⠀⠀└─ Nickname: ${profile.nickname}` : ''}` : '✦ Profile\n⠀⠀└─ Nothing to Update'}\n\n✦ Custom Instructions\n${profile.instructions.length > 0 ? `⠀⠀└─ ${profile.instructions.substring(0, 30)}${profile.instructions.length > 30 ? '...' : ''}` : '⠀⠀└─ No Instructions Provided.'}\n⠀`, isMeta: true }]);
+                            setMessages(prev => [...prev, { id: Date.now(), role: 'system', text: `${profile.name.length > 0 || profile.nickname.length > 0 ? `✦ Profile Updated${profile.name.length > 0 ? `\n⠀⠀\x1b[2m└─\x1b[22m Name: ${profile.name} ` : ''}${profile.nickname.length > 0 ? `\n⠀⠀\x1b[2m└─\x1b[22m Nickname: ${profile.nickname}` : ''}` : '✦ Profile\n⠀⠀\x1b[2m└─\x1b[22m Nothing to Update'}\n\n✦ Custom Instructions\n${profile.instructions.length > 0 ? `⠀⠀\x1b[2m└─\x1b[22m ${profile.instructions.substring(0, 30)}${profile.instructions.length > 30 ? '...' : ''}` : '⠀⠀\x1b[2m└─\x1b[22m No Instructions Provided.'}\n⠀`, isMeta: true }]);
                             setActiveView('chat');
                         }}
                         onCancel={() => setActiveView('chat')}
