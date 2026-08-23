@@ -1220,6 +1220,7 @@ export default function App({ args = [] }) {
         if (isFirstThinkingRender.current) {
             timeoutThinkingOne = setTimeout(() => {
                 isFirstThinkingRender.current = false;
+                prevProviderRef.current = aiProvider;
             }, 1000);
             return;
         }
@@ -1229,12 +1230,13 @@ export default function App({ args = [] }) {
             if (aiProvider === 'Mistral') {
                 setThinkingLevel('Fast');
             } else {
+                if (aiProvider === 'SenseNova') {
+                    setThinkingLevel('High');
+                    return;
+                }
                 const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
 
-                if (aiProvider === 'SenseNova') {
-                    setThinkingLevel('High');
-                }
             }
         } else {
             if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
