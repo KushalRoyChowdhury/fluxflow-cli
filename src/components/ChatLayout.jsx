@@ -1168,17 +1168,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/resume', desc: 'Load previous session' },
             { cmd: '/revert', desc: 'Revert codebase to checkpoint' },
             { cmd: '/save', desc: 'Force save current chat' },
-            {
-                cmd: '/export',
-                desc: 'Export current chat or error logs',
-                subs: [
-                    { cmd: 'chat', desc: 'Export current active chat' },
-                    { cmd: 'logs', desc: 'Export error logs' }
-                ]
-            },
+            { cmd: '/export', desc: 'Export current chat or error logs' },
             { cmd: '/chats', desc: 'List all chat sessions' },
             { cmd: '/btw', desc: 'Send raw inquiry mid-turn' },
-            { cmd: '/image', desc: 'Generate images' },
+            // { cmd: '/image', desc: 'Generate images' },
             { cmd: '/budget', desc: 'Set or View budget limits' },
             { cmd: '/mode', desc: 'Toggle Flux/Flow modes' },
             { cmd: '/thinking', desc: 'Set AI reasoning depth' },
@@ -1191,7 +1184,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/profile', desc: 'Edit developer persona' },
             { cmd: '/memory', desc: 'Manage agent memory' },
             { cmd: '/stats', desc: 'Show session usage' },
-            { cmd: '/reset', desc: 'Wipe all project data' },
+            { cmd: '/reset', desc: 'Wipe all saved FluxFlow AppData' },
             { cmd: '/about', desc: 'Project info & credits' },
             { cmd: '/changelog', desc: 'View latest updates' },
             { cmd: '/docs', desc: 'View documentation' },
@@ -1202,11 +1195,11 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         return (
             <Box marginBottom={1} paddingX={1} width="100%">
                 <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={2} paddingY={1} width="100%">
-                    <Text color={colors.text} bold underline>COMMAND REFERENCE</Text>
+                    <Text color={colors.text} bold underline>AVAILABLE COMMANDS IN FLUX-FLOW</Text>
                     <Box flexDirection="column" marginTop={1}>
                         {commandList.map((c, i) => (
                             <Box key={i} flexDirection="row">
-                                <Box width={15}>
+                                <Box width={20}>
                                     <Text color={colors.text} bold>{c.cmd}</Text>
                                 </Box>
                                 <Text color={colors.textMuted}> - {c.desc}</Text>

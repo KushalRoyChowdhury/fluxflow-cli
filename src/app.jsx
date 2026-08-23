@@ -1199,6 +1199,9 @@ export default function App({ args = [] }) {
     const isFirstRender = useRef(true);
     const isSecondRender = useRef(true);
     const isThirdRender = useRef(true);
+    const isFirstThinkingRender = useRef(true);
+    const isSecondThinkingRender = useRef(true);
+    const isThirdThinkingRender = useRef(true);
     const prevProviderRef = useRef(aiProvider);
     const originalAllowExternalAccessRef = useRef(false);
     const originalMemoryRef = useRef(true);
@@ -1216,17 +1219,32 @@ export default function App({ args = [] }) {
 
     // [THINKING DEPTH AWARENESS] Auto-switch reasoning depth based on model and provider capabilities
     useEffect(() => {
+        if (isThirdThinkingRender.current) {
+            isFirstThinkingRender.current = false;
+            setTimeout(() => {
+                isSecondThinkingRender.current = false;
+                setTimeout(() => {
+                    isThirdThinkingRender.current = false;
+                }, 2500);
+            }, 2500);
+            return;
+        }
+
         if (prevProviderRef.current !== aiProvider) {
             prevProviderRef.current = aiProvider;
             if (aiProvider === 'Mistral') {
                 setThinkingLevel('Fast');
             } else {
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX';
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
+
+                if (aiProvider === 'SenseNova') {
+                    setThinkingLevel('High');
+                }
             }
         } else {
-            if ((aiProvider === 'Google' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') && thinkingLevel === 'xHigh') {
-                if ((activeModel && activeModel.toLowerCase().startsWith('gemini-3')) || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
+            if (aiProvider === 'Google' && thinkingLevel === 'xHigh') {
+                if (activeModel && activeModel.toLowerCase().startsWith('gemini-3')) {
                     setThinkingLevel('High');
                 }
             }
@@ -1237,14 +1255,14 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (!apiKey) return;
 
-        if (isFirstRender.current) {
+        if (isThirdRender.current) {
             isFirstRender.current = false;
             setTimeout(() => {
                 isSecondRender.current = false;
                 setTimeout(() => {
                     isThirdRender.current = false;
-                }, 1000);
-            }, 2000);
+                }, 2500);
+            }, 2500);
             return;
         }
 
