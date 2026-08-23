@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260824,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -20,7 +20,8 @@
         "gemma_janitor_fallback_google": "gemma-4-26b-a4b-it",
         "inferx_fallback": "deepseek-v4-flash-0731",
         "sensenova_fallback": "sensenova-6.8-flash-lite",
-        "crofai_fallback": "deepseek-v4-flash-0731"
+        "crofai_fallback": "deepseek-v4-flash-0731",
+        "aihubmix_fallback": "coding-kimi-k3-free"
     },
     "providers": {
         "Ollama": {
@@ -156,6 +157,14 @@
                         "desc": "Text Only"
                     }
                 ],
+                "Paid": []
+            }
+        },
+        "AIHubMix": {
+            "default_free": "",
+            "default_paid": "",
+            "models": {
+                "Free": [],
                 "Paid": []
             }
         },
@@ -493,7 +502,7 @@
                         "desc": "Text Only"
                     },
                     {
-                        "cmd": "--- Moonshot Models ---",
+                        "cmd": "\n--- Moonshot Models ---",
                         "desc": ""
                     },
                     {

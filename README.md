@@ -28,6 +28,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **CrofAI**
   - **InferX**
   - **SenseNovaAI**
+  - **AIHubMix** (*Experimental*)
   - **OpenRouter** (*Experimental*)
 
 - **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:

@@ -1,12 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.3.5": {
-        "note": "AUGUST 23",
-        "added": [],
-        "changed": [],
+    "4.4.0": {
+        "note": "AUGUST 24",
+        "added": [
+            "Added support for new *Experimental* AI Provider: AIHubMix."
+        ],
+        "changed": [
+            "Improved Overall Experience (& better branding) with OpenRouter API Integration.",
+            "Better error handling on tool failures."
+        ],
         "fixes": [
-            "Improved OpenRouter integration."
+            "Fixed Several bugs with OpenRouter.",
+            "Fixed few *tiny* bugs in NVIDIA API Integration.",
         ]
     },
     "4.3.2": {
@@ -32,7 +38,7 @@ export const changelogData = {
         "added": [
             "Added new memory management algorithm. May use lower RAM. Can be turned on via `EXPERIMENTAL_MEMORY_MANAGER` flag via ENV variables.",
             "Added new startup argument `--path path/to/prroject` to open a new FluxFlow instance with a specific path if terminal CWD is different.",
-            "Added service tier support for open router. Syntax `model_id:provider::service_tier` or `model_id:provider/service_tier`. Priority, Flex (~50% cheaper)."
+            "Added service tier support for open router. Syntax `model_id:provider/service_tier`. Priority, Flex."
         ],
         "changed": [],
         "fixes": [

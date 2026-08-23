@@ -757,7 +757,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -770,6 +770,7 @@ export default function App({ args = [] }) {
                     if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
                     if (lower === 'inferx') return 'InferX';
                     if (lower === 'sensenova') return 'SenseNova';
+                    if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
                     return null;
                 };
 
@@ -876,7 +877,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -887,6 +888,7 @@ export default function App({ args = [] }) {
                         else if (provPart === 'crof' || provPart === 'crofai') mapped = 'CrofAI';
                         else if (provPart === 'inferx') mapped = 'InferX';
                         else if (provPart === 'sensenova') mapped = 'SenseNova';
+                        else if (provPart === 'aihubmix' || provPart === 'aihub') mapped = 'AIHubMix';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
                     }
@@ -958,7 +960,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -969,6 +971,7 @@ export default function App({ args = [] }) {
                     else if (val === 'crof' || val === 'crofai') mapped = 'CrofAI';
                     else if (val === 'inferx') mapped = 'InferX';
                     else if (val === 'sensenova') mapped = 'SenseNova';
+                    else if (val === 'aihubmix' || val === 'aihub') mapped = 'AIHubMix';
                     parsed.provider = mapped;
                 }
                 i++;
@@ -2383,6 +2386,10 @@ export default function App({ args = [] }) {
                 prefix: '',
                 minLength: 0,
             },
+            AIHubMix: {
+                prefix: 'sk-',
+                minLength: 10,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2407,7 +2414,7 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
+            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
@@ -2417,13 +2424,13 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova') {
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀└─ Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -3389,7 +3396,8 @@ export default function App({ args = [] }) {
                                 OpenRouter: 'Free',
                                 CrofAI: 'Free',
                                 InferX: 'Free',
-                                SenseNova: 'Free'
+                                SenseNova: 'Free',
+                                AIHubMix: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -4659,7 +4667,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -4791,8 +4799,9 @@ export default function App({ args = [] }) {
                             { label: 'SenseNova', value: 'SenseNova' },
                             { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Ollama', value: 'Ollama' },
-                            { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
-                            { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
+                            { label: 'AIHubMix       [EXPERIMENTAL]', value: 'AIHubMix' },
+                            { label: 'Mistral        [EXPERIMENTAL]', value: 'Mistral' },
+                            { label: 'OpenRouter     [EXPERIMENTAL]', value: 'OpenRouter' },
                             { label: 'Back', value: providerReturnView }
                         ]}
                         theme={systemSettings.theme}
@@ -4823,7 +4832,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀└─ Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix') && systemSettings.memory ? `\n⠀⠀└─ Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀└─ Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -6665,8 +6674,9 @@ export default function App({ args = [] }) {
                                                         { label: 'SenseNova', value: 'SenseNova' },
                                                         { label: 'CrofAI', value: 'CrofAI' },
                                                         { label: 'Ollama', value: 'Ollama' },
-                                                        { label: 'Mistral [EXPERIMENTAL]', value: 'Mistral' },
-                                                        { label: 'OpenRouter [EXPERIMENTAL]', value: 'OpenRouter' },
+                                                        { label: 'AIHubMix     [EXPERIMENTAL]', value: 'AIHubMix' },
+                                                        { label: 'Mistral      [EXPERIMENTAL]', value: 'Mistral' },
+                                                        { label: 'OpenRouter   [EXPERIMENTAL]', value: 'OpenRouter' },
                                                     ]}
                                                     onSelect={(item) => {
                                                         setAiProvider(item.value);

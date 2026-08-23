@@ -23,7 +23,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- JSON escape literal escape sequences in tool arguments
+    const fluxInstructions = `- JSON escape literal escape sequences in tool arguments (new line: \\\\n, backslash: \\\\)
 - Same file, multiple edits? One PatchFile (≤15 blocks) ← Priority
 - Tool denied? Ask for guidance ← mandatory
 - Need text or huge file? CodeSearch > Full Read
