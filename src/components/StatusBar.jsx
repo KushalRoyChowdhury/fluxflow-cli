@@ -203,7 +203,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     const hc = process.env.HIGH_CONTEXT;
     if (hc && hc !== 'false') {
         const val = parseInt(hc, 10);
-        if (!isNaN(val) && val >= 256000 && val <= 1000000) {
+        if (!isNaN(val) && val >= 32000 && val <= 1000000) {
             maxLimit = val;
         }
     }

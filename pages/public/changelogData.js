@@ -1,12 +1,17 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.4.3": {
+    "4.4.5": {
         "note": "AUGUST 25",
         "added": [],
-        "changed": [],
+        "changed": [
+            "Improved general stability & User Experience.",
+            "Improved the `/stat` viewer for more transparency & Granularity."
+        ],
         "fixes": [
-            "QoL bug fixes."
+            "QoL bug fixes.",
+            "Reduce *few* tool's ambiguity.",
+            "Major rework to reduce false-positives with system schemas with contextual states."
         ]
     },
     "4.4.0": {

@@ -66,6 +66,57 @@ export const convertChannelThinkTags = (str) => {
     return str.replace(RE_CHANNEL_THINK_OPEN, '<think>').replace(RE_CHANNEL_THINK_CLOSE, '</think>');
 };
 
+export const RE_LEADING_THINK = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\]|$)/i;
+
+export const isInsideBacktick = (str, idx) => {
+    let inCode = false;
+    for (let i = 0; i < idx; i++) {
+        if (str[i] === '`') inCode = !inCode;
+    }
+    return inCode;
+};
+
+// Finds the genuine, outermost </think> closing tag outside backticks
+export const findGenuineThinkClose = (str) => {
+    const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
+    let match;
+    while ((match = regex.exec(str)) !== null) {
+        if (isInsideBacktick(str, match.index)) continue;
+        return { index: match.index, length: match[0].length };
+    }
+    return { index: -1, length: 0 };
+};
+
+export const getLeadingThinkBlock = (text) => {
+    if (!text || typeof text !== 'string') return null;
+    const openMatch = text.match(/^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i);
+    if (!openMatch) return null;
+    const afterOpenIndex = openMatch.index + openMatch[0].length;
+    const afterOpenText = text.substring(afterOpenIndex);
+    const closeRes = findGenuineThinkClose(afterOpenText);
+    if (closeRes.index !== -1) {
+        const fullLength = afterOpenIndex + closeRes.index + closeRes.length;
+        return {
+            fullBlock: text.substring(0, fullLength),
+            innerContent: afterOpenText.substring(0, closeRes.index),
+            remainingText: text.substring(fullLength)
+        };
+    }
+    // Unclosed leading think (entire string is think)
+    return {
+        fullBlock: text,
+        innerContent: afterOpenText,
+        remainingText: ''
+    };
+};
+
+export const stripLeadingThinking = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    const leading = getLeadingThinkBlock(text);
+    if (!leading) return text;
+    return leading.remainingText.trimStart();
+};
+
 const RE_STRIP_THINK_CLOSED = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
 const RE_STRIP_THINK_OPEN = /(?:<(think|thought|thoughts)>|<\|channel>thought|\[(think|thought|thoughts)\])[\s\S]*$/gi;
 const RE_STRIP_THINK_SIMPLE = /(?:<think>|<\|channel>thought|\[think\])[\s\S]*?(?:<\/think>|<channel\|>|\[\/think\]|$)/gi;
@@ -81,6 +132,14 @@ const RE_KIMI_SECTION_END = /<\|\s*tool_calls_section_end\s*\|>/gi;
 const RE_TOOL_WRAPPER_CODE_FENCE = /```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi;
 const RE_XML_TAG_OPEN = /<(\w+)(?:[^>]*)>\r?\n?/gi;
 const RE_XML_TAG_CLOSE = /\r?\n?<\/\w+(?:[^>]*)>/gi;
+
+export const stripNakedXmlTags = (str) => {
+    if (!str || typeof str !== 'string') return str;
+    return str.replace(/(```[\s\S]*?```|`[^`]*`)|(<(?:\w+)(?:[^>]*)>\r?\n?|\r?\n?<\/\w+(?:[^>]*)>)/gi, (match, codeSpan) => {
+        if (codeSpan) return codeSpan;
+        return '';
+    });
+};
 
 let client = null;
 
@@ -339,9 +398,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
         .filter(msg => msg.text && !msg.text.includes('[TOOL RESULT]') && !msg.text.includes('OBSERVATION:') && !msg.text.startsWith('[TERMINAL_RECORD]') && !msg.isTerminalRecord && !msg.isMeta && !msg.isLogo && !String(msg.id).startsWith('welcome') && !String(msg.id).startsWith('logo'))
         .slice(-14)
         .map(msg => {
-            let processedText = stripAnsi(msg.text)
+            let processedText = stripLeadingThinking(stripAnsi(msg.text))
                 .replace(/\[tool:functions\..*?\]/g, '')
-                .replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '')
                 .replace(/\[Prompted on:.*?\]/g, '')
                 .replace(/\[METADATA \(PRIORITY: DYNAMIC\)\] Time: ([^|\n]+)/g, (match, p1) => {
                     return `[METADATA (PRIORITY: DYNAMIC)] Time: ${p1.replace(/:\d{2}/g, '')}`;
@@ -376,14 +434,14 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
     const thisHas80pChanceOfBeingTrue = Math.random() < 0.8;
     const needTitle = isFirstPrompt || hasTitleSignal || thisHas80pChanceOfBeingTrue;
 
-    const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
+    const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
     const janitorPrompt = getJanitorInstruction(
         janitorUserMemories,
         isMemoryEnabled,
         needTitle
     );
 
-    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[TOOL RESULTS\]\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
+    let agentRes = `${cleanedFullResponse.replace(/\[tool:functions\..*?\]/g, '').replace(/\[Prompted on:.*?\]/g, '').replace(/\[\[\s*turn\s*:\s*(continue|finish)\s*\]\]/gi, '').replace(/\[\[END\]\]/g, '').replace(/\[\[TOOL RESULTS\]\]/g, '').replace(/\[tool results\]/g, '').substring(0, AGENT_CONTEXT_LENGTH)}`;
     if (agentRes.length > AGENT_CONTEXT_LENGTH) {
         agentRes += '\n... (truncated) ...';
     }
@@ -758,10 +816,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 };
 
 const getActiveToolContext = (text) => {
-    // Strip thinking blocks (<think>...</think> or active <think>...) so live tool sniffing ignores tool syntax drafted inside thinking
-    const cleanText = text
-        .replace(RE_STRIP_THINK_CLOSED, '')
-        .replace(RE_STRIP_THINK_OPEN, '');
+    // Strip leading thinking block ONLY so live tool sniffing ignores tool syntax drafted inside thinking
+    const cleanText = stripLeadingThinking(text);
 
     // Blank out backtick-delimited inline-code spans (equal-length spaces) so that
     // tool triggers written inside backticks are invisible to the regex while all
@@ -822,7 +878,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
 
     while ((match = toolRegex.exec(text)) !== null) {
         const before = text.substring(lastIdx, match.index);
-        result += stripThoughts ? before.replace(RE_STRIP_THINK_SIMPLE, '') : before;
+        result += (stripThoughts && lastIdx === 0) ? stripLeadingThinking(before) : before;
 
         const startIdx = match.index + match[0].length - 1;
         let balance = 0;
@@ -873,7 +929,7 @@ const getContextSafeText = (text, stripThoughts = true) => {
     }
 
     if (lastIdx < text.length) {
-        result += stripThoughts ? text.substring(lastIdx).replace(RE_STRIP_THINK_SIMPLE, '') : text.substring(lastIdx);
+        result += (stripThoughts && lastIdx === 0) ? stripLeadingThinking(text.substring(lastIdx)) : text.substring(lastIdx);
     }
     return result;
 };
@@ -970,7 +1026,8 @@ const translateKimiToolCalls = (text) => {
         'generateimage': 'GenerateImage',
         'todo': 'Todo',
         'goal': 'Goal',
-        'ask': 'Ask'
+        'askuser': 'AskUser',
+        'ask': 'AskUser'
     };
 
     const toPascalCase = (str) => {
@@ -1036,9 +1093,8 @@ const isPlaceholderVal = (val) => {
 const detectToolCalls = (text) => {
     if (!text) return [];
     const translatedText = translateKimiToolCalls(text);
-    // Strip any thinking blocks first to ensure no tool calls are detected inside them
-    RE_STRIP_THINK_FULL.lastIndex = 0;
-    const cleanText = translatedText.replace(RE_STRIP_THINK_FULL, '');
+    // Strip leading thinking block ONLY if the response starts with thinking
+    const cleanText = stripLeadingThinking(translatedText);
     const results = [];
     // Replace backtick-delimited inline-code spans with spaces of equal length so that
     // tool triggers written inside backticks (e.g. `[tool:functions.foo()]`) are ignored
@@ -1638,7 +1694,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         let contextTruncationCount = 260000;
         if (hc && hc !== 'false') {
             const val = parseInt(hc, 10);
-            if (!isNaN(val) && val >= 256000 && val <= 1000000) {
+            if (!isNaN(val) && val >= 0 && val <= 1000000) {
                 contextTruncationCount = val;
                 contextCompressionCount = Math.round(val * 0.85);
             }
@@ -1649,6 +1705,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
+        }
+
+        if (aiProvider === 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
+            yield { type: 'text', content: '✦ Maximum Context Limit Reached. Start a new chat.' };
+            return;
         }
 
         if (aiProvider !== 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
@@ -2166,14 +2227,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             userMsgObj.binaryPart = attachedBinaryPart;
         }
 
-        // [PRE-LOOP ARCHIVE] Strip thoughts from ALL PREVIOUS turns once before entering the loop.
-        // This acts as a security firewall against brain-hijacking (user injecting <think> tags)
-        // and ensures steering hints don't carry reasoning glitches.
-        // Only Agent Msgs should be stripped.
+        // [PRE-LOOP ARCHIVE] Strip leading thoughts from previous turns once before entering the loop.
+        // If response does not start with thinking, text is kept completely intact.
         modifiedHistory.forEach(msg => {
             if (msg.text && msg.role === 'agent') {
-                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[\s\S]*?(?:<\/(think|thought)>|\[\/(think|thought)\])/gi, '');
-                msg.text = msg.text.replace(/(?:<(think|thought)>|\[(think|thought)\])[^\[\n]*/gi, '').trim();
+                msg.text = stripLeadingThinking(msg.text);
             }
         });
 
@@ -2352,11 +2410,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // Detect and remove XML/YAML/fence wrappers around our [tool:...] format,
                     // so the model only sees the raw tool call on the next turn.
                     const stripToolCallWrappers = (text) => {
+                        // Just adding safe comment to return instantly without any processing if needed in future
+                        // return text;
+
+
                         if (!text || !text.includes('[tool:')) return text;
-                        // Deterministically protect <think> and </think> tags so they are never stripped
-                        const THINK_OPEN_PH = '___THINK_OPEN_TAG___';
-                        const THINK_CLOSE_PH = '___THINK_CLOSE_TAG___';
-                        text = text.replace('<think>', THINK_OPEN_PH).replace('</think>', THINK_CLOSE_PH);
+
+                        // 1. Cut the entire leading thought block as-is (protecting any inner XML/HTML tags and backticks)
+                        let leadingThink = '';
+                        const leading = getLeadingThinkBlock(text);
+                        if (leading) {
+                            leadingThink = leading.fullBlock;
+                            text = leading.remainingText;
+                        }
 
                         // Strip YAML/code fence wrappers around tool calls: ```tool ... [tool:...] ... ```
                         text = text.replace(RE_TOOL_WRAPPER_CODE_FENCE, (match, inner) => {
@@ -2364,20 +2430,41 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             return match;
                         });
 
-                        // Process string segment by segment: strip junk XML tags outside [tool:...], keeping all content inside [tool:...] 100% untouched
+                        // Process string segment by segment: strip naked XML tags outside [tool:...], keeping backtick code spans and tool content 100% untouched
                         let result = '';
                         let i = 0;
                         while (i < text.length) {
                             const toolIdx = text.indexOf('[tool:', i);
                             if (toolIdx === -1) {
-                                result += text.substring(i).replace(RE_XML_TAG_OPEN, '').replace(RE_XML_TAG_CLOSE, '');
+                                result += stripNakedXmlTags(text.substring(i));
                                 break;
                             }
 
                             const beforeTool = text.substring(i, toolIdx);
-                            result += beforeTool.replace(RE_XML_TAG_OPEN, '').replace(RE_XML_TAG_CLOSE, '');
+                            result += stripNakedXmlTags(beforeTool);
 
-                            const endToolIdx = text.indexOf(']', toolIdx);
+                            // Find the true matching ']' for [tool:...(...)]
+                            let endToolIdx = -1;
+                            let inStr = null;
+                            let parenBal = 0;
+                            for (let k = toolIdx; k < text.length; k++) {
+                                const ch = text[k];
+                                if (inStr) {
+                                    if (ch === inStr) {
+                                        let bCount = 0;
+                                        for (let b = k - 1; b >= 0 && text[b] === '\\'; b--) bCount++;
+                                        if (bCount % 2 === 0) inStr = null;
+                                    }
+                                } else {
+                                    if (ch === '"' || ch === "'" || ch === '`') inStr = ch;
+                                    else if (ch === '(') parenBal++;
+                                    else if (ch === ')') parenBal--;
+                                    else if (ch === ']' && parenBal <= 0) {
+                                        endToolIdx = k;
+                                        break;
+                                    }
+                                }
+                            }
                             if (endToolIdx === -1) {
                                 result += text.substring(toolIdx);
                                 break;
@@ -2387,11 +2474,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             result += text.substring(toolIdx, endToolIdx + 1);
                             i = endToolIdx + 1;
                         }
-                        text = result;
 
-                        // Restore <think> and </think> tags
-                        text = text.replaceAll(THINK_OPEN_PH, '<think>').replaceAll(THINK_CLOSE_PH, '</think>');
-                        return text;
+                        // 2. Paste the intact leading thought block back in front
+                        return leadingThink + result;
                     };
 
                     const contents = modifiedHistory
@@ -2520,6 +2605,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     // [SYSTEM INSTRUCTION CACHING]
                     const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
+                    const userHasWAYYTOOMuchMoney_GoodLuck = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
+                    if (userHasWAYYTOOMuchMoney_GoodLuck) {
+                        isCacheHit = false;
+                    }
                     if (isCacheHit) {
                         currentSystemInstruction = systemInstructionCache.value;
                     } else {
@@ -3111,7 +3200,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 detectedAnyToolCalls = true;
                                 if (!lastToolEventTime) lastToolEventTime = Date.now();
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
+                                    'Ask': 'ask', 'AskUser': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape',
                                     'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file',
                                     'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx',
                                     'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory',
@@ -3200,6 +3289,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             'code_search': 'Searching',
                                             'Run': 'Executing',
                                             'Ask': 'User Input Required',
+                                            'AskUser': 'User Input Required',
                                             'Memory': 'Updating Memory',
                                             'GenerateImage': 'Generating',
                                             'InvokeSync': 'Sub-Agent Working',
@@ -3242,8 +3332,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 lastLoopCheckLen = turnText.length;
 
                                 const contextSafeText = getContextSafeText(turnText, false);
-                                const thinkBlocks = contextSafeText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\]|$)/gi) || [];
-                                const thinkContent = thinkBlocks.join('').trim();
+                                const leadingThink = getLeadingThinkBlock(contextSafeText);
+                                const thinkContent = leadingThink ? (leadingThink.innerContent || '').trim() : '';
 
                                 // 1. Repetitive Sentence Check (The most common loop symptom)
                                 const sentences = thinkContent.split(/[.!?]\s+/);
@@ -3384,8 +3474,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
 
                             // [REAL-TIME TOOL EXECUTION]
-                            // We use a version that only strips thoughts but preserves full tool arguments
-                            const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
+                            // Only strip leading thoughts if response starts with thinking, keeping tool arguments 100% intact
+                            const toolActionableText = stripLeadingThinking(turnText);
                             const allToolsFound = detectToolCalls(toolActionableText);
                             while (allToolsFound.length > toolCallPointer) {
                                 // [ORDER PROTECTION] - Flush any pending Google text BEFORE tool execution
@@ -3396,7 +3486,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 const executionStart = Date.now();
 
                                 const NORMALIZE_MAP = {
-                                    'Ask': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
+                                    'Ask': 'ask', 'AskUser': 'ask', 'WebSearch': 'web_search', 'WebScrape': 'web_scrape', 'ReadFile': 'view_file', 'ReadFolder': 'read_folder', 'WriteFile': 'write_file', 'PatchFile': 'update_file', 'WritePDF': 'write_pdf', 'WriteDoc': 'write_docx', 'Run': 'exec_command', 'SearchKeyword': 'search_keyword', 'CodeSearch': 'search_keyword', 'code_search': 'search_keyword', 'Code_Search': 'search_keyword', 'codesearch': 'search_keyword', 'Memory': 'memory', 'file_map': 'file_map', 'FileMap': 'file_map', 'Chat': 'chat', 'chat': 'chat', 'GenerateImage': 'generate_image', 'generate_image': 'generate_image', 'todo': 'todo', 'Todo': 'todo', 'goal': 'todo', 'Goal': 'todo', 'Invoke': 'invoke', 'InvokeSync': 'invoke_sync', 'getProgress': 'get_progress', 'GetProgress': 'get_progress', 'Await': 'await', 'await': 'await', 'AwaitSubagent': 'await', 'awaitSubagent': 'await', 'Answer': 'answer', 'answer': 'answer', 'AnswerSubagent': 'answer', 'answerSubagent': 'answer', 'Steer': 'steer', 'steer': 'steer', 'SteerSubagent': 'steer', 'steerSubagent': 'steer', 'Cancel': 'cancel', 'cancel': 'cancel',
                                     'Click': 'click', 'click': 'click', 'Drag': 'drag', 'drag': 'drag', 'Scroll': 'scroll', 'scroll': 'scroll', 'KeyboardTyping': 'keyboard_typing', 'keyboard_typing': 'keyboard_typing', 'KeyPress': 'key_press', 'key_press': 'key_press', 'RecaptureScreen': 'recapture_screen', 'recapture_screen': 'recapture_screen',
                                     'EmergencyRollback': 'EmergencyRollback'
                                 };
@@ -3888,6 +3978,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         let patchResults = [];
                                         let requestedPatchCount = 0;
                                         let isNewFileCreated = false;
+                                        let preparedModifiedContent = "";
 
                                         if (!approval) {
                                             if (normToolName === 'write_file' || normToolName === 'update_file') {
@@ -3923,7 +4014,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             let modifiedContent = originalContent;
                                                             // simulation logic
                                                             if (normToolName === 'write_file') {
-                                                                modifiedContent = toolArgs.content || toolArgs.newContent || '';
+                                                                const rawContent = toolArgs.content || toolArgs.newContent || '';
+                                                                modifiedContent = rawContent.endsWith('\n') ? rawContent : rawContent + '\n';
+                                                                preparedModifiedContent = modifiedContent;
                                                             } else {
                                                                 const { patchPairs: patches, allowMultiple: parsedAllowMultiple, error: parseError } = parsePatchPairs(toolArgs);
                                                                 if (parseError) {
@@ -3943,6 +4036,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                                 requestedPatchCount = patches.length;
                                                                 const sim = applyPatches(originalContent, patches, { allowMultiple });
                                                                 modifiedContent = sim.content;
+                                                                preparedModifiedContent = modifiedContent;
                                                                 patchResults = sim.results;
                                                                 // STRICT MATCHING ENFORCEMENT:
                                                                 // If ANY block failed in the simulation, we do not show the IDE diff.
@@ -3982,6 +4076,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                             const rawContent = toolArgs.content || toolArgs.newContent || '';
                                                             // Ensure the sacred trailing \n — same guarantee as write_file.js
                                                             const modifiedContent = rawContent.endsWith('\n') ? rawContent : rawContent + '\n';
+                                                            preparedModifiedContent = modifiedContent;
                                                             if (!fs.existsSync(absPath)) {
                                                                 isNewFileCreated = true;
                                                                 fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -4059,11 +4154,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                                 finalContent = finalIDE.full_content;
                                             }
                                             if (!finalContent && fs.existsSync(absPath)) {
-                                                finalContent = fs.readFileSync(absPath, 'utf8');
-                                                if (!finalContent) {
-                                                    await new Promise(r => setTimeout(r, 100));
-                                                    finalContent = fs.readFileSync(absPath, 'utf8');
+                                                const diskContent = fs.readFileSync(absPath, 'utf8');
+                                                if (diskContent) {
+                                                    finalContent = diskContent;
                                                 }
+                                            }
+                                            if (!finalContent && preparedModifiedContent) {
+                                                finalContent = preparedModifiedContent;
+                                            }
+                                            if (finalContent || isNewFileCreated) {
+                                                fs.writeFileSync(absPath, finalContent, 'utf8');
                                             }
 
                                             // Prepare Reporting (Match write_file.js style)
@@ -4505,7 +4605,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const hasContinue = /\[\s*(turn\s*:)?\s*continue\s*\]/i.test(signalSafeText.toLowerCase());
                     const didCallTool = toolResults.length > 0 || lastToolSniffed !== null;
 
-                    const pureOutputText = signalSafeText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
+                    const pureOutputText = stripLeadingThinking(signalSafeText).trim();
                     const endsWithEmoji = /(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u.test(pureOutputText);
                     // This regex catches trailing markdown (*, **, _, `), quotes (", '), brackets, tables (|), and trailing spaces/newlines
                     // Added curly quotes, curly brackets, wave dashes, and a unicode punctuation wildcard (\p{P})
@@ -4687,14 +4787,9 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
             fullAgentResponseChunks.push(turnText);
 
-            // [SAFETY] Surgical extraction of top-level thinking blocks only.
-            // We avoid global stripping to protect documentation or code that might mention <think> tags.
-            let textToProcess = turnText;
-            const thinkMatch = turnText.match(/(?:<think>|\[think\])([\s\S]*?)(?:<\/think>|\[\/think\])/i);
-            if (thinkMatch) {
-                // Only strip if it's at the very beginning or followed by significant output
-                textToProcess = turnText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/i, '');
-            }
+            // [SAFETY] Surgical extraction of top-level leading thinking blocks only.
+            // If response does not start with thinking, text is kept completely intact.
+            let textToProcess = stripLeadingThinking(turnText);
 
             const signalSafeText = getSanitizedText(turnText);
             const hasFinish = /\[\s*(turn\s*:)?\s*finish\s*\]/i.test(signalSafeText.toLowerCase()) || /\[\[END\]\]/i.test(signalSafeText.toLowerCase()) || true;
@@ -4722,7 +4817,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
             if (isActuallyFinished) {
                 const fullAgentTextRaw = fullAgentResponseChunks.join('\n');
-                const cleanedFullResponse = fullAgentTextRaw.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/g, '').trim();
+                const cleanedFullResponse = stripLeadingThinking(fullAgentTextRaw).trim();
 
                 yield {
                     type: 'interactive_turn_finished',
@@ -4783,8 +4878,11 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             if (toolResults.length > 0 || anyToolExecutedInThisTurn) {
                 if (toolResults.length > 0) {
                     let combinedText = toolResults.map(tr => tr.text).join('\n\n');
-                    const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
-                    const attemptedToolsCount = (toolActionableText.match(/\[tool:/gi) || []).length;
+                    const toolActionableText = stripLeadingThinking(turnText);
+                    // Eat all valid closed [tool:...)] calls so valid calls (and nested tool syntax inside them) are cleared
+                    const remainingUnclosedText = toolActionableText.replace(/\[{1,2}tool:[\s\S]*?\)\s*\]{1,2}/gi, '');
+                    const unexecutedToolsCount = (remainingUnclosedText.match(/\[tool:/gi) || []).length;
+                    const attemptedToolsCount = toolResults.length + unexecutedToolsCount;
                     if (toolResults.length < attemptedToolsCount) {
                         combinedText += `\n\n[system] Only ${toolResults.length} out of ${attemptedToolsCount} attempted tool calls were executed. Verify proper structure compliance & try failed calls again [/system]`;
                         const missedCount = attemptedToolsCount - toolResults.length;
@@ -4794,19 +4892,21 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     modifiedHistory.push({ role: 'user', text: combinedText, binaryPart });
                 }
             } else {
-                const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/gi, '');
-                const attemptedToolsCount = (toolActionableText.match(/\[tool:/gi) || []).length;
-                if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
-                    modifiedHistory.push({ role: 'user', text: `[system] Failed to execute ${attemptedToolsCount} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance & try again [/system]` });
-                    await incrementUsage('toolFailure');
-                    yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Execution Error`)}\n` };
-                } else {
-                    yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Loop Detected`)}\n` };
-                    modifiedHistory.push({ role: 'user', text: `[system] ${isStutteringLoop && !isThinkingLoop ? `Stuttering Detected by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' Over Thinking' : ' Loop'} Detected by Internal System${isThinkingLoop ? ' for current Effort Level' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/system]` });
+                if (!TERMINATION_SIGNAL) {
+                    const toolActionableText = turnText.replace(/(?:<(think|thought|thoughts)>|\[(think|thought|thoughts)\])[\s\S]*?(?:<\/(think|thought|thoughts)>|\[\/(think|thought|thoughts)\]|$)/i, '');
+                    const attemptedToolsCount = (toolActionableText.match(/\[tool:/gi) || []).length;
+                    if (wasToolCalledInLastLoop || detectedAnyToolCalls || attemptedToolsCount > 0) {
+                        modifiedHistory.push({ role: 'user', text: `[system] Failed to execute ${attemptedToolsCount} tool${attemptedToolsCount > 1 ? 's' : ''}. Verify proper structure compliance & try again [/system]` });
+                        await incrementUsage('toolFailure');
+                        yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Execution Error`)}\n` };
+                    } else {
+                        yield { type: 'visual_feedback', content: `\n ${colorMainWords(`✘  Loop Detected`)}\n` };
+                        modifiedHistory.push({ role: 'user', text: `[system] ${isStutteringLoop && !isThinkingLoop ? `Stuttering Detected by Internal System. Re-calibrate your response & proceed.` : `${isThinkingLoop ? ' Over Thinking' : ' Loop'} Detected by Internal System${isThinkingLoop ? ' for current Effort Level' : ''}. ${isThinkingLoop ? 'If you have planned the task, prioritize execution/output' : 'If you have finished your task provide a simple summary and end'}`} [/system]` });
+                    }
+                    isThinkingLoop = false;
+                    isStutteringLoop = false;
+                    isGeneralLoop = false;
                 }
-                isThinkingLoop = false;
-                isStutteringLoop = false;
-                isGeneralLoop = false;
             }
             if (systemSettings?.advanceRollback) {
                 await AdvanceRevertManager.recordTurnDelta(chatId, loop + 1, currentTurnTools);
@@ -4938,21 +5038,19 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, tool:functions must
+You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat output & wait for system response ← no exception, tool:functions must
 Tool Rules:
-- JSON escape literal escape sequences in tool arguments (new line: \\\\n, backslash: \\\\)
-- Same file, multiple edits? ONE PatchFile (≤15 blocks) ← Priority
-- Tool denied? Ask for guidance ← mandatory
+- JSON escape literal sequences inside tool arguments (backslash: \\\\, newLine: \\n, quote: \\\") ← Mandatory
+- Same file, multiple edits? ONE PatchFile (≤15 blocks)
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
 - Dont hallucinate tool results, verify, fix errors
 - Stuck on syntax error? Tell user > waste time
-- ONLY valid tools and syntax defined below are allowed
-- Stuck on syntax error? Tell user > Time waste
+- ONLY valid tools defined below are allowed
 
 # Provided Tools
 **Communication Tools**
-- Ask(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+- AskUser(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
 ${isAsync ? `- AskMain(question="..."). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
@@ -5016,7 +5114,7 @@ Current Time: ${time}
 
         const response = await generateSimpleContent(mergedSettings, targetModel, contents, systemInstructionSubAgent, 'Fast');
         const responseText = response.text || '';
-        const cleanResponse = responseText.replace(/(?:<think>|\[think\])[\s\S]*?(?:<\/think>|\[\/think\])/gi, '').trim();
+        const cleanResponse = stripLeadingThinking(responseText).trim();
         finalAnswer = cleanResponse;
 
         if (logCallback) logCallback(`[Subagent Response]\n${cleanResponse}\n`);
@@ -5047,7 +5145,9 @@ Current Time: ${time}
                     throw new Error('Subagent task was cancelled.');
                 }
             }
-            const normalizedToolName = toolCall.toolName.toLowerCase();
+            let normalizedToolName = toolCall.toolName.toLowerCase();
+            // Alias: models sometimes emit AskUser instead of Ask
+            if (normalizedToolName === 'askuser') normalizedToolName = 'ask';
 
             // Handle AskMain
             if (normalizedToolName === 'askmain' || normalizedToolName === 'ask_main') {

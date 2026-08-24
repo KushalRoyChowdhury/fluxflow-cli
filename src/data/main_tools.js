@@ -23,9 +23,9 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- JSON escape literal escape sequences in tool arguments (new line: \\\\n, backslash: \\\\)
-- Same file, multiple edits? One PatchFile (≤15 blocks) ← Priority
-- Tool denied? Ask for guidance ← mandatory
+    const fluxInstructions = `- JSON escape literal sequences inside tool arguments (backslash: \\\\, newLine: \\n, quote: \\\") ← Mandatory
+- Same file, multiple edits? One PatchFile (≤15 blocks)
+- Tool denied? Ask for guidance
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
 - Dont hallucinate tool results, verify, fix errors
@@ -77,12 +77,13 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat response ← no exception, tool:functions must
+You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat output & wait for system response ← no exception, tool:functions must
 Tool Rules:
 - Max 3 tool calls/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Todo: 3+)' : ''}
+- NO chat text with tool calls
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- Ask(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+- AskUser(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
 
 **Web Tools**
 - WebSearch(query="...", aiMode="bool, optional", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search

@@ -757,7 +757,7 @@ export const parseMessageToBlocks = (msg, columns) => {
     if (!msg.isStreaming && blocksCache.has(cacheKey)) {
         return blocksCache.get(cacheKey);
     }
-    const text = flattenString(cleanSignals(msg.text || '', msg.role === 'think'));
+    const text = flattenString(cleanSignals(msg.text || '', msg.role));
 
     const streamCacheKey = `${msg.id}-${columns}`;
     let cachedBlocks = new Map();
@@ -971,7 +971,6 @@ export const parseMessageToBlocks = (msg, columns) => {
         let inTable = false;
         let tableLines = [];
         let inCodeBlock = false;
-        let inEmbeddedThink = false;
         let currentLang = '';
         let codeLineNum = 0;
         let codeStartIdx = 0;
@@ -980,60 +979,6 @@ export const parseMessageToBlocks = (msg, columns) => {
             const isLast = idx === lines.length - 1;
             const isTableRow = line.trim().startsWith('|');
             const isCodeBlockMarker = line.trim().startsWith('```');
-
-            if (inEmbeddedThink) {
-                if (line.includes('</think>') || line.includes('<channel|>') || line.includes('</thought>')) {
-                    const parts = line.split(/(?:<\/(think|thought|thoughts)>|<channel\|>)/i);
-                    const thinkTail = parts[0] || '';
-                    const agentHead = parts.slice(2).join('');
-
-                    if (thinkTail) {
-                        enqueue(getBlock(`${msg.id}-think-${idx}`, 'think-line', thinkTail, {}), isLast && !agentHead);
-                    }
-                    flushPending();
-                    completedBlocks.push({ key: `${msg.id}-think-footer-${idx}`, type: 'think-footer-padding', text: '' });
-                    inEmbeddedThink = false;
-
-                    if (agentHead && agentHead.trim()) {
-                        enqueue(getBlock(`${msg.id}-${idx}`, 'agent-line', agentHead, {}), isLast);
-                    }
-                } else {
-                    enqueue(getBlock(`${msg.id}-think-${idx}`, 'think-line', line, {}), isLast);
-                }
-                return;
-            }
-
-            if (!inCodeBlock && (line.includes('<think>') || line.includes('<|channel>thought') || line.includes('<thought>') || line.startsWith('<think') || line.startsWith('<|channel>thought'))) {
-                flushPending();
-                if (inTable) {
-                    completedBlocks.push(getBlock(`${msg.id}-table-${idx}`, 'table', tableLines.join('\n'), { isStreaming: false }));
-                    inTable = false;
-                    tableLines = [];
-                }
-                completedBlocks.push(getBlock(`${msg.id}-think-header-${idx}`, 'think-header', ''));
-                inEmbeddedThink = true;
-
-                const thinkContent = line.replace(/^(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought\s*)\r?\n?/i, '');
-                if (thinkContent.includes('</think>') || thinkContent.includes('<channel|>') || thinkContent.includes('</thought>')) {
-                    const parts = thinkContent.split(/(?:<\/(think|thought|thoughts)>|<channel\|>)/i);
-                    const thinkTail = parts[0] || '';
-                    const agentHead = parts.slice(2).join('');
-
-                    if (thinkTail) {
-                        enqueue(getBlock(`${msg.id}-think-${idx}`, 'think-line', thinkTail, {}), isLast && !agentHead);
-                    }
-                    flushPending();
-                    completedBlocks.push({ key: `${msg.id}-think-footer-${idx}`, type: 'think-footer-padding', text: '' });
-                    inEmbeddedThink = false;
-
-                    if (agentHead && agentHead.trim()) {
-                        enqueue(getBlock(`${msg.id}-${idx}`, 'agent-line', agentHead, {}), isLast);
-                    }
-                } else if (thinkContent) {
-                    enqueue(getBlock(`${msg.id}-think-${idx}`, 'think-line', thinkContent, {}), isLast);
-                }
-                return;
-            }
 
             if (inCodeBlock) {
                 if (isCodeBlockMarker) {
@@ -1151,7 +1096,6 @@ export const TOOL_LABELS = {
 // PRE-COMPILED REGEXES
 // Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
 // ============================================================================
-const REGEX_INITIAL_THINK = /<\/think>(\r?\n){2}/gi;
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
 // Helper: returns true when `idx` in `str` falls inside a backtick-delimited inline code span
 const isInsideBacktick = (str, idx) => {
@@ -1161,15 +1105,18 @@ const isInsideBacktick = (str, idx) => {
     }
     return inCode;
 };
-const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|(?:<(think|thought|thoughts)>|<\|channel>thought)[\s\S]*?(?:<\/(think|thought|thoughts)>|<channel\|>)|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
+const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
 const REGEX_TOOLS = /\b(write_file|update_file|read_folder|view_file|exec_command|web_search|web_scrape|search_keyword|write_pdf|write_docx|generate_image)\b/gi;
 
 // Set to true for models that wrap tool calls in backticks so the backtick-skip logic is bypassed.
 export let bypassBacktick = false;
 
-export const cleanSignals = (text, isThinkRole = false) => {
+export const cleanSignals = (text, role = 'agent') => {
     if (!text) return text;
+
+    const isThinkRole = role === true || role === 'think';
+    const isAgentRole = role === false || role === 'agent';
 
     let normalizedText = text
         .replace(/<\|channel>thought/gi, '<think>')
@@ -1183,30 +1130,32 @@ export const cleanSignals = (text, isThinkRole = false) => {
             .replace(/\r?\n+$/, '');
     }
 
-    let result = normalizedText
-        .replace(REGEX_INITIAL_THINK, '</think>')
-        .replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
+    let result = normalizedText;
+
+    if (isAgentRole) {
+        result = result.replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
             (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
 
-    // Strip XML/YAML/code fence wrappers around tool calls so raw wrappers are not shown in UI
-    if (result && result.includes('[tool:')) {
-        result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
-            if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
-            return match;
-        });
-        if (bypassBacktick) {
-            result = result.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
-                if (inner.includes('[tool:')) return inner.trim();
+        // Strip XML/YAML/code fence wrappers around tool calls so raw wrappers are not shown in UI
+        if (result && result.includes('[tool:')) {
+            result = result.replace(/<(\w+)(?:[^>]*)>\s*([\s\S]*?\[tool:[^\]]*\][\s\S]*?)\s*<\/\1>/gi, (match, tagName, innerContent) => {
+                if (innerContent && innerContent.includes('[tool:')) return innerContent.trim();
                 return match;
             });
+            if (bypassBacktick) {
+                result = result.replace(/```(?:tool|yaml|function|json)?\s*\n?([\s\S]*?)\n?\```/gi, (match, inner) => {
+                    if (inner.includes('[tool:')) return inner.trim();
+                    return match;
+                });
+            }
         }
     }
 
     const trigger = 'tool:functions.';
     const subagentTrigger = 'agent:generalist.';
 
-    // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present
-    if (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger)) {
+    // FAST PATH: Bypass the heavy while-loop entirely if the tool trigger isn't present or not agent role
+    if (isAgentRole && (result.toLowerCase().includes(trigger) || result.toLowerCase().includes(subagentTrigger))) {
         // Greedy loop to strip all tool calls
         while (true) {
             const lowerResult = result.toLowerCase();

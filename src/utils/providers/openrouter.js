@@ -1,4 +1,5 @@
 import { fetchWithBackoff, hash } from './_shared.js';
+import fs from 'fs';
 
 export const getOpenRouterStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0, chatId = null) {
     const messages = [];
@@ -66,18 +67,24 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
         'xHigh': 'high'
     };
 
+    const openRouterVariants = ['free', 'nitro', 'floor', 'exact', 'extended', 'beta', 'online'];
     let formattedModel = model;
     let providerConfig = null;
 
     if (model.includes(':')) {
-        const [modelId, ...providerParts] = model.split(':');
-        formattedModel = modelId.trim();
-        const provider = providerParts.join(':').toLowerCase().trim();
-        if (provider) {
-            providerConfig = {
-                order: [provider],
-                allow_fallbacks: false
-            };
+        const parts = model.split(':');
+        const lastPart = parts[parts.length - 1].toLowerCase().trim();
+        if (!openRouterVariants.includes(lastPart)) {
+            const provider = parts.pop().trim();
+            formattedModel = parts.join(':').trim();
+            if (provider) {
+                providerConfig = {
+                    order: [provider],
+                    allow_fallbacks: false
+                };
+            }
+        } else {
+            formattedModel = model.trim();
         }
     }
 
@@ -121,7 +128,12 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         // console.log(errData); // check errData.error.message for specifics
-        throw new Error(`OpenRouter Error (${response.status}): ${errData.error?.metadata.raw || errData.error?.message || response.statusText}`);
+        const errorMsg = errData.error?.metadata?.raw
+            || errData.error?.message
+            || (typeof errData.error === 'string' ? errData.error : '')
+            || response.statusText
+            || 'Unknown error';
+        throw new Error(`OpenRouter Error (${response.status}): ${errorMsg}`);
     }
 
     const reader = response.body.getReader();
@@ -147,6 +159,7 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
+        // fs.appendFileSync('debug.txt', `${lines}\n\n`);
         buffer = lines.pop();
 
         for (const line of lines) {
@@ -158,6 +171,10 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
             } else {
                 try {
                     const json = JSON.parse(cleanLine.substring(6));
+                    if (json.error) {
+                        const streamErr = json.error.metadata?.raw || json.error.message || JSON.stringify(json.error);
+                        throw new Error(`OpenRouter Stream Error: ${streamErr}`);
+                    }
                     const delta = json.choices?.[0]?.delta;
                     const usage = json.usage;
                     if (json.choices?.[0]?.finish_reason) {
@@ -187,6 +204,9 @@ export const getOpenRouterStream = async function* (apiKey, model, contents, sys
                         }
                     }
                 } catch (e) {
+                    if (e.message && e.message.startsWith('OpenRouter Stream Error:')) {
+                        throw e;
+                    }
                     // Ignore parse errors for partial chunks
                 }
             }

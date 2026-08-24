@@ -63,7 +63,7 @@ export default function StartupArgs() {
             <ul>
                 <li>
                     <strong><code>--model &lt;model_name&gt;</code></strong><br />
-                    Temporary override for the active AI model (e.g., <code>gemini-2.5-pro</code>). This keeps your global settings file untouched.
+                    Temporary override for the active AI model (e.g., <code>gemini-3.7-flash</code>). This keeps your global settings file untouched.
                 </li>
                 <li>
                     <strong><code>--provider &lt;google|deepseek|openrouter&gt;</code></strong><br />

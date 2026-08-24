@@ -1227,7 +1227,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     }
 
     const [animationDone, setAnimationDone] = React.useState(!msg.isStreaming);
-    const content = React.useMemo(() => cleanSignals(msg.text, msg.role === 'think'), [msg.text, msg.role]);
+    const content = React.useMemo(() => cleanSignals(msg.text, msg.role), [msg.text, msg.role]);
 
     // Reset animation state if message ID changes (rare but possible)
     React.useEffect(() => {

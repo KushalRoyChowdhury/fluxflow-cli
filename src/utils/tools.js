@@ -95,6 +95,7 @@ const TOOL_MAP = {
 
     // PascalCase Normalizations for Token Efficiency
     Ask: ask_user,
+    AskUser: ask_user,
     WebSearch: web_search,
     WebScrape: web_scrape,
     ReadFile: view_file,

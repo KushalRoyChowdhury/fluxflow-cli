@@ -1165,6 +1165,7 @@ export default function App({ args = [] }) {
     const [customPeriodUsage, setCustomPeriodUsage] = useState(null);
     const [statsMode, setStatsMode] = useState('daily');
     const [statsScrollOffset, setStatsScrollOffset] = useState(0);
+    const [modelBreakdownSearch, setModelBreakdownSearch] = useState('');
     const PLAYGROUND_CHAT_ID = 'flow-playground';
     const [chatId, setChatId] = useState(args.includes('--playground') ? PLAYGROUND_CHAT_ID : generateChatId());
 
@@ -1234,7 +1235,7 @@ export default function App({ args = [] }) {
                     setThinkingLevel('High');
                     return;
                 }
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI';
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI' || aiProvider === 'OpenRouter';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
 
             }
@@ -1649,17 +1650,59 @@ export default function App({ args = [] }) {
         }
 
         if (activeView === 'stats') {
+            const isModelBreakdown = statsMode === 'dailyModelBreakdown' || statsMode === 'modelBreakdown';
+
+            if (isModelBreakdown) {
+                if (key.tab && !key.shift) {
+                    setStatsMode(prev => prev === 'dailyModelBreakdown' ? 'modelBreakdown' : 'dailyModelBreakdown');
+                    setStatsScrollOffset(0);
+                    return;
+                }
+                if (key.space || inputText === ' ') {
+                    setStatsMode(prev => prev === 'dailyModelBreakdown' ? 'daily' : 'monthly');
+                    setStatsScrollOffset(0);
+                    setModelBreakdownSearch('');
+                    return;
+                }
+                if (key.escape) {
+                    if (modelBreakdownSearch) {
+                        setModelBreakdownSearch('');
+                        setStatsScrollOffset(0);
+                        return;
+                    }
+                    setActiveView('chat');
+                    return;
+                }
+                if (key.upArrow) {
+                    setStatsScrollOffset(prev => Math.max(0, prev - 1));
+                    return;
+                }
+                if (key.downArrow) {
+                    setStatsScrollOffset(prev => Math.min(maxScrollRef.current, prev + 1));
+                    return;
+                }
+                if (key.backspace || key.delete) {
+                    setModelBreakdownSearch(prev => prev.slice(0, -1));
+                    setStatsScrollOffset(0);
+                    return;
+                }
+                if (inputText && inputText !== ' ' && !key.space && !key.ctrl && !key.meta && inputText.length === 1 && inputText.charCodeAt(0) >= 32) {
+                    setModelBreakdownSearch(prev => prev + inputText);
+                    setStatsScrollOffset(0);
+                    return;
+                }
+                return;
+            }
+
             if (key.tab && !key.shift) {
-                setStatsMode(prev => {
-                    if (prev === 'modelBreakdown') return 'daily';
-                    return prev === 'daily' ? 'monthly' : 'daily';
-                });
+                setStatsMode(prev => prev === 'daily' ? 'monthly' : 'daily');
                 setStatsScrollOffset(0);
                 return;
             }
             if (key.space || inputText === ' ') {
-                setStatsMode(prev => prev === 'modelBreakdown' ? 'daily' : 'modelBreakdown');
+                setStatsMode(prev => prev === 'daily' ? 'dailyModelBreakdown' : 'modelBreakdown');
                 setStatsScrollOffset(0);
+                setModelBreakdownSearch('');
                 return;
             }
             if (key.upArrow) {
@@ -4305,17 +4348,39 @@ export default function App({ args = [] }) {
                             }
                         }
 
-                        // 1. Detect transition to THINK mode (Handles <think>, <thought>, <|channel>thought, etc.)
-                        const RE_STREAM_THINK_OPEN = /(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
-                        const RE_STREAM_THINK_CLOSE = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/i;
-                        const RE_STREAM_ALL_THINK_TAGS = /(?:<\/?(think|thought|thoughts)[^>]*>|<\|channel>thought|<channel\|>|\[\/?(think|thought|thoughts)\])/gi;
+                        // 1. Detect transition to THINK mode (Strictly at the START of response only)
+                        const RE_STREAM_THINK_OPEN = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
 
-                        const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
+                        const isInsideBacktick = (str, idx) => {
+                            let inCode = false;
+                            for (let i = 0; i < idx; i++) {
+                                if (str[i] === '`') inCode = !inCode;
+                            }
+                            return inCode;
+                        };
+
+                        const findGenuineThinkClose = (str) => {
+                            const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
+                            let match;
+                            while ((match = regex.exec(str)) !== null) {
+                                if (inCodeBlock || isInsideBacktick(str, match.index)) continue;
+                                return { index: match.index, length: match[0].length };
+                            }
+                            return { index: -1, length: 0 };
+                        };
+
                         const curAgentText = (activeStreamingMsgRef.current?.role === 'agent') ? (activeStreamingMsgRef.current.text || '') : '';
                         const combinedText = curAgentText + chunkText;
 
+                        // If response did not start with think tags and we have non-whitespace content, think mode is permanently disabled for this turn
+                        if (!inThinkMode && !thinkConsumedInTurn && combinedText.trim().length > 0 && !RE_STREAM_THINK_OPEN.test(combinedText)) {
+                            thinkConsumedInTurn = true;
+                        }
+
+                        const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
+
                         if (canThink && (RE_STREAM_THINK_OPEN.test(chunkText) || RE_STREAM_THINK_OPEN.test(combinedText))) {
-                            const fullTextToProcess = RE_STREAM_THINK_OPEN.test(chunkText) ? chunkText : combinedText;
+                            const fullTextToProcess = RE_STREAM_THINK_OPEN.test(combinedText) ? combinedText : chunkText;
                             const isCombined = (fullTextToProcess === combinedText && curAgentText.length > 0);
                             const match = fullTextToProcess.match(RE_STREAM_THINK_OPEN);
                             const tagIndex = match.index;
@@ -4345,14 +4410,12 @@ export default function App({ args = [] }) {
                             currentThinkId = 'think-' + Date.now();
                             activeStreamingMsgRef.current = { id: currentThinkId, role: 'think', text: '', isStreaming: true, startTime: Date.now() };
 
-                            // If this chunk also contains the closing tag
-                            if (RE_STREAM_THINK_CLOSE.test(afterText)) {
-                                const closeMatch = afterText.match(RE_STREAM_THINK_CLOSE);
-                                const closeTagIndex = closeMatch.index;
-                                const closeTagLen = closeMatch[0].length;
-                                const rawThinkContent = afterText.substring(0, closeTagIndex);
-                                const thinkContent = rawThinkContent.replace(RE_STREAM_ALL_THINK_TAGS, '').replace(/^\r?\n+/, '').replace(/\r?\n+$/, '');
-                                const agentContent = afterText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
+                            // Check if this chunk also contains the genuine closing tag
+                            const closeRes = findGenuineThinkClose(afterText);
+                            if (closeRes.index !== -1) {
+                                const rawThinkContent = afterText.substring(0, closeRes.index);
+                                const thinkContent = rawThinkContent.replace(/^\r?\n+/, '').replace(/\r?\n+$/, '');
+                                const agentContent = afterText.substring(closeRes.index + closeRes.length);
 
                                 activeStreamingMsgRef.current.text = flattenString(thinkContent);
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -4366,7 +4429,7 @@ export default function App({ args = [] }) {
                                     appendStreamText(agentContent);
                                 }
                             } else {
-                                let thinkStartText = afterText.replace(RE_STREAM_ALL_THINK_TAGS, '').replace(/^\r?\n+/, '');
+                                let thinkStartText = afterText.replace(/^\r?\n+/, '');
                                 if (thinkStartText) {
                                     appendStreamText(thinkStartText);
                                 }
@@ -4374,42 +4437,14 @@ export default function App({ args = [] }) {
                             continue;
                         }
 
-                        // 2. Aggressive Transition Analysis (Handles closing think tags)
-                        if (RE_STREAM_THINK_CLOSE.test(chunkText) && activeStreamingMsgRef.current?.role === 'think') {
-                            const closeMatch = chunkText.match(RE_STREAM_THINK_CLOSE);
-                            const closeTagIndex = closeMatch.index;
-                            const closeTagLen = closeMatch[0].length;
-                            const thinkPart = chunkText.substring(0, closeTagIndex).replace(RE_STREAM_ALL_THINK_TAGS, '');
-                            const agentPart = chunkText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
-
-                            // Flush queue FIRST so queued tokens appear before this chunk's tail text
-                            flushTypewriterNow();
-                            activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + thinkPart);
-                            const startTime = activeStreamingMsgRef.current.startTime || Date.now();
-                            activeStreamingMsgRef.current.duration = Date.now() - startTime;
-
-                            commitActiveStreamingMessage();
-
-                            inThinkMode = false;
-                            currentAgentId = 'agent-' + Date.now();
-                            activeStreamingMsgRef.current = { id: currentAgentId, role: 'agent', text: '', isStreaming: true };
-                            if (agentPart) {
-                                appendStreamText(agentPart);
-                            }
-                            continue;
-                        }
-
-                        // 3. Append to target role with Leak Protection
+                        // 2. Append to target role with Genuine Closing and Leak Protection
                         if (inThinkMode && activeStreamingMsgRef.current?.role === 'think') {
-                            // Flush queue FIRST so ref.text is complete before deriving thinkPart
                             flushTypewriterNow();
                             const newText = activeStreamingMsgRef.current.text + chunkText;
-                            if (RE_STREAM_THINK_CLOSE.test(newText)) {
-                                const closeMatch = newText.match(RE_STREAM_THINK_CLOSE);
-                                const closeTagIndex = closeMatch.index;
-                                const closeTagLen = closeMatch[0].length;
-                                const thinkPart = newText.substring(0, closeTagIndex).replace(RE_STREAM_ALL_THINK_TAGS, '');
-                                const agentPart = newText.substring(closeTagIndex + closeTagLen).replace(RE_STREAM_ALL_THINK_TAGS, '');
+                            const closeRes = findGenuineThinkClose(newText);
+                            if (closeRes.index !== -1) {
+                                const thinkPart = newText.substring(0, closeRes.index);
+                                const agentPart = newText.substring(closeRes.index + closeRes.length);
 
                                 activeStreamingMsgRef.current.text = flattenString(thinkPart);
                                 const startTime = activeStreamingMsgRef.current.startTime || Date.now();
@@ -4426,6 +4461,7 @@ export default function App({ args = [] }) {
                             } else {
                                 appendStreamText(chunkText);
                             }
+                            continue;
                         } else if (!inThinkMode) {
                             // [SIGNAL MONITOR] Mark turn state if tool call encountered
                             const chunkLower = chunkText.toLowerCase();
@@ -5494,16 +5530,19 @@ export default function App({ args = [] }) {
                 );
 
             case 'stats': {
-                const u = statsMode === 'monthly' ? monthlyUsage : dailyUsage;
-                const trackerTitle = statsMode === 'monthly' ? 'LAST 30 DAYS USAGE' : 'TODAY\'s USAGE';
-                const timeLabel = statsMode === 'monthly' ? 'Wall Time:' : 'Wall Time:';
-                const tokensLabel = statsMode === 'monthly' ? 'Tokens Used:' : 'Tokens Used:';
-                const imagesLabel = statsMode === 'monthly' ? 'Images Made:' : 'Images Made:';
-                const imageCreditsLabel = statsMode === 'monthly' ? 'Image Credits:' : 'Image Credits:';
-                const codeChangesLabel = statsMode === 'monthly' ? 'Code Changes:' : 'Code Changes:';
-                const toolCallsLabel = statsMode === 'monthly' ? 'Tool Calls:' : 'Tool Calls:';
+                const isModelBreakdown = statsMode === 'modelBreakdown' || statsMode === 'dailyModelBreakdown';
+                const isDaily = statsMode === 'daily' || statsMode === 'dailyModelBreakdown';
+                const u = isDaily ? dailyUsage : monthlyUsage;
+                const trackerTitle = isDaily ? 'TODAY\'s USAGE' : 'LAST 30 DAYS USAGE';
+                const modelBreakdownTitle = isDaily ? 'TODAY\'S MODEL TOKEN BREAKDOWN' : '30-DAY MODEL TOKEN BREAKDOWN';
+                const timeLabel = 'Wall Time:';
+                const tokensLabel = 'Tokens Used:';
+                const imagesLabel = 'Images Made:';
+                const imageCreditsLabel = 'Image Credits:';
+                const codeChangesLabel = 'Code Changes:';
+                const toolCallsLabel = 'Tool Calls:';
 
-                const maxRows = Math.max(4, (stdout?.rows || terminalSize?.rows || 24) - 15); // [MAX ROWS FOR 30 DAY MODEL BREAKDOWN]
+                const maxRows = Math.max(4, (stdout?.rows || terminalSize?.rows || 24) - 15); // [MAX ROWS FOR MODEL BREAKDOWN]
                 const renderLeaderRow = (key, leftText, rightText, leftColor, rightColor, indent = 0, isBold = false) => {
                     const cols = stdout?.columns || terminalSize?.columns || 80;
                     const boxWidth = Math.min(125, cols - 2);
@@ -5532,41 +5571,80 @@ export default function App({ args = [] }) {
                 };
 
                 const breakdownRows = [];
-                if (!monthlyUsage?.models || Object.keys(monthlyUsage.models).length === 0) {
+                const usageModels = u?.models;
+                if (!usageModels || Object.keys(usageModels).length === 0) {
                     breakdownRows.push(
                         <Box key="empty" marginTop={1}>
-                            <Text color={colors.textMuted} italic>No model token usage recorded in the last 30 days.</Text>
+                            <Text color={colors.textMuted} italic>No model token usage recorded for {isDaily ? 'today' : 'the last 30 days'}.</Text>
                         </Box>
                     );
                 } else {
-                    Object.entries(monthlyUsage.models).forEach(([provider, models], pIdx) => {
-                        const providerTotalTokens = Object.values(models).reduce((sum, m) => sum + (m.tokens || 0), 0);
-                        if (pIdx > 0) {
-                            breakdownRows.push(<Box key={`space-prov-${provider}`}><Text>{' '}</Text></Box>);
-                        }
-                        breakdownRows.push(
-                            renderLeaderRow(`prov-${provider}`, `${provider}:`, formatTokens(providerTotalTokens), colors.primary, colors.text, 0, true)
-                        );
-                        Object.entries(models).forEach(([modelName, stats], mIdx) => {
-                            if (mIdx > 0) {
-                                breakdownRows.push(<Box key={`space-mod-${provider}-${modelName}`}><Text>{' '}</Text></Box>);
+                    const rawSearch = (modelBreakdownSearch || '').trim();
+                    let providerFilter = '';
+                    let modelFilter = '';
+
+                    if (rawSearch.includes(':')) {
+                        const colonIdx = rawSearch.indexOf(':');
+                        providerFilter = rawSearch.substring(0, colonIdx).trim().toLowerCase();
+                        modelFilter = rawSearch.substring(colonIdx + 1).trim().toLowerCase();
+                    } else {
+                        providerFilter = rawSearch.toLowerCase();
+                    }
+
+                    const sortedProviders = Object.entries(usageModels)
+                        .sort(([provA], [provB]) => provA.localeCompare(provB, undefined, { sensitivity: 'base' }))
+                        .filter(([provider, models]) => {
+                            if (providerFilter && !provider.toLowerCase().includes(providerFilter)) {
+                                return false;
                             }
-                            breakdownRows.push(
-                                renderLeaderRow(`mod-${provider}-${modelName}`, `» ${modelName}:`, formatTokens(stats.tokens || 0), colors.secondary, colors.text, 2, true)
-                            );
-                            breakdownRows.push(
-                                renderLeaderRow(`in-${provider}-${modelName}`, '» Input Tokens:', formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)), colors.textMuted, colors.text, 5, false)
-                            );
-                            if ((stats.cachedTokens || 0) > 0) {
-                                breakdownRows.push(
-                                    renderLeaderRow(`cache-${provider}-${modelName}`, '» Cached:', formatTokens(stats.cachedTokens), colors.textMuted, colors.text, 7, false)
-                                );
+                            if (modelFilter) {
+                                return Object.keys(models).some(mName => mName.toLowerCase().includes(modelFilter));
                             }
-                            breakdownRows.push(
-                                renderLeaderRow(`out-${provider}-${modelName}`, '» Output Tokens:', formatTokens(stats.candidateTokens || 0), colors.textMuted, colors.text, 5, false)
-                            );
+                            return true;
                         });
-                    });
+
+                    if (sortedProviders.length === 0) {
+                        breakdownRows.push(
+                            <Box key="no-matches" marginTop={1}>
+                                <Text color={colors.textMuted} italic>No results found matching "{modelBreakdownSearch}".</Text>
+                            </Box>
+                        );
+                    } else {
+                        sortedProviders.forEach(([provider, models], pIdx) => {
+                            const filteredModels = Object.entries(models)
+                                .sort(([modA], [modB]) => modA.localeCompare(modB, undefined, { sensitivity: 'base' }))
+                                .filter(([modelName]) => !modelFilter || modelName.toLowerCase().includes(modelFilter));
+
+                            if (filteredModels.length === 0) return;
+
+                            const providerTotalTokens = filteredModels.reduce((sum, [, m]) => sum + (m.tokens || 0), 0);
+                            if (pIdx > 0 && breakdownRows.length > 0) {
+                                breakdownRows.push(<Box key={`space-prov-${provider}`}><Text>{' '}</Text></Box>);
+                            }
+                            breakdownRows.push(
+                                renderLeaderRow(`prov-${provider}`, `${provider}:`, formatTokens(providerTotalTokens), colors.primary, colors.text, 0, true)
+                            );
+                            filteredModels.forEach(([modelName, stats], mIdx) => {
+                                if (mIdx > 0) {
+                                    breakdownRows.push(<Box key={`space-mod-${provider}-${modelName}`}><Text>{' '}</Text></Box>);
+                                }
+                                breakdownRows.push(
+                                    renderLeaderRow(`mod-${provider}-${modelName}`, `» ${modelName}:`, formatTokens(stats.tokens || 0), colors.secondary, colors.text, 2, true)
+                                );
+                                breakdownRows.push(
+                                    renderLeaderRow(`in-${provider}-${modelName}`, '» Input Tokens:', formatTokens((stats.tokens || 0) - (stats.candidateTokens || 0)), colors.textMuted, colors.text, 5, false)
+                                );
+                                if ((stats.cachedTokens || 0) > 0) {
+                                    breakdownRows.push(
+                                        renderLeaderRow(`cache-${provider}-${modelName}`, '» Cached:', formatTokens(stats.cachedTokens), colors.textMuted, colors.text, 7, false)
+                                    );
+                                }
+                                breakdownRows.push(
+                                    renderLeaderRow(`out-${provider}-${modelName}`, '» Output Tokens:', formatTokens(stats.candidateTokens || 0), colors.textMuted, colors.text, 5, false)
+                                );
+                            });
+                        });
+                    }
                 }
 
                 const totalRows = breakdownRows.length;
@@ -5577,14 +5655,22 @@ export default function App({ args = [] }) {
 
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} paddingX={3} paddingY={1} paddingBottom={0} width={Math.min(125, (stdout?.columns || 100) - 2)}>
-                        {statsMode === 'modelBreakdown' ? (
+                        {isModelBreakdown ? (
                             <Box flexDirection="column">
                                 <Box justifyContent="space-between">
-                                    <Text color={colors.text} bold underline>30-DAY MODEL TOKEN BREAKDOWN</Text>
+                                    <Text color={colors.text} bold underline>{modelBreakdownTitle}</Text>
                                     {totalRows > maxRows && (
                                         <Text color={colors.textMuted} dimColor>
                                             [{effectiveScroll + 1}-{Math.min(totalRows, effectiveScroll + maxRows)} of {totalRows}] ▲▼
                                         </Text>
+                                    )}
+                                </Box>
+                                <Box marginTop={1}>
+                                    <Text color={colors.secondary} bold>Filter (provider:model): </Text>
+                                    <Text color={colors.text}>{modelBreakdownSearch}</Text>
+                                    <Text color={colors.primary} bold>▊</Text>
+                                    {modelBreakdownSearch.length > 0 && (
+                                        <Text color={colors.textMuted} dimColor italic> (Type to search, Esc/Backspace to clear)</Text>
                                     )}
                                 </Box>
                                 <Box flexDirection="column" height={maxRows} marginTop={1}>
@@ -5754,7 +5840,7 @@ export default function App({ args = [] }) {
                             </>
                         )}
 
-                        <Text color={colors.textMuted} dimColor italic>{'\n'}(Press TAB to toggle Daily/Monthly views, SPACE for Model Breakdown, ESC to return)</Text>
+                        <Text color={colors.textMuted} dimColor italic>{'\n'}(Press TAB to toggle Today/30-Day views, SPACE to toggle Model Breakdown, ESC to return)</Text>
                     </Box>
                 );
             }
