@@ -61,6 +61,15 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
     const isVersion = args.includes('--version') || args.includes('-v');
     const isUpdate = args[0] === '--update';
     const isExport = args[0] === '--export';
+    const isUsage = args[0] === '--usage' || args.includes('--usage') || args[0] === '--budget' || args.includes('--budget');
+
+    if (isUsage) {
+        const { openUsageDashboard } = await import('./utils/usageServer.js');
+        const { url } = await openUsageDashboard();
+        console.log(`\n✦ FluxFlow Token Usage & Analytics Dashboard\n⠀⠀└─ Serving at: ${url}\n⠀⠀└─ Opened in default browser. Press Ctrl+C to stop.\n`);
+        // Keep server process running
+        await new Promise(() => {});
+    }
 
     if (isVersion || isHelp || isHelpCommands || isUpdate || isExport) {
         const fs = await import('fs');
@@ -113,12 +122,13 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   --help                               Show this help menu
   --help commands                      Show available /commands
   --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
- --cwd <path>                         Set working directory to path
- --path <path>                        Same as --cwd, set working directory
- --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
- --update check                       Check for new updates
- --update check latest                Show the latest version available on npm
- --update [latest]                    Update the app to the latest version (latest is default)`);
+  --cwd <path>                         Set working directory to path
+  --path <path>                        Same as --cwd, set working directory
+  --usage                              Open token usage analytics dashboard in browser
+  --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
+  --update check                       Check for new updates
+  --update check latest                Show the latest version available on npm
+  --update [latest]                    Update the app to the latest version (latest is default)`);
             process.exit(0);
         }
 
@@ -148,6 +158,7 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
   /profile                                 Edit developer persona
   /memory                                  Manage agent memory
   /stats                                   Show session usage
+  /usage                                   Open graphical token analytics dashboard in browser
   /reset                                   Wipe all project data
   /about                                   Project info & credits
   /changelog                               View latest updates

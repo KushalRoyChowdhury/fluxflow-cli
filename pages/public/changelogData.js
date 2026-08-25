@@ -1,12 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
-    "4.4.5": {
+    "4.5.0": {
         "note": "AUGUST 25",
-        "added": [],
+        "added": [
+            "Added Token Usage & Analytics Dashboard (GUI). Run `fluxflow --usage` OR `/usage` to view."
+        ],
         "changed": [
             "Improved general stability & User Experience.",
-            "Improved the `/stat` viewer for more transparency & Granularity."
+            "Improved the `/stats` viewer."
         ],
         "fixes": [
             "QoL bug fixes.",

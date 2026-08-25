@@ -4,7 +4,7 @@
 <p align="left">
   <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v4-blue?style=plastic" alt="FluxFlow Version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=plastic" alt="License MIT"></a>
-  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D24-green?style=plastic" alt="Node Compatibility"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D22-green?style=plastic" alt="Node Compatibility"></a>
 </p>
 
 **A Beautiful, Autonomous Terminal AI Agent**
@@ -62,7 +62,7 @@ Whether you need a conversational partner or an autonomous developer that can wr
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- [Node.js](https://nodejs.org/) (v22 or higher required)
 - `npm`, `yarn`, or `pnpm`
 
 ### Via NPM (Global & Instant)
@@ -109,7 +109,7 @@ fluxflow [options]
 ```
 
 ### Supported Flags:
- - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.5-pro`). Keeps settings file untouched.
+ - `--model <model-name>`: Temporary override for the active AI model (e.g., `gemini-3.7-flash`). Keeps settings file untouched.
  - `--cwd <path>`: Set the working directory for the session (relative or absolute path).
  - `--path <path>`: Alias for `--cwd`. Set the working directory for the session.
  - `--memory <on | off>`: Toggle persistent long-term agent memory for the session.
@@ -122,6 +122,7 @@ fluxflow [options]
  - `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
  - `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
  - `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
+ - `--usage`: Launches the usage dashboard in your browser.
 
 ---
 

@@ -43,6 +43,7 @@ import { formatTokens, parseMessageToBlocks, clearBlocksCache, flattenString } f
 import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 import { handleExport } from './utils/export.js';
+import { openUsageDashboard } from './utils/usageServer.js';
 
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -2640,6 +2641,7 @@ export default function App({ args = [] }) {
         { cmd: '/profile', desc: 'Edit developer persona' },
         { cmd: '/memory', desc: 'Manage agent memory' },
         { cmd: '/stats', desc: 'Show session usage' },
+        { cmd: '/usage', desc: 'Open graphical token usage & analytics dashboard in browser' },
         { cmd: '/reset', desc: 'Wipe all project data' },
         { cmd: '/about', desc: 'Project info & credits' },
         { cmd: '/changelog', desc: 'View latest updates' },
@@ -2652,6 +2654,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/budget', desc: 'Set or View budget limits', subs: [
                 { cmd: 'view', desc: 'View current usage budget bars' },
+                { cmd: 'web', desc: 'Open graphical usage and budget dashboard in browser' },
                 { cmd: 'set', desc: 'Configure budgets (Daily/Monthly limits)' },
                 { cmd: 'reset', desc: 'Reset budgets to default limits' }
             ]
@@ -3279,6 +3282,34 @@ export default function App({ args = [] }) {
                     run();
                     break;
                 }
+                case '/usage': {
+                    const run = async () => {
+                        try {
+                            const { url } = await openUsageDashboard();
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `✦ Launching Token Analytics Dashboard\n⠀⠀\x1b[2m└─\x1b[22m Serving at ${url}\n⠀⠀\x1b[2m└─\x1b[22m Opening in your default browser...\n⠀`,
+                                    isMeta: true
+                                }];
+                            });
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, {
+                                    id: Date.now(),
+                                    role: 'system',
+                                    text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Failed to launch dashboard: ${err.message}\n⠀`,
+                                    isMeta: true
+                                }];
+                            });
+                        }
+                    };
+                    run();
+                    break;
+                }
                 case '/save': {
                     // Use first user prompt as default title instead of time-based session name
                     let promptDefault = undefined;
@@ -3420,7 +3451,23 @@ export default function App({ args = [] }) {
                 }
                 case '/budget': {
                     const sub = parts[1]?.toLowerCase();
-                    if (sub === 'set') {
+                    if (sub === 'web' || sub === 'gui' || sub === 'dashboard') {
+                        const run = async () => {
+                            try {
+                                const { url } = await openUsageDashboard();
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ Token Usage & Budget Dashboard\n⠀⠀└─ Opened at ${url}\n⠀`, isMeta: true }];
+                                });
+                            } catch (err) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR: Failed to launch dashboard: ${err.message}\n⠀`, isMeta: true }];
+                                });
+                            }
+                        };
+                        run();
+                    } else if (sub === 'set') {
                         setBudgetReturnView('chat');
                         setActiveView('budgetTypeSelect');
                     } else if (sub === 'view') {
@@ -3465,7 +3512,7 @@ export default function App({ args = [] }) {
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Usage: /budget <Set|View|Reset>.\n⠀`, isMeta: true }];
+                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Usage: /budget <View|Web|Set|Reset>.\n⠀`, isMeta: true }];
                         });
                     }
                     break;

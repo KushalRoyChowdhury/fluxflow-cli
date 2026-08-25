@@ -1184,6 +1184,7 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
             { cmd: '/profile', desc: 'Edit developer persona' },
             { cmd: '/memory', desc: 'Manage agent memory' },
             { cmd: '/stats', desc: 'Show session usage' },
+            { cmd: '/usage', desc: 'Open graphical token usage & analytics in browser' },
             { cmd: '/reset', desc: 'Wipe all saved FluxFlow AppData' },
             { cmd: '/about', desc: 'Project info & credits' },
             { cmd: '/changelog', desc: 'View latest updates' },

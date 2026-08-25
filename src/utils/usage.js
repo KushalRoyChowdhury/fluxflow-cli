@@ -911,3 +911,168 @@ export const recordImageGeneration = async (settings) => {
     });
     queueFlush();
 };
+
+/**
+ * Retrieves full comprehensive usage datasets: today, history, chronological timeline,
+ * and runtime metrics for dashboard visualization.
+ */
+export const getAllUsageData = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    if (!cachedUsage) {
+        cachedUsage = await loadUsageFromFile();
+    }
+    if (cachedUsage.date !== today) {
+        await getDailyUsage();
+    }
+
+    const todayStats = cachedUsage.stats || { ...defaultStats };
+    const history = cachedUsage.history || {};
+
+    const dateSet = new Set(Object.keys(history));
+    dateSet.add(today);
+
+    const sortedDates = Array.from(dateSet).sort();
+
+    const timeline = sortedDates.map(dateKey => {
+        const raw = dateKey === today ? todayStats : (history[dateKey] || {});
+        const stats = { ...defaultStats, ...raw };
+        const totalTokens = stats.tokens || 0;
+        const cachedTokens = stats.cachedTokens || 0;
+        const candidateTokens = stats.candidateTokens || 0;
+        const promptTokens = Math.max(0, totalTokens - candidateTokens);
+        const uncachedPromptTokens = Math.max(0, promptTokens - cachedTokens);
+        const agent = stats.agent || 0;
+        const background = stats.background || 0;
+        const search = stats.search || 0;
+        const totalRequests = agent + background + search;
+        const toolSuccess = stats.toolSuccess || 0;
+        const toolFailure = stats.toolFailure || 0;
+        const toolDenied = stats.toolDenied || 0;
+        const totalTools = toolSuccess + toolFailure + toolDenied;
+        const toolSuccessRate = totalTools > 0 ? ((toolSuccess / totalTools) * 100).toFixed(1) : '100.0';
+        const linesAdded = stats.linesAdded || 0;
+        const linesRemoved = stats.linesRemoved || 0;
+        const imageCalls = Array.isArray(stats.imageCalls) ? stats.imageCalls : [];
+        const imageCost = imageCalls.reduce((acc, c) => acc + (c.cost || 0), 0);
+
+        return {
+            date: dateKey,
+            tokens: totalTokens,
+            cachedTokens,
+            candidateTokens,
+            promptTokens,
+            uncachedPromptTokens,
+            agent,
+            background,
+            search,
+            totalRequests,
+            toolSuccess,
+            toolFailure,
+            toolDenied,
+            totalTools,
+            toolSuccessRate: parseFloat(toolSuccessRate),
+            linesAdded,
+            linesRemoved,
+            netLines: linesAdded - linesRemoved,
+            duration: stats.duration || 0,
+            imageCallsCount: imageCalls.length,
+            imageCost,
+            models: stats.models || {},
+            providerRequests: stats.providerRequests || {}
+        };
+    });
+
+    const loadedSettings = await loadSettings().catch(() => ({}));
+    const quotas = loadedSettings.quotas || {};
+    const apiTier = loadedSettings.apiTier || 'Free';
+    const monthlyUsage = await getMonthlyUsage().catch(() => ({ tokens: 0, agent: 0 }));
+    let customPeriodUsage = null;
+    if (quotas.resetMode === 'Custom') {
+        customPeriodUsage = await getCustomPeriodUsage(quotas.resetDay || 1).catch(() => ({ tokens: 0 }));
+    }
+
+    const dailyTokenLimit = quotas.tokenLimit || 0;
+    const monthlyTokenLimit = quotas.monthlyTokenLimit || 0;
+    const dailyAgentLimit = quotas.agentLimit || 0;
+    const resetMode = quotas.resetMode || 'Daily';
+    const resetDay = quotas.resetDay || 1;
+
+    const providerBudgets = quotas.providerBudgets || {};
+    const useProvider = !!providerBudgets.__useProvider;
+    const providersList = ['Google', 'Anthropic', 'OpenAI', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+    
+    Object.keys(providerBudgets).forEach(k => {
+        if (k !== '__useProvider' && !providersList.includes(k)) {
+            providersList.push(k);
+        }
+    });
+
+    const activeProviderBudgets = [];
+    for (const prov of providersList) {
+        const pb = providerBudgets[prov];
+        if (pb && (pb.agentLimit || pb.tokenLimit || pb.monthlyTokenLimit)) {
+            let provDailyTokens = 0;
+            const dailyModels = todayStats.models?.[prov] || {};
+            for (const m in dailyModels) {
+                provDailyTokens += dailyModels[m]?.tokens || 0;
+            }
+
+            let provMonthlyTokens = 0;
+            const periodModels = (quotas.resetMode === 'Custom' ? customPeriodUsage?.models : monthlyUsage?.models)?.[prov] || {};
+            for (const m in periodModels) {
+                provMonthlyTokens += periodModels[m]?.tokens || 0;
+            }
+
+            const provDailyReqs = todayStats.providerRequests?.[prov] || 0;
+
+            const pDailyTokenLimit = pb.tokenLimit || 0;
+            const pMonthlyTokenLimit = pb.monthlyTokenLimit || 0;
+            const pDailyAgentLimit = pb.agentLimit || 0;
+
+            activeProviderBudgets.push({
+                provider: prov,
+                dailyTokens: provDailyTokens,
+                dailyTokenLimit: pDailyTokenLimit,
+                isDailyUnlimited: pDailyTokenLimit >= 9999999999999 || pDailyTokenLimit === 0,
+                monthlyTokens: provMonthlyTokens,
+                monthlyTokenLimit: pMonthlyTokenLimit,
+                isMonthlyUnlimited: pMonthlyTokenLimit >= 9999999999999 || pMonthlyTokenLimit === 0,
+                dailyRequests: provDailyReqs,
+                dailyAgentLimit: pDailyAgentLimit,
+                isRequestsUnlimited: pDailyAgentLimit >= 9999999 || pDailyAgentLimit === 0
+            });
+        }
+    }
+
+    const budgetInfo = {
+        apiTier,
+        resetMode,
+        resetDay,
+        quotas,
+        usingProviderBudgets: (useProvider && activeProviderBudgets.length > 0) || activeProviderBudgets.length > 0,
+        providerBudgetsList: activeProviderBudgets,
+        daily: {
+            tokensUsed: todayStats.tokens || 0,
+            tokenLimit: dailyTokenLimit,
+            agentRequests: todayStats.agent || 0,
+            agentLimit: dailyAgentLimit,
+            isUnlimitedTokens: dailyTokenLimit >= 9999999999999 || dailyTokenLimit === 0,
+            isUnlimitedRequests: dailyAgentLimit >= 9999999 || dailyAgentLimit === 0,
+        },
+        monthly: {
+            tokensUsed: (quotas.resetMode === 'Custom' ? customPeriodUsage?.tokens : monthlyUsage?.tokens) || 0,
+            tokenLimit: monthlyTokenLimit,
+            isUnlimitedTokens: monthlyTokenLimit >= 9999999999999 || monthlyTokenLimit === 0,
+        },
+        providerBudgets
+    };
+
+    return {
+        currentDate: today,
+        todayStats,
+        history,
+        timeline,
+        budget: budgetInfo,
+        runtimeSession: { ...runtimeSession }
+    };
+};

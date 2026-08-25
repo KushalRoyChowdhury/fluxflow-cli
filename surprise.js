@@ -4,7 +4,7 @@
 
 const W = process.stdout.columns || 100;
 const H = Math.min(process.stdout.rows || 30, 40);
-const DURATION_MS = 14000;
+const DURATION_MS = 60000;
 
 const COLORS = [196, 202, 208, 214, 220, 226, 118, 46, 51, 87, 123, 159, 213, 207, 201];
 const SPARK_CHARS = ['*', '+', '·', '✦', '˙', '.'];
