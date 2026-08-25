@@ -1,6 +1,16 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.6.0": {
+        "note": "AUGUST 26",
+        "added": [
+            "Introduced New Hierarchical Skill & Project Instruction System:\n• Global Instructions (`~/.fluxflow/fluxflow.md` or `agent.md`) and Local Instructions (`./fluxflow.md` or `agent.md`) are automatically detected and merged under `--- Additional Instructions ---`.\n• Global & Local Skill Discovery: Discovers skills from `~/.fluxflow/skills/∗∗/skill.md`, `~/.fluxflow/.skills/∗∗/skill.md`, `./skills/∗∗/skill.md`, and `./.skills/∗∗/skill.md` (case-insensitive).\n• Skill Manifest Format: Skills use standard YAML frontmatter (`name` and `description`) followed by markdown workflows.\n• Modular References Support: Skills can bundle deep guides or API docs in a `references/` directory, accessed on-demand via `#skills/{global|local}/‹skillName>/reference/‹file›.md`. Reference files should be linked in the parent `skill.md` (e.g. `[references/file.md](references/file.md)`) so the agent discovers them.\n• Token & Context Optimization: Descriptions are automatically stripped on load to save tokens, and loaded skills are protected from `/truncate` and `autoTruncateResults\n\nFor details about the internal working, refer 👉 [FluxFlow Docs](https://fluxflow-cli.onrender.com/architecture) 👈`."
+        ],
+        "changed": [],
+        "fixes": [
+            "Fixed few bugs with InferX API Implementation."
+        ]
+    },
     "4.5.0": {
         "note": "AUGUST 25",
         "added": [

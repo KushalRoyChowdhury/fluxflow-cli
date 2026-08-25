@@ -22,7 +22,7 @@ export default function GettingStarted() {
             <ul>
                 <li><strong>Node.js</strong> — v22 or higher</li>
                 <li><strong>Package Manager</strong> — npm, yarn, or pnpm</li>
-                <li><strong>AI API Key</strong> — Google Gemini, DeepSeek, NVIDIA, OpenRouter, Mistral or Ollama, CrofAI (anything based on your taste, we dont judge here)</li>
+                <li><strong>AI API Key</strong> — Google Gemini, DeepSeek, NVIDIA, OpenRouter, Mistral, Ollama, CrofAI, InferX, Sensenova, AIHubMix (anything based on your taste, we dont judge here ...maybe)</li>
             </ul>
 
             <h2 id="installation">Installation Options</h2>

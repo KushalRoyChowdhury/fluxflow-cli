@@ -4,6 +4,7 @@ const headings = [
     { id: 'ui-layer', text: 'UI Layer: React & Ink', level: 2 },
     { id: 'sub-terminal', text: 'Interactive Sub-Terminal', level: 2 },
     { id: 'hitl-verification', text: 'Human-in-the-Loop (HITL) & Security', level: 2 },
+    { id: 'project-instructions-skills', text: 'Project Instructions & Skills System', level: 2 },
     { id: 'steering-resolution', text: 'Real-Time Steering & Resolution', level: 2 },
     { id: 'thinking-visualization', text: 'Thinking Levels & Reasoning', level: 2 },
     { id: 'agentic-loop', text: 'The Agentic Loop & Status Bar', level: 2 },
@@ -56,6 +57,61 @@ export default function Architecture() {
             <ul>
                 <li><strong>Tool & Command Approval</strong> — Shell execution (<code>exec_command</code>) and file modifications prompt an interactive approval UI (Allow/Deny). Safe read-only commands (<code>ls</code>, <code>pwd</code>) execute automatically.</li>
                 <li><strong>Auto-Execution & YOLO Mode</strong> — Advanced configuration in <code>/settings</code> allows power users to enable autonomous execution, adjust external directory access, or configure granular auto-approve/auto-deny rules and network sandboxing.</li>
+            </ul>
+
+            <h2 id="project-instructions-skills">Project Instructions &amp; Skills System</h2>
+            <p>
+                FluxFlow incorporates a modular, hierarchical context and skill execution architecture that supports both workspace-specific configurations and global machine-wide instructions:
+            </p>
+            <ul>
+                <li>
+                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>agent.md</code>)</strong> — 
+                    Instructions are discovered case-insensitively from both the global sanctuary directory (<code>FLUXFLOW_DIR</code>: <code>~/.fluxflow/fluxflow.md</code> located in the user's home directory) and the local workspace (<code>CWD/fluxflow.md</code>). <code>agent.md</code> is supported as a direct alias. Both instruction sets are merged automatically under <code>--- Additional Instructions ---</code> in the system prompt on startup.
+                </li>
+                <li>
+                    <strong>Hierarchical Skill Discovery &amp; Folders</strong> — Skills are discovered and cached on startup from both global and local scopes:
+                    <ul>
+                        <li><em>Global Scope:</em> <code>~/.fluxflow/skill.md</code>, <code>~/.fluxflow/skills/**/skill.md</code>, <code>~/.fluxflow/.skills/**/skill.md</code></li>
+                        <li><em>Local Scope:</em> <code>./skill.md</code>, <code>./skills/**/skill.md</code>, <code>./.skills/**/skill.md</code></li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Skill Manifest Structure</strong> — Each skill file declares structured YAML frontmatter:
+                    <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm my-3 font-mono">
+{`---
+name: skill-name
+description: Purpose and overview of the skill
+---
+# Instructions
+...`}
+                    </pre>
+                </li>
+                <li>
+                    <strong>Prompt-Injected Skill Index</strong> — The system prompt indexes available skills under <code>-- Global Skills --</code> and <code>-- Local Skills --</code> with high-level descriptions.
+                </li>
+                <li>
+                    <strong>Deterministic On-Demand Reading &amp; References</strong> — Models load full skill details and auxiliary documentation on demand via virtual path routing:
+                    <ul>
+                        <li><em>Primary Skill File:</em> <code>ReadFile(path=&quot;#skills/{'{global|local}'}/skillName&quot;)</code></li>
+                        <li><em>Auxiliary References:</em> <code>ReadFile(path=&quot;#skills/{'{global|local}'}/skillName/reference/filename.md&quot;)</code></li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Modular References (<code>references/*.md</code>)</strong> — When to use and how they work:
+                    <ul>
+                        <li><em>Purpose:</em> Keep the primary <code>skill.md</code> concise and focused on high-level workflow steps. Move deep technical specifications, extensive API tables, multi-step deployment runbooks, or troubleshooting FAQs into a <code>references/</code> subfolder.</li>
+                        <li><em>When to Use:</em> Use references whenever supplementary information exceeds 50–100 lines or is only needed conditionally (e.g., <code>references/troubleshooting.md</code>, <code>references/api-schema.md</code>, <code>references/migration-guide.md</code>).</li>
+                        <li><em>Linking &amp; Discoverability:</em> Always list and link all reference files as markdown links inside the parent <code>skill.md</code> (e.g., <code>- **CLI Reference**: [references/cli.md](references/cli.md)</code>). Because only the parent <code>skill.md</code> is indexed by default, references must be referenced within the parent file or the agent will miss them.</li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Best Practices for Skills &amp; Instructions</strong>:
+                    <ul>
+                        <li><em>Concise Frontmatter:</em> Keep the <code>description</code> in frontmatter to 1–2 short, punchy sentences. This description is permanently visible in the system prompt index, so keeping it compact saves context tokens on every single turn.</li>
+                        <li><em>Scope Segregation:</em> Use <strong>Global Scope</strong> (<code>~/.fluxflow/skills/</code>) for developer-wide universal tooling (Git workflows, Docker commands, release checklists) and <strong>Local Scope</strong> (<code>./.skills/</code> or <code>./skills/</code>) for repo-specific architecture, conventions, and design guidelines.</li>
+                        <li><em>Zero Truncation &amp; Frontmatter Optimization:</em> When a skill is loaded into context, redundant descriptions are stripped to conserve tokens, line pagination limits are bypassed to ingest the full skill, and skill contents are protected from automated conversation truncation.</li>
+                    </ul>
+                </li>
             </ul>
 
             <h2 id="steering-resolution">Real-Time Steering & Resolution</h2>

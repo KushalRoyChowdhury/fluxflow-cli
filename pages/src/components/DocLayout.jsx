@@ -5,6 +5,7 @@ import { DocProvider } from './DocContext'
 import Sidebar from './Sidebar'
 import RightNav from './RightNav'
 import MobileNav from './MobileNav'
+import CopyAsMarkdown from './CopyAsMarkdown'
 
 export default function DocLayout() {
     const location = useLocation()
@@ -50,6 +51,7 @@ export default function DocLayout() {
                         </div>
                     </div>
                 </div>
+                <CopyAsMarkdown />
             </div>
         </DocProvider>
     )

@@ -2,11 +2,115 @@ import { TOOL_PROTOCOL } from '../data/main_tools.js';
 import { JANITOR_TOOLS_PROTOCOL } from '../data/janitor_tools.js';
 import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' };
 import fs from 'fs';
+import path from 'path';
 import { readEncryptedJson } from './crypto.js';
-import { MEMORIES_FILE } from './paths.js';
-import { LOGS_DIR } from './paths.js';
+import { MEMORIES_FILE, LOGS_DIR, FLUXFLOW_DIR } from './paths.js';
 import { loadSettings } from './settings.js';
 import screenshotDesktop from 'screenshot-desktop';
+
+const readCaseInsensitiveFile = (dir, fileNames) => {
+    try {
+        if (!fs.existsSync(dir)) return '';
+        const names = Array.isArray(fileNames) ? fileNames.map(f => f.toLowerCase()) : [fileNames.toLowerCase()];
+        const files = fs.readdirSync(dir);
+        for (const name of names) {
+            const match = files.find(f => f.toLowerCase() === name);
+            if (match) {
+                const filePath = path.join(dir, match);
+                const stat = fs.statSync(filePath);
+                if (stat.isFile()) {
+                    return fs.readFileSync(filePath, 'utf8');
+                }
+            }
+        }
+    } catch (e) {}
+    return '';
+};
+
+export const globalFluxflowMD = readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
+export const localFluxflowMD = readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md']);
+
+const parseSkillFrontmatter = (content) => {
+    if (!content) return null;
+    const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
+    if (!match) return null;
+    const frontmatter = match[1];
+    let name = '';
+    let description = '';
+
+    const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+    const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
+
+    if (nameMatch) {
+        name = nameMatch[1].trim().replace(/^["']|["']$/g, '');
+    }
+    if (descMatch) {
+        description = descMatch[1].trim().replace(/^["']|["']$/g, '');
+    }
+
+    if (name && description) {
+        return { name, description };
+    }
+    return null;
+};
+
+const findSkillFiles = (baseDir) => {
+    const results = [];
+    if (!baseDir || !fs.existsSync(baseDir)) return results;
+
+    const traverse = (dir, depth = 0) => {
+        if (depth > 5) return;
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                const lowerName = entry.name.toLowerCase();
+                if (entry.isFile()) {
+                    if (lowerName === 'skill.md') {
+                        results.push(fullPath);
+                    }
+                } else if (entry.isDirectory()) {
+                    if (depth === 0) {
+                        if (lowerName === 'skills' || lowerName === '.skills' || lowerName === 'skill' || lowerName === '.skill') {
+                            traverse(fullPath, depth + 1);
+                        }
+                    } else {
+                        traverse(fullPath, depth + 1);
+                    }
+                }
+            }
+        } catch (e) {}
+    };
+
+    traverse(baseDir, 0);
+    return results;
+};
+
+const loadSkillsFromDir = (dir) => {
+    const files = findSkillFiles(dir);
+    const skills = [];
+    for (const filePath of files) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const meta = parseSkillFrontmatter(content);
+            if (meta) {
+                skills.push({ ...meta, filePath });
+            }
+        } catch (e) {}
+    }
+    return skills;
+};
+
+const formatSkillsPrompt = (skills) => {
+    if (!skills || skills.length === 0) return '';
+    return skills.map(s => `- ${s.name}: ${s.description}`).join('\n');
+};
+
+export const globalSkills = loadSkillsFromDir(FLUXFLOW_DIR);
+export const localSkills = loadSkillsFromDir(process.cwd());
+
+export const globalSkillsPrompt = formatSkillsPrompt(globalSkills);
+export const localSkillsPrompt = formatSkillsPrompt(localSkills);
 
 let isSecondary = false;
 (async () => {
@@ -21,7 +125,6 @@ let isSecondary = false;
     } catch (e) {}
 })();
 
-let cachedProjectContextBlock = null;
 let cachedChatId = null;
 let cachedUserMemories = null;
 const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
@@ -111,6 +214,9 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
     const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
+    const additionalInstructions = [globalFluxflowMD, localFluxflowMD].filter(Boolean).join('\n\n');
+    const additionalInstrStr = additionalInstructions.length > 0 ? `--- Additional Instructions ---\n${additionalInstructions}\n\n` : '';
+
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();
         if (process.platform === 'win32') {
@@ -123,25 +229,6 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
             return cwd === '/' || sysPaths.some(p => cwd.startsWith(p));
         }
     })();
-
-    // Check for existing project context files
-    const projectContextFiles = [
-        { name: 'Fluxflow.md', desc: 'HIGH PRIORITY' },
-        { name: 'README.md', desc: 'Goals' },
-        { name: 'Agent.md', desc: 'Standards' },
-        { name: 'Skills.md', desc: 'Workflows' },
-        { name: 'design.md', desc: 'UI/UX' },
-        { name: 'architecture.md', desc: 'System Structure' }
-    ];
-
-    if (isFirstPrompt || cachedProjectContextBlock === null) {
-        const foundFiles = projectContextFiles.filter(f => fs.existsSync(f.name));
-        cachedProjectContextBlock = (mode === 'Flux' && foundFiles.length > 0) ? `
--- PROJECT CONTEXT --
-${foundFiles.map(f => `- ${f.name}: ${f.desc}`).join('\n')}
-Check these first; These Files > Training Data. Safety rules apply\n` : '';
-    }
-    const projectContextBlock = cachedProjectContextBlock;
 
     // --MARKERS --
     // - TOOL SYSTEM: [TOOL RESULT]
@@ -164,14 +251,14 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary**' : ''}
 
 - OS: ${osDetected}
-- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}
+- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for any task before acting: Use ReadFile, path=\"#skills/{global|local}/skillName\". If references exist: path=\"#skills/{global|local}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `critical thinking policy
 - Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}
 ${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
-${projectContextBlock}${isMemoryEnabled ? `\n-- MEMORY RULES --
+${isMemoryEnabled ? `\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}
 ${mode === 'Flux' ? '-- SECURITY POLICIES --\n- Sensitive files? Ask before Read\n' : mode.toLowerCase().includes('cu') ? '-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}
 -- CHAT FORMATTING --
@@ -179,7 +266,7 @@ ${mode === 'Flux' ? '-- SECURITY POLICIES --\n- Sensitive files? Ask before Read
 - Language: English only${mode === 'Flow' ? '\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===
 
-${nameStr}${nicknameStr}${userInstrStr}${userMemoriesStr}`.trim();
+${nameStr}${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Local Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
 };
 
 // -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}

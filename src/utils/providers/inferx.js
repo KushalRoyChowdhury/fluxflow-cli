@@ -35,16 +35,22 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
         'xHigh': 'high'
     };
 
+    const isSkipReasoningModel = model && model.toLowerCase().includes('qwen3.8-27b');
+    const addThink = model && (model.toLowerCase().includes('qwen3.8-27b') || model.toLowerCase().includes('qwen3.6-35b-a3b-fp8'));
+
     const requestPayload = {
         model: model,
-        messages: messages,
+        messages: messages.filter(m => m.content && String(m.content).trim().length > 0),
         stream: true,
         stream_options: { include_usage: true },
         temperature: temperature
     };
 
-    if (reasoningEffortMap[thinkingLevel]) {
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+    if (!isSkipReasoningModel) {
+        requestPayload.stream_options = { include_usage: true };
+        if (reasoningEffortMap[thinkingLevel]) {
+            requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
+        }
     }
 
     const response = await fetchWithBackoff('https://model.inferx.net/endpoints/v1/chat/completions', {
@@ -58,8 +64,25 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
     });
 
     if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(`InferX Error (${response.status}): ${errData.error?.message || response.statusText || String(errData)}`);
+        const errText = await response.text().catch(() => '');
+        let errorMsg = '';
+        try {
+            const errData = JSON.parse(errText);
+            errorMsg = errData.error?.message
+                || errData.error?.detail
+                || errData.message
+                || errData.detail
+                || (typeof errData.error === 'string' ? errData.error : '')
+                || (errText && errText !== '{}' ? errText : '');
+        } catch {
+            errorMsg = errText;
+        }
+
+        if (!errorMsg || errorMsg === '{}') {
+            errorMsg = response.statusText || 'Unknown error';
+        }
+
+        throw new Error(`InferX Error (${response.status}): ${errorMsg}`);
     }
 
     const reader = response.body.getReader();
@@ -70,6 +93,7 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
     let latestUsageMetadata = null;
     let lastFlushTime = Date.now();
     let hasNewData = false;
+    let isFirstChunk = true;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -118,7 +142,12 @@ export const getInferXStream = async function* (apiKey, model, contents, systemI
                             hasNewData = true;
                         }
                         if (delta.content) {
-                            pendingParts.push({ text: delta.content });
+                            let contentText = delta.content;
+                            if (addThink && isFirstChunk && contentText.length > 0) {
+                                contentText = '<think>' + contentText;
+                                isFirstChunk = false;
+                            }
+                            pendingParts.push({ text: contentText });
                             hasNewData = true;
                         }
                     }

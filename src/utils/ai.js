@@ -149,7 +149,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Execution Error|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Execution Error|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -2616,7 +2616,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId);
 
                         if (!systemSettings?.dynamicDirAwareness) {
-                            currentSystemInstruction += `\n${dirStructure.replace('\n**Directory Structure**', '\n**Directory Structure**')}`;
+                            currentSystemInstruction += `\n${dirStructure.replace('\n**Directory Structure**', '\n-- Directory Structure --')}`;
                         }
                         systemInstructionCache.key = sysInstructionCacheKey;
                         systemInstructionCache.value = currentSystemInstruction;
@@ -3533,30 +3533,35 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     let totalLines = '...';
                                     let actualEndLine = eLine;
-                                    try {
-                                        const absPath = path.resolve(process.cwd(), targetPath);
-                                        if (fs.existsSync(absPath)) {
-                                            const content = fs.readFileSync(absPath, 'utf8');
-                                            const lines = content.split('\n').length;
-                                            totalLines = lines;
-                                            // Mirror view_file.js: if no start/end args and file >800 lines, show only 1-50
-                                            if (!rawStart && !rawEnd && lines > 800) {
-                                                actualEndLine = Math.min(50, lines);
-                                            } else {
-                                                actualEndLine = Math.min(eLine, lines);
-                                            }
-                                        }
-                                    } catch (e) { }
-                                    const pathLower = (targetPath || '').toLowerCase();
-                                    const isPdf = pathLower.endsWith('.pdf');
-                                    const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
-                                    const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
-                                    if (isPdf || isOfficeFile) {
-                                        label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Analyzed: ${path.basename(targetPath)}` : 'Analyzed: File Not Found'}`;
-                                    } else if (isImage) {
-                                        label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Processed: ${path.basename(targetPath)}` : 'Processed: File Not Found'}`;
+                                    const isSkillPath = (targetPath || '').trim().toLowerCase().startsWith('#skill');
+                                    if (isSkillPath) {
+                                        label = `✔  Read Skill: ${path.basename(targetPath.replaceAll('\\', '/'))}`;
                                     } else {
-                                        label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${targetPath ? `${path.basename(targetPath)} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}` : 'File Not Found'}`;
+                                        try {
+                                            const absPath = path.resolve(process.cwd(), targetPath);
+                                            if (fs.existsSync(absPath)) {
+                                                const content = fs.readFileSync(absPath, 'utf8');
+                                                const lines = content.split('\n').length;
+                                                totalLines = lines;
+                                                // Mirror view_file.js: if no start/end args and file >800 lines, show only 1-50
+                                                if (!rawStart && !rawEnd && lines > 800) {
+                                                    actualEndLine = Math.min(50, lines);
+                                                } else {
+                                                    actualEndLine = Math.min(eLine, lines);
+                                                }
+                                            }
+                                        } catch (e) { }
+                                        const pathLower = (targetPath || '').toLowerCase();
+                                        const isPdf = pathLower.endsWith('.pdf');
+                                        const isOfficeFile = pathLower.endsWith('.docx') || pathLower.endsWith('.doc') || pathLower.endsWith('.ppt') || pathLower.endsWith('.pptx') || pathLower.endsWith('.xls') || pathLower.endsWith('.xlsx');
+                                        const isImage = /\.(png|jpg|jpeg|webp|gif|bmp)$/.test(pathLower);
+                                        if (isPdf || isOfficeFile) {
+                                            label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Analyzed: ${path.basename(targetPath)}` : 'Analyzed: File Not Found'}`;
+                                        } else if (isImage) {
+                                            label = `${targetPath.length > 0 ? '✔' : '✘'}  ${targetPath ? `Processed: ${path.basename(targetPath)}` : 'Processed: File Not Found'}`;
+                                        } else {
+                                            label = `${totalLines !== '...' ? '✔' : '✘'}  Read: ${targetPath ? `${path.basename(targetPath)} → ${totalLines !== '...' ? `Lines ${sLine} - ${actualEndLine} of ${totalLines}` : 'File Not Found'}` : 'File Not Found'}`;
+                                        }
                                     }
                                 } else if (normToolName === 'list_files' || normToolName === 'read_folder') {
                                     const action = normToolName === 'list_files' ? 'List' : 'Browsed';
