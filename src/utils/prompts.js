@@ -143,8 +143,8 @@ const formatPathForUI = (filePath, scope = 'Project') => {
 };
 
 export const getLoadedFilesSummary = () => {
-    const globalInstPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
-    const localInstPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md']);
+    const globalInstPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
+    const localInstPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
 
     const currentGlobalSkills = loadSkillsFromDir(FLUXFLOW_DIR);
     const currentLocalSkills = loadSkillsFromDir(process.cwd());
