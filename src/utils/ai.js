@@ -1820,7 +1820,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             'EFI', 'boot', 'grub',
 
             // --- Linters, Formatters, Logs & QA ---
-            'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter'
+            'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter',
+
+            // Fluxflow
+            '.skills', 'skills'
         ];
 
         // Helper to safely read a directory with its file types directly (saves disk hits!)

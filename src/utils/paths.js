@@ -35,7 +35,7 @@ try {
         if (settings) {
             const sys = settings.systemSettings || {};
             if (sys.useExternalData && sys.externalDataPath) {
-                externalDir = sys.externalDataPath;
+                externalDir = path.normalize(sys.externalDataPath.trim());
             }
         }
     }

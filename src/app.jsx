@@ -44,6 +44,7 @@ import { isBridgeConnected, initBridge, sendStatus } from './utils/editor.js';
 import GlintText from './components/GlintText.jsx';
 import { handleExport } from './utils/export.js';
 import { openUsageDashboard } from './utils/usageServer.js';
+import { loadedFilesCount, getLoadedFilesSummary } from './utils/prompts.js';
 
 const shouldClearValue = (val) => {
     const s = String(val);
@@ -2638,6 +2639,7 @@ export default function App({ args = [] }) {
         { cmd: '/settings', desc: 'Configure system prefs' },
         { cmd: '/theme', desc: 'Customize UI color theme' },
         { cmd: '/key', desc: 'Manage API keys' },
+        { cmd: '/files', desc: 'List loaded instruction and skill files' },
         { cmd: '/profile', desc: 'Edit developer persona' },
         { cmd: '/memory', desc: 'Manage agent memory' },
         { cmd: '/stats', desc: 'Show session usage' },
@@ -2648,7 +2650,8 @@ export default function App({ args = [] }) {
         { cmd: '/docs', desc: 'View Documentation' },
         {
             cmd: '/fluxflow', desc: 'Project management', subs: [
-                { cmd: 'init', desc: 'Create empty FluxFlow.md template' }
+                { cmd: 'global', desc: 'Opens the Global FluxFlow Directory in File Explorer' },
+                { cmd: 'saves', desc: 'Opens FluxFlow AppData Directory in File Explorer' }
             ]
         },
         {
@@ -3379,6 +3382,13 @@ export default function App({ args = [] }) {
                     setActiveView('memory');
                     break;
                 }
+                case '/files': {
+                    setMessages(prev => {
+                        setCompletedIndex(prev.length + 1);
+                        return [...prev, { id: 'files-' + Date.now(), role: 'system', text: getLoadedFilesSummary(), isMeta: true }];
+                    });
+                    break;
+                }
                 case '/reset': {
                     const runReset = async () => {
                         try {
@@ -3519,32 +3529,44 @@ export default function App({ args = [] }) {
                 }
                 case '/fluxflow': {
                     const args = parts.slice(1);
-                    if (args[0] === 'init') {
-                        const template = `# FluxFlow Configuration\n# This file defines project-specific instructions for the Flux Flow Agent.\n\n# IDENTITY & TONE\n- Tone: Technical, precise, and highly efficient.\n\n# PROJECT CONTEXT\n- Goal: [Describe your project goal here]\n- Tech Stack: [List your technologies here]\n\n# CUSTOM RULES\n- [Add specific coding standards or rules here]\n\n# SKILLS & WORKFLOWS\n- [Define custom step-by-step recipes for this project here]\n`;
-                        const filePath = path.join(process.cwd(), 'FluxFlow.md');
-                        if (fs.pathExistsSync(filePath)) {
-                            setMessages(prev => {
-                                setCompletedIndex(prev.length + 1);
-                                return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: 'ERROR: FluxFlow.md already exists in this directory.', isMeta: true }];
-                            });
+                    const subCmd = args[0]?.toLowerCase()?.trim();
+                    if (subCmd === 'global') {
+                        // Open FLUXFLOW_DIR
+                        const targetDir = path.normalize(FLUXFLOW_DIR);
+                        try {
+                            fs.ensureDirSync(targetDir);
+                        } catch (e) {}
+                        const platform = process.platform;
+                        if (platform === 'win32') {
+                            exec(`explorer "${targetDir}"`);
+                        } else if (platform === 'darwin') {
+                            exec(`open "${targetDir}"`);
                         } else {
+                            exec(`xdg-open "${targetDir}"`);
+                        }
+                    } else if (subCmd === 'saves') {
+                        // Open DATA_DIR
+                        let targetDir = path.normalize(DATA_DIR);
+                        try {
+                            fs.ensureDirSync(targetDir);
+                        } catch (e) {
+                            targetDir = path.normalize(FLUXFLOW_DIR);
                             try {
-                                fs.writeFileSync(filePath, template);
-                                setMessages(prev => {
-                                    setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: 'init-ok-' + Date.now(), role: 'system', text: '[SUCCESS] FluxFlow.md has been initialized. You can now customize it for this project.', isMeta: true }];
-                                });
-                            } catch (err) {
-                                setMessages(prev => {
-                                    setCompletedIndex(prev.length + 1);
-                                    return [...prev, { id: 'init-err-' + Date.now(), role: 'system', text: `ERROR: Failed to initialize FluxFlow.md: ${err.message}`, isMeta: true }];
-                                });
-                            }
+                                fs.ensureDirSync(targetDir);
+                            } catch (err) {}
+                        }
+                        const platform = process.platform;
+                        if (platform === 'win32') {
+                            exec(`explorer "${targetDir}"`);
+                        } else if (platform === 'darwin') {
+                            exec(`open "${targetDir}"`);
+                        } else {
+                            exec(`xdg-open "${targetDir}"`);
                         }
                     } else {
                         setMessages(prev => {
                             setCompletedIndex(prev.length + 1);
-                            return [...prev, { id: 'ff-err-' + Date.now(), role: 'system', text: 'Usage: /fluxflow init', isMeta: true }];
+                            return [...prev, { id: 'ff-err-' + Date.now(), role: 'system', text: 'Usage: /fluxflow global/saves', isMeta: true }];
                         });
                     }
                     break;
@@ -3644,7 +3666,7 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [')) {
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:')) {
                                 return m;
                             }
                             truncatedCount++;
@@ -4284,6 +4306,15 @@ export default function App({ args = [] }) {
                         }
                         if (packet.type === 'tool_result') {
                             commitActiveStreamingMessage();
+                            currentThinkId = null;
+                            currentAgentId = null;
+                            inThinkMode = false;
+                            inCodeBlock = false;
+                            inToolCall = false;
+                            toolCallEncounteredInTurn = false;
+                            thinkConsumedInTurn = false;
+                            toolCallBalance = 0;
+                            inToolCallString = null;
                             setMessages(prev => {
                                 const newMsgs = [...prev, {
                                     id: 'tool-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
@@ -4395,7 +4426,7 @@ export default function App({ args = [] }) {
                             }
                         }
 
-                        // 1. Detect transition to THINK mode (Strictly at the START of response only)
+                        // 1. Detect transition to THINK mode (Strictly at the START of response for this turn)
                         const RE_STREAM_THINK_OPEN = /^\s*(?:<(think|thought|thoughts)[^>]*>|<\|channel>thought|\[(think|thought|thoughts)\])/i;
 
                         const isInsideBacktick = (str, idx) => {
@@ -4410,47 +4441,24 @@ export default function App({ args = [] }) {
                             const regex = /(?:<\/(think|thought|thoughts)>|<channel\|>|\[\/(think|thought|thoughts)\])/gi;
                             let match;
                             while ((match = regex.exec(str)) !== null) {
-                                if (inCodeBlock || isInsideBacktick(str, match.index)) continue;
+                                if (isInsideBacktick(str, match.index)) continue;
                                 return { index: match.index, length: match[0].length };
                             }
                             return { index: -1, length: 0 };
                         };
 
                         const curAgentText = (activeStreamingMsgRef.current?.role === 'agent') ? (activeStreamingMsgRef.current.text || '') : '';
-                        const combinedText = curAgentText + chunkText;
+                        const isStartOfTurn = !thinkConsumedInTurn && curAgentText.trim().length === 0;
 
-                        // If response did not start with think tags and we have non-whitespace content, think mode is permanently disabled for this turn
-                        if (!inThinkMode && !thinkConsumedInTurn && combinedText.trim().length > 0 && !RE_STREAM_THINK_OPEN.test(combinedText)) {
-                            thinkConsumedInTurn = true;
-                        }
-
-                        const canThink = !inThinkMode && !inCodeBlock && !inToolCall && !thinkConsumedInTurn;
-
-                        if (canThink && (RE_STREAM_THINK_OPEN.test(chunkText) || RE_STREAM_THINK_OPEN.test(combinedText))) {
-                            const fullTextToProcess = RE_STREAM_THINK_OPEN.test(combinedText) ? combinedText : chunkText;
-                            const isCombined = (fullTextToProcess === combinedText && curAgentText.length > 0);
-                            const match = fullTextToProcess.match(RE_STREAM_THINK_OPEN);
+                        if (!inThinkMode && isStartOfTurn && (RE_STREAM_THINK_OPEN.test(chunkText) || RE_STREAM_THINK_OPEN.test(curAgentText + chunkText))) {
+                            const textToMatch = RE_STREAM_THINK_OPEN.test(chunkText) ? chunkText : (curAgentText + chunkText);
+                            const match = textToMatch.match(RE_STREAM_THINK_OPEN);
                             const tagIndex = match.index;
                             const tagLen = match[0].length;
-                            const beforeText = fullTextToProcess.substring(0, tagIndex);
-                            const afterText = fullTextToProcess.substring(tagIndex + tagLen);
+                            const afterText = textToMatch.substring(tagIndex + tagLen);
 
-                            if (beforeText && beforeText.trim()) {
-                                if (isCombined && activeStreamingMsgRef.current) {
-                                    activeStreamingMsgRef.current.text = flattenString(beforeText);
-                                } else {
-                                    if (!activeStreamingMsgRef.current || activeStreamingMsgRef.current.role !== 'agent') {
-                                        activeStreamingMsgRef.current = { id: 'agent-' + Date.now(), role: 'agent', text: flattenString(beforeText), isStreaming: true };
-                                    } else {
-                                        activeStreamingMsgRef.current.text = flattenString(activeStreamingMsgRef.current.text + beforeText);
-                                    }
-                                }
-                                flushTypewriterNow();
-                                commitActiveStreamingMessage();
-                            } else {
-                                flushTypewriterNow();
-                                activeStreamingMsgRef.current = null;
-                            }
+                            flushTypewriterNow();
+                            activeStreamingMsgRef.current = null;
 
                             inThinkMode = true;
                             thinkConsumedInTurn = true;
@@ -4482,6 +4490,11 @@ export default function App({ args = [] }) {
                                 }
                             }
                             continue;
+                        }
+
+                        // If response did not start with think tags and we have non-whitespace content, think mode is permanently disabled for this turn
+                        if (!inThinkMode && !thinkConsumedInTurn && chunkText.trim().length > 0) {
+                            thinkConsumedInTurn = true;
                         }
 
                         // 2. Append to target role with Genuine Closing and Leak Protection
@@ -6679,6 +6692,9 @@ export default function App({ args = [] }) {
                                     glintWidth={3}
                                 />
                                 <Text color={colors.textMuted}> {activeModel.length > 0 ? `(${thinkingLevel})` : ''}</Text>
+                                {loadedFilesCount > 0 && (
+                                    <Text color={colors.textMuted}> [{loadedFilesCount} {loadedFilesCount === 1 ? 'file' : 'files'}]</Text>
+                                )}
                             </Box>
                         </Box>
 
@@ -6710,7 +6726,7 @@ export default function App({ args = [] }) {
                                                         ) : escPressCount === 1 ? (
                                                             <Text color={colors.inputPrompt} bold>  Press ESC again to {input.length > 0 ? 'clear input' : 'revert codebase to checkpoint'}...</Text>
                                                         ) : (
-                                                            <Text color={colors.inputPlaceholder}>{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd ... (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
+                                                            <Text color={colors.inputPlaceholder}>{escPressed ? "  Press ESC again to cancel the request." : isCompressing ? "  Compacting session history, please wait..." : !isProcessing ? `  Send message, @file or /cmd (${terminalEnv.shortcut} for newline)` : "  Enter a prompt to steer the agent."}</Text>
                                                         )}
                                                     </Box>
                                                 )}

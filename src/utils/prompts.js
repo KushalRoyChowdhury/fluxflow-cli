@@ -3,14 +3,15 @@ import { JANITOR_TOOLS_PROTOCOL } from '../data/janitor_tools.js';
 import thinkingPrompts from '../data/thinking_prompts.json' with { type: 'json' };
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { readEncryptedJson } from './crypto.js';
 import { MEMORIES_FILE, LOGS_DIR, FLUXFLOW_DIR } from './paths.js';
 import { loadSettings } from './settings.js';
 import screenshotDesktop from 'screenshot-desktop';
 
-const readCaseInsensitiveFile = (dir, fileNames) => {
+export const getCaseInsensitiveFilePath = (dir, fileNames) => {
     try {
-        if (!fs.existsSync(dir)) return '';
+        if (!fs.existsSync(dir)) return null;
         const names = Array.isArray(fileNames) ? fileNames.map(f => f.toLowerCase()) : [fileNames.toLowerCase()];
         const files = fs.readdirSync(dir);
         for (const name of names) {
@@ -19,16 +20,29 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
                 const filePath = path.join(dir, match);
                 const stat = fs.statSync(filePath);
                 if (stat.isFile()) {
-                    return fs.readFileSync(filePath, 'utf8');
+                    return filePath;
                 }
             }
         }
     } catch (e) {}
+    return null;
+};
+
+const readCaseInsensitiveFile = (dir, fileNames) => {
+    const filePath = getCaseInsensitiveFilePath(dir, fileNames);
+    if (filePath) {
+        try {
+            return fs.readFileSync(filePath, 'utf8');
+        } catch (e) {}
+    }
     return '';
 };
 
-export const globalFluxflowMD = readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
-export const localFluxflowMD = readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md']);
+export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
+export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md']);
+
+export const globalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']) : '';
+export const localFluxflowMD = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md']) : '';
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
@@ -111,6 +125,73 @@ export const localSkills = loadSkillsFromDir(process.cwd());
 
 export const globalSkillsPrompt = formatSkillsPrompt(globalSkills);
 export const localSkillsPrompt = formatSkillsPrompt(localSkills);
+
+export const loadedFilesCount = (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + (globalSkills?.length || 0) + (localSkills?.length || 0);
+
+const formatPathForUI = (filePath, scope = 'Project') => {
+    if (!filePath) return '';
+    const normalized = filePath.replace(/\\/g, '/');
+    if (scope === 'Global') {
+        const home = os.homedir().replace(/\\/g, '/');
+        if (normalized.toLowerCase().startsWith(home.toLowerCase())) {
+            return '~' + normalized.slice(home.length);
+        }
+        return normalized;
+    }
+    const rel = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+    return rel.startsWith('.') ? rel : `./${rel}`;
+};
+
+export const getLoadedFilesSummary = () => {
+    const globalInstPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
+    const localInstPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md']);
+
+    const currentGlobalSkills = loadSkillsFromDir(FLUXFLOW_DIR);
+    const currentLocalSkills = loadSkillsFromDir(process.cwd());
+
+    const instructions = [];
+    if (globalInstPath) {
+        instructions.push({ scope: 'Global', path: globalInstPath });
+    }
+    if (localInstPath) {
+        instructions.push({ scope: 'Project', path: localInstPath });
+    }
+
+    const totalCount = instructions.length + (currentGlobalSkills?.length || 0) + (currentLocalSkills?.length || 0);
+
+    if (totalCount === 0) {
+        return `✦ Loaded Files & Instructions\n⠀⠀\x1b[2m└─\x1b[22m No instruction or skill files are currently loaded.\n⠀`;
+    }
+
+    const lines = [];
+    lines.push(`✦ Loaded Files & Instructions (${totalCount} ${totalCount === 1 ? 'file' : 'files'} active)`);
+
+    if (instructions.length > 0) {
+        lines.push(`\n  \x1b[1mInstructions:\x1b[22m`);
+        instructions.forEach(inst => {
+            lines.push(`  • [${inst.scope}] ${formatPathForUI(inst.path, inst.scope)}`);
+        });
+    }
+
+    if (currentGlobalSkills?.length > 0 || currentLocalSkills?.length > 0) {
+        lines.push(`\n  \x1b[1mSkills:\x1b[22m`);
+        if (currentGlobalSkills?.length > 0) {
+            currentGlobalSkills.forEach(s => {
+                lines.push(`  • [Global] \x1b[36m${s.name}\x1b[39m`);
+                lines.push(`    \x1b[2m└─ ${formatPathForUI(s.filePath, 'Global')}\x1b[22m`);
+            });
+        }
+        if (currentLocalSkills?.length > 0) {
+            currentLocalSkills.forEach(s => {
+                lines.push(`  • [Project] \x1b[36m${s.name}\x1b[39m`);
+                lines.push(`    \x1b[2m└─ ${formatPathForUI(s.filePath, 'Project')}\x1b[22m`);
+            });
+        }
+    }
+
+    lines.push('⠀');
+    return lines.join('\n');
+};
 
 let isSecondary = false;
 (async () => {
@@ -214,8 +295,8 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     const userMemories = getCachedUserMemories(chatId, isMemoryEnabled);
     const userMemoriesStr = userMemories?.length > 0 ? `--- Saved Memories ---\n${userMemories}\n\n` : '';
 
-    const additionalInstructions = [globalFluxflowMD, localFluxflowMD].filter(Boolean).join('\n\n');
-    const additionalInstrStr = additionalInstructions.length > 0 ? `--- Additional Instructions ---\n${additionalInstructions}\n\n` : '';
+    // const additionalInstructions = [globalFluxflowMD, localFluxflowMD].filter(Boolean).join('\n\n');
+    const additionalInstrStr = globalFluxflowMD.length > 0 || localFluxflowMD.length > 0 ? `--- Additional Instructions ---\n${globalFluxflowMD.length > 0 ? `-- Global --\n${globalFluxflowMD}` : ''}${localFluxflowMD.length > 0 ? `${globalFluxflowMD.length > 0 ? '\n\n' : ''}-- Project --\n${localFluxflowMD}` : ''}\n\n` : '';
 
     const isSystemDir = (() => {
         const cwd = process.cwd().toLowerCase();
@@ -251,7 +332,7 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary**' : ''}
 
 - OS: ${osDetected}
-- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for any task before acting: Use ReadFile, path=\"#skills/{global|local}/skillName\". If references exist: path=\"#skills/{global|local}/skillName/references/<file-name>.md\"' : ''}
+- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills (if exist) for tasks before acting: Use ReadFile, path=\"#skills/{global|project}/skillName\". If references exist: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
@@ -266,7 +347,7 @@ ${mode === 'Flux' ? '-- SECURITY POLICIES --\n- Sensitive files? Ask before Read
 - Language: English only${mode === 'Flow' ? '\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===
 
-${nameStr}${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Local Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
+${nameStr}${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
 };
 
 // -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}

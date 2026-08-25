@@ -116,7 +116,7 @@ export const view_file = async (args, context = {}) => {
     let finalStart = sLine || 1;
     let finalEnd = eLine || (sLine ? (sLine + 800) : 800);
 
-    if (!targetPath) return 'ERROR: Missing "path" argument for view_file.';
+    if (!targetPath) return 'ERROR: Missing "path" argument for ReadFile.';
 
     // Deterministic #skill path resolution
     if (targetPath.trim().toLowerCase().startsWith('#skill')) {
@@ -125,8 +125,8 @@ export const view_file = async (args, context = {}) => {
         const parts = rest.split('/').filter(Boolean);
 
         const scope = parts[0]?.toLowerCase();
-        if (scope !== 'global' && scope !== 'local') {
-            return `ERROR: Invalid skill scope '${scope || ''}'. Expected 'global' or 'local'.`;
+        if (scope !== 'global' && scope !== 'project') {
+            return `ERROR: Invalid skill scope '${scope || ''}'. Expected 'global' or 'project'.`;
         }
 
         const skillName = parts[1];
@@ -193,7 +193,7 @@ export const view_file = async (args, context = {}) => {
             const end = endProvided ? Math.min(totalLines, finalEnd) : totalLines;
             const resultLines = lines.slice(start, end);
 
-            const header = `Skill: [${targetPath}]`;
+            const header = `Skill: [${targetPath.replace(/\\/g, '/')}]`;
             const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line.trimEnd()}`).join('\n');
 
             return `${header}\n\n${code}`;

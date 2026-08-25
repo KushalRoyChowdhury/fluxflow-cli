@@ -215,7 +215,10 @@ export const search_keyword = async (args) => {
         // Binaries, Media, Compressed & Font Files
         '.exe', '.dll', '.so', '.dylib', '.png', '.jpg', '.jpeg', '.gif', '.ico',
         '.svg', '.webp', '.mp3', '.mp4', '.avi', '.zip', '.tgz', '.tar', '.gz',
-        '.7z', '.rar', '.pdf', '.docx', '.xlsx', '.pptx', '.woff', '.woff2', '.ttf', '.eot'
+        '.7z', '.rar', '.pdf', '.docx', '.xlsx', '.pptx', '.woff', '.woff2', '.ttf', '.eot',
+
+        // FluxFlow
+        '.skills', 'skills'
     ];
     const maxMatches = 150;
 

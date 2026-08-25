@@ -32,7 +32,7 @@ const EXCLUDED_DIRS = new Set([
     '.dbus', '.fontconfig', '.snap', '.var', '.lost+found', 'lost+found',
     '.thumb', '.thumbnails',
     'EFI', 'boot', 'grub',
-    'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter'
+    'logs', 'log', '.nyc_output', '.sonar', '.ruff_cache', '.VSCodeCounter', '.skills', 'skills'
 ]);
 
 const isExcludedDir = (dirName) => EXCLUDED_DIRS.has(dirName) || dirName.startsWith('.pnpm');
