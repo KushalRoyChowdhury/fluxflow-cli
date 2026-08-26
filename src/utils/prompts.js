@@ -38,17 +38,20 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     return '';
 };
 
-export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']);
-export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md']);
+export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
+export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
 
-export const globalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md']) : '';
-export const localFluxflowMD = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md']) : '';
+export const globalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+export const localFluxflowMD = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
-    const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
+    const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/);
     if (!match) return null;
     const frontmatter = match[1];
+    const body = (match[2] || '').trim();
+    if (body.length === 0) return null;
+
     let name = '';
     let description = '';
 
@@ -143,21 +146,18 @@ const formatPathForUI = (filePath, scope = 'Project') => {
 };
 
 export const getLoadedFilesSummary = () => {
-    const globalInstPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
-    const localInstPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
-
-    const currentGlobalSkills = loadSkillsFromDir(FLUXFLOW_DIR);
-    const currentLocalSkills = loadSkillsFromDir(process.cwd());
-
     const instructions = [];
-    if (globalInstPath) {
-        instructions.push({ scope: 'Global', path: globalInstPath });
+    if (globalFluxflowPath && globalFluxflowMD.length > 0) {
+        instructions.push({ scope: 'Global', path: globalFluxflowPath });
     }
-    if (localInstPath) {
-        instructions.push({ scope: 'Project', path: localInstPath });
+    if (localFluxflowPath && localFluxflowMD.length > 0) {
+        instructions.push({ scope: 'Project', path: localFluxflowPath });
     }
 
-    const totalCount = instructions.length + (currentGlobalSkills?.length || 0) + (currentLocalSkills?.length || 0);
+    const currentGlobalSkills = globalSkills || [];
+    const currentLocalSkills = localSkills || [];
+
+    const totalCount = instructions.length + currentGlobalSkills.length + currentLocalSkills.length;
 
     if (totalCount === 0) {
         return `✦ Loaded Files & Instructions\n⠀⠀\x1b[2m└─\x1b[22m No instruction or skill files are currently loaded.\n⠀`;

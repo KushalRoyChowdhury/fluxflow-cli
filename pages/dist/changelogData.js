@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.6.3": {
+        "note": "AUGUST 27",
+        "added": [],
+        "changed": [
+            "Minor adjustments for `AGENTS.md` & `Skills` for better experience."
+        ],
+        "fixes": []
+    },
     "4.6.0": {
         "note": "AUGUST 26",
         "added": [

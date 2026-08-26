@@ -5,9 +5,12 @@ import { FLUXFLOW_DIR } from '../utils/paths.js';
 
 const parseSkillFrontmatter = (content) => {
     if (!content) return null;
-    const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---/);
+    const match = content.match(/^\s*---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/);
     if (!match) return null;
     const frontmatter = match[1];
+    const body = (match[2] || '').trim();
+    if (body.length === 0) return null;
+
     let name = '';
     const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
     if (nameMatch) {
