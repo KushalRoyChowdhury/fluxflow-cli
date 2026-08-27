@@ -65,7 +65,7 @@ export default function Architecture() {
             </p>
             <ul>
                 <li>
-                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>agent.md</code>)</strong> — 
+                    <strong>Global Sanctuary &amp; Workspace Context (<code>fluxflow.md</code> / <code>agent.md</code>)</strong> —
                     Instructions are discovered case-insensitively from both the global sanctuary directory (<code>FLUXFLOW_DIR</code>: <code>~/.fluxflow/fluxflow.md</code> located in the user's home directory) and the local workspace (<code>CWD/fluxflow.md</code>). <code>agent.md</code> is supported as a direct alias. Both instruction sets are merged automatically under <code>--- Additional Instructions ---</code> in the system prompt on startup.
                 </li>
                 <li>
@@ -109,6 +109,7 @@ description: Purpose and overview of the skill
                     <ul>
                         <li><em>Concise Frontmatter:</em> Keep the <code>description</code> in frontmatter to 1–2 short, punchy sentences. This description is permanently visible in the system prompt index, so keeping it compact saves context tokens on every single turn.</li>
                         <li><em>Scope Segregation:</em> Use <strong>Global Scope</strong> (<code>~/.fluxflow/skills/</code>) for developer-wide universal tooling (Git workflows, Docker commands, release checklists) and <strong>Local Scope</strong> (<code>./.skills/</code> or <code>./skills/</code>) for repo-specific architecture, conventions, and design guidelines.</li>
+                        <li><em>Token Efficient reference format:</em> `→ Ref: references/*.md`</li>
                         <li><em>Zero Truncation &amp; Frontmatter Optimization:</em> When a skill is loaded into context, redundant descriptions are stripped to conserve tokens, line pagination limits are bypassed to ingest the full skill, and skill contents are protected from automated conversation truncation.</li>
                     </ul>
                 </li>

@@ -74,9 +74,9 @@ export const read_folder = async (args) => {
     }
     recurseDepth = Math.max(1, Math.min(3, recurseDepth));
 
-    const absolutePath = path.resolve(process.cwd(), targetPath);
-
     try {
+        const absolutePath = path.resolve(process.cwd(), targetPath);
+
         if (!fs.existsSync(absolutePath)) {
             return `ERROR: Path [${targetPath}] does not exist.`;
         }

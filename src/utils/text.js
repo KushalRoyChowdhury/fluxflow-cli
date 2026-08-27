@@ -1097,13 +1097,23 @@ export const TOOL_LABELS = {
 // Hoisted out of cleanSignals to prevent V8 from re-compiling during stream GC
 // ============================================================================
 const REGEX_INITIAL_TOOL = /(\r?\n){2}(?=\[?(?:tool:functions|tool\.functions|agent:generalist|agent\.generalist|\s*turn\s*:))/gi;
-// Helper: returns true when `idx` in `str` falls inside a backtick-delimited inline code span
+// Helper: returns true when `idx` in `str` falls inside a backtick code block or inline code span
 const isInsideBacktick = (str, idx) => {
-    let inCode = false;
-    for (let i = 0; i < idx; i++) {
-        if (str[i] === '`') inCode = !inCode;
+    let inInlineCode = false;
+    let inFence = false;
+    let i = 0;
+    while (i < idx) {
+        if (str.startsWith('```', i)) {
+            inFence = !inFence;
+            i += 3;
+            continue;
+        }
+        if (!inFence && str[i] === '`' && (i === 0 || str[i - 1] !== '\\')) {
+            inInlineCode = !inInlineCode;
+        }
+        i++;
     }
-    return inCode;
+    return inFence || inInlineCode;
 };
 const REGEX_CLEAN_SIGNALS = /\[SYSTEM\][\s\S]*?\[\/SYSTEM\]|\[ANSWER\][\s\S]*?(?:\[\/ANSWER\]|$)|\[TOOL RESULT\]:?\s*|^\s*(SUCCESS|ERROR):.*(\r?\n)?|\[\s*turn\s*:\s*(continue|finish)\s*\]|\[\[END\]\]|\[\s*turn\s*:?.*?$|\n\s*turn\s*:?.*?$|\[\s*(?:turn|ANSWER|TOOL).*?$|\n\nResponded on .*|\n\n\[Prompted on: .*\]|@\[TerminalName:.*?, ProcessId:.*?\]/gm;
 const REGEX_ARROWS_ALL = /(\$?\\?\/?\\rightarrow\$?|\$\\rightarrow\$)|(\$?\\?\/?\\leftarrow\$?|\$\\leftarrow\$)|(\$?\\?\/?\\uparrow\$?|\$\\uparrow\$)|(\$?\\?\/?\\downarrow\$?|\$\\downarrow\$)|(\$?\\?\/?\\leftrightarrow\$?|\$\\leftrightarrow\$)/gi;
@@ -1124,8 +1134,8 @@ export const cleanSignals = (text, role = 'agent') => {
 
     if (isThinkRole) {
         return normalizedText
-            .replace(/^<(think|thought|thoughts)>/gi, '')
-            .replace(/<\/(think|thought|thoughts)>$/gi, '')
+            .replace(/^<(think|thought|thoughts|thinking)>/gi, '')
+            .replace(/<\/(think|thought|thoughts|thinking)>$/gi, '')
             .replace(/^\r?\n+/, '')
             .replace(/\r?\n+$/, '');
     }
@@ -1133,6 +1143,10 @@ export const cleanSignals = (text, role = 'agent') => {
     let result = normalizedText;
 
     if (isAgentRole) {
+        // Strip only the <think> and </think> tags from agent responses if not wrapped in code backticks
+        result = result.replace(/<\/?(?:think|thought|thoughts|thinking)>/gi, (match, offset, str) =>
+            isInsideBacktick(str, offset) ? match : '');
+
         result = result.replace(REGEX_INITIAL_TOOL, (match, _nl, offset, str) =>
             (!bypassBacktick && isInsideBacktick(str, offset)) ? match : '');
 

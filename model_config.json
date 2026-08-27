@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "release": 20260824,
+    "version": 0,
+    "release": 20260828,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -288,15 +288,6 @@
                         "cmd": "z-ai/glm-5.2:free",
                         "multimodal": false,
                         "desc": "Text Only"
-                    },
-                    {
-                        "cmd": "\n--- Stealth Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "stealth/ox-alpha",
-                        "multimodal": true,
-                        "desc": "Multimodal"
                     }
                 ],
                 "Paid": [
@@ -502,6 +493,11 @@
                         "desc": "Text Only"
                     },
                     {
+                        "cmd": "deepseek-ai/deepseek-v4-pro-0813",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
                         "cmd": "\n--- Moonshot Models ---",
                         "desc": ""
                     },
@@ -608,15 +604,6 @@
                         "cmd": "meta/muse-glimmer-30b",
                         "multimodal": true,
                         "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "\n--- Thinking Machines Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "thinkingmachines/inkling",
-                        "multimodal": false,
-                        "desc": "Text Only [EXPERIMENTAL]"
                     },
                     {
                         "cmd": "\n--- PoolSide Models ---",

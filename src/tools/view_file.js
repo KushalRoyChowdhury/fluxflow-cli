@@ -196,8 +196,10 @@ export const view_file = async (args, context = {}) => {
             const end = endProvided ? Math.min(totalLines, finalEnd) : totalLines;
             const resultLines = lines.slice(start, end);
 
-            const header = `Skill: [${targetPath.replace(/\\/g, '/')}]`;
-            const code = resultLines.map((line, i) => `${String(start + i + 1).padStart(4)}: ${line.trimEnd()}`).join('\n');
+            const normTarget = targetPath.replace(/\\/g, '/').toLowerCase();
+            const isDocs = normTarget.includes('#skill/global/fluxflow') || normTarget.includes('#skills/global/fluxflow');
+            const header = `${isDocs ? 'DOCs' : 'Skill'}: [${targetPath.replace(/\\/g, '/')}]`;
+            const code = resultLines.map(line => line.trimEnd()).join('\n');
 
             return `${header}\n\n${code}`;
         } catch (err) {
@@ -206,9 +208,9 @@ export const view_file = async (args, context = {}) => {
         }
     }
 
-    const absolutePath = path.resolve(process.cwd(), targetPath);
-
     try {
+        const absolutePath = path.resolve(process.cwd(), targetPath);
+
         if (!fs.existsSync(absolutePath)) {
             return `ERROR: File [${targetPath}] does not exist.`;
         }

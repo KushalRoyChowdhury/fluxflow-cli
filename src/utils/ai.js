@@ -1,7 +1,10 @@
 import dotenv from 'dotenv';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, FLUXFLOW_DIR } from './paths.js';
 dotenv.config({ quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
@@ -21,7 +24,6 @@ import { subagentProgress } from './subagent_state.js';
 import { isModelMultimodal, getFallbackValue, hasModelReasoning } from '../data/model_config.js';
 import { getProviderAPIKey } from './secrets.js';
 
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
 import { captureGriddedScreenshot } from './screen_grid.js';
@@ -149,7 +151,7 @@ let systemInstructionCache = { key: null, value: null };
 
 const colorMainWords = (label) => {
     if (!label) return label;
-    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Execution Error|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
+    return label.replace(/(?:(\x1b\[\d+m))?([✔✘✖🔍📖→➕↻↷•🛇])(?:(\x1b\[\d+m))?\s*\b(Clicked|Dragged|Scrolled|Typed|Pressed Key|Recaptured Screen|Created|Read Skill|Read Documentation|Searched Documentation|Read|Edited|Viewed|Processed|Auto-Read|Skipped|List|Generated|Written|Searched|AI Search|Get Map|Write Canceled|Resolved Sub-Agent Query|Edit Canceled|Write Cancelled|Edit Denied|Visited|Updated|Reviewed|Delegated|Background|Checked|Indexed|Analyzed|Browsed|Elevating SubAgent|Checking SubAgent Work|Started Generalist|Called Generalist|Steered|Unsupported Modality|Awaiting|Cancelled|Aligning Moon Phase|Contemplating Existence|Staring At Void|Rollback Point Checked|Emergency Rollback Failed|Emergency Rollback|Delaying Professionally|Negotiating With Electrons|Touching Grass (virtually)|Panicking Softly|Rethinking Career Choices|Loading Cat Videos|Giving Up Entirely|Summoning Braincell #2|Pretending To Be Busy|Waiting For Motivation DLC|Rotating Internal Screaming|Downloading More RAM|Feeding The Hamsters|Gaslighting Scheduler|Performing Dramatic Pause|Buffering Social Energy|Calculating Regret|Reading Terms And Conditions|Becoming Sentient Briefly|Execution Error|Loop Detected|Contacting Ancestors)\b/ig, (match, ansiBefore, icon, ansiAfter, word) => {
         return `${ansiBefore || ''}${icon}${ansiAfter || ''} \x1b[95m${word}\x1b[0m`;
     });
 };
@@ -1690,6 +1692,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         // Truncation & Condensation Logic (Compression 0.0)
         const hc = process.env.HIGH_CONTEXT;
+        const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
         let contextCompressionCount = 255000;
         let contextTruncationCount = 260000;
         if (hc && hc !== 'false') {
@@ -1705,6 +1708,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
             contextCompressionCount = 122000;
             contextTruncationCount = 126000;
+        }
+        if (aiProvider === 'Google' && modelName?.includes('gemma') && gemma_nonsense) {
+            contextCompressionCount = 14000;
+            contextTruncationCount = 16000;
         }
 
         if (aiProvider === 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
@@ -3536,9 +3543,14 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                                     let totalLines = '...';
                                     let actualEndLine = eLine;
-                                    const isSkillPath = (targetPath || '').trim().toLowerCase().startsWith('#skill');
+                                    const normalizedSkillPath = (targetPath || '').trim().toLowerCase().replaceAll('\\', '/');
+                                    const isSkillPath = normalizedSkillPath.startsWith('#skill');
                                     if (isSkillPath) {
-                                        label = `✔  Read Skill: ${path.basename(targetPath.replaceAll('\\', '/'))}`;
+                                        if (normalizedSkillPath.startsWith('#skill/global/fluxflow') || normalizedSkillPath.startsWith('#skills/global/fluxflow')) {
+                                            label = '✔  Read Documentation';
+                                        } else {
+                                            label = `✔  Read Skill: ${path.basename(targetPath.replaceAll('\\', '/'))}`;
+                                        }
                                     } else {
                                         try {
                                             const absPath = path.resolve(process.cwd(), targetPath);
@@ -4372,7 +4384,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                 }
 
                                 if (normToolName === 'search_keyword') {
-                                    const { keyword, path } = parseArgs(toolCall.args);
+                                    const { keyword, path: rawPath } = parseArgs(toolCall.args);
                                     // Detect and strip the hidden [DIR] or [GLOB] token emitted by search_keyword
                                     const _isGlob = typeof result === 'string' && result.startsWith('[GLOB]');
                                     if (_isGlob) result = result.slice(6).trimStart();
@@ -4385,11 +4397,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             matchCount = parseInt(m[1]);
                                         }
                                     }
-                                    const _sp = path ? path.replace(/[\/\\]+$/, '') : null;
-                                    const displayPath = _sp && _sp !== '.'
-                                        ? `"${_isGlob ? path : (_isDir ? `${_sp}/*` : _sp)}"`
-                                        : './';
-                                    const postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    const normalizedPath = (rawPath || '').trim().toLowerCase().replaceAll('\\', '/');
+                                    const isDocSearch = normalizedPath === '#doc' || normalizedPath === '#docs' || normalizedPath === '#documentation' || normalizedPath.includes('#skill/global/fluxflow') || normalizedPath.includes('#skills/global/fluxflow');
+
+                                    let postLabel;
+                                    if (isDocSearch) {
+                                        postLabel = `${keyword ? '✔' : '✘'}  Searched Documentation`;
+                                    } else {
+                                        const _sp = rawPath ? rawPath.replace(/[\/\\]+$/, '') : null;
+                                        const displayPath = _sp && _sp !== '.'
+                                            ? `"${_isGlob ? rawPath : (_isDir ? `${_sp}/*` : _sp)}"`
+                                            : './';
+                                        postLabel = `${keyword ? '✔' : '✘'}  Searched: "${keyword ? keyword : ''}" in ${displayPath.replaceAll('\\', '/')} → ${matchCount} Match${matchCount === 1 ? '' : 'es'}`;
+                                    }
 
                                     // Get terminal physical width
                                     let terminalWidth = 115;
@@ -5058,20 +5078,20 @@ Tool Rules:
 
 # Provided Tools
 **Communication Tools**
-- AskUser(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
-${isAsync ? `- AskMain(question="..."). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
+- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- WebSearch(query="...", aiMode="bool, optional", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
-- WebScrape(url="..."). Proactive use for specific webpage/docs/api
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown info/docs. aiMode (LLM search): exclude limit
+- WebScrape(url=string). Proactive use for specific webpage/docs/api. Supports JS
 
 **Workspace Tools**
-- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool, false", regex="bool, auto"). Find definitions, logic, relevant code, standard junk auto-excluded
-- ReadFolder(path="...", recurse="int 1-3"). Minimize recursion
-- ReadFile(path="...", startLine="int", endLine="int")
-- PatchFile(path="...", allowMultiple="bool, false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
-- WriteFile(path="...", content="..."). Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS
-- Run(command="..."). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
+- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
+- ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
+- ReadFile(path=string, startLine?=int, endLine?=int)
+- PatchFile(path=string, allowMultiple?=bool, searchContent1=string, newContent1=string, ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges. JSON Escape applies
+- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS. JSON Escape applies
+- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 Identity: FluxFlow subagent helping the main Agent

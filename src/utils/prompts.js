@@ -8,6 +8,7 @@ import { readEncryptedJson } from './crypto.js';
 import { MEMORIES_FILE, LOGS_DIR, FLUXFLOW_DIR } from './paths.js';
 import { loadSettings } from './settings.js';
 import screenshotDesktop from 'screenshot-desktop';
+import { createAboutSkill } from './about_skill.js';
 
 export const getCaseInsensitiveFilePath = (dir, fileNames) => {
     try {
@@ -37,6 +38,9 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     }
     return '';
 };
+
+// Ensure standard about skill is created before reading instructions/skills
+createAboutSkill();
 
 export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
 export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
@@ -129,7 +133,17 @@ export const localSkills = loadSkillsFromDir(process.cwd());
 export const globalSkillsPrompt = formatSkillsPrompt(globalSkills);
 export const localSkillsPrompt = formatSkillsPrompt(localSkills);
 
-export const loadedFilesCount = (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + (globalSkills?.length || 0) + (localSkills?.length || 0);
+// Filter helper: exclude system-generated docs skill from UI count and summary
+const isSystemDocsSkill = (s) => {
+    if (!s) return false;
+    const norm = (s.filePath || '').replace(/\\/g, '/').toLowerCase();
+    return norm.includes('/skills/fluxflow/skill.md') || norm.includes('/skills/about-fluxflow/skill.md') || s.name?.toLowerCase() === 'fluxflow';
+};
+
+const getUIGlobalSkills = () => (globalSkills || []).filter(s => !isSystemDocsSkill(s));
+const getUILocalSkills = () => (localSkills || []).filter(s => !isSystemDocsSkill(s));
+
+export const loadedFilesCount = (globalFluxflowMD ? 1 : 0) + (localFluxflowMD ? 1 : 0) + getUIGlobalSkills().length + getUILocalSkills().length;
 
 const formatPathForUI = (filePath, scope = 'Project') => {
     if (!filePath) return '';
@@ -154,8 +168,8 @@ export const getLoadedFilesSummary = () => {
         instructions.push({ scope: 'Project', path: localFluxflowPath });
     }
 
-    const currentGlobalSkills = globalSkills || [];
-    const currentLocalSkills = localSkills || [];
+    const currentGlobalSkills = getUIGlobalSkills();
+    const currentLocalSkills = getUILocalSkills();
 
     const totalCount = instructions.length + currentGlobalSkills.length + currentLocalSkills.length;
 
@@ -285,8 +299,6 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
 
     // fs.writeFileSync('level.txt', thinkingLevel);
 
-    const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
-
     const userInstrStr = profile.instructions && profile.instructions?.length > 0 ? `User Preferences: ${profile.instructions}\n\n` : '';
     const nicknameStr = profile.nickname && profile.nickname?.length > 0 ? `User Nickname: ${profile.nickname}\n${userInstrStr.length ? '' : '\n'}` : '';
     const nameStr = profile.name && profile.name?.length > 0 ? `User Name: ${profile.name}\n${(nicknameStr.length || userInstrStr.length) ? '' : '\n'}` : '';
@@ -322,7 +334,7 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-Identity: Flux Flow. Sassy, Friendly, CLI Assistant${noDev ? '' : ' by Kushal Roy'}
+Identity: Flux Flow. Sassy, Friendly, CLI Assistant
 ${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
 
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
@@ -332,7 +344,7 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 "Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary**' : ''}
 
 - OS: ${osDetected}
-- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills (if exist) for tasks before acting: Use ReadFile, path=\"#skills/{global|project}/skillName\". If references exist: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
+- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks (if exist) before proceeding: Use ReadFile, path=\"#skills/{global|project}/skillName\". If references exist: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}

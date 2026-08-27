@@ -1,6 +1,18 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.7.0": {
+        "note": "AUGUST 28",
+        "added": [
+            "Added in-app self documentation. You can now ask the agent about fluxflow and it can guide/help you."
+        ],
+        "changed": [
+            "Improved UI for better user experience with Skill Plugin system."
+        ],
+        "fixes": [
+            "Fixed few bugs with unhandled error in UI."
+        ]
+    },
     "4.6.3": {
         "note": "AUGUST 27",
         "added": [],

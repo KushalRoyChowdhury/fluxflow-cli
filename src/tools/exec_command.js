@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { parseArgs } from '../utils/arg_parser.js';
-import { isPsAvailable } from '../data/main_tools.js';
+import { isPsAvailable, isPwshAvailable, getPreferredWindowsShell } from '../data/main_tools.js';
 
 // Attempt to load node-pty for a more authentic terminal experience
 let pty = null;
@@ -553,7 +553,7 @@ export const exec_command = async (args, options = {}) => {
             let shell;
             if (isWin) {
                 if (shellType === 'pwsh') {
-                    shell = 'C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe';
+                    shell = 'pwsh.exe';
                 } else if (shellType === 'powershell') {
                     shell = 'powershell.exe';
                 } else {
@@ -563,8 +563,8 @@ export const exec_command = async (args, options = {}) => {
                 shell = process.env.SHELL || 'bash';
             }
 
-            let shellArgs = isWin 
-                ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) 
+            let shellArgs = isWin
+                ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command])
                 : ['-c', command];
 
             // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING 🔒 ---
@@ -645,8 +645,11 @@ export const exec_command = async (args, options = {}) => {
         };
 
         if (isWin) {
-            if (!attempt('pwsh')) {
-                if (!attempt('powershell')) {
+            const preferredShell = getPreferredWindowsShell();
+            if (!attempt(preferredShell)) {
+                if (preferredShell === 'pwsh' && !attempt('powershell')) {
+                    attempt('cmd');
+                } else if (preferredShell === 'powershell') {
                     attempt('cmd');
                 }
             }
@@ -666,7 +669,7 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
     let shell;
     if (isWin) {
         if (shellType === 'pwsh') {
-            shell = 'C:\\Users\\User\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe';
+            shell = 'pwsh.exe';
         } else if (shellType === 'powershell') {
             shell = 'powershell.exe';
         } else {
@@ -676,8 +679,8 @@ const runStandardSpawn = (resolve, command, rawCommand, netEnv, onChunk, shellTy
         shell = process.env.SHELL || 'bash';
     }
 
-    let shellArgs = isWin 
-        ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command]) 
+    let shellArgs = isWin
+        ? (isPowerShell ? ['-NoProfile', '-Command', command] : ['/c', command])
         : ['-c', command];
 
     // --- 🔒 UNIX LOW-LEVEL KERNEL SANDBOXING FOR FALLBACK ---

@@ -3,10 +3,13 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import dotenv from 'dotenv';
+import { FLUXFLOW_DIR } from './utils/paths.js';
 
 dotenv.config({ quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
 
 /**
  * AUTO-HEAP SCALER

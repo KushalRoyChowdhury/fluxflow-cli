@@ -201,6 +201,7 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
 
     let maxLimit = 262144;
     const hc = process.env.HIGH_CONTEXT;
+    const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
     if (hc && hc !== 'false') {
         const val = parseInt(hc, 10);
         if (!isNaN(val) && val >= 32000 && val <= 1000000) {
@@ -210,6 +211,9 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
     // ~128k fixed cap for limited-context models; HIGH_CONTEXT is ignored for these.
     if ((aiProvider === 'NVIDIA' && (activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium') || activeModel.includes('muse'))) || aiProvider === 'Mistral') {
         maxLimit = 128000;
+    }
+    if (aiProvider === 'Google' && activeModel?.includes('gemma') && gemma_nonsense) {
+        maxLimit = 16000;
     }
 
     return (

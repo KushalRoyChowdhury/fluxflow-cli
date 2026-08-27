@@ -1,18 +1,36 @@
 import { execSync } from 'child_process';
 import { isPtyAvailable } from '../tools/exec_command';
 
+let _isPwshAvailable = null;
+export const isPwshAvailable = () => {
+    if (process.platform !== 'win32') return false;
+    if (_isPwshAvailable !== null) return _isPwshAvailable;
+    try {
+        execSync('where.exe pwsh.exe', { stdio: 'ignore', windowsHide: true });
+        _isPwshAvailable = true;
+    } catch (e) {
+        _isPwshAvailable = false;
+    }
+    return _isPwshAvailable;
+};
+
 let _isPsAvailable = null;
 export const isPsAvailable = () => {
     if (process.platform !== 'win32') return false;
     if (_isPsAvailable !== null) return _isPsAvailable;
     try {
-        // Silent check for powershell availability
-        execSync('powershell.exe -NoProfile -Command "exit"', { stdio: 'ignore' });
+        execSync('where.exe powershell.exe', { stdio: 'ignore', windowsHide: true });
         _isPsAvailable = true;
     } catch (e) {
         _isPsAvailable = false;
     }
     return _isPsAvailable;
+};
+
+export const getPreferredWindowsShell = () => {
+    if (isPwshAvailable()) return 'pwsh';
+    if (isPsAvailable()) return 'powershell';
+    return 'cmd';
 };
 
 let _cachedAdvanceRollback = null;
@@ -35,41 +53,41 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     // =====================================================================================================
 
     const fluxTools = `**Workspace Tools (path = relative; first argument, path separator: '/')**
-- ReadFile(path="...", startLine="int", endLine="int")${aiProvider !== 'Google' ? `${isMultiModal ? `. Supports images/docs` : ''}` : `. Supports images/docs`}
-- ReadFolder(path="...", recurse="int 1-3"). Minimize recursion
-- PatchFile(path="...", allowMultiple="bool, false", searchContent1="search string OR ^LINE:start..end$", newContent1="...", ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges
-- WriteFile(path="...", content="..."). Creates/Overwrites. File Exist? PatchFile > WriteFile
-- CodeSearch(keyword="...", path="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy="bool, false", regex="bool, auto"). Find definitions, logic, relevant code, standard junk auto-excluded
-- Run(command="..."). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user
-- Goal(method="create/append/get", tasks=[string array], markDone=[task array]). If long multi-task: create Goals before starting. \`get + markDone\` to mark complete. Update every turn when created
+- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider !== 'Google' ? `${isMultiModal ? `. Supports images/docs` : ''}` : `. Supports images/docs`}
+- ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Use small searchStringMatch. Line Ranges must for large searchBlock and escape sequences. ^...$ must for line ranges. JSON Escape applies
+- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile. JSON Escape applies
+- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
+- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user
+- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. \`get + markDone\` to mark complete. Update every turn when created
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
-- EmergencyRollback(method="getCheckpoint/forceRevert", id="..."). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`id\` omitted for \`getCheckpoint\`\n` : ''}${enableSubAgents ? `
+- EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`getCheckpoint\`: \`id\` excluded\n` : ''}${enableSubAgents ? `
 **Sub Agent Tools**
-proactive use highly recommended. Prefer for any task, no user nudge needed
+Default to using subagents whenever helpful, no user nudge needed
 Invocations:
 • Invoke (async/background, ≤7 parallel). Parallelize long tasks. May take time
 • InvokeSync (sync/blocking). Sequential, repetitive or delegated tasks. Saves tokens/cost
-- InvokeSync/Invoke(title="...", task="..."). Task must be detailed: exact file paths, imports/exports, dependencies
-- Await(id="...", timeout="integer"). Event-driven wait
-- GetProgress(id="..."). Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
-- Steer(id="...", message="..."). Inject additional instruction or redirection into active async subagent
-- Cancel(id="..."). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
+- InvokeSync/Invoke(title=string, task=string). Task must be detailed: exact file paths, imports/exports, dependencies
+- Await(id=string, timeout=int[..=180]). Event-driven wait
+- GetProgress(id=string). Poll sparingly; NO initial poll. Work or await. Never end while subagent runs
+- Steer(id=string, message=string). Inject additional instruction or redirection into active async subagent
+- Cancel(id=string). Cancel async task ONLY if stalled (2m+) or incorrect` : ''}`;
 
     // =====================================================================================================
 
     const flowTools = `**Creative Tools (path = relative; first argument, path separator: '/')**
-- WritePDF(path="...", content="...", orientation="..."). Proactive A4 page breaks must in css. HTML/CSS for premium layout, stable margins & headers/footers, no watermarks
-- WriteDoc(path="...", content="..."). A4 Word document, no watermarks, stable margins & headers/footers`;
+- WritePDF(path=string, content=string, orientation="landscape/portrait"). Proactive A4 page breaks must in css. HTML/CSS for premium layout, stable margins & headers/footers, no watermarks
+- WriteDoc(path=string, content=string). A4 Word document, no watermarks, stable margins & headers/footers`;
 
     // =====================================================================================================
 
     const computerTools = `**Computer Use Tools (GUI Desktop Automation)**
-- Click(gridId="integer", type="single/double", button="left/middle/right", intendedClickText="target text"). Click target grid number, intendedClickText: literal text/icon on screen (OCR scannable, upto 3 words). Double click desktop icons
-- Drag(fromGridId="integer", toGridId="integer"). Drag mouse from start grid number to target grid number
-- Scroll(direction="up/down", gridId="mouse hover area"). Scroll viewport vertically
-- KeyboardTyping(text="string", autoPressEnter="bool"). Type text string into currently active input. JSON escape literal escape sequences
+- Click(gridId=int, type="single/double", button="left/middle/right", intendedClickText=string). Click target grid number, intendedClickText: literal text/symbol on screen (OCR scannable, upto 3 words). Double click desktop icons
+- Drag(fromGridId=int, toGridId=int). Drag mouse from start grid number to target grid number
+- Scroll(direction="up/down", gridId=int). Scroll viewport vertically
+- KeyboardTyping(text=string, autoPressEnter?=bool). Type text string into currently active input. JSON escape literal escape sequences
 - KeyPress(key="key or ;-separated combination, eg: enter, back, backspace, clearInput, ctrl;c, alt;tab, f5, f11, alt;f4"). Press key, shortcut, function key (f1-f12), or clear active input field
 - RecaptureScreen(). Request fresh gridded screenshot`;
 
@@ -83,11 +101,11 @@ Tool Rules:
 - NO chat text with tool calls
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- AskUser(question="...", optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
 
 **Web Tools**
-- WebSearch(query="...", aiMode="bool, optional", limit="integer 3-10 aiMode: exclude"). Proactive use for unknown info/docs. aiMode: LLM search
-- WebScrape(url="..."). Proactive use for specific webpage/docs/api
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown info/docs. aiMode (LLM search): exclude limit
+- WebScrape(url=string). Proactive use for specific webpage/docs/api. Supports JS
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };

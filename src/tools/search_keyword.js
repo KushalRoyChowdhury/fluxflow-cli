@@ -3,6 +3,7 @@ import path from 'path';
 import fg from 'fast-glob';
 import { Minimatch } from 'minimatch';
 import { parseArgs } from '../utils/arg_parser.js';
+import { FLUXFLOW_DIR } from '../utils/paths.js';
 import fsSync from 'fs';
 
 /**
@@ -136,6 +137,60 @@ function fuzzyMatch(line, keyword) {
     });
 }
 
+async function searchDocsDirectory(keyword) {
+    const skillDir = path.join(FLUXFLOW_DIR, 'skills', 'fluxflow');
+    const referencesDir = path.join(skillDir, 'references');
+    if (!fsSync.existsSync(referencesDir)) {
+        return `No documentation found in #docs.`;
+    }
+
+    const getAllFiles = async (dir) => {
+        let results = [];
+        try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    results = results.concat(await getAllFiles(fullPath));
+                } else if (entry.isFile()) {
+                    results.push(fullPath);
+                }
+            }
+        } catch { }
+        return results;
+    };
+
+    const files = await getAllFiles(referencesDir);
+    if (files.length === 0) {
+        return `No documentation found in #docs.`;
+    }
+
+    let regex = null;
+    try {
+        regex = new RegExp(keyword, 'i');
+    } catch { }
+
+    const lowerKeyword = keyword.toLowerCase();
+    const matchedFiles = [];
+
+    for (const filePath of files) {
+        try {
+            const content = await fs.readFile(filePath, 'utf8');
+            const isMatch = (regex && regex.test(content)) || content.toLowerCase().includes(lowerKeyword);
+            if (isMatch) {
+                const relPath = path.relative(skillDir, filePath).replace(/\\/g, '/');
+                matchedFiles.push(relPath);
+            }
+        } catch { }
+    }
+
+    if (matchedFiles.length === 0) {
+        return `No matches found for "${keyword}" in #docs.`;
+    }
+
+    return `DOCs Search "${keyword}":\n${matchedFiles.map(f => `- ${f}`).join('\n')}`;
+}
+
 /**
  * Search Keyword Tool
  * Searches for a specific keyword in the current workspace natively without shell commands.
@@ -152,6 +207,10 @@ export const search_keyword = async (args) => {
     const { keyword: rawKeyword, path: pathArg, fuzzy, subString, regex } = parseArgs(args);
     if (rawKeyword === undefined || rawKeyword === null) return 'ERROR: Missing "keyword" argument.';
     const keyword = String(rawKeyword);
+
+    if (pathArg && (pathArg.trim().toLowerCase() === '#docs' || pathArg.trim().toLowerCase() === '#doc' || pathArg.trim().toLowerCase() === '#documentation' || pathArg.trim().toLowerCase().includes('#skill/global/fluxflow'))) {
+        return searchDocsDirectory(keyword);
+    }
 
     // Normalise boolean-like flags
     const toBool = v => v === true || v === 'true' || v === 1 || v === '1' || v === 'yes';
