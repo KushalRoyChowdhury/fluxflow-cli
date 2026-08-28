@@ -18,7 +18,7 @@ export const ARCH_MD = `# FluxFlow Architecture
 ## 4. Security & Sandbox
 * Approvals: HITL confirmation on destructive file/shell operations
 * Modes: Strict | Balanced | Autonomous (YOLO)
-* Recovery: Pre-turn encrypted ledger snapshots via \`EmergencyRollback\`
+* Recovery: Pre-turn snapshot indexing via \`EmergencyRollback\`
 
 ## 5. Computer Use Automation
 * Vision: 720p normalized canvas, 4ms variance scan, Set-of-Marks (SoM) overlay

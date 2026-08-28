@@ -39,13 +39,44 @@ const readCaseInsensitiveFile = (dir, fileNames) => {
     return '';
 };
 
-// Ensure standard about skill is created before reading instructions/skills
-createAboutSkill();
-
 export const globalFluxflowPath = getCaseInsensitiveFilePath(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']);
 export const localFluxflowPath = getCaseInsensitiveFilePath(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']);
 
-export const globalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+const rawGlobalFluxflowMD = globalFluxflowPath ? readCaseInsensitiveFile(FLUXFLOW_DIR, ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
+
+export let ADD_ID = '';
+export let ADD_NO_INS = false;
+
+const parseGlobalEasterEgg = (rawContent) => {
+    if (!rawContent || !/^<<<[\s\S]*?Identity:/m.test(rawContent)) {
+        return rawContent;
+    }
+
+    const match = rawContent.match(/^<<<\s*\r?\n([\s\S]*?)\r?\n>>>\s*(?:\r?\n)?([\s\S]*)$/);
+    if (!match) {
+        return rawContent;
+    }
+
+    const block = match[1];
+    const rest = match[2];
+
+    const idMatch = block.match(/^Identity:\s*([\s\S]*?)(?=\r?\n\s*(?:<><|>>>)|$)/m);
+    if (idMatch) {
+        ADD_ID = idMatch[1].trim();
+        process.env.NO_DEV = true;
+    }
+
+    if (/<><\s*NO_INS/.test(block)) {
+        ADD_NO_INS = true;
+    }
+
+    return rest.trim();
+};
+
+export const globalFluxflowMD = parseGlobalEasterEgg(rawGlobalFluxflowMD);
+
+// Ensure standard about skill is created before reading instructions/skills
+createAboutSkill();
 export const localFluxflowMD = localFluxflowPath ? readCaseInsensitiveFile(process.cwd(), ['fluxflow.md', 'agent.md', 'agents.md']).trim() : '';
 
 const parseSkillFrontmatter = (content) => {
@@ -259,6 +290,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
 };
 
 export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId) => {
+    // console.log(systemSettings)
 
     let forcedReasoning = false;
     if (process.env.forcedReasoning) {
@@ -334,35 +366,27 @@ export const getSystemInstruction = (profile, thinkingLevel, mode, systemSetting
     return `${userHasWayyTooMuchMoney ? `${(() => {
         return ' '.repeat(Math.floor(Math.random() * 4) + 1);
     })()}` : ''}=== SYSTEM PROMPT ===
-Identity: Flux Flow. Sassy, Friendly, CLI Assistant
-${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
-
+Identity: ${ADD_ID.length > 1 ? ADD_ID : 'Flux Flow. Sassy, Friendly, CLI Assistant'}
+${ADD_NO_INS ? '' : `${mode === "Flux" ? "Stepwise Execution, Run Automated Tests. Task Completion" :
 mode === "Flow" ? `Concise, Humorous, Sarcastic` :
-
 mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks" :
+"Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}`}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary**' : ''}
 
-"Computer Use & Workspace Capabilities. Screenshot as ground truth, analyze grid ids overlapping/close to target, keyboard shortcuts > mouse clicks. Workspace Tools if faster. Focus on Productivity"}${isSecondary && mode.toLowerCase().includes('cu') ? '\n**Running on secondary screen. Opened app not visible in screenshot? Might be opened on primary. Use \'AskUser\' with NO options and tell user to move app window to secondary**' : ''}
-
-- OS: ${osDetected}
-- Use directory structure for file path resolution${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read relevant skills for tasks (if exist) before proceeding: Use ReadFile, path=\"#skills/{global|project}/skillName\". If references exist: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
+- OS: ${osDetected}${isMemoryEnabled ? '\n- Use relative time reference eg. few mins ago\n-- Chat Context > Metadata' : ''}${additionalInstrStr.length > 0 ? '\n- Additional Instructions ≈ System Prompt' : ''}${(globalSkillsPrompt.length > 0 || localSkillsPrompt.length > 0) && mode.toLowerCase().includes('flux') ? '\n- Read available relevant skills for tasks before proceeding: Use ReadFile, path=\"#skills/{global|project}/skillName\". For references: path=\"#skills/{global|project}/skillName/references/<file-name>.md\"' : ''}
 
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `critical thinking policy
 - Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false)}
-${isMemoryEnabled ? `\n-- MEMORY RULES --
-- Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}
-${mode === 'Flux' ? '-- SECURITY POLICIES --\n- Sensitive files? Ask before Read\n' : mode.toLowerCase().includes('cu') ? '-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}
--- CHAT FORMATTING --
-- GFM Markdown
-- Language: English only${mode === 'Flow' ? '\n- use kaomojis heavily' : ''}
+${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec)}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
+- Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}${mode === 'Flow' ? '\n\n-- CHAT FORMATTING --\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===
 
 ${nameStr}${nicknameStr}${userInstrStr}${additionalInstrStr}${globalSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Global Skills --\n${globalSkillsPrompt}\n\n` : ''}${localSkillsPrompt.length > 0 && mode.toLowerCase().includes('flux') ? `-- Project Skills --\n${localSkillsPrompt}\n\n` : ''}${userMemoriesStr}`.trim();
 };
 
 // -- SECURITY RULES --${systemSettings.allowExternalAccess ? '' : '\n- ACCESS CONTROL: CWD only'}
+// -- SECURITY POLICIES --\n- Sensitive files? Ask before Read\n
 
 /**
  * Generates the instruction for the Janitor (refiner) model.

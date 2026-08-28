@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.7.1": {
+        "note": "AUGUST 29",
+        "added": [],
+        "changed": [
+            "Reduced System Prompt size (~590 tokens total with tools)."
+        ],
+        "fixes": []
+    },
     "4.7.0": {
         "note": "AUGUST 28",
         "added": [

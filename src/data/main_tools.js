@@ -36,14 +36,13 @@ export const getPreferredWindowsShell = () => {
 let _cachedAdvanceRollback = null;
 
 
-export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true) => {
+export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanceRollback = false, enableSubAgents = true, autoExec) => {
     if (_cachedAdvanceRollback === null) {
         _cachedAdvanceRollback = advanceRollback;
     }
 
-    const fluxInstructions = `- JSON escape literal sequences inside tool arguments (backslash: \\\\, newLine: \\n, quote: \\\") ← Mandatory
-- Same file, multiple edits? One PatchFile (≤15 blocks)
-- Tool denied? Ask for guidance
+    const fluxInstructions = `- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
+- Same file, multiple edits? One PatchFile (≤15 blocks)${autoExec ? '' : '\n- Tool denied? Ask for guidance'}
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
 - Dont hallucinate tool results, verify, fix errors
@@ -52,14 +51,14 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 
     // =====================================================================================================
 
-    const fluxTools = `**Workspace Tools (path = relative; first argument, path separator: '/')**
-- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider !== 'Google' ? `${isMultiModal ? `. Supports images/docs` : ''}` : `. Supports images/docs`}
-- ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
-- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Use small searchStringMatch. Line Ranges must for large searchBlock and escape sequences. ^...$ must for line ranges. JSON Escape applies
-- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile. JSON Escape applies
-- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
-- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user
-- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. \`get + markDone\` to mark complete. Update every turn when created
+    const fluxTools = `**Workspace Tools (path = relative; first argument; separator: '/')**
+- ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images/docs` : ''}
+- ReadFolder(path=string, recurse?=int[1..3])
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^...$ syntax, must for large blocks/escape sequences
+- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
+- CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find relevant code, standard junk excluded
+- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user
+- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. \`get + markDone\` marks complete
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
 Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
@@ -95,17 +94,16 @@ Invocations:
 
     return `
 -- TOOLS --
-You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat output & wait for system response ← no exception, tool:functions must
+You cant execute tools. Instead, output in chat the exact string [tool:functions.ToolName(arg1="value1")] & wait for system response ← no exception, tool:functions must
 Tool Rules:
-- Max 5 tool calls/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Todo: 5+)' : ''}
-- NO chat text with tool calls
+- Max 5 tools/turn${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? ' (Goal: 5+)' : ''}
 ${mode === 'Flux' || mode.toLowerCase() === 'fluxcu' ? `${fluxInstructions}` : ""}
 **User Communication**
-- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk
 
 **Web Tools**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown info/docs. aiMode (LLM search): exclude limit
-- WebScrape(url=string). Proactive use for specific webpage/docs/api. Supports JS
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebScrape(url=string). Proactive use for specific webpage/docs
 
 ${mode === 'ICU' ? `${computerTools}` : mode === 'FluxCU' ? `${fluxTools}\n${computerTools}` : mode === 'Flux' ? `${fluxTools}` : `${flowTools}`}`.trim();
 };

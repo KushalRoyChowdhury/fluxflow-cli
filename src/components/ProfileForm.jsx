@@ -65,7 +65,7 @@ export default function ProfileForm({ initialData, onSave, onCancel, theme = 'Da
             width="100%"
         >
             <Box paddingX={1} marginBottom={1}>
-                <Text color={colors.text} bold>DEVELOPER PROFILE CONFIGURATION</Text>
+                <Text color={colors.text} bold>USER PROFILE CONFIGURATION</Text>
             </Box>
 
             <Box paddingX={1} flexDirection="column">

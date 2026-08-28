@@ -10,7 +10,7 @@ Trigger in chat via /command
 * /chats → List stored chat sessions
 * /resume → Switch to previous session
 * /save → Force-save current session state
-* /reset → Wipe project data, sessions, and cache
+* /reset → Wipe fluxflow appdata, sessions, and cache
 
 ## Context & History Management
 * /compress → Summarize chat history to reclaim context headroom

@@ -1,8 +1,8 @@
 {
     "name": "fluxflow-cli",
-    "version": "4.7.0",
-    "date": "2026-08-28",
-    "description": "A High-Fidelity Agentic CLI with Sub-Agents for the Flux Era. Now has Computer Use.",
+    "version": "4.7.1",
+    "date": "2026-08-29",
+    "description": "One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & computer use.",
     "keywords": [
         "ai",
         "agent",

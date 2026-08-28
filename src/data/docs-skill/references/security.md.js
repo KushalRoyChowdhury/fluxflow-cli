@@ -15,11 +15,11 @@ export const SECURITY_MD = `# FluxFlow Security, Sandboxing & Safety
   * Always Ask Commands → Configurable list always prompting for confirmation
   * Auto Approve Commands → Whitelist of trusted commands executed automatically
   * Auto Disapprove Commands → Blacklist of forbidden commands instantly rejected
-* Workspace Directory Lock → Restricts file read/write operations strictly to current CWD unless allowExternalAccess: ON
+* Workspace Directory Lock → Restricts file read/write operations strictly to current CWD unless External Access: ON
 * Terminal Network Isolation → Blocks outbound network sockets for spawned shell commands when networkAccess: OFF
 
 ## Recovery & Data Sanctuary
-* Emergency Rollback → Automatic pre-turn file snapshots in encrypted ledger; restore via EmergencyRollback
-* Git-less Checkpoint Reversion → Trigger interactive diff rollback viewer via /revert or double-pressing ESC
+* Emergency Rollback → Automatic pre-turn file snapshots; Agent can still fix it (default: OFF) → \`references/SETTINGS.md\`
+* Git-less Checkpoint Reversion → Trigger conversational changes rollback via double-ESC
 * External Sanctuary Redirection → Move \`~/.fluxflow\` data sanctuary (chats, keys etc)
 `;

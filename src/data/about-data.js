@@ -73,16 +73,16 @@ export const ABOUT_SKILL_MANIFEST = {
 
     'SKILL.md': `---
 name: fluxflow
-description: System Generated FluxFlow Documentation. Read this if user ask anything regarding fluxflow (this app)
+description: System Generated Documentation. Read this if asked anything regarding FluxFlow Harness (this app)
 ---
 
-[tool:functions.SearchKeyword(keyword="regex/word", path="#docs")]. Usage: search any keyword across docs, avoid hunting excessive references
-
 # FluxFlow, by Kushal Roy Chowdhury
-Open Source Terminal Based AI Assistant
+Open Source Terminal AI Assistant
 App Version: ${appVersion}. Check Updates \`fluxflow --update check\`. Update \`fluxflow --update\`
 GitHub: https://github.com/KushalRoyChowdhury/fluxflow-cli
-Public Documentation: https://fluxflow-cli.onrender.com
+Documentation: https://fluxflow-cli.onrender.com
+
+[tool:functions.SearchKeyword(keyword="regex/word", path="#docs")]. Usage: search any keyword across docs, avoid hunting excessive references
 
 ## Supported Features & Documentation References
 * Operating Modes (Flux, Flow, CU, FluxCU) → \`references/MODES.md\`

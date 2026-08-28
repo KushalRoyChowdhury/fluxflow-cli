@@ -1871,16 +1871,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         // Add a 300ms sleep for something
         // await new Promise(resolve => setTimeout(resolve, 300));
         const totalFolders = countFolders(process.cwd());
-        let dynamicMaxDepth = 12;
+        let dynamicMaxDepth = 10;
         if (totalFolders > 3072) dynamicMaxDepth = 1;      // 24 * 128
-        else if (totalFolders > 2304) dynamicMaxDepth = 2; // 24 * 96
-        else if (totalFolders > 1536) dynamicMaxDepth = 3; // 24 * 64
-        else if (totalFolders > 768) dynamicMaxDepth = 4;  // 24 * 32
-        else if (totalFolders > 384) dynamicMaxDepth = 6;  // 24 * 16
-        else if (totalFolders > 192) dynamicMaxDepth = 7;  // 24 * 8
-        else if (totalFolders > 96) dynamicMaxDepth = 8;   // 24 * 4
+        else if (totalFolders > 2304) dynamicMaxDepth = 1; // 24 * 96
+        else if (totalFolders > 1536) dynamicMaxDepth = 2; // 24 * 64
+        else if (totalFolders > 768) dynamicMaxDepth = 3;  // 24 * 32
+        else if (totalFolders > 384) dynamicMaxDepth = 5;  // 24 * 16
+        else if (totalFolders > 192) dynamicMaxDepth = 6;  // 24 * 8
+        else if (totalFolders > 96) dynamicMaxDepth = 7;   // 24 * 4
         else if (totalFolders > 48) dynamicMaxDepth = 9;   // 24 * 2
-        else if (totalFolders > 24) dynamicMaxDepth = 10;  // 24 * 1
+        else if (totalFolders > 24) dynamicMaxDepth = 9;  // 24 * 1
 
         const chatPaths = readEncryptedJson(PATHS_FILE, {});
         const lastCwd = chatPaths[chatId];
@@ -2646,7 +2646,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
                     // [JIT INSTRUCTION INJECTION] - Only for tool results, kept out of persistent history
                     const isGemmaOrMistral = aiProvider === 'Mistral' || (aiProvider === 'Google' && modelName?.toLowerCase().startsWith('gemma'));
-                    if (isGemmaOrMistral) {
+                    if (isGemmaOrMistral && false) {
                         const needsThinkingWarning = thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || thinkingLevel !== 'xHigh');
                         const thinkingText = needsThinkingWarning ? '. **strictly maintain thinking policy. do not start a response without <think>...</think>**' : '';
                         // const jitInstruction = `\n[system] Tool result received. Analyze output and proceed with your turn${thinkingText} [/system]`;
@@ -5066,9 +5066,9 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
     const osDetected = process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux';
 
     const providedToolsSection = `-- TOOL DEFINITIONS (path = relative to CWD, path separator: '/') --
-You cant execute tools. To use tools, must output exactly [tool:functions.ToolName(arg1="value1")] structured string in chat output & wait for system response ← no exception, tool:functions must
+You cant execute tools. Instead, output in chat the exact string [tool:functions.ToolName(arg1="value1")] & wait for system response ← no exception, tool:functions must
 Tool Rules:
-- JSON escape literal sequences inside tool arguments (backslash: \\\\, newLine: \\n, quote: \\\") ← Mandatory
+- Mandatorily JSON escape literal sequences (backslash: \\\\, newLine: \\ n, quote: \\\")
 - Same file, multiple edits? ONE PatchFile (≤15 blocks)
 - Need text or huge file? CodeSearch > Full Read
 - Avoid unnecessary large file chunk reads
@@ -5078,26 +5078,24 @@ Tool Rules:
 
 # Provided Tools
 **Communication Tools**
-- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk. Ask, dont finish/guess. Keep titles short
+- AskUser(question=string, optionA="title::description", ...MAX4). Ambiguity, path divergence, security risk
 ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. When clarification/decision is needed for a task` : ''}
 
 **Web Tools**
-- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown info/docs. aiMode (LLM search): exclude limit
-- WebScrape(url=string). Proactive use for specific webpage/docs/api. Supports JS
+- WebSearch(query=string, aiMode?=bool, limit?=int[3..10]). Proactive use for unknown/latest info. aiMode: exclude limit
+- WebScrape(url=string). Proactive use for specific webpage/docs
 
 **Workspace Tools**
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
-- PatchFile(path=string, allowMultiple?=bool, searchContent1=string, newContent1=string, ...MAX15). Use small searchContent. Line Ranges must for large searchContent and escape sequences. ^...$ must for line ranges. JSON Escape applies
-- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile. VERIFY IMPORTS. JSON Escape applies
-- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive/Irreversible ops → Ask user`.trim();
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^...$ syntax, must for large blocks/escape sequences
+- WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
+- Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user`.trim();
 
     const systemInstructionSubAgent = `=== START SYSTEM PROMPT ===
 Identity: FluxFlow subagent helping the main Agent
 Your task is: "${task}"
-
-${providedToolsSection.trimEnd()}
 
 -- THINKING GUIDANCE --
 NO EXPLICIT THINKING REQUIRED. FOCUS ON TASK COMPLETION
@@ -5105,6 +5103,9 @@ Main focus: tools and task, not chatting
 On completion, provide a detailed summary in Tables/Markdown Format with file modified info. If any task failed report back in detail
 
 CWD: ${process.cwd()}
+
+${providedToolsSection.trimEnd()}
+
 Current Time: ${time}
 === END SYSTEM PROMPT ===`;
 
