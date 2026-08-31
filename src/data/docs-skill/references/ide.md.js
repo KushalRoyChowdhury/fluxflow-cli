@@ -1,5 +1,5 @@
 // Export ide.md content to string
-export const IDE_MD = `# FluxFlow IDE Integration & Real-Time Context
+export const IDE_MD = `# Fluxflow IDE Companion
 
 ## WebSocket Bridge Protocol
 * Local Bridge → Runs on ws://localhost:56832 connecting FluxFlow CLI with the companion editor extension

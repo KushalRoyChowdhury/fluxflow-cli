@@ -12,7 +12,7 @@ export const createAboutSkill = () => {
         const aboutSkillDir = path.join(FLUXFLOW_DIR, 'skills', 'fluxflow');
         const referencesDir = path.join(aboutSkillDir, 'references');
 
-        const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || false;
+        const isNoDev = process.env.NO_DEV === 'true' || process.env.NO_DEV === '1' || process.env.NO_DEV === true || process.env.NO_INS === 'true' || process.env.NO_INS === '1' || process.env.NO_INS === true || false;
 
         if (isNoDev) {
             if (fs.existsSync(aboutSkillDir)) {

@@ -78,25 +78,25 @@ description: System Generated Documentation. Read this if asked anything regardi
 
 # FluxFlow, by Kushal Roy Chowdhury
 Open Source Terminal AI Assistant
-App Version: ${appVersion}. Check Updates \`fluxflow --update check\`. Update \`fluxflow --update\`
+App Version: ${appVersion}. Check Updates: fluxflow --update check. Update: fluxflow --update
 GitHub: https://github.com/KushalRoyChowdhury/fluxflow-cli
 Documentation: https://fluxflow-cli.onrender.com
 
 [tool:functions.SearchKeyword(keyword="regex/word", path="#docs")]. Usage: search any keyword across docs, avoid hunting excessive references
 
 ## Supported Features & Documentation References
-* Operating Modes (Flux, Flow, CU, FluxCU) → \`references/MODES.md\`
-* Inference Providers & Aggregators (Setup, Local NIM, Ollama) → \`references/PROVIDERS.md\`
-* In-App Settings (\`/settings\`) → \`references/SETTINGS.md\`
-* In-app /commands → \`references/COMMANDS.md\`
-* CLI Startup Flags → \`references/STARTUP.md\`
-* Environment Variables → \`references/ENV.md\`
-* Tool System (Workspace, Web, Communication, Sub-Agents, Safety, Creative, Computer Use) → \`references/TOOLS.md\`
-* Sub-Agents & Multi-Agent Runtime → \`references/SUB_AGENTS.md\`
-* Security, Sandboxing & Checkpoints (\`/revert\`, double-ESC) → \`references/SECURITY.md\`
-* IDE Companion Extension & Real-time Context → \`references/IDE.md\`
-* Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → \`references/PLUGINS.md\`
-* Agent Architecture & Memory System → \`references/ARCHITECTURE.md\`
+* Operating Modes (Flux, Flow, CU, FluxCU) → references/MODES.md
+* Inference Providers & Aggregators (Setup, Local NIM, Ollama) → references/PROVIDERS.md
+* In-App Settings (/settings) → references/SETTINGS.md
+* In-app /commands → references/COMMANDS.md
+* CLI Startup Flags → references/STARTUP.md
+* Environment Variables → references/ENV.md
+* Tool System (Workspace, Web, Communication, Sub-Agents, Safety, Creative, Computer Use) → references/TOOLS.md
+* Sub-Agents & Multi-Agent Runtime → references/SUB_AGENTS.md
+* Security, Sandboxing & Checkpoints (/revert, double-ESC) → references/SECURITY.md
+* IDE Companion Extension & Real-time Context → references/IDE.md
+* Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → references/PLUGINS.md
+* Agent Architecture & Memory System → references/ARCHITECTURE.md
 
 Docs missing required info? Say you are not sure enough to answer. Dont give wrong info`,
 

@@ -1,16 +1,16 @@
 // Export settings.md content to string
 export const SETTINGS_MD = `# FluxFlow In-App Settings Reference
 
-Open in chat via \`/settings\`
+Open in chat via /settings
 
 ## Settings Categories & Options
 
-### 1. Providers & Tips → \`references/PROVIDERS.md\`
+### 1. Providers & Tips → references/PROVIDERS.md
 
 ### 2. Appearance
 * Theme → UI theme (Dark | Light | Cyberpunk | Forest | Sunset | Matrix | Dracula | Nord | Monokai | Mystery/Chaos)
 * Loading Phrases → Humorous status phrases during thinking
-* Progressive Rendering → Smooth streaming token rendering
+* Progressive Rendering [Experimental] → Smooth streaming token rendering. May have few glitches
 * Show TPM Estimate → Real-time Tokens Throughput speed estimate
 
 ### 3. Memory

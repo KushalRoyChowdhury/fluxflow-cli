@@ -1,10 +1,10 @@
 // Export plugins.md content to string
-export const PLUGINS_MD = `# FluxFlow Instructions & Skills System
+export const PLUGINS_MD = `# Fluxflow Instructions & Skills System
 
-## 1. High Priority Instructions (AGENTS.md / FLUXFLOW.md)
+## 1. Instructions
 * Locations:
-  * Global: ~/.fluxflow/fluxflow.md | ~/.fluxflow/agents.md
-  * Workspace: ./fluxflow.md | ./agents.md
+  * Global: ~/.fluxflow/FLUXFLOW.md | ~/.fluxflow/AGENTS.md
+  * Workspace: ./FLUXFLOW.md | ./AGENTS.md
 * Auto indexed on boot
 
 ## 2. Skills System

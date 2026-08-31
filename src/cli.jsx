@@ -2,14 +2,45 @@
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { FLUXFLOW_DIR } from './utils/paths.js';
 
-dotenv.config({ quiet: true });
+// Ensure AGENTS.md or FLUXFLOW.md exists in FLUXFLOW_DIR
+try {
+    const agentsMdPath = path.join(FLUXFLOW_DIR, 'AGENTS.md');
+    const fluxflowMdPath = path.join(FLUXFLOW_DIR, 'FLUXFLOW.md');
+    if (!fs.existsSync(agentsMdPath) && !fs.existsSync(fluxflowMdPath)) {
+        if (!fs.existsSync(FLUXFLOW_DIR)) {
+            fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+        }
+        fs.writeFileSync(agentsMdPath, '', 'utf8');
+    }
+} catch (e) {
+    // Ignore error if directory or file initialization fails
+}
+
+// Base generic envs
+dotenv.config({ path: './.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env`, override: true, quiet: true });
+
+// Legacy custom envs (for backward compatibility)
+dotenv.config({ path: './agents.env', override: true, quiet: true });
+dotenv.config({ path: './.agents.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/agents.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.agents.env`, override: true, quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
 dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
+
+// Conventional custom envs (.env.<name>)
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env.agents`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env.fluxflow`, override: true, quiet: true });
+dotenv.config({ path: './.env.agents', override: true, quiet: true });
+dotenv.config({ path: './.env.fluxflow', override: true, quiet: true });
+process.env.NO_INS = false;
 
 /**
  * AUTO-HEAP SCALER

@@ -1,10 +1,25 @@
 import dotenv from 'dotenv';
 import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, FLUXFLOW_DIR } from './paths.js';
-dotenv.config({ quiet: true });
+
+// Base generic envs
+dotenv.config({ path: './.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env`, override: true, quiet: true });
+
+// Legacy custom envs (for backward compatibility)
+dotenv.config({ path: './agents.env', override: true, quiet: true });
+dotenv.config({ path: './.agents.env', override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/agents.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.agents.env`, override: true, quiet: true });
 dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
 dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
 dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
+
+// Conventional custom envs (.env.<name>)
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env.agents`, override: true, quiet: true });
+dotenv.config({ path: `${FLUXFLOW_DIR}/.env.fluxflow`, override: true, quiet: true });
+dotenv.config({ path: './.env.agents', override: true, quiet: true });
+dotenv.config({ path: './.env.fluxflow', override: true, quiet: true });
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';

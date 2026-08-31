@@ -1,5 +1,5 @@
 // Export commands.md content to string
-export const COMMANDS_MD = `# FluxFlow In-Session Slash Commands
+export const COMMANDS_MD = `# Fluxflow in-app /commands
 
 Trigger in chat via /command
 

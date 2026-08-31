@@ -19,7 +19,7 @@ export const SECURITY_MD = `# FluxFlow Security, Sandboxing & Safety
 * Terminal Network Isolation → Blocks outbound network sockets for spawned shell commands when networkAccess: OFF
 
 ## Recovery & Data Sanctuary
-* Emergency Rollback → Automatic pre-turn file snapshots; Agent can still fix it (default: OFF) → \`references/SETTINGS.md\`
+* Emergency Rollback → Automatic pre-turn file snapshots; Agent can still fix it (default: OFF) → references/SETTINGS.md
 * Git-less Checkpoint Reversion → Trigger conversational changes rollback via double-ESC
-* External Sanctuary Redirection → Move \`~/.fluxflow\` data sanctuary (chats, keys etc)
+* External Sanctuary Redirection → Move ~/.fluxflow data sanctuary (chats, keys etc)
 `;

@@ -1,7 +1,10 @@
 // Export ENV.md content to string
-export const ENV_MD = `# FluxFlow Environment Variables Reference
+export const ENV_MD = `# Env Variables
 
-Configure in shell or place inside \`./.fluxflow.env\` or \`~/.fluxflow/.fluxflow.env\` for globals
+* Locations:
+  * Shell
+  * Global: ~/.fluxflow/.env.fluxflow | ~/.fluxflow/.env.agents
+  * Workspace: ./.env.fluxflow | ./.env.agents
 
 ## Core Variables
 * SUBAGENT_MODEL → Model override for sub-agents

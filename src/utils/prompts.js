@@ -63,7 +63,7 @@ const parseGlobalEasterEgg = (rawContent) => {
     const idMatch = block.match(/^Identity:\s*([\s\S]*?)(?=\r?\n\s*(?:<><|>>>)|$)/m);
     if (idMatch) {
         ADD_ID = idMatch[1].trim();
-        process.env.NO_DEV = true;
+        process.env.NO_INS = true;
     }
 
     if (/<><\s*NO_INS/.test(block)) {

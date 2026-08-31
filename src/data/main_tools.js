@@ -58,11 +58,11 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find relevant code, standard junk excluded
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user
-- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. \`get + markDone\` marks complete
+- Goal(method="create/append/get", tasks=string[], markDone=string[]). If long multi-task: create Goals before starting. get + markDone marks complete
 ${_cachedAdvanceRollback ? `
 **Emergency Tools**
-Info: \`initial\` = current task prompt. Revert \`id\` = turn before disaster (eg. disaster: \`turn_3\` → revert: \`turn_2\`). Reason explicitly
-- EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. \`getCheckpoint\`: \`id\` excluded\n` : ''}${enableSubAgents ? `
+Info: initial = current task prompt. Revert id = turn before disaster (eg. disaster: turn_3 → revert: turn_2). Reason explicitly
+- EmergencyRollback(method="getCheckpoint/forceRevert", id=string). Rollback workspace in this agent loop. ONLY for catastrophic corruption. Before ending, verify no catastrophe. getCheckpoint: id excluded\n` : ''}${enableSubAgents ? `
 **Sub Agent Tools**
 Default to using subagents whenever helpful, no user nudge needed
 Invocations:

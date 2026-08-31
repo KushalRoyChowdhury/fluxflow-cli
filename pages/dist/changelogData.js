@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.7.2": {
+        "note": "AUGUST 31",
+        "added": [],
+        "changed": [
+            "Changed custom ENV filenames from `.fluxflow.env` to `.env.fluxflow` (old style still compatible for now, recommended to update file name asap)."
+        ],
+        "fixes": []
+    },
     "4.7.1": {
         "note": "AUGUST 29",
         "added": [],

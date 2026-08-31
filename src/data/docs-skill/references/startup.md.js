@@ -13,7 +13,7 @@ fluxflow [options]
 * --path project/path → Set working directory for session
 * --memory on | off → Toggle persistent long-term agent memory
 * --resume session-id → Resume previous chat session programmatically
-* --allocation mb → Override Node.js \`--max-old-space-size\` in MB (Req \`env.EXPERIMENTAL_MEMORY_MANAGER\` enabled → Ref: \`references/ENV.md\`)
+* --allocation mb → Override Node.js --max-old-space-size in MB (Req env.EXPERIMENTAL_MEMORY_MANAGER enabled → Ref: references/ENV.md)
 * --package npm | pnpm | yarn | bun → Override package manager for core updates
 * --auto-del 1d | 7d | 30d → History auto-deletion retention timeframe
 * --auto-exec on | off / --yolo on | off → Toggle autonomous command execution
