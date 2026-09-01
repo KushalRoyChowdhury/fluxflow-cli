@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260828,
+    "release": 20260901,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -21,9 +21,41 @@
         "inferx_fallback": "deepseek-v4-flash-0731",
         "sensenova_fallback": "sensenova-6.8-flash-lite",
         "crofai_fallback": "deepseek-v4-flash-0731",
-        "aihubmix_fallback": "coding-kimi-k3-free"
+        "aihubmix_fallback": "coding-kimi-k3-free",
+        "poolside_fallback": "poolside/laguna-s-2.1",
+        "9router_fallback": "oc/big-pickle"
     },
     "providers": {
+        "9router": {
+            "default_free": "",
+            "default_paid": "",
+            "models": {
+                "Free": [],
+                "Paid": []
+            }
+        },
+        "Poolside": {
+            "default_free": "poolside/laguna-s-2.1",
+            "default_paid": "poolside/laguna-s-2.1",
+            "models": {
+                "Free": [
+                    {
+                        "cmd": "poolside/laguna-s-2.1",
+                        "multimodal": false,
+                        "hasReasoning": true,
+                        "desc": "Laguna 2.1 (Reasoning / Text Only)"
+                    }
+                ],
+                "Paid": [
+                    {
+                        "cmd": "poolside/laguna-s-2.1",
+                        "multimodal": false,
+                        "hasReasoning": true,
+                        "desc": "Laguna 2.1 (Reasoning / Text Only)"
+                    }
+                ]
+            }
+        },
         "Ollama": {
             "default_free": "",
             "default_paid": "",

@@ -14,6 +14,7 @@ export const ENV_MD = `# Env Variables
 * OLLAMA_HOST → Custom Ollama endpoint (default: http://127.0.0.1:11434)
 * SHELL → Terminal shell executable
 * HIGH_CONTEXT → Context window override (false or integer 32k..1M)
+* ENABLE_9ROUTER → Enable 9Router provider. Local proxy for using other providers & OAuth subscription like Codex, Claude Code, GitHub Copilot etc
 
 ## Diagnostic & Optimization Flags
 * SHOW_DEBUG_GRID → (true|false, default: false) Coordinate grid overlay for Computer Use tooling

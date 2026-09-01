@@ -1,6 +1,14 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.8.0": {
+        "note": "SEPTEMBER 01",
+        "added": [
+            "Added new Provider: 9Router, Poolside."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.7.2": {
         "note": "AUGUST 31",
         "added": [],

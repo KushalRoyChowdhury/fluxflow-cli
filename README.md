@@ -30,6 +30,8 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **CrofAI**
   - **InferX**
   - **SenseNovaAI**
+  - **Poolside**
+  - **9Router** (*Experimental*)
   - **AIHubMix** (*Experimental*)
   - **OpenRouter** (*Experimental*)
 
