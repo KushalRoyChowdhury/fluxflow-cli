@@ -6717,7 +6717,7 @@ export default function App({ args = [] }) {
                                 })()}
 
                                 <GlintText
-                                    text={activeModel.split('/')[1] || (activeModel.length > 1 ? activeModel : 'Use \'/model model-id\' to select model')}
+                                    text={path.basename(activeModel) || (activeModel.length > 1 ? activeModel : 'Use \'/model model-id\' to select model')}
                                     baseColor={colors.text}
                                     glintColor={colors.textMuted}
                                     glintWidth={3}

@@ -5,6 +5,7 @@ const headings = [
     { id: 'deepseek', text: 'DeepSeek', level: 2 },
     { id: 'inferx', text: 'InferX', level: 2 },
     { id: 'sensenova', text: 'SenseNova', level: 2 },
+    { id: 'poolside', text: 'Poolside', level: 2 },
     { id: 'crofai', text: 'CrofAI', level: 2 },
     { id: 'ollama', text: 'Ollama', level: 2 },
     { id: 'mistral', text: 'Mistral', level: 2 },
@@ -226,6 +227,32 @@ export default function StableModels() {
                             <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">sensenova-6.8-flash-lite</td>
                             <td className="py-2.5 px-4"><Badge type="text" /></td>
                             <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Default, Fast & Lightweight</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* POOLSIDE */}
+            <h2 id="poolside" className="text-2xl font-bold text-slate-900 dark:text-white mt-12 mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Poolside
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400 mb-4">
+                Poolside AI inference platform featuring specialized Laguna reasoning models engineered for code and complex logic.
+            </p>
+            <div className="overflow-x-auto my-6 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Model Name</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-sm">
+                        <tr>
+                            <td className="py-2.5 px-4 font-mono text-slate-800 dark:text-slate-200">poolside/laguna-s-2.1</td>
+                            <td className="py-2.5 px-4"><Badge type="text" /></td>
+                            <td className="py-2.5 px-4 text-slate-600 dark:text-slate-400">Laguna 2.1 (Reasoning / Text Only)</td>
                         </tr>
                     </tbody>
                 </table>
