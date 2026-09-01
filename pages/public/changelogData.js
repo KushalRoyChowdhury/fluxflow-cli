@@ -4,7 +4,7 @@ export const changelogData = {
     "4.8.0": {
         "note": "SEPTEMBER 01",
         "added": [
-            "Added new Provider: 9Router, Poolside."
+            "Added new Provider: 9Router (Local proxy to use providers not natively implemented in fluxflow, including OAuth based subscriptions like GitHub Copilot, Claude Code etc.), Poolside."
         ],
         "changed": [],
         "fixes": []

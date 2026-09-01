@@ -26,7 +26,7 @@ Route sub-agent workloads to faster/cheaper models independently of the main age
 
 * Models are shown for providers whose API key is used before in fluxflow
 
-### 2. Environment Variables for Custom Sub-Agent models (.fluxflow.env / Shell)
+### 2. Environment Variables for Custom Sub-Agent models (.env.fluxflow or Shell)
 * SUBAGENT_MODEL → Target model override
 * SUBAGENT_PROVIDER → Target provider override
 * Setting SubAgentModel=ENV in settings pulls directly from environment overrides

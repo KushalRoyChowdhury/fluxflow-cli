@@ -9,7 +9,7 @@ export const PROVIDERS_MD = `# FluxFlow AI Providers & Setup
 * Fluxflow has default model list for many providers, updated based on vibes. Can be overriden using /model <model-id>
 
 ## Setup: Local NVIDIA NIM (OpenAI-Compatible)
-1. Environment Variables (.fluxflow.env or shell):
+1. Environment Variables (.env.fluxflow or shell):
    * NVIDIA_BASE_URL = http://<host>:<port>/v1/chat/completions (or custom OpenAI endpoint)
    * NVIDIA_API_KEY = Optional API key (if NIM container requires authentication)
 2. Switch Provider: Select NVIDIA in /settings → Providers

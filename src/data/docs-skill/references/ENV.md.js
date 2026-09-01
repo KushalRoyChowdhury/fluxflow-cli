@@ -14,7 +14,7 @@ export const ENV_MD = `# Env Variables
 * OLLAMA_HOST → Custom Ollama endpoint (default: http://127.0.0.1:11434)
 * SHELL → Terminal shell executable
 * HIGH_CONTEXT → Context window override (false or integer 32k..1M)
-* ENABLE_9ROUTER → Enable 9Router provider. Local proxy for using other providers & OAuth subscription like Codex, Claude Code, GitHub Copilot etc
+* ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
 * 9ROUTER_BASE_URL → 9Router base URL
 
 ## Diagnostic & Optimization Flags
