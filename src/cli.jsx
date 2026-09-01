@@ -139,30 +139,30 @@ if (isBundled && !process.execArgv.some(arg => arg.includes('max-old-space-size'
 
         if (isHelp) {
             console.log(`FluxFlow CLI Arguments:
-  --mode <flux|flow>                   Set startup mode (flux: Agent / flow: Chat)
-  --model <model_name>                 Set startup AI model
-  --key <key@provider>                 Set API key and provider
-  --provider <google|deepseek|openrouter|nvidia|mistral|ollama|crofai> Override default provider
-  --thinking <Fast|Low|Medium|High|xHigh> Set startup thinking level
-  --memory <on|off>                    Toggle memory system
-  --resume <session_id>                Resume a previous session
-  --allocation <mb>                    Override Node.js max-old-space-size in MB (default: auto)
-  --package <npm|pnpm|yarn|bun>        Set package manager for updates
-  --auto-del <1d|7d|30d>               Set history auto-deletion timeframe
-  --auto-exec <on|off>                 Toggle permission for autonomous command execution
-  --yolo <on|off>                      Same as --auto-exec
-  --external-access <on|off>           Toggle permission for file reads outside CWD
-  -v, --version                        Show installed version
-  --help                               Show this help menu
-  --help commands                      Show available /commands
-  --playground                         Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
-  --cwd <path>                         Set working directory to path
-  --path <path>                        Same as --cwd, set working directory
-  --usage                              Open token usage analytics dashboard in browser
-  --export error                       Export system error logs to fluxflow-error-<timestamp>.txt
-  --update check                       Check for new updates
-  --update check latest                Show the latest version available on npm
-  --update [latest]                    Update the app to the latest version (latest is default)`);
+  --mode <flux|flow>                       Set startup mode (flux: Agent / flow: Chat)
+  --model <model_name>                     Set startup AI model
+  --key <key@provider>                     Set API key and provider
+  --provider                               Override default provider
+  --thinking <Fast|Low|Medium|High|xHigh>  Set startup thinking level
+  --memory <on|off>                        Toggle memory system
+  --resume <session_id>                    Resume a previous session
+  --allocation <mb>                        Override Node.js max-old-space-size in MB (default: auto)
+  --package <npm|pnpm|yarn|bun>            Set package manager for updates
+  --auto-del <1d|7d|30d>                   Set history auto-deletion timeframe
+  --auto-exec <on|off>                     Toggle permission for autonomous command execution
+  --yolo <on|off>                          Same as --auto-exec
+  --external-access <on|off>               Toggle permission for file reads outside CWD
+  -v, --version                            Show installed version
+  --help                                   Show this help menu
+  --help commands                          Show available /commands
+  --playground                             Launch in Playground mode (fixed session, CWD: DATA_DIR/playground)
+  --cwd <path>                             Set working directory to path
+  --path <path>                            Same as --cwd, set working directory
+  --usage                                  Open token usage analytics dashboard in browser
+  --export error                           Export system error logs to fluxflow-error-<timestamp>.txt
+  --update check                           Check for new updates
+  --update check latest                    Show the latest version available on npm
+  --update [latest]                        Update the app to the latest version (latest is default)`);
             process.exit(0);
         }
 

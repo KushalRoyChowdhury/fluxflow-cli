@@ -59,6 +59,8 @@ import { getCrofAIStream } from './providers/crofai.js';
 import { getInferXStream } from './providers/inferx.js';
 import { getSenseNovaStream } from './providers/sensenova.js';
 import { getAIHubMixStream } from './providers/aihubmix.js';
+import { getPoolsideStream } from './providers/poolside.js';
+import { getNineRouterStream } from './providers/9router.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -405,7 +407,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -624,6 +626,36 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const stream = getAIHubMixStream(
                             apiKey,
                             targetModel || getFallbackValue('aihubmix_fallback') || 'gpt-4o-mini',
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast',
+                            mode,
+                            false,
+                            null,
+                            0.7
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else if (aiProvider === 'Poolside') {
+                        const stream = getPoolsideStream(
+                            apiKey,
+                            targetModel || getFallbackValue('poolside_fallback') || 'poolside/laguna-s-2.1',
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast',
+                            mode,
+                            false,
+                            null,
+                            0.7
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
+                    } else if (aiProvider === '9router' || aiProvider === '9Router') {
+                        const stream = getNineRouterStream(
+                            apiKey,
+                            targetModel || getFallbackValue('9router_fallback') || 'z-ai/glm-5.3-flash',
                             janitorContents,
                             janitorPrompt,
                             'Fast',
@@ -1286,6 +1318,10 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getSenseNovaStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === 'AIHubMix') {
                 stream = getAIHubMixStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'Poolside') {
+                stream = getPoolsideStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === '9router' || aiProvider === '9Router') {
+                stream = getNineRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const genStream = await googleClient.models.generateContentStream({
@@ -1461,6 +1497,8 @@ Chats to process:
         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
+        if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
+        if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
 
         while (attempts <= maxAttempts && !success) {
             // console.log(targetModel, settings);
@@ -1551,6 +1589,8 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === 'InferX') targetModel = getFallbackValue('inferx_fallback');
         if (aiProvider === 'SenseNova') targetModel = getFallbackValue('sensenova_fallback');
         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
+        if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
+        if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
 
         let attempts = 0;
         let success = false;
@@ -1633,7 +1673,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -1729,12 +1769,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             contextTruncationCount = 16000;
         }
 
-        if (aiProvider === 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router') && (sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'text', content: '✦ Maximum Context Limit Reached. Start a new chat.' };
             return;
         }
 
-        if (aiProvider !== 'Ollama' && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if (aiProvider !== 'Ollama' && aiProvider !== '9router' && aiProvider !== '9Router' && (sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
             const newSummary = await compressHistory(settings, modifiedHistory, true);
             if (newSummary) {
@@ -2828,6 +2868,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === 'AIHubMix') {
                         stream = getAIHubMixStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === 'Poolside') {
+                        stream = getPoolsideStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === '9router' || aiProvider === '9Router') {
+                        stream = getNineRouterStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -5012,6 +5076,9 @@ export const runSubagent = async (task, settings, model = null, allowedTools = n
         if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
         if (lower === 'inferx') return 'InferX';
         if (lower === 'sensenova') return 'SenseNova';
+        if (lower === 'poolside') return 'Poolside';
+        if (lower === '9router' || lower === '9Router') return '9router';
+        if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
         return null;
     };
 

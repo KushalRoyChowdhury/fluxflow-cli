@@ -100,7 +100,7 @@ export default function SettingsMenu({
 
     useEffect(() => {
         const checkKeys = async () => {
-            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+            const providers = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router'];
             const keyMap = {};
             for (const p of providers) {
                 try {
@@ -114,7 +114,7 @@ export default function SettingsMenu({
     }, []);
 
     const allSubAgentItems = React.useMemo(() => {
-        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+        const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router'];
         const hasEnv = !!(process.env.SUBAGENT_MODEL && process.env.SUBAGENT_MODEL.trim());
         const envLabel = hasEnv ? `ENV (${process.env.SUBAGENT_MODEL.trim()})` : 'ENV';
 

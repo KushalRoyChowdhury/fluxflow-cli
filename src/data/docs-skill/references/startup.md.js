@@ -7,7 +7,7 @@ fluxflow [options]
 ## Supported CLI Flags
 * --mode flux | flow | icu | fluxcu → Startup mode
 * --model model-id → Session model override
-* --provider google | deepseek | openrouter | nvidia | mistral | ollama | crofai | inferx | sensenova | aihubmix → Override default AI provider
+* --provider google | deepseek | openrouter | nvidia | mistral | ollama | crofai | inferx | sensenova | aihubmix | poolside | 9router → Override default AI provider
 * --key key@provider → Set new API key for provider
 * --thinking Fast | Low | Medium | High | xHigh → Override reasoning depth
 * --path project/path → Set working directory for session

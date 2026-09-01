@@ -25,7 +25,8 @@ const DEFAULT_SETTINGS = {
             NVIDIA: 'Free',
             OpenRouter: 'Free',
             InferX: 'Free',
-            SenseNova: 'Free'
+            SenseNova: 'Free',
+            Poolside: 'Free'
         }
     },
     systemSettings: {

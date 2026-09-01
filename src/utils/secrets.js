@@ -33,6 +33,8 @@ export const getProviderAPIKey = async (provider) => {
         if (provider === 'CrofAI' || provider === 'Crof') return secrets.CROFAI_API_KEY || null;
         if (provider === 'InferX') return secrets.INFERX_API_KEY || null;
         if (provider === 'SenseNova' || provider === 'Sensenova') return secrets.SENSENOVA_API_KEY || null;
+        if (provider === 'Poolside' || provider === 'poolside') return secrets.POOLSIDE_API_KEY || null;
+        if (provider === '9router' || provider === '9Router') return secrets['9ROUTER_API_KEY'] || 'LOCAL';
     } catch (e) {}
     return null;
 };
@@ -57,6 +59,10 @@ export const saveProviderAPIKey = async (provider, key) => {
         await saveSecret('INFERX_API_KEY', key);
     } else if (provider === 'SenseNova' || provider === 'Sensenova') {
         await saveSecret('SENSENOVA_API_KEY', key);
+    } else if (provider === 'Poolside' || provider === 'poolside') {
+        await saveSecret('POOLSIDE_API_KEY', key);
+    } else if (provider === '9router' || provider === '9Router') {
+        await saveSecret('9ROUTER_API_KEY', key);
     }
 };
 

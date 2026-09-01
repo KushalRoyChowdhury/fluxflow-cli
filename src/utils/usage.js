@@ -999,7 +999,7 @@ export const getAllUsageData = async () => {
 
     const providerBudgets = quotas.providerBudgets || {};
     const useProvider = !!providerBudgets.__useProvider;
-    const providersList = ['Google', 'Anthropic', 'OpenAI', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+    const providersList = ['Google', 'Anthropic', 'OpenAI', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'];
     
     Object.keys(providerBudgets).forEach(k => {
         if (k !== '__useProvider' && !providersList.includes(k)) {

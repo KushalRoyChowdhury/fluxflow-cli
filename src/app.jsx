@@ -759,7 +759,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -772,6 +772,8 @@ export default function App({ args = [] }) {
                     if (lower === 'crofai' || lower === 'crof') return 'CrofAI';
                     if (lower === 'inferx') return 'InferX';
                     if (lower === 'sensenova') return 'SenseNova';
+                    if (lower === 'poolside') return 'Poolside';
+                    if (lower === '9router') return '9router';
                     if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
                     return null;
                 };
@@ -879,7 +881,7 @@ export default function App({ args = [] }) {
                     const parts = val.split('@');
                     const keyPart = parts[0];
                     const provPart = parts[1].toLowerCase();
-                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub'].includes(provPart)) {
+                    if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r'].includes(provPart)) {
                         let mapped = 'Google';
                         if (provPart === 'google') mapped = 'Google';
                         else if (provPart === 'deepseek') mapped = 'DeepSeek';
@@ -890,6 +892,8 @@ export default function App({ args = [] }) {
                         else if (provPart === 'crof' || provPart === 'crofai') mapped = 'CrofAI';
                         else if (provPart === 'inferx') mapped = 'InferX';
                         else if (provPart === 'sensenova') mapped = 'SenseNova';
+                        else if (provPart === 'poolside' || provPart === 'pool') mapped = 'Poolside';
+                        else if (provPart === '9router' || provPart === '9r') mapped = '9router';
                         else if (provPart === 'aihubmix' || provPart === 'aihub') mapped = 'AIHubMix';
                         parsed.key = keyPart;
                         parsed.provider = mapped;
@@ -962,7 +966,7 @@ export default function App({ args = [] }) {
                 i++;
             } else if (arg === '--provider' && args[i + 1]) {
                 const val = args[i + 1].toLowerCase();
-                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub'].includes(val)) {
+                if (['google', 'deepseek', 'openrouter', 'nvidia', 'mistral', 'ollama', 'crof', 'crofai', 'inferx', 'sensenova', 'aihubmix', 'aihub', 'poolside', 'pool', '9router', '9r'].includes(val)) {
                     let mapped = 'Google';
                     if (val === 'google') mapped = 'Google';
                     else if (val === 'deepseek') mapped = 'DeepSeek';
@@ -973,6 +977,8 @@ export default function App({ args = [] }) {
                     else if (val === 'crof' || val === 'crofai') mapped = 'CrofAI';
                     else if (val === 'inferx') mapped = 'InferX';
                     else if (val === 'sensenova') mapped = 'SenseNova';
+                    else if (val === 'poolside' || val === 'pool') mapped = 'Poolside';
+                    else if (val === '9router' || val === '9r') mapped = '9router';
                     else if (val === 'aihubmix' || val === 'aihub') mapped = 'AIHubMix';
                     parsed.provider = mapped;
                 }
@@ -1233,7 +1239,7 @@ export default function App({ args = [] }) {
             if (aiProvider === 'Mistral') {
                 setThinkingLevel('Fast');
             } else {
-                if (aiProvider === 'SenseNova') {
+                if (aiProvider === 'SenseNova' || aiProvider === 'Poolside') {
                     setThinkingLevel('High');
                     return;
                 }
@@ -1789,7 +1795,7 @@ export default function App({ args = [] }) {
 
         // Provider Budget Select keyboard handling
         if (activeView === 'providerBudgetSelect') {
-            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
+            const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'];
             if (key.upArrow) {
                 setPbsCursor(c => (c - 1 + PBS_PROVIDERS.length) % PBS_PROVIDERS.length);
                 return;
@@ -2447,6 +2453,14 @@ export default function App({ args = [] }) {
                 prefix: 'sk-',
                 minLength: 10,
             },
+            Poolside: {
+                prefix: '',
+                minLength: 0,
+            },
+            '9router': {
+                prefix: '',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2454,7 +2468,7 @@ export default function App({ args = [] }) {
             minLength: 0,
         };
 
-        const isOllamaLocalEscape = aiProvider === 'Ollama' && (key.trim() === 'LOCAL' || key.trim() === '');
+        const isOllamaLocalEscape = (aiProvider === 'Ollama' || aiProvider === '9router') && (key.trim() === 'LOCAL' || key.trim() === '');
         const effectiveKey = isOllamaLocalEscape ? 'LOCAL' : key;
 
         if (isOllamaLocalEscape || (key.startsWith(prefix) && key.length >= minLength)) {
@@ -2469,25 +2483,25 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-v4-flash';
             } else if (aiProvider === 'NVIDIA') {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
-            } else if (aiProvider === 'Ollama') {
+            } else if (aiProvider === 'Ollama' || aiProvider === '9router') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix') {
+            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
 
             let newSys = { ...systemSettings };
-            if (isOllamaLocalEscape) {
+            if (isOllamaLocalEscape && aiProvider === 'Ollama') {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix') {
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2590,6 +2604,18 @@ export default function App({ args = [] }) {
                                 { cmd: 'Fast', desc: 'Reasoning Disabled' },
                                 { cmd: 'xHigh', desc: 'Deep Reasoning' }
                             ]
+                        : aiProvider === 'Poolside'
+                            ? [
+                                { cmd: 'Fast', desc: 'Reasoning Disabled' },
+                                { cmd: 'High', desc: 'Extended Reasoning' }
+                            ]
+                        : (aiProvider === '9router' || aiProvider === '9Router')
+                            ? [
+                                { cmd: 'Fast', desc: 'None (Reasoning Disabled)' },
+                                { cmd: 'Low', desc: 'Low Reasoning' },
+                                { cmd: 'Medium', desc: 'Medium Reasoning' },
+                                { cmd: 'High', desc: 'High Reasoning' }
+                            ]
                             : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova')
                                 ? [
                                     { cmd: 'Fast', desc: 'Fastest' },
@@ -2608,7 +2634,7 @@ export default function App({ args = [] }) {
         {
             cmd: '/model',
             desc: 'Select Agent Model',
-            subs: (aiProvider === 'Ollama' && (apiKey === 'LOCAL' || !apiKey))
+            subs: ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router') && (apiKey === 'LOCAL' || !apiKey))
                 ? []
                 : (mode === 'ICU' || mode.toLowerCase() === 'fluxcu'
                     ? getModels(aiProvider, apiTier).filter(m => isModelMultimodal(m.cmd || m))
@@ -3509,7 +3535,8 @@ export default function App({ args = [] }) {
                                 CrofAI: 'Free',
                                 InferX: 'Free',
                                 SenseNova: 'Free',
-                                AIHubMix: 'Free'
+                                AIHubMix: 'Free',
+                                Poolside: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -4776,7 +4803,7 @@ export default function App({ args = [] }) {
     // Effect: initialize pbsSelected when entering providerBudgetSelect, pre-checking already-configured providers
     useEffect(() => {
         if (activeView !== 'providerBudgetSelect') return;
-        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix'];
+        const PBS_PROVIDERS = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'];
         const existingBudgets = quotas.providerBudgets || {};
         const initialSelected = PBS_PROVIDERS.reduce((acc, p) => {
             acc[p] = !!(existingBudgets[p] && (existingBudgets[p].agentLimit || existingBudgets[p].tokenLimit));
@@ -4907,6 +4934,8 @@ export default function App({ args = [] }) {
                             { label: 'InferX', value: 'InferX' },
                             { label: 'SenseNova', value: 'SenseNova' },
                             { label: 'CrofAI', value: 'CrofAI' },
+                            { label: 'Poolside', value: 'Poolside' },
+                            ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                             { label: 'Ollama', value: 'Ollama' },
                             { label: 'AIHubMix       [EXPERIMENTAL]', value: 'AIHubMix' },
                             { label: 'Mistral        [EXPERIMENTAL]', value: 'Mistral' },
@@ -4931,7 +4960,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -4941,7 +4970,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5104,7 +5133,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5312,7 +5341,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -5539,10 +5568,12 @@ export default function App({ args = [] }) {
                                     } else if (key === 'providerKey') {
                                         let keyInput = val.trim();
                                         const prov = inputConfig.provider;
-                                        if (prov === 'Ollama' && (keyInput === 'LOCAL' || keyInput === '')) {
+                                        if ((prov === 'Ollama' || prov === '9router') && (keyInput === 'LOCAL' || keyInput === '')) {
                                             keyInput = 'LOCAL';
-                                            setSystemSettings(s => ({ ...s, ollamaEndpoint: 'Local' }));
-                                            newSettings.systemSettings = { ...systemSettings, ollamaEndpoint: 'Local' };
+                                            if (prov === 'Ollama') {
+                                                setSystemSettings(s => ({ ...s, ollamaEndpoint: 'Local' }));
+                                                newSettings.systemSettings = { ...systemSettings, ollamaEndpoint: 'Local' };
+                                            }
                                         }
                                         await saveProviderAPIKey(prov, keyInput);
                                         setAiProvider(prov);
@@ -5556,14 +5587,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -6835,6 +6866,8 @@ export default function App({ args = [] }) {
                                                         { label: 'InferX', value: 'InferX' },
                                                         { label: 'SenseNova', value: 'SenseNova' },
                                                         { label: 'CrofAI', value: 'CrofAI' },
+                                                        { label: 'Poolside', value: 'Poolside' },
+                                                        ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                                                         { label: 'Ollama', value: 'Ollama' },
                                                         { label: 'AIHubMix     [EXPERIMENTAL]', value: 'AIHubMix' },
                                                         { label: 'Mistral      [EXPERIMENTAL]', value: 'Mistral' },
@@ -6949,6 +6982,9 @@ export default function App({ args = [] }) {
                                                 label = "billing";
                                             } else if (aiProvider === 'CrofAI') {
                                                 url = "https://crof.ai";
+                                                label = "account";
+                                            } else if (aiProvider === 'Poolside') {
+                                                url = "https://inference.poolside.ai";
                                                 label = "account";
                                             }
                                             // return (
