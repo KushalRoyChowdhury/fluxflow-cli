@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260901,
+    "release": 20260902,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -511,8 +511,8 @@
             }
         },
         "NVIDIA": {
-            "default_free": "stepfun-ai/step-3.7-flash",
-            "default_paid": "stepfun-ai/step-3.7-flash",
+            "default_free": "nvidia/nemotron-3-super-120b-a12b",
+            "default_paid": "nvidia/nemotron-3-super-120b-a12b",
             "models": {
                 "Free": [
                     {
@@ -535,15 +535,6 @@
                     },
                     {
                         "cmd": "moonshotai/kimi-k3",
-                        "multimodal": true,
-                        "desc": "Multimodal"
-                    },
-                    {
-                        "cmd": "\n--- StepFun Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "stepfun-ai/step-3.7-flash",
                         "multimodal": true,
                         "desc": "Multimodal"
                     },
@@ -616,11 +607,6 @@
                     {
                         "cmd": "\n--- Meta Models ---",
                         "desc": ""
-                    },
-                    {
-                        "cmd": "meta/llama-3.1-70b-instruct",
-                        "multimodal": false,
-                        "desc": "Text Only"
                     },
                     {
                         "cmd": "meta/llama-3.3-70b-instruct",

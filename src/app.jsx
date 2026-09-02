@@ -60,34 +60,71 @@ const getPrefilledValue = (val) => {
 
 const getIDEName = () => {
     const termProgram = (process.env.TERM_PROGRAM || '').toLowerCase();
+    const vscodeCwd = (process.env.VSCODE_CWD || '').toLowerCase();
+    const vscodeCache = (process.env.VSCODE_CODE_CACHE_PATH || '').toLowerCase();
+    const gitAskPass = (process.env.GIT_ASKPASS || '').toLowerCase();
+    const gitAskPassNode = (process.env.VSCODE_GIT_ASKPASS_NODE || '').toLowerCase();
+    const gitAskPassMain = (process.env.VSCODE_GIT_ASKPASS_MAIN || '').toLowerCase();
 
-    // 1. Direct high-priority terminal check
+    // 1. Antigravity IDE
+    if (
+        termProgram === 'antigravity' ||
+        process.env.ANTIGRAVITY_AGENT ||
+        process.env.ANTIGRAVITY_PID ||
+        process.env.ANTIGRAVITY_EDITOR_APP_ROOT ||
+        process.env.ANTIGRAVITY_CLI_ALIAS ||
+        vscodeCwd.includes('antigravity') ||
+        vscodeCache.includes('antigravity') ||
+        gitAskPass.includes('antigravity') ||
+        gitAskPassNode.includes('antigravity') ||
+        gitAskPassMain.includes('antigravity')
+    ) {
+        return 'Antigravity';
+    }
+
+    // 2. Cursor
+    if (
+        termProgram === 'cursor' ||
+        process.env.CURSOR_SETTINGS_DIR ||
+        process.env.CURSOR_CONFIG_DIR ||
+        vscodeCwd.includes('cursor') ||
+        vscodeCache.includes('cursor') ||
+        gitAskPass.includes('cursor') ||
+        gitAskPassNode.includes('cursor')
+    ) {
+        return 'Cursor';
+    }
+
+    // 3. Windsurf
+    if (
+        termProgram === 'windsurf' ||
+        process.env.WINDSURF_SETTINGS_DIR ||
+        vscodeCwd.includes('windsurf') ||
+        vscodeCache.includes('windsurf') ||
+        gitAskPass.includes('windsurf') ||
+        gitAskPassNode.includes('windsurf')
+    ) {
+        return 'Windsurf';
+    }
+
+    // 4. Trae & Positron & VSCodium
+    if (termProgram === 'trae' || process.env.TRAE_SETTINGS_DIR || vscodeCwd.includes('trae') || gitAskPassNode.includes('trae')) return 'Trae';
+    if (termProgram === 'positron' || vscodeCwd.includes('positron') || gitAskPassNode.includes('positron')) return 'Positron';
+    if (termProgram === 'codium' || termProgram === 'vscode-oss' || vscodeCwd.includes('codium') || vscodeCache.includes('codium') || gitAskPassNode.includes('codium')) return 'VSCodium';
+
+    // 5. Standard VS Code & Insiders
+    if (termProgram === 'vscode-insiders' || vscodeCwd.includes('code - insiders') || vscodeCache.includes('code - insiders') || gitAskPassNode.includes('code - insiders')) return 'VS Code Insiders';
+    if (termProgram === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || process.env.VSCODE_PID || process.env.VSCODE_INJECTION || vscodeCwd.includes('code') || vscodeCache.includes('code') || gitAskPassNode.includes('code')) {
+        return 'VS Code';
+    }
+
+    // 6. JetBrains
+    if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || process.env.TERMINAL_EMULATOR?.toLowerCase().includes('jetbrains')) {
+        return 'JetBrains';
+    }
+
+    // 7. Standalone terminals
     if (process.env.WT_SESSION) return 'Windows Terminal';
-
-    // 2. Helper for safer string searching (ignores paths/noisy keys)
-    const inEnvVars = (target) => {
-        const query = target.toLowerCase();
-        for (const [key, val] of Object.entries(process.env)) {
-            if (['PATH', 'PWD', 'CWD', 'PS1', 'LS_COLORS', 'PROMPT'].includes(key)) continue;
-            if (String(val).toLowerCase().includes(query)) return true;
-        }
-        return false;
-    };
-
-    // 3. IDE Forks (Must check BEFORE generic 'vscode')
-    if (termProgram === 'cursor' || process.env.CURSOR_SETTINGS_DIR || inEnvVars('cursor')) return 'Cursor';
-    if (termProgram === 'windsurf' || inEnvVars('windsurf')) return 'Windsurf';
-    if (inEnvVars('antigravity')) return 'Antigravity';
-    if (termProgram === 'trae' || inEnvVars('trae')) return 'Trae';
-    if (termProgram === 'codium' || inEnvVars('codium') || inEnvVars('vscode-oss')) return 'VSCodium';
-    if (inEnvVars('positron')) return 'Positron';
-
-    // 4. Standard VS Code & Insiders
-    if (termProgram === 'vscode-insiders' || inEnvVars('insiders')) return 'VS Code Insiders';
-    if (termProgram === 'vscode' || process.env.VSCODE_GIT_IPC_HANDLE || inEnvVars('vscode')) return 'VS Code';
-
-    // 5. Other
-    if (process.env.INTELLIJ_TERMINAL_COMMAND_BLOCKS || inEnvVars('intellij')) return 'JetBrains';
 
     return 'Terminal';
 };
@@ -6309,12 +6346,10 @@ export default function App({ args = [] }) {
             case 'keybindingsPrompt':
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor="grey" paddingX={2} paddingY={1} width="100%">
-                        <Text color="white" bold underline>⌨ CONFIGURE SHIFT+ENTER NEWLINE</Text>
-                        <Text marginTop={1}>
-                            To support multi-line inputs with <Text bold color="white">Shift + Enter</Text> for newline, a terminal sequence keybinding needs to be added to your IDE configuration.
-                        </Text>
-                        <Text marginTop={1}>
-                            Would you like FluxFlow to automatically add this to your {getIDEName()} keybindings?
+                        <Text color="white" bold underline>CONFIGURE SHIFT+ENTER NEWLINE</Text>
+                        <Text>
+                            {'\n'}To support multi-line inputs with <Text bold color="white">Shift + Enter</Text> for newline, a terminal sequence keybinding needs to be added to your IDE configuration.
+                            {'\n\n'}Would you like FluxFlow to automatically add this to your {getIDEName()} keybindings?
                         </Text>
                         <Box marginTop={1}>
                             <CommandMenu
