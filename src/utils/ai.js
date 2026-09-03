@@ -4390,10 +4390,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                     }
-                                    let hasNextSteering = steeringCallback?.() ?? null;
+
+                                    let hint = await steeringCallback();
+                                    let hasHint = false;
+                                    if (hint) {
+                                        hasHint = hint.trim().length > 0;
+                                    }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasNextSteering ? '' : '\n'}`}`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasHint ? '' : '\n'}`    }`) };
                                     thisIsFirstToolFeedback = false;
                                 }
 
@@ -4518,9 +4523,16 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         if (process.stdout.isTTY) {
                                             terminalWidth = process.stdout.columns - 5 || 120;
                                         }
+
+                                        let hint = await steeringCallback();
+                                        let hasHint = false;
+                                        if (hint) {
+                                            hasHint = hint.trim().length > 0;
+                                        }
+
                                         const boxWidth = Math.min(postLabel.length + 4, terminalWidth);
                                         const boxMid = `${postLabel.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}\n`) };
+                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${hasHint ? '' : '\n'}`) };
                                         thisIsFirstToolFeedback = false;
                                     }
                                 }
@@ -4581,7 +4593,15 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                             `${uiTitle}`, // Clean title with a slight indent aligned with other feedbacks
                                             ...listItems.map(item => `    ${item}`) // Sub-indented items for that premium look
                                         ].join('\n');
-                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${output}\n`) };
+
+
+                                        let hint = await steeringCallback();
+                                        let hasHint = false;
+                                        if (hint) {
+                                            hasHint = hint.trim().length > 0;
+                                        } 
+
+                                        yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${output}${hasHint ? '' : '\n'}`) };
                                         thisIsFirstToolFeedback = false;
                                     }
                                 }
@@ -5027,7 +5047,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
         const errLog = rawErrStr.replace(/^(Error:\s*)+/i, '');
         const date = new Date().toLocaleString();
         const agentErrDir = path.join(LOGS_DIR, 'agent');
-        yield { type: 'text', content: `✦ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}\n⠀` };
+        yield { type: 'text', content: `\n\n✦ CRITICAL ERROR: ${errLog.includes('fetch failed') ? 'Failed to Connect. Check your Internet Connection or Wait a moment' : errLog}\n⠀` };
         if (!fs.existsSync(agentErrDir)) fs.mkdirSync(agentErrDir, { recursive: true });
         fs.appendFileSync(path.join(agentErrDir, 'error.log'), `CRITICAL ERROR [${date}]: ${err}\n\n----------------------------------------------------------------------\n\n`);
 

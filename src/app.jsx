@@ -3733,19 +3733,19 @@ export default function App({ args = [] }) {
                             if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                 return m;
                             }
-                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command')) {
+                            if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command')) {
                                 return m;
                             }
                             truncatedCount++;
                             if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
                                 return {
                                     ...m,
-                                    fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
+                                    fullText: '[TOOL RESULT]: SUCCESS: ...Results Truncated by System on User Command'
                                 };
                             }
                             return {
                                 ...m,
-                                fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
+                                fullText: '[TOOL RESULT]: ...Results Truncated by System on User Command'
                             };
                         });
 
@@ -4275,18 +4275,18 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.includes('...SUCCESS Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
+                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
                                             return m;
                                         }
                                         if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
                                             return {
                                                 ...m,
-                                                fullText: '[TOOL RESULT]: SUCCESS: ...SUCCESS Results Truncated by System on User Command'
+                                                fullText: '[TOOL RESULT]: SUCCESS: ...Results Truncated by System on User Command'
                                             };
                                         }
                                         return {
                                             ...m,
-                                            fullText: '[TOOL RESULT]: ...SUCCESS Results Truncated by System on User Command'
+                                            fullText: '[TOOL RESULT]: ...Results Truncated by System on User Command'
                                         };
                                     });
                                     saveChat(chatId, null, updatedMessages);

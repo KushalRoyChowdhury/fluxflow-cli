@@ -15,7 +15,7 @@ export const todo = async (args, context = {}) => {
     const { method, tasks, markDone } = parseArgs(args);
     const chatId = context.chatId || 'default';
 
-    if (!method) return 'ERROR: Missing "method" argument for todo tool (create/append/get).';
+    if (!method) return 'ERROR: Missing "method" argument for Goal tool (create/append/get).';
 
     const todoDir = path.join(DATA_DIR, 'plan', chatId);
     const todoFile = path.join(todoDir, 'todo.md');
@@ -120,9 +120,9 @@ export const todo = async (args, context = {}) => {
             const total = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             if (markedCount > 0) {
                 const completed = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
-                return `SUCCESS: TASK LIST CREATED (${markedCount} marked done, ${completed} completed, ${total - completed} left)\n${content}`;
+                return `SUCCESS: Goal Created (${markedCount} marked done, ${completed} completed, ${total - completed} left)\n${content}`;
             }
-            return `SUCCESS: TASK LIST CREATED (${total} total)\n${content}`;
+            return `SUCCESS: Goal Created (${total} total)\n${content}`;
         }
 
         if (method === 'append') {
@@ -138,12 +138,12 @@ export const todo = async (args, context = {}) => {
             const completed = lines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             const added = appendContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
 
-            return `SUCCESS: TASK APPENDED (${completed} completed, ${total - completed} left, ${added} added)\n${fullContent}`;
+            return `SUCCESS: Goal Appended (${completed} completed, ${total - completed} left, ${added} added)\n${fullContent}`;
         }
 
         if (method === 'get') {
             if (!fs.existsSync(todoFile)) {
-                return 'TODO GET: No task list found for this session.';
+                return 'Goal: No task list found for this session.';
             }
 
             let content = fs.readFileSync(todoFile, 'utf8');
@@ -163,13 +163,13 @@ export const todo = async (args, context = {}) => {
             const total = totalLines.filter(l => l.startsWith('- [ ]') || l.startsWith('- [x]') || l.startsWith('- [X]')).length;
             const completed = totalLines.filter(l => l.startsWith('- [x]') || l.startsWith('- [X]')).length;
 
-            const prefix = markedCount > 0 ? `SUCCESS: ${markedCount} TASK(S) MARKED DONE` : `TODO GET`;
+            const prefix = markedCount > 0 ? `SUCCESS: ${markedCount} Goal(s) Marked Done` : `Goal`;
             return `${prefix}: ${completed} Completed, ${total - completed} left\n${content}`;
         }
 
         return `ERROR: Unknown method "${method}". Use create, append, or get.`;
     } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        return `ERROR: Todo tool failure: ${errorMsg}`;
+        return `ERROR: Goal failure: ${errorMsg}`;
     }
 };
