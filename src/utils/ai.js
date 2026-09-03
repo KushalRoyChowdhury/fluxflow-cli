@@ -2416,10 +2416,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     } else {
                         // Protocol Sync: If last message is 'user', append hint to it to avoid consecutive role errors
                         if (modifiedHistory.length > 0 && modifiedHistory[modifiedHistory.length - 1].role === 'user') {
-                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]`;
+                            modifiedHistory[modifiedHistory.length - 1].text += `\n\n[STEERING HINT from USER, High Priority] ${hint.trim()} [/STEERING HINT]`;
                         } else {
                             // modifiedHistory.push({ role: 'user', text: `${(thinkingLevel !== 'Fast' && (aiProvider === 'Mistral' || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${(aiProvider === 'Mistral' || modelName.toLowerCase().startsWith('gemma')) ? "[system] **STRICTLY FOLLOW THINKING POLICY AS HIGH PRIORITY. DO NOT START A RESPONSE WITHOUT <think>...</think>** [/system]\n" : ""}` : ''}[STEERING HINT FROM USER] ${hint.trim()} [/STEERING HINT]` });
-                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT from USER, HIGH PRIORITY] ${hint.trim().toUpperCase()} [/STEERING HINT]` });
+                            modifiedHistory.push({ role: 'user', text: `[STEERING HINT from USER, High Priority] ${hint.trim()} [/STEERING HINT]` });
                         }
                     }
                     yield { type: 'status', content: `${hint.startsWith('/btw') ? 'Question Forwarded...' : 'Steering Hint Injected...'}` };
@@ -4390,9 +4390,10 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     if (process.stdout.isTTY) {
                                         terminalWidth = process.stdout.columns - 5 || 120;
                                     }
+                                    let hasNextSteering = steeringCallback?.() ?? null;
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : '\n'}`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasNextSteering ? '' : '\n'}`}`) };
                                     thisIsFirstToolFeedback = false;
                                 }
 

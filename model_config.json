@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "release": 20260902,
+    "version": 0,
+    "release": 20260903,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -9,8 +9,8 @@
         "deepseek_fast_fallback": "deepseek-v4-flash",
         "deepseek_level_1": "deepseek-v4-flash",
         "deepseek_level_2": "deepseek-v4-pro",
-        "mistral_janitor_fallback": "mistral-small-2506",
-        "mistral_level_1": "mistral-medium-2505",
+        "mistral_janitor_fallback": "",
+        "mistral_level_1": "",
         "nvidia_janitor_fallback": "mistralai/mistral-nemotron",
         "nvidia_chat_summarizer_fallback": "nvidia/nemotron-3-super-120b-a12b",
         "google_level_1": "gemini-3-flash-preview",
@@ -201,58 +201,10 @@
             }
         },
         "Mistral": {
-            "default_free": "mistral-large-2512",
-            "default_paid": "devstral-2512",
+            "default_free": "",
+            "default_paid": "",
             "models": {
-                "Free": [
-                    {
-                        "cmd": "--- Mistral Models ---",
-                        "desc": ""
-                    },
-                    {
-                        "cmd": "open-mistral-nemo",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-3b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-8b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "ministral-14b-2512",
-                        "multimodal": false,
-                        "desc": "Cost Saving (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "devstral-2512",
-                        "multimodal": false,
-                        "desc": "Devstral Coding (Text Only) [EXPERIMENTAL]"
-                    },
-                    {
-                        "cmd": "mistral-medium-2508",
-                        "multimodal": true,
-                        "hasReasoning": false,
-                        "desc": "Mistral Medium (Multimodal)"
-                    },
-                    {
-                        "cmd": "mistral-large-2512",
-                        "multimodal": true,
-                        "hasReasoning": false,
-                        "desc": "Mistral Large (Multimodal)"
-                    },
-                    {
-                        "cmd": "labs-leanstral-1-5-1",
-                        "multimodal": false,
-                        "hasReasoning": false,
-                        "desc": "Enable Lab  Models to access (Text Only) [EXPERIMENTAL]"
-                    }
-                ],
+                "Free": [],
                 "Paid": []
             }
         },

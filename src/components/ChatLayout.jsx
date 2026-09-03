@@ -1031,8 +1031,37 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
     if (msg.isVisualFeedback) {
         return (
             // [SPACE POINT]
-            <Box marginBottom={0} marginTop={0} paddingX={0} width="100%">
+            <Box marginBottom={0} marginTop={0} paddingX={1} width="100%">
                 <Text color={colors.text}>{msg.text}</Text>
+            </Box>
+        );
+    }
+
+    if (msg.isSteeringHint || (msg.role === 'user' && (msg.text?.startsWith('[STEERING HINT]') || msg.text?.startsWith('[QUESTION]')))) {
+        const isQuestion = msg.hintType === 'QUESTION' || msg.text?.startsWith('[QUESTION]');
+        const rawContent = msg.hintContent || (msg.text || '').replace(/^\[(?:STEERING HINT|QUESTION)\]\s*/i, '').trim();
+        const tagLabel = isQuestion ? 'QUESTION' : 'STEERING HINT';
+        const tagColor = isQuestion ? (colors.accent || '#c451d6') : (colors.primary || 'cyan');
+
+        return (
+            <Box marginBottom={0} marginTop={0} paddingX={1} width="100%">
+                <Box
+                    flexDirection="column"
+                    borderStyle="round"
+                    borderColor={colors.borderMuted}
+                    paddingX={1}
+                    paddingY={0}
+                    width={Math.max(20, columns - 2)}
+                >
+                    <Box justifyContent="space-between" width="100%">
+                        <Box flexDirection="row" gap={1}>
+                            <Text color={tagColor} bold>✦ {tagLabel}</Text>
+                        </Box>
+                    </Box>
+                    <Box marginTop={0} paddingLeft={2}>
+                        <Text color={colors.text} bold>└─ {rawContent}</Text>
+                    </Box>
+                </Box>
             </Box>
         );
     }

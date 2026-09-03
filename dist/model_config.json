@@ -1,5 +1,5 @@
 {
-    "version": 0,
+    "version": 1,
     "release": 20260902,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
@@ -370,7 +370,7 @@
                         "desc": "Multimodal"
                     },
                     {
-                        "cmd": "anthropic/claude-fable-5",
+                        "cmd": "anthropic/claude-fable-5.1",
                         "multimodal": true,
                         "desc": "Multimodal"
                     },

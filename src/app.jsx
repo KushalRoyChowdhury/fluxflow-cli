@@ -1195,6 +1195,8 @@ export default function App({ args = [] }) {
     const [sessionTotalTokens, setSessionTotalTokens] = useState(0);
     const [chatTokens, setChatTokens] = useState(0);
     const chatTokenStartRef = useRef(0);
+    const [chatCachedTokens, setChatCachedTokens] = useState(0);
+    const chatCachedTokenStartRef = useRef(0);
 
     const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState(0);
     const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState(0);
@@ -1217,11 +1219,13 @@ export default function App({ args = [] }) {
     useEffect(() => {
         if (chatLoadingRef.current) return;
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
+        const nextCachedTokens = sessionTotalCachedTokens - chatCachedTokenStartRef.current;
         setChatTokens(nextTokens);
+        setChatCachedTokens(nextCachedTokens);
         if (chatId) {
-            saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => { });
+            saveChatContext(chatId, nextTokens, sessionStats.tokens, nextCachedTokens).catch(() => { });
         }
-    }, [sessionTotalTokens, chatId, sessionStats.tokens]);
+    }, [sessionTotalTokens, sessionTotalCachedTokens, chatId, sessionStats.tokens]);
 
     useEffect(() => {
         if (activeView === 'apiTier') {
@@ -2313,8 +2317,10 @@ export default function App({ args = [] }) {
                     setChatId(id);
                     const savedData = await loadChatContext(id);
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                    chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
                     chatLoadingRef.current = false;
                     setChatTokens(savedData.total);
+                    setChatCachedTokens(savedData.cached || 0);
                     setSessionStats({ tokens: savedData.context });
 
                     const resumedMsgs = [...h[id].messages];
@@ -2798,13 +2804,6 @@ export default function App({ args = [] }) {
 
             setQueuedPrompt(hintText);
             queuedPromptRef.current = hintText;
-            setMessages(prev => {
-                setCompletedIndex(prev.length + 1);
-                const isBtw = hintText.startsWith('/btw');
-                const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, '') : hintText;
-                const prefix = isBtw ? '[QUESTION]' : '[STEERING HINT]';
-                return [...prev, { id: 'hint-' + Date.now(), role: 'user', text: `${prefix} \n${cleanText}`, color: 'magenta' }];
-            });
             setInput('');
             return;
         }
@@ -2849,8 +2848,10 @@ export default function App({ args = [] }) {
 
                                 const savedData = await loadChatContext(targetId);
                                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
                                 chatLoadingRef.current = false;
                                 setChatTokens(savedData.total);
+                                setChatCachedTokens(savedData.cached || 0);
                                 setSessionStats({ tokens: savedData.context });
 
                                 // Ensure logo is present at the start of resumed history
@@ -2994,7 +2995,9 @@ export default function App({ args = [] }) {
                     setSessionStats({ tokens: 0 });
                     setIsExpanded(false);
                     setChatTokens(0);
+                    setChatCachedTokens(0);
                     chatTokenStartRef.current = sessionTotalTokens;
+                    chatCachedTokenStartRef.current = sessionTotalCachedTokens;
                     setTimeout(() => {
                         if (global.gc) {
                             const gCAsync = async () => {
@@ -4106,33 +4109,7 @@ export default function App({ args = [] }) {
                         async () => {
                             // Use the Ref directly to avoid stale closure issues with current state
                             if (queuedPromptRef.current) {
-                                const p = queuedPromptRef.current;
-                                setQueuedPrompt(null);
-                                queuedPromptRef.current = null;
-
-                                // [SYNC] Mark the manual hint as "INJECTED" in the UI thread
-                                setMessages(prev => {
-                                    const index = [...prev].reverse().findIndex(m => m.text?.includes('[STEERING HINT: QUEUED]') || m.text?.includes('[QUESTION: QUEUED]'));
-                                    if (index !== -1) {
-                                        const actualIndex = prev.length - 1 - index;
-                                        const newMsgs = [...prev];
-                                        let text = newMsgs[actualIndex].text;
-                                        if (text.includes('[STEERING HINT: QUEUED]')) {
-                                            text = text.replace('[STEERING HINT: QUEUED]', '[STEERING HINT: INJECTED]');
-                                        } else if (text.includes('[QUESTION: QUEUED]')) {
-                                            text = text.replace('[QUESTION: QUEUED]', '[QUESTION: ASKED]');
-                                        }
-                                        newMsgs[actualIndex] = {
-                                            ...newMsgs[actualIndex],
-                                            text,
-                                            color: 'cyan'
-                                        };
-                                        return newMsgs;
-                                    }
-                                    return prev;
-                                });
-
-                                return p;
+                                return queuedPromptRef.current;
                             }
                             return null;
                         },
@@ -4167,6 +4144,28 @@ export default function App({ args = [] }) {
                             }
                         }
                         if (packet.type === 'status') {
+                            if (packet.content && (packet.content.includes('Steering Hint Injected') || packet.content.includes('Question Forwarded'))) {
+                                const hintText = queuedPromptRef.current;
+                                if (hintText) {
+                                    setMessages(prev => {
+                                        setCompletedIndex(prev.length + 1);
+                                        const isBtw = hintText.startsWith('/btw');
+                                        const cleanText = isBtw ? hintText.replace(/^\/btw\s*/, '') : hintText;
+                                        const prefix = isBtw ? '[QUESTION]' : '[STEERING HINT]';
+                                        return [...prev, {
+                                            id: 'hint-' + Date.now(),
+                                            role: 'user',
+                                            text: `${prefix} \n${cleanText}`,
+                                            color: 'cyan',
+                                            isSteeringHint: true,
+                                            hintType: isBtw ? 'QUESTION' : 'STEERING HINT',
+                                            hintContent: cleanText
+                                        }];
+                                    });
+                                    setQueuedPrompt(null);
+                                    queuedPromptRef.current = null;
+                                }
+                            }
 
                             if (!packet.content?.includes('[start]')) {
                                 setStatusText(packet.content);
@@ -5865,7 +5864,29 @@ export default function App({ args = [] }) {
                                     {sessionStats?.tokens > 0 && (
                                         <Box>
                                             <Box width={25}><Text color={colors.secondary}>Active Context:</Text></Box>
-                                            <Text color={colors.text}>{formatTokens(sessionStats.tokens)}</Text>
+                                            <Text color={colors.text}>
+                                                {formatTokens(sessionStats.tokens)}{' '}
+                                                {(() => {
+                                                    let maxLimit = 262144;
+                                                    const hc = process.env.HIGH_CONTEXT;
+                                                    const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
+                                                    if (hc && hc !== 'false') {
+                                                        const val = parseInt(hc, 10);
+                                                        if (!isNaN(val) && val >= 32000 && val <= 1000000) {
+                                                            maxLimit = val;
+                                                        }
+                                                    }
+                                                    if ((aiProvider === 'NVIDIA' && (activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium') || activeModel.includes('muse'))) || aiProvider === 'Mistral') {
+                                                        maxLimit = 128000;
+                                                    }
+                                                    if (aiProvider === 'Google' && activeModel?.includes('gemma') && gemma_nonsense) {
+                                                        maxLimit = 16000;
+                                                    }
+                                                    const pct = (sessionStats.tokens / maxLimit) * 100;
+                                                    const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
+                                                    return <Text color={color} dimColor>({pct.toFixed(0)}%)</Text>;
+                                                })()}
+                                            </Text>
                                         </Box>
                                     )}
                                     {sessionImageCount > 0 && (
@@ -6314,8 +6335,10 @@ export default function App({ args = [] }) {
 
                                     const savedData = await loadChatContext(id);
                                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
+                                    chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
                                     chatLoadingRef.current = false;
                                     setChatTokens(savedData.total);
+                                    setChatCachedTokens(savedData.cached || 0);
                                     setSessionStats({ tokens: savedData.context });
 
                                     // Ensure logo is present at the start of resumed history
@@ -6677,6 +6700,31 @@ export default function App({ args = [] }) {
                                     {activeSubagents.filter(sa => sa.status === 'running').map(sa => (
                                         <SubagentRow key={sa.id} sa={sa} showTPMEstimate={systemSettings.showTPMEstimate} />
                                     ))}
+                                </Box>
+                            </Box>
+                        )}
+                        {/* ⏳ QUEUED STEERING HINT BOX */}
+                        {queuedPrompt && (
+                            <Box
+                                flexDirection="column"
+                                borderStyle="round"
+                                borderColor={colors.borderMuted}
+                                paddingX={2}
+                                paddingY={0}
+                                width="100%"
+                                marginBottom={0}
+                            >
+                                <Box justifyContent="space-between" width="100%">
+                                    <Box flexDirection="row" gap={1}>
+                                        <Text color={colors.warning || 'yellow'} bold>
+                                            ✦ {queuedPrompt.startsWith('/btw') ? 'Question Queued' : 'Steering Hint Queued'}
+                                        </Text>
+                                    </Box>
+                                </Box>
+                                <Box marginTop={0} paddingLeft={2}>
+                                    <Text color={colors.text} bold>
+                                        └─ {queuedPrompt.startsWith('/btw') ? queuedPrompt.replace(/^\/btw\s*/, '') : queuedPrompt}
+                                    </Text>
                                 </Box>
                             </Box>
                         )}
@@ -7086,6 +7134,7 @@ export default function App({ args = [] }) {
                                 thinkingLevel={thinkingLevel}
                                 tokens={sessionStats.tokens}
                                 tokensTotal={chatTokens}
+                                cachedTokens={chatCachedTokens}
                                 chatId={chatId}
                                 isMemoryEnabled={systemSettings.memory}
                                 apiTier={apiTier}

@@ -45,7 +45,7 @@ const getLatencyColor = (delay) => {
     return '#ff0000';
 };
 
-const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0, theme = 'Dark', wps = 0, showTPMEstimate = false }) => {
+const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTotal = '0.0k', cachedTokens = 0, chatId = 'NEW-SESSION', isMemoryEnabled = true, apiTier = 'Free', aiProvider = 'Google', activeModel = '', isProcessing = false, lastChunkTime = 0, theme = 'Dark', wps = 0, showTPMEstimate = false }) => {
     const colors = getThemeColors(theme);
     const modeIcon = mode === 'Flux' ? '' : '';
     const [memoryUsage, setMemoryUsage] = useState(0);
@@ -265,11 +265,13 @@ const StatusBar = React.memo(({ mode, thinkingLevel, tokens = '0.0k', tokensTota
                     <>
                         <Box marginX={1}>
                             <Text color={colors.text}>
-                                {formatTokens(tokensTotal)}{' '}
+                                {formatTokens(tokensTotal)}
                                 {(() => {
-                                    const pct = (tokens / maxLimit) * 100;
-                                    const color = pct < 60 ? colors.text : pct < 80 ? colors.warning : colors.danger;
-                                    return <Text color={color} dimColor>{pct.toFixed(0)}%</Text>;
+                                    const total = typeof tokensTotal === 'number' ? tokensTotal : 0;
+                                    const cached = typeof cachedTokens === 'number' ? cachedTokens : 0;
+                                    const pct = total > 0 ? (cached / total) * 100 : 0;
+                                    if (pct <= 0) return null;
+                                    return <Text color={colors.success || 'green'} dimColor> {pct.toFixed(0)}%</Text>;
                                 })()}
                             </Text>
                         </Box>

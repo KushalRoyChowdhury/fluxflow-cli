@@ -78,5 +78,6 @@ ${coloredArt[3]}  ${textColor}FluxFlow ${grey('v' + version)}${reset}
 ${coloredArt[4]}
 ${coloredArt[5]}  ${bodyColor}See /help for additional commands.${reset}
 ${coloredArt[6]}  ${grey(quote)}
-${coloredArt[7]}`;
+${coloredArt[7]}
+`;
 };

@@ -122,8 +122,8 @@ export const saveChat = async (id, name, messages) => {
         const extractedFirst = extractPrompt(firstUserMsg);
 
         if (existingChat && existingChat.prompt) {
-            // Gacha: 50% chance to update prompt with latest user prompt if valid, otherwise retain existing
-            if (Math.random() < 0.50 && extractedLatest) {
+            // Gacha: 30% chance to update prompt with latest user prompt if valid, otherwise retain existing
+            if (Math.random() < 0.30 && extractedLatest) {
                 prompt = extractedLatest;
             } else {
                 prompt = existingChat.prompt;
@@ -480,12 +480,12 @@ export const getRangeByTokens = (history, startToken, endToken) => {
 
     return results;
 };
-export const saveChatContext = async (chatId, chatTokens, contextTokens) => {
+export const saveChatContext = async (chatId, chatTokens, contextTokens, cachedTokens = 0) => {
     return withLock(async () => {
         let contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) contextData = [];
 
-        const data = { total: chatTokens, context: contextTokens };
+        const data = { total: chatTokens, context: contextTokens, cached: cachedTokens };
         const existingIdx = contextData.findIndex(item => Object.keys(item)[0] === String(chatId));
         if (existingIdx !== -1) {
             contextData[existingIdx] = { [String(chatId)]: data };
@@ -499,12 +499,12 @@ export const saveChatContext = async (chatId, chatTokens, contextTokens) => {
 
 export const loadChatContext = async (chatId) => {
     try {
-        if (!(await fs.pathExists(CONTEXT_FILE))) return { total: 0, context: 0 };
+        if (!(await fs.pathExists(CONTEXT_FILE))) return { total: 0, context: 0, cached: 0 };
         const contextData = readEncryptedJson(CONTEXT_FILE, []);
-        if (!Array.isArray(contextData)) return { total: 0, context: 0 };
+        if (!Array.isArray(contextData)) return { total: 0, context: 0, cached: 0 };
         const entry = contextData.find(item => Object.keys(item)[0] === String(chatId));
-        return entry ? entry[String(chatId)] : { total: 0, context: 0 };
+        return entry ? { total: 0, context: 0, cached: 0, ...entry[String(chatId)] } : { total: 0, context: 0, cached: 0 };
     } catch (e) {
-        return { total: 0, context: 0 };
+        return { total: 0, context: 0, cached: 0 };
     }
 };
