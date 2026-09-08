@@ -1,6 +1,6 @@
 {
     "version": 0,
-    "release": 20260903,
+    "release": 20260908,
     "fallbacks": {
         "janitor_default": "gemini-3.1-flash-lite",
         "janitor_attempts_fallback": "gemma-4-26b-a4b-it",
@@ -136,9 +136,9 @@
                         "desc": "Multimodal"
                     },
                     {
-                        "cmd": "greg-1-mini",
-                        "multimodal": true,
-                        "desc": "Multimodal"
+                        "cmd": "glm-5.3-flash",
+                        "multimodal": false,
+                        "desc": "Text Only"
                     }
                 ],
                 "Paid": []
@@ -150,12 +150,17 @@
             "models": {
                 "Free": [
                     {
-                        "cmd": "Devstral-2-123B-Instruct-2512-int4-AutoRound",
+                        "cmd": "qwen38-flash-next",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
                     {
-                        "cmd": "Qwen3-Coder-Next-FP8",
+                        "cmd": "gemma-4-31B-it-fp8",
+                        "multimodal": false,
+                        "desc": "Text Only"
+                    },
+                    {
+                        "cmd": "gpt-oss-20b",
                         "multimodal": false,
                         "desc": "Text Only"
                     },
@@ -167,12 +172,17 @@
                     {
                         "cmd": "Qwen3.8-27B-FP8",
                         "multimodal": false,
-                        "desc": "Text Only"
+                        "desc": "Text Only (Paid)"
                     },
                     {
                         "cmd": "deepseek-v4-flash-0731",
                         "multimodal": false,
-                        "desc": "Text Only"
+                        "desc": "Text Only (Paid)"
+                    },
+                    {
+                        "cmd": "glm-5.3-flash",
+                        "multimodal": false,
+                        "desc": "Text Only (Paid)"
                     }
                 ],
                 "Paid": []
@@ -559,11 +569,6 @@
                     {
                         "cmd": "\n--- Meta Models ---",
                         "desc": ""
-                    },
-                    {
-                        "cmd": "meta/llama-3.3-70b-instruct",
-                        "multimodal": false,
-                        "desc": "Text Only"
                     },
                     {
                         "cmd": "meta/llama-3.2-90b-vision-instruct",
