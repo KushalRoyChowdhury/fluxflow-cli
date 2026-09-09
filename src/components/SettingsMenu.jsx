@@ -313,6 +313,7 @@ export default function SettingsMenu({
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
+                    { label: 'Image History for CU', value: 'imageHistoryCU', status: systemSettings.imageHistoryCU || 'Standard' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
@@ -593,6 +594,15 @@ export default function SettingsMenu({
         } else if (item.value === 'autoTruncateResults') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, autoTruncateResults: !s.autoTruncateResults };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'imageHistoryCU') {
+            const options = ['Low', 'Standard', 'Extended'];
+            const currentIndex = options.indexOf(systemSettings.imageHistoryCU || 'Standard');
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, imageHistoryCU: options[nextIndex] };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

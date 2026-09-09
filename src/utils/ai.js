@@ -2364,10 +2364,19 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             }
                         };
 
-                        // Strip old vision inlineData parts from previous turns to prevent accumulated image payload bloat
-                        for (const msg of modifiedHistory) {
-                            if (Array.isArray(msg.parts)) {
-                                msg.parts = msg.parts.filter(p => !p.inlineData);
+                        // Retain vision inlineData up to maxTurns based on settings (Low = 1, Standard = 3, Extended = 5)
+                        const historySetting = systemSettings?.imageHistoryCU || 'Standard';
+                        const maxImageTurns = historySetting === 'Low' ? 1 : historySetting === 'Extended' ? 5 : 3;
+
+                        // Identify messages that contain inlineData
+                        const msgsWithImages = modifiedHistory.filter(msg => Array.isArray(msg.parts) && msg.parts.some(p => p.inlineData));
+                        if (msgsWithImages.length >= maxImageTurns) {
+                            const excessCount = msgsWithImages.length - maxImageTurns + 1;
+                            for (let i = 0; i < excessCount; i++) {
+                                const msgToStrip = msgsWithImages[i];
+                                if (Array.isArray(msgToStrip.parts)) {
+                                    msgToStrip.parts = msgToStrip.parts.filter(p => !p.inlineData);
+                                }
                             }
                         }
 

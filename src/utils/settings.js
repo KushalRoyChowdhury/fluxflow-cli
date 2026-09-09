@@ -52,7 +52,8 @@ const DEFAULT_SETTINGS = {
         indentationTree: true,
         ollamaEndpoint: 'Cloud',
         compressToolResults: false,
-        autoTruncateResults: false
+        autoTruncateResults: false,
+        imageHistoryCU: 'Standard'
     },
     profileData: {
         name: null,
