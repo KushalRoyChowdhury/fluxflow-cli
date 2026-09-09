@@ -98,7 +98,7 @@ Documentation: https://fluxflow-cli.onrender.com
 * Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → references/PLUGINS.md
 * Agent Architecture & Memory System → references/ARCHITECTURE.md
 
-Default Context Length: 256k Tokens. Want Change? → references/ENV.md
+Default Context Length: 256k Tokens. Can be changed via ENV
 
 Docs missing required info? Say you are not sure enough to answer. Dont give wrong info`,
 
