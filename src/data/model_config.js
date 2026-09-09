@@ -149,17 +149,19 @@ export const loadRemoteModelConfig = async () => {
     return true;
 };
 
-let customOllamaMultimodal = false;
+let customMultimodal = false;
 
-export const setOllamaMultimodal = (enabled) => {
-    customOllamaMultimodal = !!enabled;
+export const setCustomMultimodal = (enabled) => {
+    customMultimodal = !!enabled;
 };
+
+export const setOllamaMultimodal = setCustomMultimodal;
 
 export const isModelMultimodal = (model) => {
     if (!model) return false;
     const lower = model.trim().toLowerCase();
 
-    if (customOllamaMultimodal) return true;
+    if (customMultimodal) return true;
 
     // O(1) set lookup
     if (multimodalModelsSet.has(lower)) return true;

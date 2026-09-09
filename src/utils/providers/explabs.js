@@ -1,6 +1,7 @@
 import { fetchWithBackoff } from './_shared.js';
+import fs from 'fs';
 
-export const getDeepSeekStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
+export const getExpLabsStream = async function* (apiKey, model, contents, systemInstruction, thinkingLevel, mode, isMultiModal, signal, temperature = 1.0) {
     const messages = [];
     if (systemInstruction) {
         messages.push({ role: 'system', content: systemInstruction });
@@ -14,10 +15,9 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
             for (const part of content.parts) {
                 if (part.text) {
                     msgContent.push({ type: 'text', text: part.text });
-                } else if ((part.inlineData || part.inline_data) && isMultiModal) {
-                    const inlineData = part.inlineData || part.inline_data;
-                    const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/jpeg';
-                    const data = inlineData.data;
+                } else if (part.inlineData && isMultiModal) {
+                    const mimeType = part.inlineData.mimeType;
+                    const data = part.inlineData.data;
                     const isImage = mimeType.startsWith('image/');
 
                     if (isImage) {
@@ -41,42 +41,46 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
         });
     }
 
+    const reasoningEffortMap = {
+        'Fast': 'low',
+        'Low': 'low',
+        'Medium': 'medium',
+        'Standard': 'medium',
+        'High': 'high',
+        'xHigh': 'high'
+    };
+
     const requestPayload = {
         model: model,
         messages: messages,
         stream: true,
         stream_options: { include_usage: true },
-        temperature: temperature,
+        temperature: temperature
     };
 
-    // DeepSeek Specific Reasoning
-    if (thinkingLevel !== 'Fast') {
-        const reasoningEffortMap = {
-            'Low': 'high',
-            'Medium': 'high',
-            'Standard': 'high',
-            'High': 'max',
-            'xHigh': 'max'
-        };
-        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel] || 'high';
-        requestPayload.extra_body = { thinking: { type: "enabled" } };
-    } else {
-        requestPayload.extra_body = { thinking: { type: "disabled" } };
+    if (reasoningEffortMap[thinkingLevel]) {
+        requestPayload.reasoning_effort = reasoningEffortMap[thinkingLevel];
     }
 
-    const response = await fetchWithBackoff('https://api.deepseek.com/chat/completions', {
+    const baseUrl = process.env.EXPLABS_URL || process.env.EXPERIENTIALLABS_URL || 'https://api.experientiallabs.ai/v1/chat/completions';
+
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+
+    const effectiveKey = apiKey || process.env.EXPLABS_API_KEY || process.env.EXPERIENTIALLABS_API_KEY || '';
+    headers['Authorization'] = `Bearer ${effectiveKey}`;
+
+    const response = await fetchWithBackoff(baseUrl, {
         method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify(requestPayload),
         signal: signal
     });
 
     if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(`DeepSeek Error (${response.status}): ${errData.error?.message || response.statusText}`);
+        throw new Error(`Experiential Labs Error (${response.status}): ${errData.error?.message || errData.message || response.statusText}`);
     }
 
     const reader = response.body.getReader();
@@ -104,6 +108,8 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
         const lines = buffer.split('\n');
         buffer = lines.pop();
 
+        // fs.appendFileSync("./debug.log", JSON.stringify(lines) + "\n\n");
+
         for (const line of lines) {
             const cleanLine = line.trim();
             if (!cleanLine || !cleanLine.startsWith('data: ')) continue;
@@ -115,24 +121,24 @@ export const getDeepSeekStream = async function* (apiKey, model, contents, syste
                     const json = JSON.parse(cleanLine.substring(6));
                     const delta = json.choices?.[0]?.delta;
                     const usage = json.usage;
-                    if (json.choices?.[0]?.finish_reason) {
-                        isDone = true;
-                    }
 
                     if (usage) {
                         latestUsageMetadata = {
-                            totalTokenCount: usage.total_tokens || (usage.prompt_tokens + usage.completion_tokens),
+                            totalTokenCount: usage.total_tokens || ((usage.prompt_tokens || 0) + (usage.completion_tokens || 0)),
                             promptTokenCount: usage.prompt_tokens || 0,
                             candidatesTokenCount: usage.completion_tokens || 0,
                             cachedContentTokenCount: usage.prompt_tokens_details?.cached_tokens || 0,
-                            thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || 0
+                            thoughtsTokenCount: usage.completion_tokens_details?.reasoning_tokens || usage.reasoning_tokens || 0
                         };
                         hasNewData = true;
                     }
 
                     if (delta) {
-                        // DeepSeek uses reasoning_content
-                        const thought = delta.reasoning_content || null;
+                        let thought = delta.reasoning_content || delta.reasoning || null;
+                        if (!thought && Array.isArray(delta.reasoning_details) && delta.reasoning_details.length > 0) {
+                            thought = delta.reasoning_details.map(d => d.text || '').filter(Boolean).join('');
+                        }
+
                         if (thought) {
                             pendingParts.push({ text: thought, thought: true });
                             hasNewData = true;

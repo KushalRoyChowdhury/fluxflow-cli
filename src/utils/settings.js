@@ -26,7 +26,8 @@ const DEFAULT_SETTINGS = {
             OpenRouter: 'Free',
             InferX: 'Free',
             SenseNova: 'Free',
-            Poolside: 'Free'
+            Poolside: 'Free',
+            ExpLabs: 'Free'
         }
     },
     systemSettings: {

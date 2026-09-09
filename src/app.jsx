@@ -32,7 +32,7 @@ import { WITTY_LOADING_PHRASES } from './data/witty_phrases.js';
 import Gradient from 'ink-gradient';
 import RevertModal from './components/RevertModal.jsx';
 import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initUsage, forceFlushUsage, getImageQuotaStats, runtimeSession } from './utils/usage.js';
-import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setOllamaMultimodal, isModelMultimodal } from './data/model_config.js';
+import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal } from './data/model_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
 import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
@@ -796,7 +796,7 @@ export default function App({ args = [] }) {
                 const envModel = process.env.SUBAGENT_MODEL ? process.env.SUBAGENT_MODEL.trim() : null;
                 const envProviderRaw = process.env.SUBAGENT_PROVIDER ? process.env.SUBAGENT_PROVIDER.trim() : null;
 
-                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router'];
+                const ALL_PROVIDERS = ['Google', 'DeepSeek', 'OpenRouter', 'NVIDIA', 'Mistral', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', '9router', 'ExpLabs'];
                 const normalizeProvider = (pStr) => {
                     if (!pStr) return null;
                     const lower = pStr.toLowerCase();
@@ -812,6 +812,7 @@ export default function App({ args = [] }) {
                     if (lower === 'poolside') return 'Poolside';
                     if (lower === '9router') return '9router';
                     if (lower === 'aihubmix' || lower === 'aihub') return 'AIHubMix';
+                    if (lower === 'explabs' || lower === 'experientiallabs' || lower === 'experimentallabs' || lower === 'experiential labs' || lower === 'experimental labs' || lower === 'experiential' || lower === 'experimental') return 'ExpLabs';
                     return null;
                 };
 
@@ -1284,7 +1285,7 @@ export default function App({ args = [] }) {
                     setThinkingLevel('High');
                     return;
                 }
-                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI' || aiProvider === 'OpenRouter';
+                const hasStandard = aiProvider === 'DeepSeek' || aiProvider === 'NVIDIA' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'Ollama' || aiProvider === 'CroAI' || aiProvider === 'OpenRouter' || aiProvider === 'ExpLabs';
                 setThinkingLevel(hasStandard ? 'Standard' : 'Medium');
 
             }
@@ -2504,6 +2505,10 @@ export default function App({ args = [] }) {
                 prefix: '',
                 minLength: 0,
             },
+            ExpLabs: {
+                prefix: 'xpl_',
+                minLength: 0,
+            },
         };
 
         const { prefix, minLength } = validators[aiProvider] ?? {
@@ -2528,7 +2533,7 @@ export default function App({ args = [] }) {
                 defaultModel = 'deepseek-ai/deepseek-v4-flash';
             } else if (aiProvider === 'Ollama' || aiProvider === '9router') {
                 defaultModel = activeModel || '';
-            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside') {
+            } else if (aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === 'ExpLabs') {
                 defaultModel = getDefaultModel(aiProvider, apiTier) || '';
             }
             setActiveModel(defaultModel);
@@ -2538,13 +2543,13 @@ export default function App({ args = [] }) {
                 newSys = { ...newSys, ollamaEndpoint: 'Local' };
                 setSystemSettings(newSys);
             }
-            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router') {
+            if (aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs') {
                 newSys = { ...newSys, memory: false };
                 setSystemSettings(newSys);
             }
             saveSettings({ aiProvider, activeModel: defaultModel, systemSettings: newSys });
 
-            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
+            setMessages(prev => [...prev, { role: 'system', text: `✦ ${aiProvider} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model set to ${defaultModel}.` : ''}${isOllamaLocalEscape && aiProvider === 'Ollama' ? '\n✦ Ollama Endpoint switched to Local.\n  └─⠀' : '\n\n✦⠀'}${aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' ? `Memory is not available with ${aiProvider}.\n  └─⠀` : ''}Initialization complete.\n⠀`, isMeta: true }]);
         } else {
             setMessages(prev => [
                 ...prev,
@@ -2622,7 +2627,7 @@ export default function App({ args = [] }) {
         { cmd: '/chats', desc: 'List all chat sessions' },
         { cmd: '/btw', desc: 'Ask a question without intefering with ongoing tasks' },
         {
-            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'Ollama' || aiProvider === 'DeepSeek'
+            cmd: '/thinking', desc: 'Set AI reasoning depth', subs: aiProvider === 'Ollama' || aiProvider === 'DeepSeek' || aiProvider === 'ExpLabs'
                 ? [
                     { cmd: 'Fast', desc: 'Reasoning Disabled' },
                     { cmd: 'Standard', desc: 'Standard Reasoning' },
@@ -2647,32 +2652,32 @@ export default function App({ args = [] }) {
                                 { cmd: 'Fast', desc: 'Reasoning Disabled' },
                                 { cmd: 'xHigh', desc: 'Deep Reasoning' }
                             ]
-                        : aiProvider === 'Poolside'
-                            ? [
-                                { cmd: 'Fast', desc: 'Reasoning Disabled' },
-                                { cmd: 'High', desc: 'Extended Reasoning' }
-                            ]
-                        : (aiProvider === '9router' || aiProvider === '9Router')
-                            ? [
-                                { cmd: 'Fast', desc: 'None (Reasoning Disabled)' },
-                                { cmd: 'Low', desc: 'Low Reasoning' },
-                                { cmd: 'Medium', desc: 'Medium Reasoning' },
-                                { cmd: 'High', desc: 'High Reasoning' }
-                            ]
-                            : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova')
+                            : aiProvider === 'Poolside'
                                 ? [
-                                    { cmd: 'Fast', desc: 'Fastest' },
-                                    { cmd: 'Low', desc: 'Quick Reasoning' },
-                                    { cmd: 'Standard', desc: 'Balanced Reasoning' },
-                                    { cmd: 'High', desc: 'Deep Reasoning' }
+                                    { cmd: 'Fast', desc: 'Reasoning Disabled' },
+                                    { cmd: 'High', desc: 'Extended Reasoning' }
                                 ]
-                                : [ // Google General / Gemma
-                                    { cmd: 'Fast', desc: 'Fastest' },
-                                    { cmd: 'Low', desc: 'Quick Reasoning' },
-                                    { cmd: 'Medium', desc: 'Balanced Reasoning' },
-                                    { cmd: 'High', desc: 'Deep Reasoning' },
-                                    { cmd: 'xHigh', desc: 'Extended Reasoning' }
-                                ]
+                                : (aiProvider === '9router' || aiProvider === '9Router')
+                                    ? [
+                                        { cmd: 'Fast', desc: 'None (Reasoning Disabled)' },
+                                        { cmd: 'Low', desc: 'Low Reasoning' },
+                                        { cmd: 'Medium', desc: 'Medium Reasoning' },
+                                        { cmd: 'High', desc: 'High Reasoning' }
+                                    ]
+                                    : activeModel && (activeModel.toLowerCase().startsWith('gemini-3') || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova')
+                                        ? [
+                                            { cmd: 'Fast', desc: 'Fastest' },
+                                            { cmd: 'Low', desc: 'Quick Reasoning' },
+                                            { cmd: 'Standard', desc: 'Balanced Reasoning' },
+                                            { cmd: 'High', desc: 'Deep Reasoning' }
+                                        ]
+                                        : [ // Google General / Gemma
+                                            { cmd: 'Fast', desc: 'Fastest' },
+                                            { cmd: 'Low', desc: 'Quick Reasoning' },
+                                            { cmd: 'Medium', desc: 'Balanced Reasoning' },
+                                            { cmd: 'High', desc: 'Deep Reasoning' },
+                                            { cmd: 'xHigh', desc: 'Extended Reasoning' }
+                                        ]
         },
         {
             cmd: '/model',
@@ -3070,7 +3075,7 @@ export default function App({ args = [] }) {
                         }
 
                         setActiveDisplay(newDisplay);
-                        saveSettings({ display: newDisplay }).catch(() => {});
+                        saveSettings({ display: newDisplay }).catch(() => { });
                         const displayName = newDisplay === 0 ? 'Primary (Display 1)' : 'Secondary (Display 2)';
                         setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ Active Computer Use display set to: ${displayName}.\n⠀`, isMeta: true }]; });
                     } else {
@@ -3252,16 +3257,11 @@ export default function App({ args = [] }) {
                     if (parts[1]) {
                         const rawArgs = parts.slice(1);
                         let isMultimodalFlag = false;
-                        let invalidFlagError = false;
 
                         const filteredParts = [];
                         for (const arg of rawArgs) {
                             if (arg === '--multimodal' || arg === '-m') {
-                                if (aiProvider === 'Ollama') {
-                                    isMultimodalFlag = true;
-                                } else {
-                                    invalidFlagError = true;
-                                }
+                                isMultimodalFlag = true;
                             } else {
                                 filteredParts.push(arg);
                             }
@@ -3269,21 +3269,7 @@ export default function App({ args = [] }) {
 
                         const mod = filteredParts.join(' ');
 
-                        if (aiProvider === 'Ollama') {
-                            setOllamaMultimodal(isMultimodalFlag);
-                        }
-
-                        if (invalidFlagError) {
-                            setMessages(prev => {
-                                setCompletedIndex(prev.length + 1);
-                                return [...prev, {
-                                    id: Date.now(),
-                                    role: 'system',
-                                    text: `✦ ERROR\n⠀⠀\x1b[2m└─\x1b[22m Flag --multimodal / -m is unavailable for provider "${aiProvider}". Flag ignored.\n⠀`,
-                                    isMeta: true
-                                }];
-                            });
-                        }
+                        setCustomMultimodal(isMultimodalFlag);
 
                         if (mod) {
                             const freeDefault = getDefaultModel('Google', 'Free');
@@ -3301,7 +3287,8 @@ export default function App({ args = [] }) {
                                 setActiveModel(paidDefault);
                             } else {
                                 setActiveModel(mod);
-                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${thinkingLevel}${aiProvider === 'Ollama' ? `\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMultimodalFlag ? 'ON' : 'OFF'}` : ''}\n⠀`, isMeta: true }]; });
+                                const isMmActive = isMultimodalFlag || isModelMultimodal(mod);
+                                setMessages(prev => { setCompletedIndex(prev.length + 1); return [...prev, { id: Date.now(), role: 'system', text: `✦ ${aiProvider}\n⠀⠀\x1b[2m└─\x1b[22m ${mod}\n⠀⠀\x1b[2m└─\x1b[22m Thinking Level: ${thinkingLevel}\n⠀⠀\x1b[2m└─\x1b[22m Multimodal: ${isMmActive ? 'ON' : 'OFF'}\n⠀`, isMeta: true }]; });
                             }
                         }
                     } else {
@@ -3576,7 +3563,8 @@ export default function App({ args = [] }) {
                                 InferX: 'Free',
                                 SenseNova: 'Free',
                                 AIHubMix: 'Free',
-                                Poolside: 'Free'
+                                Poolside: 'Free',
+                                ExpLabs: 'Free'
                             }
                         };
                         setQuotas(defaultQuotas);
@@ -3602,7 +3590,7 @@ export default function App({ args = [] }) {
                         const targetDir = path.normalize(FLUXFLOW_DIR);
                         try {
                             fs.ensureDirSync(targetDir);
-                        } catch (e) {}
+                        } catch (e) { }
                         const platform = process.platform;
                         if (platform === 'win32') {
                             exec(`explorer "${targetDir}"`);
@@ -3620,7 +3608,7 @@ export default function App({ args = [] }) {
                             targetDir = path.normalize(FLUXFLOW_DIR);
                             try {
                                 fs.ensureDirSync(targetDir);
-                            } catch (err) {}
+                            } catch (err) { }
                         }
                         const platform = process.platform;
                         if (platform === 'win32') {
@@ -4971,6 +4959,7 @@ export default function App({ args = [] }) {
                             { label: 'SenseNova', value: 'SenseNova' },
                             { label: 'CrofAI', value: 'CrofAI' },
                             { label: 'Poolside', value: 'Poolside' },
+                            { label: 'Experiential Labs', value: 'ExpLabs' },
                             ...(process.env.ENABLE_9ROUTER === 'true' || process.env.ENABLE_9ROUTER === true ? [{ label: '9router', value: '9router' }] : []),
                             { label: 'Ollama', value: 'Ollama' },
                             { label: 'AIHubMix       [EXPERIMENTAL]', value: 'AIHubMix' },
@@ -4996,7 +4985,7 @@ export default function App({ args = [] }) {
                                 const defaultModel = getDefaultModel(selectedProvider, targetTier);
                                 setActiveModel(defaultModel);
                                 setApiTier(targetTier);
-                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router') {
+                                if ((selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs') {
                                     setSystemSettings(s => ({ ...s, memory: false }));
                                     saveSettings({ aiProvider: selectedProvider, activeModel: defaultModel, apiTier: targetTier, quotas, systemSettings: { ...systemSettings, memory: false } });
                                 } else {
@@ -5006,7 +4995,7 @@ export default function App({ args = [] }) {
                                     ...prev,
                                     {
                                         role: 'system',
-                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
+                                        text: `✦ Switched to ${selectedProvider} (cached)!${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}.` : ''}${(selectedProvider === 'Ollama' || selectedProvider === 'CrofAI' || selectedProvider === 'InferX' || selectedProvider === 'SenseNova' || selectedProvider === 'AIHubMix' || selectedProvider === 'Poolside' || selectedProvider === '9router' || selectedProvider === 'ExpLabs') && systemSettings.memory ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${selectedProvider}.` : ''}${selectedProvider === 'NVIDIA' && process.env.NVIDIA_BASE_URL && systemSettings.memory ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with Custom Endpoints.' : ''}\n⠀`,
                                         isMeta: true
                                     }
                                 ]);
@@ -5169,7 +5158,7 @@ export default function App({ args = [] }) {
                 );
 
             case 'providerBudgetSelect': {
-                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'];
+                const PROVIDERS_LIST = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs'];
                 const anySelected = PROVIDERS_LIST.some(p => pbsSelected[p]);
                 return (
                     <Box flexDirection="column" borderStyle="round" borderColor={colors.borderMuted} padding={0} width="100%">
@@ -5377,7 +5366,7 @@ export default function App({ args = [] }) {
                 const isFreeTier = apiTier !== 'Paid';
                 const usingProviderBudgets = !!(quotas.providerBudgets?.__useProvider);
                 const providerBudgetsMap = quotas.providerBudgets || {};
-                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside'].filter(
+                const configuredProviders = ['Google', 'DeepSeek', 'Mistral', 'NVIDIA', 'OpenRouter', 'Ollama', 'CrofAI', 'InferX', 'SenseNova', 'AIHubMix', 'Poolside', 'ExpLabs'].filter(
                     p => providerBudgetsMap[p] && (providerBudgetsMap[p].agentLimit || providerBudgetsMap[p].tokenLimit || providerBudgetsMap[p].monthlyTokenLimit)
                 );
                 const limitsNotSet = !usingProviderBudgets && (shouldClearValue(reqLimit) || shouldClearValue(tokenLimit) || shouldClearValue(monthlyLimit));
@@ -5623,14 +5612,14 @@ export default function App({ args = [] }) {
                                         newSettings.activeModel = defaultModel;
                                         newSettings.apiTier = targetTier;
 
-                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router') {
+                                        if ((prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) || prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs') {
                                             setSystemSettings(s => ({ ...s, memory: false }));
                                             newSettings.systemSettings = { ...systemSettings, memory: false };
                                         }
 
                                         setMessages(prev => {
                                             setCompletedIndex(prev.length + 1);
-                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
+                                            return [...prev, { id: Date.now(), role: 'system', text: `✦ ${prov} API Key saved successfully! ${defaultModel ? `\n⠀⠀\x1b[2m└─\x1b[22m Model: ${defaultModel}` : ''}${prov === 'Ollama' && keyInput === 'LOCAL' ? '\n⠀⠀\x1b[2m└─\x1b[22m Ollama Endpoint automatically switched to Local' : ''}${prov === 'Ollama' || prov === 'CrofAI' || prov === 'InferX' || prov === 'SenseNova' || prov === 'AIHubMix' || prov === 'Poolside' || prov === '9router' || prov === 'ExpLabs' ? `\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available with ${prov}` : ''}${(prov === 'NVIDIA' && process.env.NVIDIA_BASE_URL) ? '\n⠀⠀\x1b[2m└─\x1b[22m Memory is not available' : ''}\n⠀⠀`, isMeta: true }];
                                         });
                                     }
 
@@ -6578,7 +6567,7 @@ export default function App({ args = [] }) {
                             }
                             const newDisplay = Number(item.value);
                             setActiveDisplay(newDisplay);
-                            saveSettings({ display: newDisplay }).catch(() => {});
+                            saveSettings({ display: newDisplay }).catch(() => { });
                             const displayName = newDisplay === 0 ? 'Primary (Display 1)' : 'Secondary (Display 2)';
                             setMessages(prev => {
                                 setCompletedIndex(prev.length + 1);

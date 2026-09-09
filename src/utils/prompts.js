@@ -377,8 +377,8 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `critical thinking policy
-- Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}
-${TOOL_PROTOCOL(mode, osDetected, aiProvider.toLowerCase() === 'deepseek' ? false : isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec)}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
+Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}${aiProvider === 'ExpLabs' ? `Before calling tools: Briefly state plan, rationale & path chosen in text\n` : ''}No text after tool call in same turn\n
+${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec)}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}${mode === 'Flow' ? '\n\n-- CHAT FORMATTING --\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===
 

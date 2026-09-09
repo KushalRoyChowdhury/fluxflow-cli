@@ -1,6 +1,15 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.9.0": {
+        "note": "SEPTEMBER 10",
+        "added": [
+            "Added new Provider: Experimental Labs (Experimental Implementation).",
+            "Added support for multimodal inputs in Deepseek API."
+        ],
+        "changed": [],
+        "fixes": []
+    },
     "4.8.5": {
         "note": "SEPTEMBER 02",
         "added": [],

@@ -61,6 +61,7 @@ import { getSenseNovaStream } from './providers/sensenova.js';
 import { getAIHubMixStream } from './providers/aihubmix.js';
 import { getPoolsideStream } from './providers/poolside.js';
 import { getNineRouterStream } from './providers/9router.js';
+import { getExpLabsStream } from './providers/explabs.js';
 
 
 // ─── Stutter Detection – pre-compiled regexes (module scope, compiled once) ───
@@ -407,7 +408,7 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
 
     const { onStatus, onMemoryUpdated, onBackgroundIncrement } = callbacks;
     const { profile, thinkingLevel, mode, janitorModel, chatId, systemSettings, sessionStats, aiProvider = 'Google', apiKey } = settings;
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || aiProvider === 'Ollama' || aiProvider === 'CrofAI' || aiProvider === 'InferX' || aiProvider === 'SenseNova' || aiProvider === 'AIHubMix' || aiProvider === 'Poolside' || aiProvider === '9router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
 
     // Harvest persistent user memories (Duplicate of logic in getAIStream for background context)
     const persistentStorage = readEncryptedJson(MEMORIES_FILE, []);
@@ -667,6 +668,21 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         const iterator = stream[Symbol.asyncIterator]();
                         const firstResult = await iterator.next();
                         return { iterator, firstResult };
+                    } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
+                        const stream = getExpLabsStream(
+                            apiKey,
+                            targetModel || getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813',
+                            janitorContents,
+                            janitorPrompt,
+                            'Fast',
+                            mode,
+                            false,
+                            null,
+                            0.7
+                        );
+                        const iterator = stream[Symbol.asyncIterator]();
+                        const firstResult = await iterator.next();
+                        return { iterator, firstResult };
                     } else {
                         const googleClient = getGoogleClient(apiKey);
                         const stream = await googleClient.models.generateContentStream({
@@ -735,9 +751,11 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                         ? getFallbackValue('nvidia_janitor_fallback')
                         : (effectiveProvider === 'DeepSeek'
                             ? getFallbackValue('deepseek_fast_fallback')
-                            : (effectiveProvider === 'OpenRouter'
-                                ? getFallbackValue('janitor_open_router')
-                                : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google')))));
+                            : (effectiveProvider === 'ExpLabs' || effectiveProvider === 'ExperientialLabs'
+                                ? (getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813')
+                                : (effectiveProvider === 'OpenRouter'
+                                    ? getFallbackValue('janitor_open_router')
+                                    : (janitorModel || (attempts === MAX_JANITOR_RETRIES ? getFallbackValue('janitor_default') : getFallbackValue('gemma_janitor_fallback_google'))))));
                     await addToUsage('tokens', total, effectiveProvider, jModel);
                     if (cached > 0) {
                         await addToUsage('cachedTokens', cached, effectiveProvider, jModel);
@@ -1322,6 +1340,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
                 stream = getPoolsideStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else if (aiProvider === '9router' || aiProvider === '9Router') {
                 stream = getNineRouterStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
+            } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
+                stream = getExpLabsStream(apiKey, model, normalizedContents, systemInstruction, thinkingLevel, mode, isModelMultimodal(model), signal, temperature);
             } else {
                 const googleClient = getGoogleClient(apiKey);
                 const genStream = await googleClient.models.generateContentStream({
@@ -1591,6 +1611,7 @@ export const compressHistory = async (settings, history, isAuto = false) => {
         if (aiProvider === 'AIHubMix') targetModel = getFallbackValue('aihubmix_fallback');
         if (aiProvider === 'Poolside') targetModel = getFallbackValue('poolside_fallback');
         if (aiProvider === '9router' || aiProvider === '9Router') targetModel = getFallbackValue('9router_fallback');
+        if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') targetModel = getFallbackValue('explabs_fallback') || 'deepseek-v4-pro-0813';
 
         let attempts = 0;
         let success = false;
@@ -1673,7 +1694,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
     //     throw new Error(`Error: Budget Exhausted for Provider (${aiProvider || 'Agent'})`);
     // }
 
-    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router') ? false : systemSettings?.memory !== false;
+    const isMemoryEnabled = (process.env.NVIDIA_BASE_URL || settings?.aiProvider === 'Ollama' || settings?.aiProvider === 'CrofAI' || settings?.aiProvider === 'InferX' || settings?.aiProvider === 'SenseNova' || settings?.aiProvider === 'AIHubMix' || settings?.aiProvider === 'Poolside' || settings?.aiProvider === '9router' || settings?.aiProvider === 'ExpLabs' || settings?.aiProvider === 'ExperientialLabs') ? false : systemSettings?.memory !== false;
     const originalText = history[history.length - 1].text;
     const summariesFile = path.join(SECRET_DIR, 'chat-summaries.json');
     let wasCompressedInStream = false;
@@ -1769,12 +1790,12 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             contextTruncationCount = 16000;
         }
 
-        if ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router') && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') && (sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'text', content: '✦ Maximum Context Limit Reached. Start a new chat.' };
             return;
         }
 
-        if (aiProvider !== 'Ollama' && aiProvider !== '9router' && aiProvider !== '9Router' && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if (aiProvider !== 'Ollama' && aiProvider !== '9router' && aiProvider !== '9Router' && aiProvider !== 'ExpLabs' && aiProvider !== 'ExperientialLabs' && (sessionStats?.tokens || 0) > contextCompressionCount) {
             yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
             const newSummary = await compressHistory(settings, modifiedHistory, true);
             if (newSummary) {
@@ -2892,6 +2913,18 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         );
                     } else if (aiProvider === '9router' || aiProvider === '9Router') {
                         stream = getNineRouterStream(
+                            settings.apiKey,
+                            targetModel,
+                            activeContents,
+                            currentSystemInstruction,
+                            thinkingLevel,
+                            mode,
+                            isMultiModal,
+                            abortController.signal,
+                            1.0
+                        );
+                    } else if (aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') {
+                        stream = getExpLabsStream(
                             settings.apiKey,
                             targetModel,
                             activeContents,
@@ -4599,7 +4632,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                         let hasHint = false;
                                         if (hint) {
                                             hasHint = hint.trim().length > 0;
-                                        } 
+                                        }
 
                                         yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${output}${hasHint ? '' : '\n'}`) };
                                         thisIsFirstToolFeedback = false;
