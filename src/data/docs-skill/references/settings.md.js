@@ -47,4 +47,5 @@ Open in chat via /settings
 * Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Classic (More Tokens)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)
 * Auto Truncate Results → Auto-truncate tool results after task finished to save token and improve caching
+* Image History for CU → Number of images to keep in context for Computer Use. Low (1 image, Low Context Accuracy, Token Efficient) / Standard (3 images, Better Accuracy, Higher Token Usage) / Extended (5 images, Better for complex tasks, Highest Token Usage)
 `;
