@@ -7,7 +7,6 @@ import os from 'os';
 import { readEncryptedJson } from './crypto.js';
 import { MEMORIES_FILE, LOGS_DIR, FLUXFLOW_DIR } from './paths.js';
 import { loadSettings } from './settings.js';
-import screenshotDesktop from 'screenshot-desktop';
 import { createAboutSkill } from './about_skill.js';
 
 export const getCaseInsensitiveFilePath = (dir, fileNames) => {
@@ -243,6 +242,7 @@ let isSecondary = false;
     try {
         const settings = await loadSettings();
         if (Number(settings?.display) === 1) {
+            const { default: screenshotDesktop } = await import('screenshot-desktop');
             const displays = await screenshotDesktop.listDisplays();
             if (displays && displays.length > 1) {
                 isSecondary = true;

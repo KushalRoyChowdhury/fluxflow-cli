@@ -1,25 +1,8 @@
-import dotenv from 'dotenv';
-import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR, FLUXFLOW_DIR } from './paths.js';
+import { LOGS_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, MEMORIES_FILE, PATHS_FILE, SECRET_DIR } from './paths.js';
 
-// Base generic envs
-dotenv.config({ path: './.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.env`, override: true, quiet: true });
-
-// Legacy custom envs (for backward compatibility)
-dotenv.config({ path: './agents.env', override: true, quiet: true });
-dotenv.config({ path: './.agents.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/agents.env`, override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.agents.env`, override: true, quiet: true });
-dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
-
-// Conventional custom envs (.env.<name>)
-dotenv.config({ path: `${FLUXFLOW_DIR}/.env.agents`, override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.env.fluxflow`, override: true, quiet: true });
-dotenv.config({ path: './.env.agents', override: true, quiet: true });
-dotenv.config({ path: './.env.fluxflow', override: true, quiet: true });
+// NOTE: dotenv is already fully initialised by src/cli.jsx (all 14 env paths, in
+// the same order) before this module is ever reached, so the duplicate block was
+// removed to avoid redundant synchronous FS reads on the boot path.
 
 import { GoogleGenAI, ThinkingLevel, HarmBlockThreshold, HarmCategory } from '@google/genai';
 import { getSystemInstruction, getJanitorInstruction, getMemoryPrompt } from './prompts.js';
@@ -41,7 +24,6 @@ import { getProviderAPIKey } from './secrets.js';
 
 import { RevertManager } from './revert.js';
 import { AdvanceRevertManager } from './advanceRevert.js';
-import { captureGriddedScreenshot } from './screen_grid.js';
 import { openFileInEditor, highlightDiffInEditor, getIDEContext, showDiffInIDE, closeDiffInIDE, isBridgeConnected, registerSecurityListener } from './editor.js';
 import { getDirTreeIndentation } from './getDirTree/indentation.js';
 import { getDirTreeBox } from './getDirTree/box.js';
@@ -2356,6 +2338,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     yield { type: 'status', content: 'Capturing Screen' };
                     // wait 3s to give time
                     await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Lazy-load the screen-capture stack (nut-js + sharp + screenshot-desktop)
+                    const { captureGriddedScreenshot } = await import('./screen_grid.js');
                     const screenshotData = await captureGriddedScreenshot();
                     if (screenshotData && screenshotData.base64) {
                         const screenshotMsg = `[system] Fresh Gridded Screen Feedback Captured. Use numeric coordinates. Old screenshots will be removed when new screenshot is captured, summarize in text if context is needed later [/system]`;
@@ -4442,7 +4426,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                                     }
                                     const boxWidth = Math.min(label.length + 4, terminalWidth);
                                     const boxMid = `${label.padEnd(boxWidth - 2).substring(0, boxWidth - 2)}`;
-                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasHint ? '' : '\n'}`    }`) };
+                                    yield { type: 'visual_feedback', content: colorMainWords(`${thisIsFirstToolFeedback ? '\n' : ''}${boxMid}${label.includes('✔') && (label.includes('Created') || label.includes('Edited')) ? '' : `${hasHint ? '' : '\n'}`}`) };
                                     thisIsFirstToolFeedback = false;
                                 }
 

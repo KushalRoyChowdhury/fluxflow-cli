@@ -1,4 +1,3 @@
-import puppeteer from 'puppeteer';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -10,12 +9,14 @@ const execAsync = promisify(exec);
  * Ensures that Puppeteer has its Chromium browser installed.
  * Returns true if already present, false if it needs installation.
  */
-export const checkPuppeteerReady = () => {
+export const checkPuppeteerReady = async () => {
     try {
         const pptrConfig = getPuppeteerConfig();
         if (pptrConfig.executablePath && fs.existsSync(pptrConfig.executablePath)) {
             return true;
         }
+        // Lazy-load puppeteer only when the config-based lookup cannot resolve a path.
+        const { default: puppeteer } = await import('puppeteer');
         const exePath = puppeteer.executablePath();
         const exists = exePath && fs.existsSync(exePath);
         // console.log(`[DEBUG] Puppeteer checking: ${exePath} | Exists: ${exists}`);

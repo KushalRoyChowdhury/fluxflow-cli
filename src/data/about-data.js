@@ -73,7 +73,7 @@ export const ABOUT_SKILL_MANIFEST = {
 
     'SKILL.md': `---
 name: fluxflow
-description: System Generated Documentation. Read this if asked anything regarding FluxFlow Harness (this app)
+description: System Generated Documentation. Read this if asked anything regarding FluxFlow Harness
 ---
 
 # FluxFlow, by Kushal Roy Chowdhury

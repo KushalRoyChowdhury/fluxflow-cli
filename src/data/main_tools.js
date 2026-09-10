@@ -1,5 +1,4 @@
 import { execSync } from 'child_process';
-import { isPtyAvailable } from '../tools/exec_command';
 
 let _isPwshAvailable = null;
 export const isPwshAvailable = () => {

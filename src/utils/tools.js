@@ -1,132 +1,135 @@
-import { web_search } from '../tools/web_search.js';
-import { web_scrape } from '../tools/web_scrape.js';
-import { memory } from '../tools/memory.js';
-import { chat } from '../tools/chat.js';
-import { view_file } from '../tools/view_file.js';
-import { write_file } from '../tools/write_file.js';
-import { update_file } from '../tools/update_file.js';
-import { exec_command } from '../tools/exec_command.js';
-import { read_folder } from '../tools/read_folder.js';
-import { ask_user } from '../tools/ask_user.js';
-import { write_pdf } from '../tools/write_pdf.js';
-import { write_docx } from '../tools/write_docx.js';
-import { search_keyword } from '../tools/search_keyword.js';
-import { generate_image } from '../tools/generate_image.js';
-import { saveSummary } from '../tools/saveSummary.js';
-import { addMemScore } from '../tools/addMemScore.js';
-import { file_map } from '../tools/file_map.js';
-import { todo } from '../tools/todo.js';
-import { invokeSync } from '../tools/invokeSync.js';
-import { invoke } from '../tools/invoke.js';
-import { getProgress } from '../tools/getProgress.js';
-import { cancel } from '../tools/cancel.js';
-import { awaitTool } from '../tools/await.js';
-import { emergency_rollback } from '../tools/emergency_rollback.js';
-import { awaitSubagent } from '../tools/awaitSubagent.js';
-import { answerSubagent } from '../tools/answerSubagent.js';
-import { steerSubagent } from '../tools/steerSubagent.js';
-import { computer_action } from '../tools/computer_action.js';
-import { click } from '../tools/click.js';
-import { drag } from '../tools/drag.js';
-import { scroll } from '../tools/scroll.js';
-import { keyboard_typing } from '../tools/keyboard_typing.js';
-import { key_press } from '../tools/key_press.js';
-import { recapture_screen } from '../tools/recapture_screen.js';
+// ─── Lazy Tool Loaders ───────────────────────────────────────────────────────
+// Tool modules are imported on first use so heavy native dependencies
+// (puppeteer, @nut-tree-fork/nut-js, sharp, pdf-lib, html-to-docx, tesseract.js,
+// screenshot-desktop, ...) stay OUT of the boot graph.
+const loadWebSearch = () => import('../tools/web_search.js').then(m => m.web_search);
+const loadWebScrape = () => import('../tools/web_scrape.js').then(m => m.web_scrape);
+const loadMemory = () => import('../tools/memory.js').then(m => m.memory);
+const loadChat = () => import('../tools/chat.js').then(m => m.chat);
+const loadViewFile = () => import('../tools/view_file.js').then(m => m.view_file);
+const loadWriteFile = () => import('../tools/write_file.js').then(m => m.write_file);
+const loadUpdateFile = () => import('../tools/update_file.js').then(m => m.update_file);
+const loadExecCommand = () => import('../tools/exec_command.js').then(m => m.exec_command);
+const loadReadFolder = () => import('../tools/read_folder.js').then(m => m.read_folder);
+const loadAskUser = () => import('../tools/ask_user.js').then(m => m.ask_user);
+const loadWritePdf = () => import('../tools/write_pdf.js').then(m => m.write_pdf);
+const loadWriteDocx = () => import('../tools/write_docx.js').then(m => m.write_docx);
+const loadSearchKeyword = () => import('../tools/search_keyword.js').then(m => m.search_keyword);
+const loadGenerateImage = () => import('../tools/generate_image.js').then(m => m.generate_image);
+const loadSaveSummary = () => import('../tools/saveSummary.js').then(m => m.saveSummary);
+const loadAddMemScore = () => import('../tools/addMemScore.js').then(m => m.addMemScore);
+const loadFileMap = () => import('../tools/file_map.js').then(m => m.file_map);
+const loadTodo = () => import('../tools/todo.js').then(m => m.todo);
+const loadInvokeSync = () => import('../tools/invokeSync.js').then(m => m.invokeSync);
+const loadInvoke = () => import('../tools/invoke.js').then(m => m.invoke);
+const loadGetProgress = () => import('../tools/getProgress.js').then(m => m.getProgress);
+const loadCancel = () => import('../tools/cancel.js').then(m => m.cancel);
+const loadEmergencyRollback = () => import('../tools/emergency_rollback.js').then(m => m.emergency_rollback);
+const loadAwaitSubagent = () => import('../tools/awaitSubagent.js').then(m => m.awaitSubagent);
+const loadAnswerSubagent = () => import('../tools/answerSubagent.js').then(m => m.answerSubagent);
+const loadSteerSubagent = () => import('../tools/steerSubagent.js').then(m => m.steerSubagent);
+const loadComputerAction = () => import('../tools/computer_action.js').then(m => m.computer_action);
+const loadClick = () => import('../tools/click.js').then(m => m.click);
+const loadDrag = () => import('../tools/drag.js').then(m => m.drag);
+const loadScroll = () => import('../tools/scroll.js').then(m => m.scroll);
+const loadKeyboardTyping = () => import('../tools/keyboard_typing.js').then(m => m.keyboard_typing);
+const loadKeyPress = () => import('../tools/key_press.js').then(m => m.key_press);
+const loadRecaptureScreen = () => import('../tools/recapture_screen.js').then(m => m.recapture_screen);
 
-
+// Alias table → lazy loader (module resolved only when the tool is invoked).
 const TOOL_MAP = {
-    web_search,
-    web_scrape,
-    memory,
-    chat,
-    view_file,
-    write_file,
-    update_file,
-    exec_command,
-    read_folder,
-    write_pdf,
-    write_docx,
-    search_keyword,
-    generate_image,
-    saveSummary,
-    addMemScore,
-    file_map,
-    todo,
-    Todo: todo,
-    goal: todo,
-    Goal: todo,
-    invokeSync,
-    invoke,
-    getProgress,
-    cancel,
-    awaitSubagent,
-    answerSubagent,
-    steerSubagent,
-    computer_action,
-    computer_use: computer_action,
-    ComputerAction: computer_action,
-    ComputerUse: computer_action,
+    web_search: loadWebSearch,
+    web_scrape: loadWebScrape,
+    memory: loadMemory,
+    chat: loadChat,
+    view_file: loadViewFile,
+    write_file: loadWriteFile,
+    update_file: loadUpdateFile,
+    exec_command: loadExecCommand,
+    read_folder: loadReadFolder,
+    write_pdf: loadWritePdf,
+    write_docx: loadWriteDocx,
+    search_keyword: loadSearchKeyword,
+    generate_image: loadGenerateImage,
+    saveSummary: loadSaveSummary,
+    addMemScore: loadAddMemScore,
+    file_map: loadFileMap,
+    todo: loadTodo,
+    Todo: loadTodo,
+    goal: loadTodo,
+    Goal: loadTodo,
+    invokeSync: loadInvokeSync,
+    invoke: loadInvoke,
+    getProgress: loadGetProgress,
+    cancel: loadCancel,
+    awaitSubagent: loadAwaitSubagent,
+    answerSubagent: loadAnswerSubagent,
+    steerSubagent: loadSteerSubagent,
+    computer_action: loadComputerAction,
+    computer_use: loadComputerAction,
+    ComputerAction: loadComputerAction,
+    ComputerUse: loadComputerAction,
 
     // New Dedicated Computer Use Tools
-    click,
-    Click: click,
-    drag,
-    Drag: drag,
-    scroll,
-    Scroll: scroll,
-    keyboard_typing,
-    KeyboardTyping: keyboard_typing,
-    keyboardtyping: keyboard_typing,
-    key_press,
-    KeyPress: key_press,
-    keypress: key_press,
-    recapture_screen,
-    RecaptureScreen: recapture_screen,
-    recapturescreen: recapture_screen,
+    click: loadClick,
+    Click: loadClick,
+    drag: loadDrag,
+    Drag: loadDrag,
+    scroll: loadScroll,
+    Scroll: loadScroll,
+    keyboard_typing: loadKeyboardTyping,
+    KeyboardTyping: loadKeyboardTyping,
+    keyboardtyping: loadKeyboardTyping,
+    key_press: loadKeyPress,
+    KeyPress: loadKeyPress,
+    keypress: loadKeyPress,
+    recapture_screen: loadRecaptureScreen,
+    RecaptureScreen: loadRecaptureScreen,
+    recapturescreen: loadRecaptureScreen,
 
-    invoke_sync: invokeSync,
-    get_progress: getProgress,
-    await_subagent: awaitSubagent,
-    answer_subagent: answerSubagent,
-    steer_subagent: steerSubagent,
-    steer: steerSubagent,
-    Steer: steerSubagent,
-    ask: ask_user,
+    invoke_sync: loadInvokeSync,
+    get_progress: loadGetProgress,
+    await_subagent: loadAwaitSubagent,
+    answer_subagent: loadAnswerSubagent,
+    steer_subagent: loadSteerSubagent,
+    steer: loadSteerSubagent,
+    Steer: loadSteerSubagent,
+    ask: loadAskUser,
 
     // PascalCase Normalizations for Token Efficiency
-    Ask: ask_user,
-    AskUser: ask_user,
-    WebSearch: web_search,
-    WebScrape: web_scrape,
-    ReadFile: view_file,
-    ReadFolder: read_folder,
-    WriteFile: write_file,
-    PatchFile: update_file,
-    WritePDF: write_pdf,
-    WriteDoc: write_docx,
-    Run: exec_command,
-    SearchKeyword: search_keyword,
-    CodeSearch: search_keyword,
-    code_search: search_keyword,
-    Memory: memory,
-    Chat: chat,
-    GenerateImage: generate_image,
-    saveSumary: saveSummary,
-    SaveSummary: saveSummary,
-    SaveSumary: saveSummary,
-    add_mem_score: addMemScore,
-    AddMemScore: addMemScore,
-    addMemoryScore: addMemScore,
-    AddMemoryScore: addMemScore,
-    FileMap: file_map,
-    answer: answerSubagent,
-    Answer: answerSubagent,
-    AnswerSubagent: answerSubagent,
-    await: awaitSubagent,
-    Await: awaitSubagent,
-    AwaitSubagent: awaitSubagent,
-    EmergencyRollback: emergency_rollback,
-    emergency_rollback: emergency_rollback
+    Ask: loadAskUser,
+    AskUser: loadAskUser,
+    WebSearch: loadWebSearch,
+    WebScrape: loadWebScrape,
+    ReadFile: loadViewFile,
+    ReadFolder: loadReadFolder,
+    WriteFile: loadWriteFile,
+    PatchFile: loadUpdateFile,
+    WritePDF: loadWritePdf,
+    WriteDoc: loadWriteDocx,
+    Run: loadExecCommand,
+    SearchKeyword: loadSearchKeyword,
+    CodeSearch: loadSearchKeyword,
+    code_search: loadSearchKeyword,
+    Memory: loadMemory,
+    Chat: loadChat,
+    GenerateImage: loadGenerateImage,
+    saveSumary: loadSaveSummary,
+    SaveSummary: loadSaveSummary,
+    SaveSumary: loadSaveSummary,
+    add_mem_score: loadAddMemScore,
+    AddMemScore: loadAddMemScore,
+    addMemoryScore: loadAddMemScore,
+    AddMemoryScore: loadAddMemScore,
+    FileMap: loadFileMap,
+    answer: loadAnswerSubagent,
+    Answer: loadAnswerSubagent,
+    AnswerSubagent: loadAnswerSubagent,
+    await: loadAwaitSubagent,
+    Await: loadAwaitSubagent,
+    AwaitSubagent: loadAwaitSubagent,
+    EmergencyRollback: loadEmergencyRollback,
+    emergency_rollback: loadEmergencyRollback
 };
 
 /**
@@ -168,13 +171,15 @@ export const dispatchTool = async (toolName, args, context = {}) => {
         }
     }
 
-    const tool = TOOL_MAP[toolName];
+    const loader = TOOL_MAP[toolName];
 
-    if (!tool) {
+    if (!loader) {
         return `ERROR: Tool [${toolName}] not found in registry.`;
     }
 
     try {
+        // Resolve the lazy module first, then execute with external context.
+        const tool = await loader();
         // Support both sync and async tools, passing external context
         return await tool(args, context);
     } catch (err) {

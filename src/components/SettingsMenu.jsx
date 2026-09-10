@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
-import { isPtyAvailable } from '../tools/exec_command.js';
 import { getThemeColors, THEMES } from '../utils/theme.js';
 import { setPreserveThinkingCache } from './ChatLayout.jsx';
 import { getModels } from '../data/model_config.js';
@@ -208,6 +207,16 @@ export default function SettingsMenu({
     const [currentMemory, setCurrentMemory] = useState(0);
     const [maxMemory, setMaxMemory] = useState(0);
     const [memoryUnit, setMemoryUnit] = useState('MB');
+    const [isPtyAvailable, setIsPtyAvailable] = useState(false);
+
+    // Lazy-check PTY support so exec_command (and node-pty) stay out of the boot graph.
+    useEffect(() => {
+        let cancelled = false;
+        import('../tools/exec_command.js')
+            .then(m => { if (!cancelled) setIsPtyAvailable(!!m.isPtyAvailable); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
 
     useEffect(() => {
         // 1. Get the absolute max limit in bytes (Runs ONCE on mount)

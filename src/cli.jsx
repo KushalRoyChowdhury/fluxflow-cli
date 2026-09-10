@@ -26,14 +26,14 @@ dotenv.config({ path: './.env', override: true, quiet: true });
 dotenv.config({ path: `${FLUXFLOW_DIR}/.env`, override: true, quiet: true });
 
 // Legacy custom envs (for backward compatibility)
-dotenv.config({ path: './agents.env', override: true, quiet: true });
-dotenv.config({ path: './.agents.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/agents.env`, override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.agents.env`, override: true, quiet: true });
-dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
-dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
+// dotenv.config({ path: './agents.env', override: true, quiet: true });
+// dotenv.config({ path: './.agents.env', override: true, quiet: true });
+// dotenv.config({ path: `${FLUXFLOW_DIR}/agents.env`, override: true, quiet: true });
+// dotenv.config({ path: `${FLUXFLOW_DIR}/.agents.env`, override: true, quiet: true });
+// dotenv.config({ path: './fluxflow.env', override: true, quiet: true });
+// dotenv.config({ path: './.fluxflow.env', override: true, quiet: true });
+// dotenv.config({ path: `${FLUXFLOW_DIR}/fluxflow.env`, override: true, quiet: true });
+// dotenv.config({ path: `${FLUXFLOW_DIR}/.fluxflow.env`, override: true, quiet: true });
 
 // Conventional custom envs (.env.<name>)
 dotenv.config({ path: `${FLUXFLOW_DIR}/.env.agents`, override: true, quiet: true });

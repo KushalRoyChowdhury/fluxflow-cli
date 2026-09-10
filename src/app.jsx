@@ -2176,7 +2176,7 @@ export default function App({ args = [] }) {
             }
 
             // 0. System Integrity Check (Build-in Chromium)
-            if (!checkPuppeteerReady()) {
+            if (!(await checkPuppeteerReady())) {
                 setMessages(prev => {
                     setCompletedIndex(prev.length + 1);
                     return [...prev, { id: 'setup-' + Date.now(), role: 'system', text: '✦ Installing Required dependencies... (One-time setup)', isMeta: true }];

@@ -4,11 +4,12 @@ const path = require('path');
 
 // Resolve paths relative to this absolute CJS root
 const CLI_PATH = path.join(__dirname, 'src', 'cli.jsx');
-const TSX_PATH = path.join(__dirname, 'node_modules', '.bin', 'tsx' + (process.platform === 'win32' ? '.cmd' : ''));
 
-const flux = spawn(TSX_PATH, [CLI_PATH], {
+// Run through the current Node binary with tsx's ESM loader instead of spawning
+// a shell + tsx.cmd. Avoids shell startup and .cmd resolution overhead.
+const flux = spawn(process.execPath, ['--import', 'tsx', CLI_PATH], {
     stdio: 'inherit',
-    shell: true
+    cwd: __dirname
 });
 
 flux.on('exit', (code) => {

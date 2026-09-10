@@ -2,12 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { spawn } from 'child_process';
 
-let pty = null;
-try {
-    const ptyModule = await import('node-pty');
-    pty = ptyModule.default || ptyModule;
-    pty = false;
-} catch (err) { }
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
@@ -73,36 +67,7 @@ const UpdateProcessor = ({ latest, current, settings, onClose, onUpdateSettings,
                         }
                     };
 
-                    if (pty) {
-                        try {
-                            const ptyProcess = pty.spawn(shell, shellArgs, {
-                                name: 'xterm-256color',
-                                cols: 80,
-                                rows: 30,
-                                cwd: process.cwd(),
-                                env: process.env
-                            });
-                            child = ptyProcess;
 
-                            ptyProcess.onData(handleOutput);
-
-                            ptyProcess.onExit(({ exitCode }) => {
-                                child = null;
-                                if (exitCode !== 0) {
-                                    resolve({ error: `Process exited with code ${exitCode}` });
-                                } else {
-                                    resolve({ success: true });
-                                }
-                            });
-                            return;
-                        } catch (err) {
-                            if (isWin && usePowerShell && err.code === 'ENOENT') {
-                                resolve({ retryCmd: true });
-                                return;
-                            }
-                            // Proceed to spawn fallback if pty fails
-                        }
-                    }
 
                     // Fallback to standard spawn
                     const cp = isWin
