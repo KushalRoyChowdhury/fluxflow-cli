@@ -54,7 +54,7 @@ export const TOOL_PROTOCOL = (mode, osDetected, isMultiModal, aiProvider, advanc
     const fluxTools = `**Workspace Tools (path = relative; first argument; separator: '/')**
 - ReadFile(path=string, startLine?=int, endLine?=int)${aiProvider === 'Google' || isMultiModal ? `. Supports images/docs` : ''}
 - ReadFolder(path=string, recurse?=int[1..3])
-- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^...$ syntax, must for large blocks/escape sequences
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^LINE:...$ syntax, must for large blocks/escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find relevant code, standard junk excluded
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user

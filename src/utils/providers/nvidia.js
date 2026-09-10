@@ -312,6 +312,7 @@ export const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName
     cleanModelId = cleanModelId.replace('llama-3.3', 'llama-3_3');
 
 
+    const pollUrlNew = `https://buildapi.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
     const pollUrl = `https://api.ngc.nvidia.com/v2/predict/queues/models/qc69jvmznzxy/${cleanModelId}`;
 
     let isStreamingStarted = false;
@@ -319,22 +320,25 @@ export const wrapNvidiaStreamWithQueueDepth = async function* (stream, modelName
 
     const poll = async () => {
         try {
-            const res = await fetch(pollUrl);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === 'number') {
-                    const depth = data.queues[0].queueDepth;
-                    if (!isStreamingStarted) {
-                        push({ value: { type: 'status', content: `Queue ${depth || 1}` }, done: false });
-                    }
+            // Fire both endpoints in parallel; use whichever returns a valid (ok) response first
+            const res = await Promise.any(
+                [pollUrlNew, pollUrl].map(async (url) => {
+                    const attempt = await fetch(url);
+                    if (!attempt.ok) throw new Error(`HTTP ${attempt.status}`);
+                    return attempt;
+                })
+            );
+            const data = await res.json();
+            // console.log(data);
+            if (data && data.queues && data.queues[0] && typeof data.queues[0].queueDepth === 'number') {
+                const depth = data.queues[0].queueDepth;
+                if (!isStreamingStarted) {
+                    push({ value: { type: 'status', content: `Queue ${depth || 1}` }, done: false });
                 }
-            } else if (!isStreamingStarted) {
-                // push({ value: { type: 'status', content: `Queue ${res.status}` }, done: false });
             }
         } catch (e) {
-            // Network-level error — no status code available, stay silent
+            // Both URLs failed / none returned ok — stay silent by design
         }
-
     };
 
     // Run first poll immediately unless custom NVIDIA_BASE_URL is set

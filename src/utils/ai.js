@@ -5237,7 +5237,7 @@ ${isAsync ? `- AskMain(question=string). Communicate with PARENT/MAIN AGENT. Whe
 - CodeSearch(keyword=string, path?="dir/file/glob/regex, inclusion/exclusion ;-separated", fuzzy?=bool, regex?=bool:auto). Find definitions, logic, relevant code, standard junk auto-excluded
 - ReadFolder(path=string, recurse?=int[1..3]). Minimize recursion
 - ReadFile(path=string, startLine?=int, endLine?=int)
-- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^...$ syntax, must for large blocks/escape sequences
+- PatchFile(path=string, allowMultiple?=bool, searchContent1="string match OR ^LINE:start..end$", newContent1=string, ...MAX15). Small searchString. Line Ranges: ^LINE:...$ syntax, must for large blocks/escape sequences
 - WriteFile(path=string, content=string). Creates/Overwrites. File Exist? PatchFile > WriteFile
 - Run(command=string). Runs ${osDetected === 'Windows' ? (isPsAvailable() ? `powershell` : `windows CMD`) : `bash`} command. Destructive command → Ask user`.trim();
 
