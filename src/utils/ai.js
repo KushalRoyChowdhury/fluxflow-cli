@@ -746,7 +746,8 @@ export const runJanitorTask = async (settings, agentText, fullAgentTextRaw, hist
                 if (lastUsage) {
                     const total = lastUsage.totalTokenCount || 0;
                     const cached = lastUsage.cachedContentTokenCount || 0;
-                    const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
+                    // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
+                    const candidates = (lastUsage.candidatesTokenCount || 0) + (effectiveProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
                     const jModel = useNvidiaFallback
                         ? getFallbackValue('nvidia_janitor_fallback')
                         : (effectiveProvider === 'DeepSeek'
@@ -1427,7 +1428,8 @@ const generateSimpleContent = async (settings, model, contents, systemInstructio
         if (usageMetadata) {
             const total = usageMetadata.totalTokenCount || 0;
             const cached = usageMetadata.cachedContentTokenCount || 0;
-            const candidates = (usageMetadata.candidatesTokenCount || 0) + (usageMetadata.thoughtsTokenCount || 0);
+            // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
+            const candidates = (usageMetadata.candidatesTokenCount || 0) + (aiProvider === 'Google' ? (usageMetadata.thoughtsTokenCount || 0) : 0);
             await addToUsage('tokens', total, aiProvider, model);
             if (cached > 0) {
                 await addToUsage('cachedTokens', cached, aiProvider, model);
@@ -4942,7 +4944,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             if (lastUsage) {
                 const total = lastUsage.totalTokenCount || 0;
                 const cached = lastUsage.cachedContentTokenCount || 0;
-                const candidates = (lastUsage.candidatesTokenCount || 0) + (lastUsage.thoughtsTokenCount || 0);
+                // [SCHEMA] Gemini adds thoughts outside candidates; OpenAI-style nests reasoning inside completion.
+                const candidates = (lastUsage.candidatesTokenCount || 0) + (aiProvider === 'Google' ? (lastUsage.thoughtsTokenCount || 0) : 0);
 
                 await addToUsage('tokens', total, aiProvider, targetModel);
                 if (cached > 0) {

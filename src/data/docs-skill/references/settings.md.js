@@ -42,7 +42,7 @@ Open in chat via /settings
 ### 6. Miscellaneous
 * Sub-Agents → Enable sub-agent delegation
 * Sub-Agent Model → Dedicated model/provider for sub-agents
-* Preserve Thinking → Keep reasoning blocks in conversation context
+* Verbose Thinking → Show reasoning blocks in the UI. Keeps UI clean when disabled. And reasoning transparent when enabled
 * Dynamic Directory Awareness → Dynamic tracking of workspace directory tree
 * Directory Tree Design → Directory visual styling. Modern (Saves Tokens) | Classic (More Tokens)
 * Compact Large Tool Results → Compress large tool outputs to save tokens (model might miss subtle indentation/syntax errors)

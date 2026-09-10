@@ -7,6 +7,36 @@ import { emojiSpace, getFluxLogo } from '../utils/terminal.js';
 import { diffWordsWithSpace } from 'diff';
 import { isAbsolute } from 'path';
 import { getThemeColors } from '../utils/theme.js';
+import { readAesEncryptedJson } from '../utils/crypto.js';
+import { SETTINGS_FILE } from '../utils/paths.js';
+
+/**
+ * [PRESERVE THINKING] Cached value of the `preserveThinking` setting.
+ * null = not read yet. Once read, it stays cached (never re-reads the disk).
+ * Exported so SettingsMenu can update it directly when the user flips the toggle.
+ */
+export let preserveThinkingCache = null;
+
+/** Update the cached value without touching the disk. */
+export const setPreserveThinkingCache = (value) => {
+    preserveThinkingCache = value === false ? false : true;
+};
+
+/**
+ * [PRESERVE THINKING] Hide thinking visuals in the UI when the setting is OFF.
+ * Reads the persisted setting only once, then serves from cache.
+ */
+const shouldPreserveThinking = () => {
+    if (preserveThinkingCache === null) {
+        try {
+            const settings = readAesEncryptedJson(SETTINGS_FILE, {});
+            preserveThinkingCache = settings?.systemSettings?.preserveThinking !== false;
+        } catch (e) {
+            preserveThinkingCache = true;
+        }
+    }
+    return preserveThinkingCache;
+};
 
 const useStreamingText = (targetText, isStreaming, isActiveBlock) => {
     return targetText;
@@ -1271,6 +1301,10 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
         return msg.isStreaming ? content : content.trimEnd();
     }, [content, msg.role, showFullThinking, msg.isStreaming]);
 
+    if (msg.role === 'think' && !shouldPreserveThinking()) {
+        return null;
+    }
+
     if (msg.role === 'agent' && finalContent.trim() === '') {
         return null;
     }
@@ -1353,6 +1387,11 @@ export const MessageItem = React.memo(({ msg, showFullThinking, columns = 80, ai
 export const BlockItem = React.memo(({ block, columns = 80, showFullThinking, aiProvider, version, theme = 'Dark' }) => {
     const colors = getThemeColors(theme);
     const { msg, type, text, isStreamingMsg, workedDuration } = block;
+
+    // [PRESERVE THINKING] Hide all thinking visuals when the setting is OFF
+    if ((type === 'think-header' || type === 'think-line' || type === 'think-footer-padding') && !shouldPreserveThinking()) {
+        return null;
+    }
 
     // Batch chunk — renders up to CHUNK_SIZE sub-blocks committed together to <Static>
     if (type === 'chunk') {

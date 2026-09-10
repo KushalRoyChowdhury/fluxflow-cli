@@ -1198,6 +1198,9 @@ export default function App({ args = [] }) {
     const chatTokenStartRef = useRef(0);
     const [chatCachedTokens, setChatCachedTokens] = useState(0);
     const chatCachedTokenStartRef = useRef(0);
+    const [chatPromptTokens, setChatPromptTokens] = useState(0);
+    const chatSessionPromptStartRef = useRef(0);
+    const [sessionTotalPromptTokens, setSessionTotalPromptTokens] = useState(0);
 
     const [sessionTotalCachedTokens, setSessionTotalCachedTokens] = useState(0);
     const [sessionTotalCandidateTokens, setSessionTotalCandidateTokens] = useState(0);
@@ -1221,12 +1224,14 @@ export default function App({ args = [] }) {
         if (chatLoadingRef.current) return;
         const nextTokens = sessionTotalTokens - chatTokenStartRef.current;
         const nextCachedTokens = sessionTotalCachedTokens - chatCachedTokenStartRef.current;
+        const sessionPrompt = sessionTotalPromptTokens - chatSessionPromptStartRef.current;
         setChatTokens(nextTokens);
         setChatCachedTokens(nextCachedTokens);
+        setChatPromptTokens(Math.max(0, sessionPrompt));
         if (chatId) {
-            saveChatContext(chatId, nextTokens, sessionStats.tokens, nextCachedTokens).catch(() => { });
+            saveChatContext(chatId, nextTokens, sessionStats.tokens).catch(() => { });
         }
-    }, [sessionTotalTokens, sessionTotalCachedTokens, chatId, sessionStats.tokens]);
+    }, [sessionTotalTokens, sessionTotalCachedTokens, sessionTotalPromptTokens, chatId, sessionStats.tokens]);
 
     useEffect(() => {
         if (activeView === 'apiTier') {
@@ -2318,10 +2323,12 @@ export default function App({ args = [] }) {
                     setChatId(id);
                     const savedData = await loadChatContext(id);
                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
-                    chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
+                    chatCachedTokenStartRef.current = sessionTotalCachedTokens;
+                    chatSessionPromptStartRef.current = sessionTotalPromptTokens;
                     chatLoadingRef.current = false;
                     setChatTokens(savedData.total);
-                    setChatCachedTokens(savedData.cached || 0);
+                    setChatCachedTokens(0);
+                    setChatPromptTokens(0);
                     setSessionStats({ tokens: savedData.context });
 
                     const resumedMsgs = [...h[id].messages];
@@ -2853,10 +2860,12 @@ export default function App({ args = [] }) {
 
                                 const savedData = await loadChatContext(targetId);
                                 chatTokenStartRef.current = sessionTotalTokens - savedData.total;
-                                chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
+                                chatCachedTokenStartRef.current = sessionTotalCachedTokens;
+                                chatSessionPromptStartRef.current = sessionTotalPromptTokens;
                                 chatLoadingRef.current = false;
                                 setChatTokens(savedData.total);
-                                setChatCachedTokens(savedData.cached || 0);
+                                setChatCachedTokens(0);
+                                setChatPromptTokens(0);
                                 setSessionStats({ tokens: savedData.context });
 
                                 // Ensure logo is present at the start of resumed history
@@ -3001,8 +3010,10 @@ export default function App({ args = [] }) {
                     setIsExpanded(false);
                     setChatTokens(0);
                     setChatCachedTokens(0);
+                    setChatPromptTokens(0);
                     chatTokenStartRef.current = sessionTotalTokens;
                     chatCachedTokenStartRef.current = sessionTotalCachedTokens;
+                    chatSessionPromptStartRef.current = sessionTotalPromptTokens;
                     setTimeout(() => {
                         if (global.gc) {
                             const gCAsync = async () => {
@@ -3725,12 +3736,6 @@ export default function App({ args = [] }) {
                                 return m;
                             }
                             truncatedCount++;
-                            if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
-                                return {
-                                    ...m,
-                                    fullText: '[TOOL RESULT]: SUCCESS: ...Results Truncated by System on User Command'
-                                };
-                            }
                             return {
                                 ...m,
                                 fullText: '[TOOL RESULT]: ...Results Truncated by System on User Command'
@@ -4083,8 +4088,13 @@ export default function App({ args = [] }) {
                                 const total = usage.totalTokenCount || 0;
                                 const cached = usage.cachedContentTokenCount || 0;
                                 const candidates = usage.candidatesTokenCount || 0;
+                                // Input tokens derived by subtraction (providers send total + candidates reliably)
+                                const input = Math.max(0, total - candidates);
                                 setSessionStats({ tokens: total });
                                 setSessionTotalTokens(prev => prev + total);
+                                if (input > 0) {
+                                    setSessionTotalPromptTokens(prev => prev + input);
+                                }
                                 if (cached > 0) {
                                     setSessionTotalCachedTokens(prev => prev + cached);
                                 }
@@ -4263,14 +4273,12 @@ export default function App({ args = [] }) {
                                         if (!fullTextStr.startsWith('[TOOL RESULT]:')) {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
+                                        // Whitelist: preserve search_keyword results (large, high-value code matches)
+                                        if (m.toolName && String(m.toolName).toLowerCase() === 'search_keyword') {
                                             return m;
                                         }
-                                        if (fullTextStr.startsWith('[TOOL RESULT]: SUCCESS')) {
-                                            return {
-                                                ...m,
-                                                fullText: '[TOOL RESULT]: SUCCESS: ...Results Truncated by System on User Command'
-                                            };
+                                        if (fullTextStr.startsWith('[TOOL RESULT]: ERROR') || fullTextStr.startsWith('[TOOL RESULT]: DENIED') || fullTextStr.startsWith('[TOOL RESULT]: SUCCESS: Goal') || fullTextStr.includes('...Results Truncated by System on User Command') || fullTextStr.startsWith('[TOOL RESULT]: Skill:') || fullTextStr.includes('Skill: [') || fullTextStr.startsWith('[TOOL RESULT]: DOCs:') || fullTextStr.includes('DOCs: [')) {
+                                            return m;
                                         }
                                         return {
                                             ...m,
@@ -4340,8 +4348,13 @@ export default function App({ args = [] }) {
                             const total = packet.content.totalTokenCount || 0;
                             const cached = packet.content.cachedContentTokenCount || 0;
                             const candidates = packet.content.candidatesTokenCount || 0;
+                            // Input tokens derived by subtraction (providers send total + candidates reliably)
+                            const input = Math.max(0, total - candidates);
                             setSessionStats({ tokens: total });
                             setSessionTotalTokens(prev => prev + total);
+                            if (input > 0) {
+                                setSessionTotalPromptTokens(prev => prev + input);
+                            }
                             if (cached > 0) {
                                 setSessionTotalCachedTokens(prev => prev + cached);
                             }
@@ -6324,10 +6337,12 @@ export default function App({ args = [] }) {
 
                                     const savedData = await loadChatContext(id);
                                     chatTokenStartRef.current = sessionTotalTokens - savedData.total;
-                                    chatCachedTokenStartRef.current = sessionTotalCachedTokens - (savedData.cached || 0);
+                                    chatCachedTokenStartRef.current = sessionTotalCachedTokens;
+                                    chatSessionPromptStartRef.current = sessionTotalPromptTokens;
                                     chatLoadingRef.current = false;
                                     setChatTokens(savedData.total);
-                                    setChatCachedTokens(savedData.cached || 0);
+                                    setChatCachedTokens(0);
+                                    setChatPromptTokens(0);
                                     setSessionStats({ tokens: savedData.context });
 
                                     // Ensure logo is present at the start of resumed history
@@ -7124,7 +7139,8 @@ export default function App({ args = [] }) {
                                 tokens={sessionStats.tokens}
                                 tokensTotal={chatTokens}
                                 cachedTokens={chatCachedTokens}
-                                chatId={chatId}
+                                promptTokens={chatPromptTokens}
+                                ther chatId={chatId}
                                 isMemoryEnabled={systemSettings.memory}
                                 apiTier={apiTier}
                                 aiProvider={aiProvider}

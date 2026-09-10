@@ -352,7 +352,9 @@ function generateDashboardHtml() {
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            min-height: 420px;
+            min-height: 450px;
+            max-height: 70vh;
+            overflow: hidden;
         }
 
         .chart-header {
@@ -406,7 +408,20 @@ function generateDashboardHtml() {
             position: relative;
             flex: 1;
             width: 100%;
-            min-height: 320px;
+            min-height: 280px;
+            max-height: calc(70vh - 90px);
+        }
+
+        .pie-canvas-wrapper {
+            position: relative;
+            width: 100%;
+            height: 210px;
+            max-height: 220px;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
         .secondary-grid {
@@ -624,8 +639,11 @@ function generateDashboardHtml() {
         .breakdown-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
             margin-top: 8px;
+            overflow-y: auto;
+            max-height: 160px;
+            padding-right: 4px;
         }
 
         .breakdown-item {
@@ -823,7 +841,7 @@ function generateDashboardHtml() {
                         <div class="chart-subtitle">Distribution of tokens across Inference Providers</div>
                     </div>
                 </div>
-                <div class="canvas-wrapper" style="min-height: 240px;">
+                <div class="pie-canvas-wrapper">
                     <canvas id="providerPieChart"></canvas>
                 </div>
                 <div class="breakdown-list" id="provider-breakdown-list"></div>
@@ -1401,7 +1419,7 @@ function generateDashboardHtml() {
             const ctx = document.getElementById('providerPieChart').getContext('2d');
             const listEl = document.getElementById('provider-breakdown-list');
 
-            const providers = Object.keys(providerTokens);
+            const providers = Object.keys(providerTokens).sort((a, b) => (providerTokens[b] || 0) - (providerTokens[a] || 0));
             const dataVals = providers.map(p => providerTokens[p]);
 
             if (providerPieChart) providerPieChart.destroy();

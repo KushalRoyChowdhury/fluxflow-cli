@@ -3,6 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { isPtyAvailable } from '../tools/exec_command.js';
 import { getThemeColors, THEMES } from '../utils/theme.js';
+import { setPreserveThinkingCache } from './ChatLayout.jsx';
 import { getModels } from '../data/model_config.js';
 import { getProviderAPIKey } from '../utils/secrets.js';
 import v8 from 'v8';
@@ -308,7 +309,7 @@ export default function SettingsMenu({
                 return [
                     { label: 'Sub-Agents', value: 'subAgents', status: systemSettings.subAgents !== false ? 'ON' : 'OFF' },
                     { label: 'Sub-Agent Model', value: 'subAgentModel', status: (systemSettings.CustomSubAgent && systemSettings.SubAgentModel) ? systemSettings.SubAgentModel : 'Default' },
-                    { label: 'Preserve Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
+                    { label: 'Verbose Thinking', value: 'preserveThinking', status: systemSettings.preserveThinking !== false ? 'ON' : 'OFF' },
                     { label: 'Dynamic Directory Awareness', value: 'dynamicDirAwareness', status: systemSettings.dynamicDirAwareness ? 'ON' : 'OFF' },
                     { label: 'Directory Tree Design', value: 'indentationTree', status: systemSettings.indentationTree !== false ? 'Modern' : 'Classic (deprecated)' },
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
@@ -620,6 +621,7 @@ export default function SettingsMenu({
         } else if (item.value === 'preserveThinking') {
             setSystemSettings(s => {
                 const newSysSettings = { ...s, preserveThinking: s.preserveThinking === false ? true : false };
+                setPreserveThinkingCache(newSysSettings.preserveThinking);
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });

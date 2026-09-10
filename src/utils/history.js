@@ -4,7 +4,6 @@ import { nanoid } from 'nanoid';
 import { readEncryptedJson, writeEncryptedJson } from './crypto.js';
 import { HISTORY_FILE, HISTORY_DIR, TEMP_MEM_FILE, TEMP_MEM_CHAT_FILE, CONTEXT_FILE } from './paths.js';
 import { RevertManager } from './revert.js';
-import { loadSettings } from './settings.js';
 
 // HIGH-FIDELITY PERSISTENCE LOCK (Prevents race conditions between foreground and janitor)
 let WRITE_LOCK = Promise.resolve();
@@ -79,14 +78,6 @@ export const saveChat = async (id, name, messages) => {
             !m.isUpdateNotification &&
             (!m.isMeta || (m.text && m.text.includes('Request Cancelled')))
         );
-
-        // [PRESERVE THINKING] Strip think-role entries when the setting is disabled.
-        try {
-            const settings = await loadSettings();
-            if (settings.systemSettings?.preserveThinking === false) {
-                persistentMessages = persistentMessages.filter(m => m.role !== 'think');
-            }
-        } catch (e) { }
 
         // Compute prompt from user messages, stripping timestamp metadata and steering hint tags
         const extractPrompt = (msg) => {
@@ -480,12 +471,12 @@ export const getRangeByTokens = (history, startToken, endToken) => {
 
     return results;
 };
-export const saveChatContext = async (chatId, chatTokens, contextTokens, cachedTokens = 0) => {
+export const saveChatContext = async (chatId, chatTokens, contextTokens) => {
     return withLock(async () => {
         let contextData = readEncryptedJson(CONTEXT_FILE, []);
         if (!Array.isArray(contextData)) contextData = [];
 
-        const data = { total: chatTokens, context: contextTokens, cached: cachedTokens };
+        const data = { total: chatTokens, context: contextTokens };
         const existingIdx = contextData.findIndex(item => Object.keys(item)[0] === String(chatId));
         if (existingIdx !== -1) {
             contextData[existingIdx] = { [String(chatId)]: data };
@@ -499,12 +490,12 @@ export const saveChatContext = async (chatId, chatTokens, contextTokens, cachedT
 
 export const loadChatContext = async (chatId) => {
     try {
-        if (!(await fs.pathExists(CONTEXT_FILE))) return { total: 0, context: 0, cached: 0 };
+        if (!(await fs.pathExists(CONTEXT_FILE))) return { total: 0, context: 0 };
         const contextData = readEncryptedJson(CONTEXT_FILE, []);
-        if (!Array.isArray(contextData)) return { total: 0, context: 0, cached: 0 };
+        if (!Array.isArray(contextData)) return { total: 0, context: 0 };
         const entry = contextData.find(item => Object.keys(item)[0] === String(chatId));
-        return entry ? { total: 0, context: 0, cached: 0, ...entry[String(chatId)] } : { total: 0, context: 0, cached: 0 };
+        return entry ? { total: 0, context: 0, ...entry[String(chatId)] } : { total: 0, context: 0 };
     } catch (e) {
-        return { total: 0, context: 0, cached: 0 };
+        return { total: 0, context: 0 };
     }
 };
