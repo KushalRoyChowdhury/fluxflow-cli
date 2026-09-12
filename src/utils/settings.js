@@ -53,7 +53,10 @@ const DEFAULT_SETTINGS = {
         ollamaEndpoint: 'Cloud',
         compressToolResults: false,
         autoTruncateResults: true,
-        imageHistoryCU: 'Standard'
+        imageHistoryCU: 'Standard',
+        contextLength: '256k',
+        keepReasoningContext: false,
+        autoExcludeMetadata: false
     },
     profileData: {
         name: null,

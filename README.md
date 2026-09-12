@@ -1,5 +1,5 @@
-# 🌊 Flux Flow
-![Flux Flow Hero](https://github.com/KushalRoyChowdhury/fluxflow-cli/blob/main/fluxflow.png)
+# 🌌 Flux Flow (`fluxflow-cli`)
+![Flux Flow Logo](https://github.com/KushalRoyChowdhury/fluxflow-cli/blob/main/fluxflow.png)
 
 <p align="left">
   <a href="https://github.com/KushalRoyChowdhury/fluxflow-cli"><img src="https://img.shields.io/badge/FluxFlow-v4-blue?style=plastic" alt="FluxFlow Version"></a>
@@ -7,19 +7,28 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node-%3E%3D22-green?style=plastic" alt="Node Compatibility"></a>
 </p>
 
-**A Beautiful, Autonomous Terminal AI Agent**
 ### One of the lightest, fastest, high-fidelity agentic CLI with sub-agents & computer use.
 #### *Only ~590 tokens total system prompt with tools.*
 
 📖 **[Official Documentation](https://fluxflow-cli.onrender.com/)**
 
-Flux Flow is an advanced, fully autonomous AI agent that lives directly in your terminal. Built with Node.js and [Ink](https://github.com/vadimdemedes/ink) (React for interactive command-line apps), it provides a highly responsive, component-based UI powered by a sophisticated dual-model AI architecture.
+**Flux Flow** is not just another CLI—it's a high-speed, sassy, and goal-oriented CLI AI Agent powered by multi-provider frontier models (Google Gemini, DeepSeek, OpenRouter, and more). Designed for developers who demand a premium UI/UX while managing complex file-system tasks, web research, and autonomous workflows.
 
-Whether you need a conversational partner or an autonomous developer that can write code, run shell commands, and read your project files, Flux Flow adapts to your needs.
+---
 
----t6
+## 🚀 Instant Ignition (No Setup Required)
+You don't even need to install it. Just fire up your terminal and run:
 
-## ✨ Features
+```bash
+# Run instantly (Zero Setup)
+npx fluxflow-cli
+
+# OR Install Globally
+npm install -g fluxflow-cli
+fluxflow-cli
+```
+
+*The agent will prompt you for your API Key on the first run and store it securely in an encrypted vault.*
 
 - **Multi-Provider Support**: Choose your preferred engine!
   - **Google GenAI**
@@ -36,77 +45,74 @@ Whether you need a conversational partner or an autonomous developer that can wr
   - **AIHubMix** (*Experimental*)
   - **OpenRouter** (*Experimental*)
 
-- **High-Fidelity IDE Companion**: Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
-  - **Surgical Diagnostic Sync**: The agent has "Red Squiggle Radar"—it proactively detects errors across your entire workspace and offers a "Magic Wand" fix button.
-  - **Live Status Heartbeat**: Real-time telemetry in the VS Code Status Bar shows exactly what the agent is doing (e.g., *Thinking...*, *Reading file.js...*, *Patching app.jsx...*).
-  - **Clickable Terminal Links**: All file paths and line numbers printed in the terminal are live links; click them to jump straight to that code in your IDE.
-  - **Selection-Driven Reasoning**: Select code and right-click -> "Chat with FluxFlow" to instantly focus the agent with full context.
-  - **Smart Context Awareness**: The agent knows your cursor position, active selection, and even errors in files you don't have open.
-  - **Universal Compatibility**: Works flawlessly with VS Code, Cursor, VSCodium, Trae, and Antigravity.
+---
 
-- **Native Multimodality**: Flux Flow can now see! Analyze images (JPG, PNG) and PDF documents natively through the `ReadFile` tool with high-fidelity context retention (Only on supported models).
-- **Document Engineering Suite**: Generate professional, branded PDF, DOCX documents on the fly. Features native HTML-to-Office translation for selectable text, high-performance rendering, and automatic watermarking.
-- **Codebase Time Travel (Git-less Reversion)**: Refactor and build with absolute fearlessness. Flux Flow maintains transaction-based secure snapshots of files before they are generated or edited:
-  - **Instant Rollback**: Revert your workspace files (source code, generated documents, images) to their exact state prior to any selected prompt in the history.
-  - **Double-ESC Shortcut**: Press `ESC` twice while idle to pop open a sleek selection modal.
-  - **`/revert` Command**: Run the `/revert` command directly in the chat to open the checkpoint viewer.
-- **External Data Sanctuary**: Redirect your logs, history, and memories to any external path for maximum portability and privacy.
-- **Responsive Terminal UI**: A gorgeous, reactive interface built with React and Ink, featuring multi-line input, status bars, modals, and diff views.
-- **Dual-Model Architecture**: A primary agent interacts with you and executes tasks, while a silent background "Janitor" model handles chat summarization and long-term memory extraction without blocking the main UI.
-- **Two Operating Modes**:
-  - **Flux (Dev Mode)**: Full system access. The agent can read/write files, execute shell commands, and run autonomous agentic loops, subagents, safety tools to solve complex coding tasks.
-  - **Flow (Chat Mode)**: Focused on conversation and web research, with limited agentic loops for faster response times.
-  - **Computer Use (GUI Automation)**: Agents can control computer GUI, with mouse and keyboard.
-  - **FluxCU/Omni (Automated Workflow Engine)**: Agents can control computer GUI for automated workflows and tasks, with mouse and keyboard.
-- **Advanced Memory System**: Features both temporary session context and persistent, cross-session user memories encrypted locally on your machine.
-- **Agentic Tooling**: Built-in tools for smart file patching, web scraping, web searching, terminal execution and high-fidelity Office document generation (PDF/DOCX).
-- **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `fluxflow.md` for high-fidelity coding standards and complex workflows.
-- **Customizable "Thinking" Levels**: Adjust the depth of the model's reasoning process (from Fast to xHigh).
-- **Autonomous Subagent System**: Spawns subagents in either blocking mode (`invokeSync`) or asynchronous mode (`invoke`) to offload tasks. Runs with a permanent suite of system tools (e.g. ReadFile, PatchFile, WebSearch). Telemetry is quietly tracked in the CLI's active subagents UI block and backed up in transaction-safe restoration records.
+## ✨ Why Flux Flow?
 
-## 🚀 Quick Start
+### 🎨 **Premium Visual Sovereignty**
+Experience a terminal UI that feels alive. Built with **Ink** and **React**, Flux Flow features:
+- **Dynamic Status Bar**: Real-time telemetry showing your "Neural Headroom" (token usage), Thinking Level, and Session ID.
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v22 or higher required)
-- `npm`, `yarn`, or `pnpm`
+### 🔌 **High-Fidelity IDE Companion**
+Flux Flow now pairs with a dedicated VS Code extension to bridge the gap between terminal and editor:
+- **Surgical Diagnostic Sync**: Proactive background scanning for errors. If your project breaks, a "Magic Wand" icon $(\text{sparkle})$ appears in your editor title bar for an instant AI fix.
+- **Live Status Heartbeat**: The VS Code Status Bar acts as a live feed, showing the agent's current task (*Thinking*, *Web Searching*, *Patching*, etc.).
+- **Clickable Terminal Links**: Jump from the terminal output straight to your code with clickable file:line links.
+- **Right-Click Integration**: "FluxFlow > Chat" is available in the editor, explorer, and tab bars, even when no files are open.
+- **Selection-Driven Reasoning**: Select a block of code and ask "What does this do?"—the agent receives your selection instantly.
+- **Universal Compatibility**: Works flawlessly with VS Code, Cursor, VSCodium, Trae, and Antigravity.
 
-### Via NPM (Global & Instant)
-You can run the agent instantly or install it globally for high-speed access:
+### 👁️ **Native Multimodality**
+Flux Flow can now see (supported models only)! Use the `view_file` tool to analyze images (JPG, PNG) or deep-dive into PDF technical papers. The agent extracts high-fidelity visual context natively, making it a true multimodal companion.
 
-```bash
-# Run instantly (Zero Setup)
-npx fluxflow-cli
+### 📑 **Document Engineering Suite**
+Need a report or a presentation? Just ask. Flux Flow features a high-fidelity "Printing Press" that generates professional, branded documents natively:
+- **PDF**: Branded documents from HTML/CSS with automatic watermarking.
+- **DOCX**: Native Word documents with multi-page support and automatic numbering.
 
-# OR Install Globally
-npm install -g fluxflow-cli
-fluxflow
-```
+### ⏱️ **Codebase Time Travel (Git-less Reversion)**
+Refactor and build with absolute fearlessness. Flux Flow maintains transaction-based secure snapshots of files before they are generated or edited:
+- **Instant Rollback**: Revert your workspace files (source code, generated documents, images) to their exact state prior to any selected prompt in the history.
+- **Double-ESC Shortcut**: Press `ESC` twice while idle to pop open a sleek selection modal.
+- **`/revert` Command**: Run the `/revert` command directly in the chat to open the checkpoint viewer.
 
-### From Source (Local Development)
-1. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/KushalRoyChowdhury/fluxflow-cli
-   cd fluxflow-cli
-   npm install
-   ```
+### 🚑 **Self-Healing Infrastructure**
+Zero setup means zero setup. On first run, Flux Flow performs an integrity check and autonomously installs its own Chromium engine if needed, ensuring features like PDF generation work 100% of the time without manual intervention.
 
-2. Start the agent:
-   ```bash
-   npm start
-   ```
+- **Archived Terminal Flow**: See execution outputs transform from live elements into permanent conversation records.
+- **Rich Aesthetics**: High-contrast, sleek design with smooth transitions and micro-animations.
 
-## 📖 Documentation
+### 🧠 **The Dual-Intelligence System**
+- **Flux Mode (Workspace)**: High-speed, agentic problem solving for massive coding tasks.
+- **Flow Mode (Creative Studio)**: Optimized for high-quality conversation and web-assisted reasoning.
+- **Computer Use (GUI Automation)**: Agents can control computer GUI, with mouse and keyboard.
+- **FluxCU/Omni (Autonomous Workflow Engine)**: Agents can control computer GUI for automated workflows and tasks, with mouse and keyboard.
 
-🌐 **Official Documentation**: [HERE](https://fluxflow-cli.onrender.com/)
+### 🛡️ **Digital Fortress Governance**
+Security isn't an afterthought; it's a boundary.
+- **Sandbox Presets**: Choose from **Strict**, **Balanced**, **Autonomous**, or **Custom** security profiles to control agent autonomy.
+- **Granular Command Policies**: Configure Auto-Approve (`Auto` / `Read-Only` / `None`), Auto-Disallow (`Auto` / `Destructive` / `None`), Network Access toggle, and Auto-Approve Git Commits independently.
+- **External Path Hardlock**: Restricts the agent to your Current Working Directory (CWD) unless you explicitly unlock it.
+- **Human-in-the-Loop (HITL)**: Every file write and terminal command requires your high-fidelity approval.
 
-To keep this README concise, detailed information about specific components of Flux Flow has been split into separate documents:
+### 🧹 **The Background Janitor**
+While you move at high speed, the Janitor follows behind—refining session titles, compressing data, and ensuring your context window remains at absolute peak performance.
 
-- **[Architecture & Design](./ARCHITECTURE.md)**: Deep dive into the React/Ink rendering, the Agentic Loop, and the Janitor background process.
-- **[Agent Tools & Capabilities](./TOOLS.md)**: A comprehensive list of the tools available to the agent (e.g., File I/O, Execution, Web tools).
-- **[UI & Interaction Features](./UI_FEATURES.md)**: Details on commands, thinking levels, and human-in-the-loop verification.
+### 🤖 **Autonomous Subagent System**
+Delegate complex tasks to subagents. Spawns blocking subagents (`invokeSync`) or asynchronous background subagents (`invoke`) with distinct telemetry and silent background logging. Built-in transaction-safe reversion logs all subagent changes under the active turn, preserving rollback security.
+
+---
+
+## 🛠️ Key Capabilities
+- **Deep File-System Interaction**: Edit, move, and refactor code across multiple files with atomic precision.
+- **Real-Time Web Intelligence**: Autonomous web-searching via DuckDuckGo for live news and technical research.
+- **Autonomous Project Alignment**: Automatically detects and adheres to project-specific instructions in `Agent.md`, `Skills.md`, and `Fluxflow.md` for high-fidelity alignment with your coding standards and custom workflows.
+
+- **Persistent Memory**: The agent learns from your preferences and project requirements across sessions.
+
+---
 
 ## 💻 CLI Startup Arguments
-
 Customize your session parameters directly from your console launch command:
 
 ```bash
@@ -122,30 +128,45 @@ fluxflow [options]
  - `--update <check | latest>`: Manually run an update check (`check`) or execute latest update setup (`latest`).
  - `--package <npm | pnpm | yarn | bun>`: Override default package manager to run core application updates.
  - `--auto-del <1d | 7d | 30d>`: Set automated chat log deletion schedule.
- - `--yolo <on | off>`: Toggle autonomous command execution permission.
+ - `--yolo <on | off>`: Toggle autonomous execution permission.
  - `--external-access <on | off>`: Toggle permission to let agent read files outside CWD.
- - `--thinking <Fast | Medium | High | xHigh>`: Override default thinking level.
- - `--key <key@google | key@deepseek | key@openrouter | key@nvidia | key@ollama/LOCAL | key@mistral >`: Set API key and provider.
- - `--provider <google | deepseek | openrouter | nvidia | ollama | mistral>`: Override default provider.
+ - `--thinking <Fast | Low | Medium/Standard | High | xHigh>`: Override thinking level for reasoning depth. `Medium` and `Standard` is the same (Deepseek compatibility).
+ - `--key <key@google | key@deepseek | key@openrouter>`: Set API key and provider.
+ - `--provider <google | deepseek | openrouter>`: Override default provider.
  - `--usage`: Launches the usage dashboard in your browser.
 
----
+----
 
-## 🔒 Security & Privacy
-
-Flux Flow runs entirely locally on your machine.
-- **Sandbox Presets**: Choose from **Strict**, **Balanced**, **Autonomous**, or **Custom** profiles to fine-tune agent autonomy out of the box.
-- **Granular Command Policies**: Configure Auto-Approve, Auto-Disallow, Network Access toggle, and Auto-Approve Git Commits independently.
-- **Global Storage**: All history, memories, and API keys are stored securely in your home directory at `~/.fluxflow`.
-- **Nuclear Reset**: Use the `/reset` command to instantly purge all logs, secrets, and settings from the global storage directory.
-- **Configurable Boundaries**: In Flux mode, file access can be strictly confined to the Current Working Directory, or expanded globally via settings.
-- **API Keys**: You supply your own API keys for your preferred provider: Google GenAI, DeepSeek, OpenRouter, Nvidia, Ollama, or Mistral.
-
-## 🛠️ Built With
-
-- **[React](https://react.dev/) & [Ink](https://github.com/vadimdemedes/ink)**: For the interactive CLI rendering.
-- **[chalk](https://www.npmjs.com/package/chalk) & [gradient-string](https://www.npmjs.com/package/gradient-string)**: For terminal styling and aesthetics.
-- **[fs-extra](https://www.npmjs.com/package/fs-extra)**: For robust file system operations.
+## ⚙️ Configuration
+Type `/settings` in-app to live-configure:
+- **Thinking Level**: Fast (No Reasoning), Low, Medium, High, xHigh (Extended Reasoning).
+- **Sandbox Preset**: Strict, Balanced, Autonomous, or Custom security profiles.
+- **Security Perimeter**: Toggle External Workspace access, Network Access, and Git Commit auto-approval.
 
 ---
-*Created as a demonstration of highly capable AI tooling.*
+
+## 🔧 Configurable Environment Variables
+Set these in your shell/session to override defaults:
+- `SUBAGENT_MODEL` — Subagent model override (e.g., `gemini-2.5-pro`)
+- `SUBAGENT_PROVIDER` — Subagent provider override (e.g., `google`, `deepseek`)
+- `NVIDIA_BASE_URL` — Custom NVIDIA endpoint URL
+- `NVIDIA_API_KEY` — NVIDIA API key (used when `NVIDIA_BASE_URL` is set)
+- `OLLAMA_HOST` — Ollama endpoint (default: `http://127.0.0.1:11434`)
+- `SHELL` — Preferred shell for command execution (default: `bash`)
+- `HIGH_CONTEXT` — Context window override (`false` or integer `32000` to `1000000`)
+- `SHOW_DEBUG_GRID` - true|false, default: false
+- `DEBUG_OCR` - true|false, default: false
+- `NO_DEV` - true|false, default: false
+- `EXPERIMENTAL_MEMORY_MANAGER` - true|false, default: false
+- `I_HAVE_TOO_MUCH_MONEY` - true|false, default: false, F's up the cache-hit ratio
+- `GOOGLE_GEMMA_NONSENSE` - true|false, default: false, for the 16k TPM limit in gemma models on gemini API. False defaults to 256k
+- `ENABLE_9ROUTER` - true|false, default: false
+- `9ROUTER_BASE_URL` - 9Router base URL
+
+---
+
+## 🏁 License
+MIT © 2026 Flux Flow.
+
+---
+*Forged with ⚡ and 🧬. Welcome to the FluxFlow.*

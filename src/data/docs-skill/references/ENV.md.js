@@ -13,7 +13,7 @@ export const ENV_MD = `# Env Variables
 * NVIDIA_API_KEY → API key for NVIDIA NIM
 * OLLAMA_HOST → Custom Ollama endpoint (default: http://127.0.0.1:11434)
 * SHELL → Terminal shell executable
-* HIGH_CONTEXT → Context window override (false or integer 32k..1M)
+* HIGH_CONTEXT → Context window override (false or integer 32k..1M) [Deprecated! Will stop working from next major version]
 * ENABLE_9ROUTER → Enables 9Router provider. Can use OAuth subscription like Codex, Claude Code, GitHub Copilot etc. or use providers not natively in Fluxflow. Set ENV ENABLE_9ROUTER=true, needs 9router package installed (via npm/npx etc) & running
 * 9ROUTER_BASE_URL → 9Router base URL
 

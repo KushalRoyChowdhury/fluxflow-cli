@@ -87,7 +87,7 @@ Documentation: https://fluxflow-cli.onrender.com
 ## Supported Features & Documentation References
 * Operating Modes (Flux, Flow, CU, FluxCU) → references/MODES.md
 * Inference Providers & Aggregators (Setup, Local NIM, Ollama) → references/PROVIDERS.md
-* In-App Settings (/settings) → references/SETTINGS.md
+* In-App Settings (/settings) & Recommended Presets → references/SETTINGS.md
 * In-app /commands → references/COMMANDS.md
 * CLI Startup Flags → references/STARTUP.md
 * Environment Variables → references/ENV.md
@@ -98,7 +98,7 @@ Documentation: https://fluxflow-cli.onrender.com
 * Priority Instructions (AGENTS.md/FLUXFLOW.md) & Skill System → references/PLUGINS.md
 * Agent Architecture & Memory System → references/ARCHITECTURE.md
 
-Default Context Length: 256k Tokens. Can be changed via ENV
+Default Context Length: 256k Tokens. Can be changed via ENV/In-app Settings
 
 Docs missing required info? Say you are not sure enough to answer. Dont give wrong info`,
 

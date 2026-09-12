@@ -1750,42 +1750,41 @@ export const getAIStream = async function* (modelName, history, settings, steeri
             return { ...msg };
         });
 
-        // Truncation & Condensation Logic (Compression 0.0)
+        // Truncation & Context Limits
         const hc = process.env.HIGH_CONTEXT;
         const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
-        let contextCompressionCount = 255000;
-        let contextTruncationCount = 260000;
+
+        const CONTEXT_MAP = {
+            '16k': 16000,
+            '32k': 32000,
+            '64k': 64000,
+            '128k': 128000,
+            '256k': 256000,
+            '512k': 512000,
+            '1M': 1000000
+        };
+        const settingContext = CONTEXT_MAP[systemSettings?.contextLength] || 256000;
+        let contextTruncationCount = settingContext;
+
         if (hc && hc !== 'false') {
             const val = parseInt(hc, 10);
             if (!isNaN(val) && val >= 0 && val <= 1000000) {
                 contextTruncationCount = val;
-                contextCompressionCount = Math.round(val * 0.85);
             }
         }
 
         // ~128k fixed cap for limited-context models; all others use ~256k default (set above),
         // with HIGH_CONTEXT optionally extending beyond 256k.
         if ((aiProvider === 'NVIDIA' && (modelName?.includes('gpt') || modelName?.includes('qwen') || modelName?.includes('medium') || modelName.includes('muse'))) || aiProvider === 'Mistral') {
-            contextCompressionCount = 122000;
             contextTruncationCount = 126000;
         }
         if (aiProvider === 'Google' && modelName?.includes('gemma') && gemma_nonsense) {
-            contextCompressionCount = 14000;
             contextTruncationCount = 16000;
         }
 
-        if ((aiProvider === 'Ollama' || aiProvider === '9router' || aiProvider === '9Router' || aiProvider === 'ExpLabs' || aiProvider === 'ExperientialLabs') && (sessionStats?.tokens || 0) > contextCompressionCount) {
+        if ((sessionStats?.tokens || 0) > contextTruncationCount) {
             yield { type: 'text', content: '✦ Maximum Context Limit Reached. Start a new chat.' };
             return;
-        }
-
-        if (aiProvider !== 'Ollama' && aiProvider !== '9router' && aiProvider !== '9Router' && aiProvider !== 'ExpLabs' && aiProvider !== 'ExperientialLabs' && (sessionStats?.tokens || 0) > contextCompressionCount) {
-            yield { type: 'status_history', content: 'Context Limit Reached. Condensing session history...' };
-            const newSummary = await compressHistory(settings, modifiedHistory, true);
-            if (newSummary) {
-                modifiedHistory = [];
-                wasCompressedInStream = true;
-            }
         }
 
 
@@ -2290,7 +2289,30 @@ export const getAIStream = async function* (modelName, history, settings, steeri
 
         const isForceReasoning = process.env.forcedReasoning || false;
 
-        const firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${(thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google'))) ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}` : ''}[system] exact tool string [tool:functions.ToolName(arg="value")] in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+        const thinkingPolicyBlock = (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || (thinkingLevel !== 'xHigh' && aiProvider === 'Google')))
+            ? `${((aiProvider === 'Mistral' && !hasModelReasoning(modelName)) || modelName.toLowerCase().startsWith('gemma') || isForceReasoning) ? "[system] strictly follow thinking policy as high priority. do not start a response without <think>...</think> [/system]\n" : ""}`
+            : '';
+
+        let firstUserMsg = '';
+        const shouldCheckExclude = !!systemSettings?.autoExcludeMetadata;
+        const hasMovingParts = Boolean(
+            ideBlock ||
+            taggedContextStr ||
+            wildcardToolingPrompt ||
+            activeSummaryBlock ||
+            memoryPrompt ||
+            thinkingPolicyBlock ||
+            cwdMismatch ||
+            systemSettings?.dynamicDirAwareness ||
+            systemSettings?.autoTruncateResults ||
+            isMemoryEnabled
+        );
+
+        if (shouldCheckExclude && !hasMovingParts) {
+            firstUserMsg = cleanPromptForModel.trim();
+        } else {
+            firstUserMsg = `[System Metadata]\nTime: ${dateTimeStr}${systemSettings?.dynamicDirAwareness ? dirStructure : ''}${cwdMismatch ? `\nWARNING: CWD Changed from previous: "${lastCwd}" to current: "${process.cwd()}", write change in chat to avoid future path mismatches\n` : ''}${memoryPrompt}${ideBlock}\n[/Metadata]\n${activeSummaryBlock}${thinkingPolicyBlock}[system] exact tool string [tool:functions.ToolName(arg="value")] in chat [/system]\n${taggedContextStr}${wildcardToolingPrompt}[user prompt] ${cleanPromptForModel.trim()} [/user prompt]`.trim();
+        }
 
         const userMsgObj = { role: 'user', text: firstUserMsg };
         if (attachedBinaryPart) {
@@ -2493,8 +2515,6 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     const stripToolCallWrappers = (text) => {
                         // Just adding safe comment to return instantly without any processing if needed in future
                         // return text;
-
-
                         if (!text || !text.includes('[tool:')) return text;
 
                         // 1. Cut the entire leading thought block as-is (protecting any inner XML/HTML tags and backticks)
@@ -2556,8 +2576,8 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                             i = endToolIdx + 1;
                         }
 
-                        // 2. Paste the intact leading thought block back in front
-                        return leadingThink + result;
+                        // 2. Paste the intact leading thought block back in front if keepReasoningContext is enabled
+                        return (systemSettings?.keepReasoningContext ? leadingThink : '') + result;
                     };
 
                     const contents = modifiedHistory
@@ -2684,7 +2704,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                     */
 
                     // [SYSTEM INSTRUCTION CACHING]
-                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}`;
+                    const sysInstructionCacheKey = `${chatId}|${aiProvider}|${mode}|${thinkingLevel}|${targetModel}|${JSON.stringify(profile)}|${!!systemSettings?.dynamicDirAwareness}|${!!systemSettings?.subAgents}|${!!systemSettings?.keepReasoningContext}`;
                     let isCacheHit = systemInstructionCache.key === sysInstructionCacheKey && systemInstructionCache.value;
                     const userHasWAYYTOOMuchMoney_GoodLuck = process.env.I_HAVE_TOO_MUCH_MONEY === "true" || process.env.I_HAVE_TOO_MUCH_MONEY === true || false;
                     if (userHasWAYYTOOMuchMoney_GoodLuck) {
@@ -2694,7 +2714,7 @@ export const getAIStream = async function* (modelName, history, settings, steeri
                         currentSystemInstruction = systemInstructionCache.value;
                     } else {
                         const isGeminiOrReasoning = aiProvider === 'Mistral' ? (hasModelReasoning(targetModel) ? true : false) : (!(targetModel || "gemma").toLowerCase().startsWith('gemma') ? true : false);
-                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId);
+                        currentSystemInstruction = getSystemInstruction(profile, !(targetModel || "gemma").toLowerCase().startsWith('gemma') ? thinkingLevel : thinkingLevel, mode, systemSettings, isMemoryEnabled, isFirstPrompt, aiProvider, aiProvider === 'Google' ? true : isMultiModal, isGeminiOrReasoning, chatId, !!systemSettings?.keepReasoningContext);
 
                         if (!systemSettings?.dynamicDirAwareness) {
                             currentSystemInstruction += `\n${dirStructure.replace('\n**Directory Structure**', '\n-- Directory Structure --')}`;

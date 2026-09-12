@@ -35,7 +35,8 @@ import { getDailyUsage, getMonthlyUsage, getCustomPeriodUsage, addToUsage, initU
 import { loadRemoteModelConfig, getModels, getDefaultModel, getFallbackValue, setCustomMultimodal, setOllamaMultimodal, isModelMultimodal } from './data/model_config.js';
 import { TerminalBox } from './components/TerminalBox.jsx';
 import { parseArgs } from './utils/arg_parser.js';
-import { FLUXFLOW_DIR, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
+import { readEncryptedJson } from './utils/crypto.js';
+import { FLUXFLOW_DIR, MEMORIES_FILE, DATA_DIR, LOGS_DIR, SECRET_DIR, SETTINGS_FILE } from './utils/paths.js';
 import { emojiSpace, getFluxLogo } from './utils/terminal.js';
 import { writeToActiveCommand, terminateActiveCommand, isActiveCommandPty, cleanTerminalOutput } from './tools/exec_command.js';
 import { checkPuppeteerReady, installPuppeteerBrowser } from './utils/setup.js';
@@ -2722,7 +2723,12 @@ export default function App({ args = [] }) {
         { cmd: '/key', desc: 'Manage API keys' },
         { cmd: '/files', desc: 'List loaded instruction and skill files' },
         { cmd: '/profile', desc: 'Edit developer persona' },
-        { cmd: '/memory', desc: 'Manage agent memory' },
+        {
+            cmd: '/memory', desc: 'Manage agent memory', subs: [
+                { cmd: 'view', desc: 'View and manage agent persistent memory' },
+                { cmd: 'migrate', desc: 'Migrate persistent memories to AGENTS.md' }
+            ]
+        },
         { cmd: '/stats', desc: 'Show session usage' },
         { cmd: '/usage', desc: 'Open graphical token usage & analytics dashboard in browser' },
         { cmd: '/reset', desc: 'Wipe all project data' },
@@ -3443,7 +3449,61 @@ export default function App({ args = [] }) {
                     break;
                 }
                 case '/memory': {
-                    setActiveView('memory');
+                    const sub = (parts[1] || 'view').toLowerCase();
+                    if (sub === 'migrate') {
+                        try {
+                            const memories = readEncryptedJson(MEMORIES_FILE, []);
+                            if (!memories || memories.length === 0) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ Memory Migration\n⠀⠀\x1b[2m└─\x1b[22m No persistent memories found in memories.json to migrate.\n⠀`, isMeta: true }];
+                                });
+                                break;
+                            }
+
+                            const formattedMemories = memories.map(m => {
+                                const clean = (m.memory || '').replace(/\[Saved on: .*?\]/g, '').replace(/\\+'/g, "'").trim();
+                                return `- ${clean}`;
+                            }).filter(m => m !== '- ').join('\n');
+
+                            if (!formattedMemories) {
+                                setMessages(prev => {
+                                    setCompletedIndex(prev.length + 1);
+                                    return [...prev, { id: Date.now(), role: 'system', text: `✦ Memory Migration\n⠀⠀\x1b[2m└─\x1b[22m No valid memory entries found to migrate.\n⠀`, isMeta: true }];
+                                });
+                                break;
+                            }
+
+                            if (!fs.existsSync(FLUXFLOW_DIR)) {
+                                fs.mkdirSync(FLUXFLOW_DIR, { recursive: true });
+                            }
+
+                            const agentsMdPath = path.join(FLUXFLOW_DIR, 'AGENTS.md');
+                            let currentContent = '';
+                            if (fs.existsSync(agentsMdPath)) {
+                                currentContent = fs.readFileSync(agentsMdPath, 'utf8');
+                            }
+
+                            const trimmed = currentContent.trimEnd();
+                            const separator = trimmed.length > 0 ? '\n\n' : '';
+                            const appendBlock = `${separator}User Memories:\n${formattedMemories}\n`;
+                            const newContent = `${trimmed}${appendBlock}`;
+
+                            fs.writeFileSync(agentsMdPath, newContent, 'utf8');
+
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Memory Migration\n⠀⠀\x1b[2m└─\x1b[22m Successfully migrated ${memories.length} memories to ${agentsMdPath.replaceAll('\\\\', '/').replaceAll('\\', '/')}\n⠀`, isMeta: true }];
+                            });
+                        } catch (err) {
+                            setMessages(prev => {
+                                setCompletedIndex(prev.length + 1);
+                                return [...prev, { id: Date.now(), role: 'system', text: `✦ Memory Migration Failed\n⠀⠀\x1b[2m└─\x1b[22m Error: ${err.message}\n⠀`, isMeta: true }];
+                            });
+                        }
+                    } else {
+                        setActiveView('memory');
+                    }
                     break;
                 }
                 case '/files': {
@@ -5869,17 +5929,26 @@ export default function App({ args = [] }) {
                                             <Text color={colors.text}>
                                                 {formatTokens(sessionStats.tokens)}{' '}
                                                 {(() => {
-                                                    let maxLimit = 262144;
+                                                    const CONTEXT_MAP = {
+                                                        '16k': 16000,
+                                                        '32k': 32000,
+                                                        '64k': 64000,
+                                                        '128k': 128000,
+                                                        '256k': 256000,
+                                                        '512k': 512000,
+                                                        '1M': 1000000
+                                                    };
+                                                    let maxLimit = CONTEXT_MAP[systemSettings?.contextLength] || 256000;
                                                     const hc = process.env.HIGH_CONTEXT;
                                                     const gemma_nonsense = process.env.GOOGLE_GEMMA_NONSENSE === 'true' || process.env.GOOGLE_GEMMA_NONSENSE === true || false;
                                                     if (hc && hc !== 'false') {
                                                         const val = parseInt(hc, 10);
-                                                        if (!isNaN(val) && val >= 32000 && val <= 1000000) {
+                                                        if (!isNaN(val) && val >= 0 && val <= 1000000) {
                                                             maxLimit = val;
                                                         }
                                                     }
                                                     if ((aiProvider === 'NVIDIA' && (activeModel?.includes('gpt') || activeModel?.includes('qwen') || activeModel?.includes('medium') || activeModel.includes('muse'))) || aiProvider === 'Mistral') {
-                                                        maxLimit = 128000;
+                                                        maxLimit = 126000;
                                                     }
                                                     if (aiProvider === 'Google' && activeModel?.includes('gemma') && gemma_nonsense) {
                                                         maxLimit = 16000;

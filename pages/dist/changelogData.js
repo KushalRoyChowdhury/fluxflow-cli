@@ -1,6 +1,20 @@
 export const stableVersions = ["999.999.999"]
 
 export const changelogData = {
+    "4.12.0": {
+        "note": "SEPTEMBER 12",
+        "added": [
+            "Added a easier way to select max context length in `/settings → Miscellaneous`.",
+            "Added new setting `Auto-Exclude Metadata`. Removes Metadata Block when no external Metadata is needed. Will effect agent's Temporal Reasoning Capabilities. Might save Cache Hit & Tokens in specific cases.",
+            "Added new setting `Keep Reasoning Content`. Keeps the exact reasoning of model in context for next turns. Uses more tokens. Might improve planning accuracy for very few models."
+        ],
+        "changed": [
+            "Depricated `Memory` & Legacy `/memory`. Will stop working in next major version. Recomended to use `/memory migrate`. New workflow for legacy 'persistent memory' will be to use Global `AGENTS.md` and write the preferences there.",
+            "Deprecated `HIGH_CONTEXT` env flag. Will stop working in next major version.",
+            "Deprecated Auto-Chat Compaction. Use manual `/compress` when needed. **Compression will be removed entirely in next major version**. Use `/truncate` or `Auto-Truncation` to maximize chat length."
+        ],
+        "fixes": []
+    },
     "4.11.0": {
         "note": "SEPTEMBER 11",
         "added": [

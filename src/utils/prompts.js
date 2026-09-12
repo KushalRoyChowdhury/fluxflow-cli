@@ -289,7 +289,7 @@ export const getMemoryPrompt = (tempMemories = '', userMemories = '', isMemoryEn
     return tempMemoriesStr ? `${tempMemoriesStr}` : '';
 };
 
-export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId) => {
+export const getSystemInstruction = (profile, thinkingLevel, mode, systemSettings, isMemoryEnabled = true, isFirstPrompt = false, aiProvider = 'Google', isMultiModal = false, isGemini, chatId, keepReasoningContext = false) => {
     // console.log(systemSettings)
 
     let forcedReasoning = false;
@@ -377,7 +377,7 @@ mode === "ICU" ? "Computer Use Capabilities. Screenshot as ground truth, analyze
 -- THINKING GUIDANCE --
 ${(aiProvider === 'Mistral' || (aiProvider === 'Google' && !isGemini)) ? `${thinkingConfig}
 ${forcedReasoning || (thinkingLevel !== 'Fast' && ((aiProvider === 'Mistral' && !isGemini) || (thinkingLevel !== 'xHigh' && !isGemini))) ? `critical thinking policy
-Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}Before calling tools: Summarize your reasoning briefly, including plans, and decisions\nNo text after tool call in same turn\n
+Use <think>...</think> for reasoning before responding any queries\n` : ''}` : `${thinkingConfig}\n`}${!keepReasoningContext ? 'Mandatory: Before calling tools, MUST provide a high level overview of your reasoning, plans, decisions, and next course of actions in chat\n' : ''}No text after tool call in same turn\n
 ${TOOL_PROTOCOL(mode, osDetected, isMultiModal, aiProvider, systemSettings?.advanceRollback, systemSettings?.subAgents !== false, !!systemSettings?.autoExec)}${isMemoryEnabled ? `\n\n-- MEMORY RULES --
 - Subtly Personalize with relevent contextual memories. Auto Saves\n` : ''}${mode === 'Flux' ? '' : mode.toLowerCase().includes('cu') ? '\n\n-- SECURITY POLICIES --\n- Dont operate on ANY confidential screens\n' : ''}${mode === 'Flow' ? '\n\n-- CHAT FORMATTING --\n- use kaomojis heavily' : ''}
 === END SYSTEM PROMPT ===

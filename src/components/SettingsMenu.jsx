@@ -292,7 +292,7 @@ export default function SettingsMenu({
                 ];
             case 'memory':
                 return [
-                    { label: 'Toggle Memory', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
+                    { label: 'Toggle Memory [Legacy]', value: 'memory', status: systemSettings.memory ? 'ON' : 'OFF' }
                 ];
             case 'security':
                 const activePreset = getActivePreset(systemSettings);
@@ -324,6 +324,9 @@ export default function SettingsMenu({
                     { label: 'Compact Large Tool Results', value: 'compressToolResults', status: systemSettings.compressToolResults ? 'ON' : 'OFF' },
                     { label: 'Auto Truncate Results', value: 'autoTruncateResults', status: systemSettings.autoTruncateResults ? 'ON' : 'OFF' },
                     { label: 'Image History for CU', value: 'imageHistoryCU', status: systemSettings.imageHistoryCU || 'Standard' },
+                    { label: 'Context Length', value: 'contextLength', status: systemSettings.contextLength || '256k' },
+                    { label: 'Keep Reasoning Context', value: 'keepReasoningContext', status: systemSettings.keepReasoningContext ? 'ON' : 'OFF' },
+                    { label: 'Auto Exclude Metadata', value: 'autoExcludeMetadata', status: systemSettings.autoExcludeMetadata ? 'ON' : 'OFF' },
                     // { label: 'Download Language Parsers', value: 'parserDownload', status: 'ACTION' } // Dont remove this comment
                 ];
             default:
@@ -613,6 +616,27 @@ export default function SettingsMenu({
             const nextIndex = (currentIndex + 1) % options.length;
             setSystemSettings(s => {
                 const newSysSettings = { ...s, imageHistoryCU: options[nextIndex] };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'contextLength') {
+            const options = ['16k', '32k', '64k', '128k', '256k', '512k', '1M'];
+            const currentIndex = options.indexOf(systemSettings.contextLength || '256k');
+            const nextIndex = (currentIndex + 1) % options.length;
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, contextLength: options[nextIndex] };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'keepReasoningContext') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, keepReasoningContext: !s.keepReasoningContext };
+                saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
+                return newSysSettings;
+            });
+        } else if (item.value === 'autoExcludeMetadata') {
+            setSystemSettings(s => {
+                const newSysSettings = { ...s, autoExcludeMetadata: !s.autoExcludeMetadata };
                 saveSettings({ systemSettings: newSysSettings, apiTier, quotas });
                 return newSysSettings;
             });
